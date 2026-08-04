@@ -1,0 +1,54 @@
+# =====================================================================
+#  fitcarnet — Caddyfile
+#  FrankenPHP sert l'API Symfony sous /api et le front React ailleurs.
+#  Le HTTPS public est assuré par ton proxy inversé DSM : on écoute en HTTP.
+# =====================================================================
+{
+	frankenphp
+	auto_https off
+	# décommente pour activer le mode worker (perf x3, à valider en usage) :
+	# frankenphp {
+	#     worker ./public/index.php 2
+	# }
+}
+
+:80 {
+	log {
+		output stderr
+		format console
+	}
+
+	encode zstd gzip
+
+	# ---------- API Symfony ----------
+	handle /api* {
+		root * /app/public
+		php_server
+	}
+
+	# ---------- assets des bundles (interface API Platform, profiler…) ----------
+	handle /bundles/* {
+		root * /app/public
+		file_server
+	}
+	handle /_profiler* {
+		root * /app/public
+		php_server
+	}
+	handle /_wdt* {
+		root * /app/public
+		php_server
+	}
+
+	# ---------- front React ----------
+	handle {
+		root * /app/front
+		# assets versionnés : cache long
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		# index.html : jamais mis en cache, sinon les mises à jour ne passent pas
+		header /index.html Cache-Control "no-store"
+		try_files {path} /index.html
+		file_server
+	}
+}

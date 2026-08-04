@@ -1,0 +1,26 @@
+# ---------- dépendances : jamais versionnées ----------
+node_modules/
+vendor/
+
+# ---------- artefacts de build ----------
+dist/
+build/
+/api/var/
+/front/.expo/
+
+# ---------- secrets et configuration locale ----------
+.env
+.env.local
+.env.*.local
+stack.env
+/api/config/jwt/*.pem
+
+# ---------- IDE ----------
+.idea/
+.vscode/
+*.iml
+
+# ---------- divers ----------
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,21 @@
+parameters:
+    off_user_agent: '%env(default::OFF_USER_AGENT)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    # Garde-fou : restreint toute collection « ProprieteUtilisateur »
+    # a l'utilisateur connecte.
+    App\Doctrine\FiltreProprietaire:
+        tags:
+            - { name: api_platform.doctrine.orm.query_extension.collection, priority: 100 }
+            - { name: api_platform.doctrine.orm.query_extension.item, priority: 100 }

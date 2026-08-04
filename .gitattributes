@@ -1,0 +1,57 @@
+# =====================================================================
+#  fitcarnet — normalisation des fins de ligne
+#
+#  Git stocke tout en LF dans le dépôt et restitue le format natif de
+#  chaque poste. Plus aucun diff parasite entre Windows, WSL et le NAS.
+# =====================================================================
+
+# Par défaut : Git détecte le texte et normalise en LF dans le dépôt
+* text=auto eol=lf
+
+# ---------- sources ----------
+*.php       text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.sql       text eol=lf
+*.html      text eol=lf
+*.css       text eol=lf
+*.md        text eol=lf
+*.xml       text eol=lf
+*.twig      text eol=lf
+*.env       text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+
+# ---------- fichiers qui DOIVENT rester en LF ----------
+# Un script shell ou un Dockerfile en CRLF casse à l'exécution sous Linux.
+*.sh        text eol=lf
+Dockerfile* text eol=lf
+Caddyfile   text eol=lf
+*.conf      text eol=lf
+bin/*       text eol=lf
+
+# ---------- fichiers Windows ----------
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# ---------- binaires : jamais touchés ----------
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.pdf       binary
+*.zip       binary
+*.gz        binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.mp4       binary
+*.pem       binary

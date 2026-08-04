@@ -1,0 +1,28 @@
+api_platform:
+    title: fitcarnet
+    version: 1.0.0
+    description: >
+        Séances de musculation, stock d'ingrédients et calcul de repas.
+        Chaque utilisateur ne voit que ses propres données ; les référentiels
+        (aliments, exercices) sont communs.
+
+    formats:
+        jsonld: ['application/ld+json']
+        json:   ['application/json']
+
+    docs_formats:
+        jsonld: ['application/ld+json']
+        jsonopenapi: ['application/vnd.openapi+json']
+        html: ['text/html']
+
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']
+        pagination_client_items_per_page: true
+
+    swagger:
+        api_keys:
+            JWT:
+                name: Authorization
+                type: header

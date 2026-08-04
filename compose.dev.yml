@@ -1,0 +1,58 @@
+# =====================================================================
+#  fitcarnet — environnement de DÉVELOPPEMENT (WSL2 / PhpStorm)
+#  Lancer depuis la racine du dépôt :  docker compose -f compose.dev.yml up -d
+#  Chemins RELATIFS : le dépôt est cloné où tu veux dans WSL.
+# =====================================================================
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: fitcarnet-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fitcarnet
+      POSTGRES_USER: fitcarnet
+      POSTGRES_PASSWORD: fitcarnet          # local uniquement, jamais en prod
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitcarnet -d fitcarnet"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"                          # pour PhpStorm → Database
+
+  app:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+      target: dev
+    user: "1000:1000"
+    container_name: fitcarnet-app-dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SERVER_NAME: ":80"
+      APP_ENV: dev
+      APP_SECRET: dev_secret_local_seulement
+      DATABASE_URL: "postgresql://fitcarnet:fitcarnet@db:5432/fitcarnet?serverVersion=16&charset=utf8"
+      JWT_PASSPHRASE: dev_passphrase_locale
+      CORS_ALLOW_ORIGIN: '^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$$'
+      OFF_USER_AGENT: "fitcarnet-dev/1.0 (contact@mickael-pol.fr)"
+      TZ: Europe/Paris
+      # indispensable pour que PhpStorm reconnaisse le serveur Xdebug
+      PHP_IDE_CONFIG: "serverName=fitcarnet"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # WSL2 : permet à Xdebug de joindre PhpStorm
+    ports:
+      - "8080:80"
+    volumes:
+      - ./api:/app
+      - ./docker/Caddyfile:/etc/frankenphp/Caddyfile:ro
+
+volumes:
+  pgdata_dev:

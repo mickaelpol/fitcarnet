@@ -1,0 +1,56 @@
+services:
+
+  fitcarnet-db:
+    image: postgres:16-alpine
+    container_name: fitcarnet-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fitcarnet
+      POSTGRES_USER: fitcarnet
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?definis DB_PASSWORD dans les variables de la stack}
+    volumes:
+      - /volume1/docker/fitcarnet/pgdata:/var/lib/postgresql/data
+      # joues UNE SEULE FOIS, a la creation de la base
+      - /volume1/docker/fitcarnet/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitcarnet -d fitcarnet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # utile pour tes outils d'admin ; retire-le si tu n'en as pas besoin
+    ports:
+      - "5433:5432"
+
+  # FrankenPHP : un seul service pour l'API Symfony ET le front React
+  fitcarnet-app:
+    build:
+      context: /volume1/docker/fitcarnet/docker
+      dockerfile: Dockerfile
+      target: prod                     # passe a "dev" pour le rechargement a chaud
+    container_name: fitcarnet-app
+    restart: unless-stopped
+    depends_on:
+      fitcarnet-db:
+        condition: service_healthy
+    environment:
+      SERVER_NAME: ":80"
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET:?definis APP_SECRET dans les variables de la stack}
+      DATABASE_URL: "postgresql://fitcarnet:${DB_PASSWORD}@fitcarnet-db:5432/fitcarnet?serverVersion=16&charset=utf8"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?definis JWT_PASSPHRASE dans les variables de la stack}
+      CORS_ALLOW_ORIGIN: '^https?://(fitcarnet\.mickael-pol\.fr|localhost:5173)$$'
+      # Open Food Facts demande un User-Agent identifiant l'application
+      OFF_USER_AGENT: "fitcarnet/1.0 (contact@mickael-pol.fr)"
+      TZ: Europe/Paris
+    ports:
+      - "8094:80"
+    volumes:
+      - /volume1/docker/fitcarnet/api:/app                       # code Symfony
+      - /volume1/docker/fitcarnet/front/dist:/app/front:ro       # build React
+      - /volume1/docker/fitcarnet/docker/Caddyfile:/etc/frankenphp/Caddyfile:ro
+      - fitcarnet_caddy_data:/data
+      - fitcarnet_caddy_config:/config
+
+volumes:
+  fitcarnet_caddy_data:
+  fitcarnet_caddy_config:
