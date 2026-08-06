@@ -1,9 +1,16 @@
 -- =====================================================================
 --  fitcarnet — objectifs macro par repas
 --
---  Adapte l'adresse e-mail et les valeurs, puis exécute :
+--  CE FICHIER N'EST PAS JOUÉ AU DÉMARRAGE.
+--
+--  Il vit dans db/manuel/ précisément pour cela : le dossier db/ est monté
+--  dans docker-entrypoint-initdb.d, où PostgreSQL exécute TOUT fichier .sql
+--  à la création de la base. Or ces objectifs supposent un compte existant,
+--  qui n'est créé qu'ensuite.
+--
+--  Adapte l'adresse ci-dessous, puis exécute :
 --    docker compose -f compose.dev.yml exec -T db \
---      psql -U fitcarnet -d fitcarnet < db/03-cibles.sql
+--      psql -U fitcarnet -d fitcarnet < db/manuel/cibles.sql
 --
 --  Idempotent : relancer le script met à jour les valeurs existantes.
 -- =====================================================================
@@ -11,7 +18,7 @@
 DO $$
 DECLARE
     v_utilisateur UUID;
-    v_email       TEXT := 'mickael@mickael-pol.fr';   -- <<< à adapter
+    v_email       TEXT := 'polmickael3@gmail.com';   -- <<< à adapter
 BEGIN
     SELECT id INTO v_utilisateur FROM utilisateur WHERE lower(email) = lower(v_email);
 
