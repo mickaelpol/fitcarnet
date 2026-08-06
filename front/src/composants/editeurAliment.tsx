@@ -1,0 +1,355 @@
+import { useEffect, useState } from 'react';
+import {
+  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View,
+} from 'react-native';
+import { Bouton, Champ, Discret, Texte } from './base';
+import {
+  CATEGORIES, RATIOS_GUIDES, controler, etatParDefaut, expliquerRatio,
+  provenanceRatio, ratioDepuisPesees, ratioVraisemblable,
+} from '@/calcul/nutrition';
+import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
+
+export interface AlimentSaisi {
+  id?: number;
+  nom: string;
+  categorie: string;
+  kcal100: number;
+  prot100: number;
+  gluc100: number;
+  lip100: number;
+  fibres100: number | null;
+  ratio: number;
+  etatReference: 'cru' | 'cuit';
+  /** pesées ayant servi à mesurer le ratio ; absentes s'il vient d'une liste */
+  peseeAvant?: number | null;
+  peseeApres?: number | null;
+}
+
+const vide: AlimentSaisi = {
+  nom: '', categorie: 'prot', kcal100: 0, prot100: 0, gluc100: 0,
+  lip100: 0, fibres100: null, ratio: 1, etatReference: 'cru',
+  peseeAvant: null, peseeApres: null,
+};
+
+/**
+ * Saisie d'un aliment et de ses valeurs nutritionnelles.
+ *
+ * Volontairement manuelle : entre deux marques de skyr, les macros varient
+ * assez pour fausser une diète. L'emballage de l'utilisateur fait foi,
+ * mieux qu'une base contributive.
+ */
+export function EditeurAliment({
+  visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours,
+}: {
+  visible: boolean;
+  aliment?: AlimentSaisi;
+  titre?: string;
+  onEnregistrer: (a: AlimentSaisi) => void;
+  onFermer: () => void;
+  enCours?: boolean;
+}) {
+  const [a, setA] = useState<AlimentSaisi>(aliment ?? vide);
+  const [mesurer, setMesurer] = useState(false);
+  const [avant, setAvant] = useState('');
+  const [apres, setApres] = useState('');
+  const [etatTouche, setEtatTouche] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      const depart = aliment ?? vide;
+      setA(depart);
+      setMesurer(false);
+      // une mesure antérieure se retrouve, pour la vérifier ou la refaire
+      setAvant(depart.peseeAvant ? String(depart.peseeAvant) : '');
+      setApres(depart.peseeApres ? String(depart.peseeApres) : '');
+      setEtatTouche(false);
+    }
+  }, [visible, aliment]);
+
+  const maj = (champs: Partial<AlimentSaisi>) => setA({ ...a, ...champs });
+
+  /* L'état de référence suit la catégorie tant que l'utilisateur n'y a pas
+     touché : sur un emballage, les valeurs sont celles du produit tel que
+     vendu — sec pour le riz, cru pour la viande. */
+  const changerCategorie = (categorie: string) =>
+    maj(etatTouche ? { categorie } : { categorie, etatReference: etatParDefaut(categorie) });
+
+  const controle = controler({
+    kcal: a.kcal100, prot: a.prot100, gluc: a.gluc100,
+    lip: a.lip100, fibres: a.fibres100,
+  });
+
+  const ratioMesure = ratioDepuisPesees(
+    parseFloat(avant.replace(',', '.')), parseFloat(apres.replace(',', '.')));
+
+  const valide = a.nom.trim() !== ''
+    && a.kcal100 > 0
+    && ratioVraisemblable(a.ratio)
+    && controle.verdict !== 'incoherent';
+
+  const nombre = (v: string) => {
+    const x = parseFloat(v.replace(',', '.'));
+
+    return Number.isNaN(x) ? 0 : x;
+  };
+
+  const couleurVerdict = {
+    coherent: C.ok, ecart: C.vif, incoherent: C.erreur, indecidable: C.attenue,
+  }[controle.verdict];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onFermer}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <Pressable style={s.fond} onPress={onFermer}>
+          <Pressable style={s.boite} onPress={(e) => e.stopPropagation()}>
+            <Texte style={s.titre}>{titre}</Texte>
+
+            <ScrollView style={{ marginTop: E.m }} keyboardShouldPersistTaps="handled">
+              <Champ
+                etiquette="Nom"
+                valeur={a.nom}
+                onChange={(v) => maj({ nom: v })}
+                placeholder="Skyr nature Milbona"
+              />
+
+              <Discret style={s.section}>Catégorie</Discret>
+              <View style={s.categories}>
+                {CATEGORIES.map((c) => (
+                  <Pressable
+                    key={c.cle}
+                    onPress={() => changerCategorie(c.cle)}
+                    style={[
+                      s.categorie,
+                      a.categorie === c.cle && {
+                        backgroundColor: couleurRole(c.cle),
+                        borderColor: couleurRole(c.cle),
+                      },
+                    ]}
+                  >
+                    <Discret style={a.categorie === c.cle
+                      ? { color: C.fond, fontFamily: P.fort, fontSize: 12 }
+                      : { fontSize: 12 }}>
+                      {c.libelle}
+                    </Discret>
+                  </Pressable>
+                ))}
+              </View>
+              <Discret style={{ fontSize: 11, marginTop: 4 }}>
+                {CATEGORIES.find((c) => c.cle === a.categorie)?.exemple}
+              </Discret>
+
+              {/* ---- valeurs nutritionnelles ---- */}
+              <Discret style={s.section}>Pour 100 g, d'après l'emballage</Discret>
+
+              <View style={s.paire}>
+                <Champ etiquette="Calories" unite="kcal" numerique style={{ flex: 1 }}
+                  valeur={a.kcal100 ? String(a.kcal100) : ''}
+                  onChange={(v) => maj({ kcal100: nombre(v) })} placeholder="0" />
+                <Champ etiquette="Protéines" unite="g" numerique style={{ flex: 1 }}
+                  valeur={a.prot100 ? String(a.prot100) : ''}
+                  onChange={(v) => maj({ prot100: nombre(v) })} placeholder="0" />
+              </View>
+              <View style={[s.paire, { marginTop: E.s }]}>
+                <Champ etiquette="Glucides" unite="g" numerique style={{ flex: 1 }}
+                  valeur={a.gluc100 ? String(a.gluc100) : ''}
+                  onChange={(v) => maj({ gluc100: nombre(v) })} placeholder="0" />
+                <Champ etiquette="Lipides" unite="g" numerique style={{ flex: 1 }}
+                  valeur={a.lip100 ? String(a.lip100) : ''}
+                  onChange={(v) => maj({ lip100: nombre(v) })} placeholder="0" />
+              </View>
+
+              <Discret style={s.aide}>
+                « Dont sucres » fait partie des glucides : ne l'ajoute pas.
+                Idem pour les acides gras saturés, compris dans les lipides.
+              </Discret>
+
+              <Champ
+                etiquette="Fibres (facultatif)"
+                unite="g" numerique style={{ marginTop: E.s }}
+                valeur={a.fibres100 === null ? '' : String(a.fibres100)}
+                onChange={(v) => maj({ fibres100: v === '' ? null : nombre(v) })}
+                placeholder="—"
+              />
+              {a.fibres100 === null && (
+                <Discret style={s.aide}>
+                  Sans les fibres, la vérification ci-dessous reste approximative :
+                  elles comptent pour 2 calories par gramme et faussent l'écart sur
+                  les aliments qui en contiennent — légumes, oléagineux, céréales
+                  complètes.
+                </Discret>
+              )}
+
+              {/* ---- contrôle ---- */}
+              {(a.kcal100 > 0 || a.prot100 > 0) && (
+                <View style={[s.controle, { borderColor: couleurVerdict }]}>
+                  <Discret style={{ color: couleurVerdict, fontSize: 12.5, lineHeight: 18 }}>
+                    {controle.message}
+                  </Discret>
+                </View>
+              )}
+
+              {/* ---- ratio ---- */}
+              <Discret style={s.section}>Changement de poids à la cuisson</Discret>
+
+              {!mesurer ? (
+                <>
+                  {RATIOS_GUIDES.map((g) => (
+                    <Pressable
+                      key={g.cle}
+                      onPress={() => maj({
+                        ratio: g.valeur, peseeAvant: null, peseeApres: null,
+                      })}
+                      style={[s.choixRatio, Math.abs(a.ratio - g.valeur) < 0.01 && s.choixActif]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Texte style={{ fontSize: 14 }}>{g.libelle}</Texte>
+                        <Discret style={{ fontSize: 11 }}>{g.exemple}</Discret>
+                      </View>
+                      {Math.abs(a.ratio - g.valeur) < 0.01 && (
+                        <Discret style={{ color: C.vif }}>✓</Discret>
+                      )}
+                    </Pressable>
+                  ))}
+                  <Bouton variante="discret" onPress={() => setMesurer(true)}>
+                    <Discret style={{ fontSize: 12.5, textDecorationLine: 'underline' }}>
+                      Je préfère mesurer
+                    </Discret>
+                  </Bouton>
+                </>
+              ) : (
+                <View style={s.mesure}>
+                  <Discret style={{ fontSize: 12.5, lineHeight: 18 }}>
+                    Pèse ton aliment <Texte style={{ fontSize: 12.5 }}>avant</Texte> de le
+                    cuire, note le poids. Cuis-le, égoutte-le, et pèse-le
+                    {' '}<Texte style={{ fontSize: 12.5 }}>après</Texte>. L'app en déduit le reste.
+                  </Discret>
+                  <View style={[s.paire, { marginTop: E.s }]}>
+                    <Champ etiquette="Poids avant cuisson" unite="g" numerique
+                      style={{ flex: 1 }} valeur={avant} onChange={setAvant} placeholder="100" />
+                    <Champ etiquette="Poids après cuisson" unite="g" numerique
+                      style={{ flex: 1 }} valeur={apres} onChange={setApres} placeholder="230" />
+                  </View>
+                  {ratioMesure !== null && (
+                    <Bouton
+                      onPress={() => {
+                        maj({
+                          ratio: ratioMesure,
+                          peseeAvant: parseFloat(avant.replace(',', '.')),
+                          peseeApres: parseFloat(apres.replace(',', '.')),
+                        });
+                        setMesurer(false);
+                      }}
+                      desactive={!ratioVraisemblable(ratioMesure)}
+                      style={{ marginTop: E.s }}
+                    >
+                      {ratioVraisemblable(ratioMesure)
+                        ? `Utiliser ce résultat (${nb(ratioMesure)})`
+                        : 'Ces deux poids ne sont pas vraisemblables'}
+                    </Bouton>
+                  )}
+                  <Bouton variante="discret" onPress={() => setMesurer(false)}>
+                    <Discret style={{ fontSize: 12.5 }}>Revenir aux valeurs courantes</Discret>
+                  </Bouton>
+                </View>
+              )}
+
+              <Discret style={[s.aide, { color: C.attenue }]}>
+                {expliquerRatio(a.ratio)}
+              </Discret>
+              {provenanceRatio(a.peseeAvant, a.peseeApres) !== null ? (
+                <Discret style={[s.aide, { color: C.ok }]}>
+                  ✓ {provenanceRatio(a.peseeAvant, a.peseeApres)}
+                </Discret>
+              ) : (
+                <Discret style={s.aide}>
+                  Valeur courante — mesure-la pour un chiffre propre à ton produit.
+                </Discret>
+              )}
+
+              {/* ---- état de référence ---- */}
+              <Discret style={s.section}>Ces valeurs sont celles du produit</Discret>
+              <View style={s.mini}>
+                {(['cru', 'cuit'] as const).map((e) => (
+                  <Pressable
+                    key={e}
+                    onPress={() => { maj({ etatReference: e }); setEtatTouche(true); }}
+                    style={[s.miniBouton, a.etatReference === e && s.miniActif]}
+                  >
+                    <Discret style={a.etatReference === e ? { color: C.encre } : undefined}>
+                      {e === 'cru' ? 'cru ou sec' : 'déjà cuit'}
+                    </Discret>
+                  </Pressable>
+                ))}
+              </View>
+              <Discret style={s.aide}>
+                Sur un emballage, ce sont presque toujours les valeurs du produit
+                tel qu'il est vendu : sec pour le riz, cru pour la viande.
+              </Discret>
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: E.s, marginTop: E.m }}>
+              <Bouton variante="contour" onPress={onFermer} style={{ flex: 1 }}>
+                Annuler
+              </Bouton>
+              <Bouton
+                onPress={() => onEnregistrer(a)}
+                desactive={!valide || enCours === true}
+                style={{ flex: 1 }}
+              >
+                {enCours === true ? 'Enregistrement…' : 'Enregistrer'}
+              </Bouton>
+            </View>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const s = StyleSheet.create({
+  fond: {
+    flex: 1, backgroundColor: 'rgba(10,11,13,0.78)',
+    alignItems: 'center', justifyContent: 'center', padding: E.m,
+  },
+  boite: {
+    backgroundColor: C.surface, borderRadius: R.l, borderWidth: 1, borderColor: C.ligne,
+    padding: E.m, maxHeight: '90%', width: '100%', maxWidth: 520,
+  },
+  titre: { fontFamily: P.titre, fontSize: 20, letterSpacing: 0.8, textTransform: 'uppercase' },
+  section: {
+    fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase',
+    marginTop: E.l, marginBottom: E.xs,
+  },
+  categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  categorie: {
+    paddingHorizontal: E.m, minHeight: 38, borderRadius: R.s, borderWidth: 1,
+    borderColor: C.ligne, backgroundColor: C.surface2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  paire: { flexDirection: 'row', gap: E.s },
+  aide: { fontSize: 11, lineHeight: 16, marginTop: 6 },
+  controle: {
+    borderWidth: 1, borderRadius: R.s, padding: E.s, marginTop: E.m,
+    backgroundColor: C.surface2,
+  },
+  choixRatio: {
+    flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: TOUCHE + 6,
+    paddingHorizontal: E.m, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
+    backgroundColor: C.surface2, marginBottom: 5,
+  },
+  choixActif: { borderColor: C.vif },
+  mesure: {
+    backgroundColor: C.surface2, borderRadius: R.s, padding: E.m,
+    borderWidth: 1, borderColor: C.ligne,
+  },
+  mini: { flexDirection: 'row', backgroundColor: C.surface2, borderColor: C.ligne,
+    borderWidth: 1, borderRadius: R.s, padding: 2 },
+  miniBouton: {
+    flex: 1, minHeight: TOUCHE - 4, alignItems: 'center', justifyContent: 'center',
+    borderRadius: R.s - 2,
+  },
+  miniActif: { backgroundColor: C.ligne },
+});
