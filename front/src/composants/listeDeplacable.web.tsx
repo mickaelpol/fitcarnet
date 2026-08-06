@@ -74,7 +74,6 @@ export function ListeDeplacable<T>({
         const cible = enCours && survole === index && saisi !== index;
 
         return (
-          // @ts-expect-error : attributs HTML natifs, disponibles sur le web uniquement
           <div
             key={cle(element, index)}
             draggable
@@ -121,7 +120,6 @@ export function ListeDeplacable<T>({
             }}
           >
             {rendu(element, index, poigneeDe(index))}
-          {/* @ts-expect-error : fermeture de la balise native */}
           </div>
         );
       })}

@@ -118,7 +118,7 @@ export function PaliersRM({ rm }: { rm: number }) {
 
       {lignes.map((l) => (
           <View key={l.pourcent} style={[s.ligne, l.zone && s.zone]}>
-            <View style={[s.col, s.colPct, s.cellePct]}>
+            <View style={[s.colPct, s.cellePct]}>
               <View style={[s.point, l.zone && { backgroundColor: C.vif }]} />
               <Texte style={{ fontFamily: P.chiffre, fontSize: 15 }}>{l.pourcent} %</Texte>
             </View>

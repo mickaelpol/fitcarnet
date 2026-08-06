@@ -53,7 +53,6 @@ export function ModaleExercice({
             {id !== null ? (
               <View style={s.video}>
                 {Platform.OS === 'web' ? (
-                  // @ts-expect-error : iframe n'existe que sur le web
                   <iframe
                     src={lecteur(id)}
                     style={{ width: '100%', height: '100%', border: 0, borderRadius: 10 }}

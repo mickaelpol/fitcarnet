@@ -258,7 +258,7 @@ function LigneAliment({
   /* Le gros chiffre est celui sur lequel on peut AGIR. */
   let gros = '—';
   let petit = 'pas utilisé';
-  let couleur = C.vif;
+  let couleur: (typeof C)[keyof typeof C] = C.vif;
 
   if (q && q.assiette > 0) {
     const cuireTotal = q.aCuire * portions;

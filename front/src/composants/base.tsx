@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import {
   ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View,
-  type StyleProp, type TextStyle, type ViewStyle,
+  type StyleProp, type TextProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { C, E, P, R, TOUCHE } from '@/theme';
 
@@ -15,8 +15,8 @@ export const Texte = ({ children, style, numberOfLines }: {
   children: ReactNode; style?: StyleProp<TextStyle>; numberOfLines?: number;
 }) => <Text numberOfLines={numberOfLines} style={[s.texte, style]}>{children}</Text>;
 
-export const Discret = ({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) => (
-  <Text style={[s.discret, style]}>{children}</Text>
+export const Discret = ({ children, style, ...props }: TextProps) => (
+  <Text {...props} style={[s.discret, style]}>{children}</Text>
 );
 
 /** Chiffre mis en avant : police condensée, alignement des colonnes. */
