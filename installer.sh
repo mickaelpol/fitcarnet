@@ -123,6 +123,31 @@ nb_perso=$(sql "SELECT count(*) FROM exercice WHERE source='perso';")
 nb_chrono=$(sql "SELECT count(*) FROM exercice WHERE mode_defaut='chrono' AND source='perso';")
 ok "$nb_aliments aliments, $nb_perso exercices personnels dont $nb_chrono en chrono"
 
+# ------------------------------------------------- migrations manuelles
+
+titre "Migrations"
+
+# db/ est monté dans docker-entrypoint-initdb.d et ne s'exécute qu'à la
+# création de la base. db/manuel/ contient ce qui vient APRÈS : évolutions
+# du schéma sur une base existante, ou scripts dépendant d'un compte.
+# Les fichiers dont le nom contient « cible » sont traités plus loin, une
+# fois le compte créé.
+migrations=$(find db/manuel -name '*.sql' ! -name '*cible*' 2>/dev/null | sort)
+
+if [[ -z "$migrations" ]]; then
+    info "aucune migration à jouer"
+else
+    for fichier in $migrations; do
+        if dc exec -T db psql -U "$UTILISATEUR" -d "$BASE" -q < "$fichier" >/dev/null 2>&1; then
+            ok "$(basename "$fichier")"
+        else
+            # ces scripts sont idempotents : un échec signale un vrai souci
+            echec "$(basename "$fichier") a échoué. Rejoue-le seul pour voir l'erreur :
+   docker compose -f $COMPOSE exec -T db psql -U $UTILISATEUR -d $BASE < $fichier"
+        fi
+    done
+fi
+
 # ------------------------------------------------------------------ compte
 
 titre "Compte administrateur"
@@ -214,6 +239,7 @@ dc exec -T db psql -U "$UTILISATEUR" -d "$BASE" -c "
     UNION ALL SELECT 'exercices',       count(*) FROM exercice
     UNION ALL SELECT '  dont personnels', count(*) FROM exercice WHERE source='perso'
     UNION ALL SELECT '  avec vidéo',    count(video_url) FROM exercice
+    UNION ALL SELECT '  ratio mesuré',   count(pesee_avant) FROM aliment
     UNION ALL SELECT 'objectifs',       count(*) FROM cible
     UNION ALL SELECT 'modèles',         count(*) FROM modele
     UNION ALL SELECT 'séances',         count(*) FROM seance
