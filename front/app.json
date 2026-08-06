@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "fitcarnet",
+    "slug": "fitcarnet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "fitcarnet",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#14161a",
+      "resizeMode": "contain"
+    },
+    "android": {
+      "package": "fr.mickaelpol.fitcarnet",
+      "adaptiveIcon": {
+        "backgroundColor": "#14161a"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "fr.mickaelpol.fitcarnet",
+      "supportsTablet": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

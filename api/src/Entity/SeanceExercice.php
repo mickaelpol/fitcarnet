@@ -47,6 +47,16 @@ class SeanceExercice
     #[Groups(['seance:lire', 'seance:ecrire'])]
     private ?string $notes = null;
 
+    /**
+     * Temps total d'un effort chronometre. Coexiste avec les series :
+     * un « 100 for time » dure 4:21 ET se compose de 93 rep a 32 kg
+     * puis 7 a 35 kg. Les deux comptent dans la progression.
+     */
+    #[ORM\Column(name: 'secondes_total', nullable: true)]
+    #[Assert\PositiveOrZero]
+    #[Groups(['seance:lire', 'seance:ecrire'])]
+    private ?int $secondesTotal = null;
+
     /** @var Collection<int, Serie> */
     #[ORM\OneToMany(
         targetEntity: Serie::class,
@@ -71,6 +81,8 @@ class SeanceExercice
     public function getMode(): ?string { return $this->mode; }
     public function setMode(?string $v): self { $this->mode = $v; return $this; }
     public function getNotes(): ?string { return $this->notes; }
+    public function getSecondesTotal(): ?int { return $this->secondesTotal; }
+    public function setSecondesTotal(?int $v): self { $this->secondesTotal = $v; return $this; }
     public function setNotes(?string $v): self { $this->notes = $v; return $this; }
 
     /** @return Collection<int, Serie> */

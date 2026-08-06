@@ -128,14 +128,26 @@ class Seance implements ProprieteUtilisateur
         return $this;
     }
 
-    /** Avancement : series faites sur le total. */
+    /**
+     * Avancement : series faites sur le total.
+     *
+     * Un exercice « for time » (mode chrono) ne compte que pour UNE serie :
+     * il n'a qu'un temps total, meme si des lignes vides subsistent.
+     */
     #[Groups(['seance:lire'])]
     public function getAvancement(): array
     {
         $total = 0;
         $faites = 0;
+
         foreach ($this->exercices as $exercice) {
-            foreach ($exercice->getSeries() as $serie) {
+            $mode = $exercice->getMode() ?? $exercice->getExercice()?->getModeDefaut() ?? 'charge';
+            $series = $exercice->getSeries()->toArray();
+            if ('chrono' === $mode) {
+                $series = \array_slice($series, 0, 1);
+            }
+
+            foreach ($series as $serie) {
                 ++$total;
                 if ($serie->isFaite()) {
                     ++$faites;
