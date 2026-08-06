@@ -45,24 +45,15 @@ docker compose -f compose.dev.yml exec app php bin/console \
 
 ## 3. Tes objectifs par repas
 
-Ouvre `db/manuel/cibles.sql` et remplace l'adresse **ligne 21** :
-
-```sql
-    v_email       TEXT := 'ton@adresse.fr';   -- <<< à adapter
-```
-
-Puis :
+Adapte l'adresse en tête de `db/90-cibles.sql`, puis :
 
 ```bash
 docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet \
-  < db/manuel/cibles.sql
+  < db/90-cibles.sql
 ```
 
-**Pourquoi `db/manuel/` et non `db/`** : le dossier `db/` est monté dans
-`docker-entrypoint-initdb.d`, où PostgreSQL exécute *tout* fichier `.sql` à
-la création de la base — quel que soit son numéro. Un fichier qui suppose un
-compte existant y échouerait. `db/` ne contient donc que ce qui s'exécute
-sans condition sur une base vierge ; `db/manuel/` accueille le reste.
+Le fichier est numéroté 90 à dessein : il vient **après** la création du
+compte, donc jamais au démarrage automatique. Il est idempotent.
 
 ---
 
@@ -114,25 +105,5 @@ sans intervention. En contrepartie, une base **existante** ne recevra pas ces
 changements : c'est sans conséquence, puisque tu les as déjà appliqués en
 développement.
 
----
-
-## Faire évoluer le schéma
-
-Deux dossiers, deux moments d'exécution.
-
-**`db/`** — joué automatiquement par PostgreSQL à la **création** de la base,
-et à ce moment-là seulement. N'y mets que ce qui s'applique à une base vierge :
-le schéma, le référentiel commun.
-
-**`db/manuel/`** — joué par `./installer.sh` à chaque exécution. C'est là que
-vont les évolutions ultérieures et tout ce qui dépend d'un compte. Ces scripts
-doivent être **idempotents** : `ADD COLUMN IF NOT EXISTS`, `ON CONFLICT DO
-UPDATE`. L'installeur les enchaîne par ordre alphabétique, et s'arrête au
-premier échec.
-
-Un cas particulier : les fichiers dont le nom contient « cible » sont écartés
-de cette passe et joués **après** la création du compte, puisqu'ils en
-dépendent.
-
-Autrement dit : ajoute ton fichier dans `db/manuel/`, et `./installer.sh` s'en
-charge — rien d'autre à faire, rien à retenir le jour du déploiement.
+Pour la suite : toute évolution du schéma passera par un fichier numéroté à
+partir de `10-`, joué explicitement, et documenté ici.

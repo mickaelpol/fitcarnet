@@ -8,7 +8,7 @@ front/src/solveur/
 ├─ types.ts                 Aliment, Cibles, Resultat, Diagnostic…
 ├─ algebre.ts               résolution linéaire (Gauss, pivot partiel)
 ├─ solveur.ts               le calcul
-├─ solveur.test.ts          29 tests
+├─ solveur.test.ts          47 tests
 └─ aliments.test-data.ts    jeu d'aliments de référence
 ```
 
@@ -52,6 +52,75 @@ r.diagnostics // explications quand ça ne tombe pas juste
 
 ---
 
+## Écouler les restes : le cas central
+
+Toute quantité imposée peut être saisie **en cru ou en cuit**, quel que soit
+l'aliment. C'est ce qui permet de partir de ce qu'on a sous la main.
+
+```ts
+calculer(ciblesDuSoir,
+  { proteine: poulet, glucide: patateDouce, lipide: amandes },
+  [
+    { aliment: riz,        grammes: 100, unite: 'cuit' },  // reste du midi
+    { aliment: saumon,     grammes:  40, unite: 'cuit' },  // reste d'hier
+    { aliment: courgettes, grammes: 120, unite: 'cuit' },
+    { aliment: huile,      grammes:   2 },
+  ]);
+```
+
+Chaque reste est ramené à l'état dans lequel ses valeurs nutritionnelles ont un
+sens — 100 g de riz cuit comptent pour 100 g cuit, 40 g de saumon cuit comptent
+pour 47 g de saumon cru — puis le reste du repas est recalculé autour.
+
+Le résultat annonce toujours les deux poids : `aCuire` (ce qu'on pèse avant
+cuisson) et `assiette` (ce qu'on mange). `pourObtenirCuit(aliment, grammes)`
+répond directement à « combien de riz sec pour 180 g cuits ? » → 60 g.
+
+---
+
+## Calculer même sans marge de manœuvre
+
+Les trois variables sont **facultatives**. Si tu verrouilles tout ce que tu as,
+le solveur ne refuse pas de répondre : il calcule ce que donne l'assiette et
+chiffre ce qui manque.
+
+- **trois variables** → les trois macros tombent juste ;
+- **deux** → les deux macros correspondantes tombent juste, la troisième dérive
+  et l'écart est annoncé ;
+- **une** → sa macro tombe juste ;
+- **aucune** → le solveur additionne ce que tu as et dit ce qui manque.
+
+C'était le défaut le plus grave de la première version : bloquer là où il
+fallait informer.
+
+---
+
+## Prévenir quand un aliment ne sert plus à rien
+
+Quand la quantité calculée d'un aliment ajustable tombe sous 8 g, le solveur le
+signale au lieu d'afficher « 1 g de thon » sans explication :
+
+> *Thon au naturel ne pèse quasiment rien ici (1,0 g, soit 0,3 g de protéines) :
+> le reste du repas couvre déjà l'objectif. Retire-le, ou réduis ce que tu as
+> déjà mis.*
+
+Le cas se produit dès qu'un ingrédient déjà présent sature une macro — 100 g de
+bœuf haché couvrent à eux seuls la moitié du budget protéique d'un dîner.
+
+---
+
+## Substituer sans toucher à la diète
+
+C'est la garantie principale. **36 combinaisons** protéine × féculent ×
+oléagineux ont été vérifiées sur le repas du midi : toutes tombent sur les mêmes
+macros, à moins de 0,3 g près.
+
+Remplacer un aliment ne change pas que sa propre quantité : passer de la patate
+douce au quinoa fait **baisser le saumon**, parce que le quinoa apporte 4,4 g de
+protéines aux 100 g. C'est vérifié par un test dédié.
+
+---
+
 ## Ce qui est garanti
 
 **Les macros affichées sont celles qui seront réellement mangées.**
@@ -81,9 +150,11 @@ porte `aCuire` (ce qu'on pèse en cuisinant : riz sec, viande crue) et
 cd front && npx tsc && node --test dist/solveur.test.js
 ```
 
-29 tests : algèbre (systèmes simples, singuliers, pivot), cas nominal des
-quatre repas, conversions, cible inatteignable, quantité imposée avec
-complément, arrondis, robustesse — plus un test de propriété sur
+47 tests : algèbre (systèmes simples, singuliers, pivot), cas nominal des
+quatre repas, conversions cru/cuit/sec, restes en unités cuites, invariance des
+macros sur 36 substitutions, calcul avec moins de trois variables, aliment
+devenu négligeable, cible inatteignable, arrondis, robustesse — plus un test de
+propriété sur
 **5 000 combinaisons aléatoires** vérifiant l'absence de valeur invalide,
 de quantité négative et d'écart non expliqué.
 
@@ -103,6 +174,18 @@ mangeable.
 **Trois aliments au profil trop proche rendent le système singulier** — par
 exemple trois féculents. Le cas est détecté et signalé, mais pas contourné :
 il faut choisir des aliments aux profils différents.
+
+**Les kcal ne sont pas une contrainte indépendante.** Elles découlent des
+macros : 4 kcal par gramme de protéines et de glucides, 9 par gramme de lipides.
+Si une cible kcal ne correspond pas à ses propres macros, aucune combinaison
+d'aliments ne peut satisfaire les deux. Le solveur respecte alors **les macros**
+et signale l'incohérence.
+
+C'est le cas des cibles actuelles du coach : le dîner annonce 551,8 kcal pour
+30,1 P / 80,3 G / 15,4 L, qui représentent en réalité 580 kcal. L'écart de 28
+kcal par repas n'est pas une erreur de calcul, c'est une incohérence de la
+consigne. À signaler au coach : soit les kcal, soit les macros doivent être
+ajustées.
 
 **Les micronutriments ne sont pas gérés.** Fibres, sucres, vitamines : hors
 périmètre. Le calcul porte sur les quatre valeurs que suit ton coach.
