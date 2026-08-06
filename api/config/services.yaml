@@ -19,3 +19,10 @@ services:
         tags:
             - { name: api_platform.doctrine.orm.query_extension.collection, priority: 100 }
             - { name: api_platform.doctrine.orm.query_extension.item, priority: 100 }
+
+    # Grocy : la base d'aliments de l'administrateur.
+    # Les identifiants viennent de l'environnement, jamais du dépôt.
+    App\Service\FrigoGrocy:
+        arguments:
+            $url: '%env(default::GROCY_URL)%'
+            $cle: '%env(default::GROCY_API_KEY)%'

@@ -128,3 +128,34 @@ export interface Utilisateur {
   roles: string[];
   sourceFrigo: 'base' | 'grocy';
 }
+
+/**
+ * Un aliment tel que le renvoie /api/mon-frigo, quelle que soit sa source.
+ * Grocy pour l'administrateur, la table « aliment » pour les autres — le
+ * front ne fait pas la différence.
+ */
+export interface AlimentDisponible {
+  /** « grocy:12 » ou « base:47 » : la source est dans la référence */
+  reference: string;
+  nom: string;
+  categorie: 'prot' | 'fec' | 'leg' | 'ole' | 'huile' | 'lait' | 'fruit' | 'autre';
+  kcal100: number;
+  prot100: number;
+  gluc100: number;
+  lip100: number;
+  fibres100: number | null;
+  ratio: number;
+  etatReference: 'cru' | 'cuit';
+  /** quantité réellement disponible, en grammes */
+  stock: number;
+  emplacement: string | null;
+  peseeAvant: number | null;
+  peseeApres: number | null;
+}
+
+export interface MonFrigo {
+  source: 'grocy' | 'base';
+  aliments: AlimentDisponible[];
+  /** message expliquant pourquoi la liste est vide, le cas échéant */
+  probleme: string | null;
+}

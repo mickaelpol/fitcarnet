@@ -36,6 +36,8 @@ services:
       SERVER_NAME: ":80"
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET:?definis APP_SECRET dans les variables de la stack}
+      GROCY_URL: ${GROCY_URL:-}
+      GROCY_API_KEY: ${GROCY_API_KEY:-}
       DATABASE_URL: "postgresql://fitcarnet:${DB_PASSWORD}@fitcarnet-db:5432/fitcarnet?serverVersion=16&charset=utf8"
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?definis JWT_PASSPHRASE dans les variables de la stack}
       CORS_ALLOW_ORIGIN: '^https?://(fitcarnet\.mickael-pol\.fr|localhost:5173)$$'

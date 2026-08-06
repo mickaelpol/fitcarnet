@@ -29,7 +29,6 @@ services:
       context: ./docker
       dockerfile: Dockerfile
       target: dev
-    user: "1000:1000"
     container_name: fitcarnet-app-dev
     restart: unless-stopped
     depends_on:
@@ -39,6 +38,8 @@ services:
       SERVER_NAME: ":80"
       APP_ENV: dev
       APP_SECRET: dev_secret_local_seulement
+      GROCY_URL: ${GROCY_URL:-}
+      GROCY_API_KEY: ${GROCY_API_KEY:-}
       DATABASE_URL: "postgresql://fitcarnet:fitcarnet@db:5432/fitcarnet?serverVersion=16&charset=utf8"
       JWT_PASSPHRASE: dev_passphrase_locale
       CORS_ALLOW_ORIGIN: '^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$$'

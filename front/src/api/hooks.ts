@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, definirJeton, membres } from './client';
-import type { Aliment, Cible, Emplacement, Exercice, LigneStock, Modele, Seance, Utilisateur } from './types';
+import type {
+  Aliment, Cible, Emplacement, Exercice, LigneStock, Modele, MonFrigo,
+  Seance, Utilisateur,
+} from './types';
 
 /* ---------- authentification ---------- */
 
@@ -94,6 +97,41 @@ export function useFusionExercices() {
 }
 
 /* ---------- données personnelles ---------- */
+
+/**
+ * Le frigo de l'utilisateur, quelle que soit sa provenance.
+ *
+ * Un seul appel, une seule forme : Grocy pour l'administrateur, la base
+ * pour les autres. Le calculateur et l'écran « Mon frigo » ne connaissent
+ * que celui-ci.
+ */
+export const useMonFrigo = () =>
+  useQuery({
+    queryKey: ['mon-frigo'],
+    queryFn: () => api<MonFrigo>('/mon-frigo'),
+    // le stock bouge à chaque repas : on ne le garde pas longtemps
+    staleTime: 2 * 60 * 1000,
+  });
+
+/** Produits Grocy sans valeurs nutritionnelles : invisibles au calculateur. */
+export const useFrigoIncomplets = (actif: boolean) =>
+  useQuery({
+    queryKey: ['mon-frigo', 'incomplets'],
+    queryFn: () => api<{ produits: { reference: string; nom: string; manquants: string[] }[] }>(
+      '/mon-frigo/incomplets'),
+    enabled: actif,
+  });
+
+/** Fixe la quantité d'un aliment. Sans effet pour les comptes lisant Grocy. */
+export function useDefinirStock() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (v: { alimentId: number; quantite: number; emplacementId?: number }) =>
+      api<{ ok: boolean }>('/mon-frigo/stock', { methode: 'POST', corps: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
+  });
+}
 
 export const useStock = () =>
   useQuery({
