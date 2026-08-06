@@ -60,7 +60,7 @@ final readonly class FrigoGrocy
 
         foreach ($produits as $produit) {
             $id = (int) $produit['id'];
-            $champs = $this->champsDe($id);
+            $champs = self::champsDe($produit);
 
             $manquants = \array_diff(self::CHAMPS, \array_keys(\array_filter(
                 $champs, static fn ($v) => null !== $v && '' !== $v)));
@@ -113,7 +113,7 @@ final readonly class FrigoGrocy
 
         $incomplets = [];
         foreach ($this->appeler('/objects/products') as $produit) {
-            $champs = $this->champsDe((int) $produit['id']);
+            $champs = self::champsDe($produit);
             $manquants = \array_diff(self::CHAMPS, \array_keys(\array_filter(
                 $champs, static fn ($v) => null !== $v && '' !== $v)));
             if ([] !== $manquants) {
@@ -134,15 +134,24 @@ final readonly class FrigoGrocy
         $this->appeler('/userfields/products/' . $idProduit, 'PUT', $valeurs);
     }
 
-    private function champsDe(int $idProduit): array
+    /**
+     * Les champs personnalises d'un produit, tels que /objects/products les
+     * renvoie deja.
+     *
+     * Ils etaient auparavant relus un par un sur /userfields/products/{id} :
+     * un appel HTTP par produit, soit 62 appels a 1,5 s pour 59 produits, bien
+     * au-dela des 30 s de PHP. Grocy les inclut dans la liste, il suffit de les
+     * y prendre.
+     *
+     * @param array<string, mixed> $produit
+     *
+     * @return array<string, mixed>
+     */
+    private static function champsDe(array $produit): array
     {
-        try {
-            $reponse = $this->appeler('/userfields/products/' . $idProduit);
+        $champs = $produit['userfields'] ?? null;
 
-            return \is_array($reponse) ? $reponse : [];
-        } catch (\RuntimeException) {
-            return [];
-        }
+        return \is_array($champs) ? $champs : [];
     }
 
     private function appeler(string $chemin, string $methode = 'GET', ?array $corps = null): array
