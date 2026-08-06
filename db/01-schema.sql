@@ -113,14 +113,45 @@ CREATE TABLE cible (
 CREATE TABLE exercice (
     id               BIGSERIAL PRIMARY KEY,
     nom              TEXT NOT NULL UNIQUE,
+    -- Nom français facultatif : l'application affiche « nom_fr » s'il existe,
+    -- sinon « nom ». Permet de traduire le catalogue importé au fil de l'eau.
+    nom_fr           TEXT,
     format_prescrit  TEXT,                     -- « 4 s × 12 rép », « 100 for time »…
     mode_defaut      TEXT NOT NULL DEFAULT 'charge'
                      CHECK (mode_defaut IN ('charge','iso','chrono')),
-    groupes          TEXT NOT NULL DEFAULT '',  -- « Push,Pull,Legs » (SIMPLE_ARRAY)
+    groupes          TEXT,                      -- « Push,Pull,Legs » (SIMPLE_ARRAY)
+
+    -- Démonstration : lien YouTube, renseigné par l'administrateur.
+    -- La vidéo reste hébergée chez YouTube et jouée dans son lecteur officiel.
+    video_url        TEXT,
+
+    -- Classement, venu du catalogue importé
+    partie_corps     TEXT,
+    equipement       TEXT,
+    muscle_cible     TEXT,
+    muscles_secondaires TEXT,
+    instructions     TEXT,
+
+    -- 'perso' = tes exercices, avec leurs formats prescrits
+    -- 'import' = catalogue commun
+    source           TEXT NOT NULL DEFAULT 'perso'
+                     CHECK (source IN ('perso','import')),
+    reference_source TEXT,                      -- identifiant chez la source
+
     public           BOOLEAN NOT NULL DEFAULT TRUE,
     cree_par         UUID REFERENCES utilisateur(id) ON DELETE SET NULL,
     cree_le          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Les exercices personnels remontent en tête : « perso » > « import ».
+CREATE INDEX exercice_tri ON exercice ((source = 'perso') DESC, nom);
+CREATE INDEX exercice_partie_corps ON exercice (partie_corps);
+CREATE INDEX exercice_equipement   ON exercice (equipement);
+
+-- Un même exercice ne peut pas être importé deux fois.
+CREATE UNIQUE INDEX exercice_source_unique
+    ON exercice (source, reference_source)
+    WHERE reference_source IS NOT NULL;
 -- Pas d'index sur « groupes » : le filtrage par groupe se fait côté API,
 -- jamais en SQL.
 
@@ -144,6 +175,7 @@ CREATE TABLE modele_exercice (
     ordre       SMALLINT NOT NULL DEFAULT 0,
     mode        TEXT CHECK (mode IN ('charge','iso','chrono')),
     notes       TEXT,
+    secondes_total_cible INTEGER,
     UNIQUE (modele_id, ordre)
 );
 
@@ -176,6 +208,10 @@ CREATE TABLE seance_exercice (
     ordre       SMALLINT NOT NULL DEFAULT 0,
     mode        TEXT CHECK (mode IN ('charge','iso','chrono')),
     notes       TEXT,
+    -- Temps total d'un effort chronométré. Coexiste avec les séries :
+    -- un « 100 for time » dure 4:21 ET se compose de 93 rép à 32 kg puis
+    -- 7 à 35 kg. Les deux comptent dans la progression.
+    secondes_total INTEGER CHECK (secondes_total IS NULL OR secondes_total >= 0),
     UNIQUE (seance_id, ordre)
 );
 CREATE INDEX ON seance_exercice (exercice_id);   -- pour l'historique et les courbes
