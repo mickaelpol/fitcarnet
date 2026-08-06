@@ -10,12 +10,38 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
 /**
  * Chrono de repos. L'écran reste allumé pendant le décompte : sans ça, le
  * téléphone se verrouille dans la poche et on rate la fin.
+ *
+ * `relance` : compteur incrémenté par le parent à chaque série cochée. Toute
+ * nouvelle valeur relance le décompte sur la durée choisie. Le redémarrage
+ * passe par une propriété et non par un `key` : un remontage réinitialiserait
+ * aussi la durée sélectionnée, qui doit survivre à la série.
  */
-export function ChronoRepos({ onCalculateur }: { onCalculateur?: () => void }) {
+export function ChronoRepos({ relance, onCalculateur }: {
+  relance?: number;
+  onCalculateur?: () => void;
+}) {
   const [duree, setDuree] = useState(90);
   const [reste, setReste] = useState(90);
   const [court, setCourt] = useState(false);
   const tic = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // La durée vit dans une référence pour que la relance ne dépende que de
+  // `relance` : sans ça, changer de préréglage redémarrerait le décompte.
+  const dureeCourante = useRef(duree);
+  const premierRendu = useRef(true);
+
+  useEffect(() => { dureeCourante.current = duree; }, [duree]);
+
+  useEffect(() => {
+    if (premierRendu.current) {
+      premierRendu.current = false;
+
+      return;
+    }
+
+    setReste(dureeCourante.current);
+    setCourt(true);
+  }, [relance]);
 
   useEffect(() => {
     if (!court) return;

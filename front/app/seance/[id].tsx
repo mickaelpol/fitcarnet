@@ -283,7 +283,7 @@ export default function DetailSeance() {
         )}
       />
 
-      <ChronoRepos key={relance} onCalculateur={() => setCalculateur(true)} />
+      <ChronoRepos relance={relance} onCalculateur={() => setCalculateur(true)} />
 
       <ModaleCalculateurRM
         visible={calculateur}
