@@ -16,11 +16,13 @@ import { Platform } from 'react-native';
  * notification locale à l'heure de fin : c'est Android qui sonne, même
  * application fermée. Elle est annulée si le chrono est arrêté ou relancé.
  *
- * Limite assumée : la sonnerie choisie dans les réglages ne peut PAS être
- * jouée par la notification sous Expo Go — un son personnalisé doit être
- * empaqueté dans l'application native. La notification utilise le son de
- * notification du téléphone. La sonnerie choisie reste celle qu'on entend
- * quand l'application est au premier plan.
+ * Limite assumée, constatée sur l'appareil : hors de l'application on entend
+ * le son de notification du téléphone, pas la sonnerie choisie dans les
+ * réglages. Un son personnalisé doit être empaqueté dans les ressources
+ * natives, ce qu'Expo Go ne permet pas. Et comme Android fige un canal à sa
+ * création, offrir cinq sonnneries au choix demanderait cinq canaux, un par
+ * son. À faire le jour où l'application sera compilée pour de bon ; au premier
+ * plan, la sonnerie choisie reste celle qu'on entend.
  */
 
 /* Le numéro fait partie du nom, volontairement. Android FIGE un canal à sa
@@ -62,16 +64,8 @@ async function preparer(): Promise<boolean> {
       enableVibrate: true,
       vibrationPattern: VIBRATION,
     });
-
-    /* Trace de contrôle : si le repos reste muet, cette ligne dit si le canal
-       porte un son (`sound: "default"`) ou non (`sound: null`). Sans elle on en
-       serait réduit à supposer. */
-    const canal = await Notifications.getNotificationChannelAsync(CANAL);
-    console.log('[chrono] canal', JSON.stringify({
-      sound: canal?.sound ?? null,
-      importance: canal?.importance ?? null,
-      vibre: canal?.enableVibrate ?? null,
-    }));
+    /* Contrôlé sur l'appareil : le canal ressort en `sound: "default"`,
+       `importance: 6`, `vibre: true`. */
   }
 
   const actuel = await Notifications.getPermissionsAsync();

@@ -58,8 +58,6 @@ export function CarteExercice({
   const [supprimerExercice, setSupprimerExercice] = useState(false);
   const [fiche, setFiche] = useState(false);
   const [notesOuvertes, setNotesOuvertes] = useState(false);
-  const [chronoEnCours, setChronoEnCours] = useState(false);
-  const [avertirChrono, setAvertirChrono] = useState(false);
   const aDesNotes = (bloc.notes ?? '').trim() !== '';
   const mode = bloc.mode ?? exercice?.modeDefaut ?? 'charge';
   const perf = performanceDe(bloc, mode);
@@ -68,6 +66,15 @@ export function CarteExercice({
   const tempsHerite = bloc.series.reduce((n, x) => n + (x.secondes ?? 0), 0) || null;
   const rm = perf.rm;
   const visibles = bloc.series;
+
+  /* Ce qui identifie une mesure lancée depuis cette carte. L'IRI accompagne la
+     position : réordonner la séance pendant une mesure déplace les positions,
+     l'exercice, lui, ne change pas. */
+  const cibleBase = {
+    blocOrdre: bloc.ordre,
+    exerciceIri: typeof bloc.exercice === 'string' ? bloc.exercice : bloc.exercice['@id'],
+    libelle: exercice?.nomFr ?? exercice?.nom ?? 'Exercice',
+  };
   const faites = visibles.filter((s) => s.faite).length;
 
   const majSerie = (i: number, s: Serie) =>
@@ -155,27 +162,16 @@ export function CarteExercice({
       {/* table des paliers, dépliée au tap sur le disque */}
       {rm !== null && paliers && <PaliersRM rm={rm} />}
 
-      {chronoEnCours && (
-        <View style={s.enCours}>
-          <View style={s.pointRouge} />
-          <Discret style={{ fontSize: 11.5, color: C.vif }}>
-            Chronomètre en cours — arrête-le avant de changer de mode.
-          </Discret>
-        </View>
-      )}
-
       {ouvert && (
         <View style={{ gap: E.s }}>
           <View style={s.modes}>
             {MODES.map((m) => (
               <Pressable
                 key={m.cle}
-                onPress={() => {
-                  // changer de mode démonte le chrono : on prévient plutôt
-                  // que de laisser filer une mesure en cours
-                  if (chronoEnCours && m.cle !== mode) { setAvertirChrono(true); return; }
-                  onChange({ ...bloc, mode: m.cle });
-                }}
+                /* Plus rien n'empêche la bascule : la mesure vit dans
+                   `etatMesure` et continue de tourner, visible dans le bandeau
+                   en haut de l'écran. */
+                onPress={() => onChange({ ...bloc, mode: m.cle })}
                 style={[s.mode, mode === m.cle && s.modeActif]}
               >
                 <Discret style={mode === m.cle ? { color: C.encre } : undefined}>{m.court}</Discret>
@@ -200,9 +196,9 @@ export function CarteExercice({
           {mode === 'chrono' && (
             <View style={s.total}>
               <ChronoEffort
+                cible={{ ...cibleBase, serieOrdre: null }}
                 secondes={bloc.secondesTotal ?? tempsHerite}
-                onChange={(sec) => onChange({ ...bloc, secondesTotal: sec })}
-                onEtatChange={setChronoEnCours}
+                onEffacer={() => onChange({ ...bloc, secondesTotal: null })}
                 etiquette="Temps total de l'exercice"
               />
             </View>
@@ -214,8 +210,8 @@ export function CarteExercice({
               serie={serie}
               mode={mode}
               index={i}
+              cible={{ ...cibleBase, serieOrdre: serie.ordre }}
               onChange={(s2) => majSerie(i, s2)}
-              onChronoChange={setChronoEnCours}
               onSupprimer={() => setASupprimer(i)}
               onCochee={onSerieCochee}
             />
@@ -295,15 +291,6 @@ export function CarteExercice({
         </View>
       )}
 
-      <Confirmer
-        visible={avertirChrono}
-        titre="Un chronomètre tourne"
-        message="Arrête-le d'abord : changer de mode maintenant interromprait la mesure."
-        libelle="J'ai compris"
-        onConfirmer={() => setAvertirChrono(false)}
-        onAnnuler={() => setAvertirChrono(false)}
-      />
-
       <ModaleExercice
         exercice={exercice}
         visible={fiche}
@@ -363,12 +350,6 @@ const s = StyleSheet.create({
     flex: 1, backgroundColor: 'rgba(227,178,60,0.12)', borderRadius: 6,
     paddingHorizontal: 8, paddingVertical: 4,
   },
-  enCours: {
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    backgroundColor: 'rgba(227,178,60,0.12)', borderRadius: R.s,
-    paddingHorizontal: E.s, paddingVertical: 6, marginBottom: E.xs,
-  },
-  pointRouge: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.erreur },
   pied: { flexDirection: 'row', alignItems: 'center', gap: E.s },
   ajouterSerie: {
     borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.ligne, borderRadius: R.s, flex: 1,

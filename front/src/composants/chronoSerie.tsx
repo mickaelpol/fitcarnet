@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Chiffre, Discret, Texte } from './base';
-import { useEcranEveille } from './ecranEveille';
+import {
+  type CibleMesure, abonnerMesure, arreterMesure, demarrerMesure, ecouleMesure, mesureSur,
+} from './etatMesure';
 import { C, E, P, R, TOUCHE } from '@/theme';
 
 export const mmss = (s: number): string =>
@@ -14,63 +16,38 @@ export const mmss = (s: number): string =>
  * « for time ». Dans les deux cas on démarre, on arrête, et le temps se
  * reporte dans le champ — plutôt que de le lire sur une montre et de le
  * ressaisir de mémoire.
+ *
+ * Le composant ne DÉTIENT pas la mesure : elle vit dans `etatMesure`, pour
+ * qu'un changement de mode ne l'interrompe pas. Ici on affiche, on démarre, on
+ * arrête. Le temps est écrit par l'écran de séance, qui seul détient l'état.
  */
 export function ChronoEffort({
-  secondes, onChange, compact = false, etiquette, onEtatChange,
+  cible, secondes, onEffacer, compact = false, etiquette,
 }: {
+  /** ce que cette mesure vise : l'exercice entier, ou une série précise */
+  cible: CibleMesure;
+  /** temps déjà enregistré, affiché quand rien ne tourne */
   secondes: number | null;
-  onChange: (s: number) => void;
+  /** remet le temps enregistré à zéro */
+  onEffacer: () => void;
   compact?: boolean;
   etiquette?: string;
-  /** prévient le parent qu'une mesure est en cours, pour éviter de la perdre */
-  onEtatChange?: (enCours: boolean) => void;
 }) {
-  const [court, setCourt] = useState(false);
-  const [ecoule, setEcoule] = useState(0);
-  const depart = useRef<number>(0);
-  const tic = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [, redessiner] = useReducer((n: number) => n + 1, 0);
+  const court = mesureSur(cible.blocOrdre, cible.serieOrdre);
 
-  useEcranEveille(court, 'effort');
+  useEffect(() => abonnerMesure(redessiner), []);
 
+  /* Le battement n'existe que pendant l'affichage. Le décompte, lui, se déduit
+     de l'heure de départ : il n'a besoin de personne pour avancer. */
   useEffect(() => {
     if (!court) return;
+    const tic = setInterval(redessiner, 250);
 
-    depart.current = Date.now() - ecoule * 1000;
-    tic.current = setInterval(() => {
-      setEcoule(Math.floor((Date.now() - depart.current) / 1000));
-    }, 250);
-
-    return () => {
-      if (tic.current) clearInterval(tic.current);
-    };
+    return () => { clearInterval(tic); };
   }, [court]);
 
-  const basculer = () => {
-    if (court) {
-      setCourt(false);
-      onEtatChange?.(false);
-      onChange(ecoule);          // on reporte le temps mesuré
-    } else {
-      setEcoule(0);
-      setCourt(true);
-      onEtatChange?.(true);
-    }
-  };
-
-  /* Si le composant disparaît alors qu'une mesure court — changement de mode,
-     fermeture de l'exercice — le temps écoulé est sauvegardé plutôt que perdu. */
-  const ecouleRef = useRef(0);
-  ecouleRef.current = ecoule;
-  const courtRef = useRef(false);
-  courtRef.current = court;
-  useEffect(() => () => {
-    if (courtRef.current && ecouleRef.current > 0) {
-      onChange(ecouleRef.current);
-      onEtatChange?.(false);
-    }
-  }, []);
-
-  const affiche = court ? ecoule : (secondes ?? 0);
+  const affiche = court ? ecouleMesure() : (secondes ?? 0);
 
   return (
     <View style={[s.barre, compact && { gap: 6 }]}>
@@ -83,7 +60,7 @@ export function ChronoEffort({
       </Chiffre>
 
       <Pressable
-        onPress={basculer}
+        onPress={() => (court ? arreterMesure() : demarrerMesure(cible))}
         style={[s.bouton, court && s.boutonStop, compact && s.boutonCompact]}
         accessibilityLabel={court ? 'Arrêter le chronomètre' : 'Démarrer le chronomètre'}
       >
@@ -93,7 +70,7 @@ export function ChronoEffort({
       </Pressable>
 
       {!court && affiche > 0 && (
-        <Pressable onPress={() => onChange(0)} style={s.effacer}>
+        <Pressable onPress={onEffacer} style={s.effacer}>
           <Discret style={{ fontSize: 15 }}>×</Discret>
         </Pressable>
       )}

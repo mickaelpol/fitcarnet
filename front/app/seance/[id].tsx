@@ -11,6 +11,8 @@ import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { ChronoRepos } from '@/composants/chrono';
 import { ModaleCalculateurRM } from '@/composants/calculateurRM';
+import { BandeauMesure } from '@/composants/bandeauMesure';
+import { abonnerMesure, appliquerResultats, prendreResultats } from '@/composants/etatMesure';
 import { CarteExercice, lireFormat } from '@/composants/exerciceSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
 import { libelleEtat, useSauvegardeAuto } from '@/composants/sauvegardeAuto';
@@ -106,6 +108,19 @@ export default function DetailSeance() {
     },
     { actif: seance !== null && seance.exercices.length > 0 },
   );
+
+  /* Le chronomètre d'effort ne connaît pas la séance : il dépose le temps
+     mesuré, et c'est ici — seul endroit qui détient l'état — qu'on l'écrit.
+     Ce détour est ce qui permet à une mesure de survivre au changement de
+     mode, qui démonte le composant où elle s'affichait. */
+  useEffect(() => abonnerMesure(() => {
+    const resultats = prendreResultats();
+    if (resultats.length === 0) return;
+
+    setSeance((courante) => (courante === null
+      ? courante
+      : { ...courante, exercices: appliquerResultats(courante.exercices, resultats) }));
+  }), []);
 
   useEffect(() => {
     if (nouvelle && seance === null) {
@@ -203,6 +218,10 @@ export default function DetailSeance() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Une mesure peut tourner alors que son champ n'est plus affiché :
+          le bandeau la garde sous les yeux, où qu'on soit dans la séance. */}
+      <BandeauMesure />
+
       {/* La liste occupe la place restante, la barre de chrono garde la sienne
           en bas. La contrainte vit ici et non dans ListeDeplacable : ce
           composant sert aussi aux modèles, où rien ne le suit. */}

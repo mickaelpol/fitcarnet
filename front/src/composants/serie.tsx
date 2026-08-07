@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { Serie } from '@/api/types';
 import { Champ, Discret, Texte } from './base';
 import { ChronoEffort } from './chronoSerie';
+import type { CibleMesure } from './etatMesure';
 import { C, E, R, TOUCHE, nb } from '@/theme';
 
 /** « 42 » ou « 1:20 » -> secondes. */
@@ -25,15 +26,16 @@ export const versTemps = (s: number | null): string =>
  * puis relance le repos : c'est le geste le plus fréquent en salle.
  */
 export function LigneSerie({
-  serie, mode, index, onChange, onSupprimer, onCochee, onChronoChange,
+  serie, mode, index, cible, onChange, onSupprimer, onCochee,
 }: {
   serie: Serie;
   mode: 'charge' | 'iso' | 'chrono';
   index: number;
+  /** ce que vise le chronomètre de cette ligne */
+  cible: CibleMesure;
   onChange: (s: Serie) => void;
   onSupprimer: () => void;
   onCochee: () => void;
-  onChronoChange?: (enCours: boolean) => void;
 }) {
   const cocher = () => {
     const suite: Serie = { ...serie, faite: !serie.faite };
@@ -77,9 +79,9 @@ export function LigneSerie({
       {mode === 'iso' && (
         <View style={{ flex: 1 }}>
           <ChronoEffort
+            cible={cible}
             secondes={serie.secondes}
-            onChange={(sec) => onChange({ ...serie, secondes: sec })}
-            onEtatChange={onChronoChange}
+            onEffacer={() => onChange({ ...serie, secondes: null })}
             compact
           />
         </View>

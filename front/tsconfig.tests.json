@@ -8,10 +8,18 @@
     "types": [
       "node"
     ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
     "outDir": "dist-tests",
-    "rootDir": "src/solveur"
+    "rootDir": "src"
   },
   "include": [
-    "src/solveur/**/*.ts"
+    "src/solveur/**/*.ts",
+    "src/composants/etatMesure.ts",
+    "src/composants/etatMesure.test.ts"
   ]
 }
