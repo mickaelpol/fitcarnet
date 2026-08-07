@@ -32,7 +32,31 @@ ratios cru/cuit dérivés de la conservation de l'énergie.
 
 **Frigo.** `/api/mon-frigo` renvoie une forme unique quelle que soit la
 source : Grocy pour le compte administrateur, table `aliment` pour les
-autres. Écran branché dessus, groupé par emplacement.
+autres. Écran branché dessus, groupé par emplacement, avec recherche sur le
+nom et l'emplacement.
+
+**Unités de stock.** Chaque aliment porte son unité et le poids en grammes
+d'une unité, lus dans Grocy (`quantity_units`, `quantity_unit_conversions_
+resolved`). Un œuf déclaré « 1 pièce = 65 g » affiche « soit 715 g » pour
+11 pièces. Ce qui n'a pas de poids connu — litre, pack — est nommé à l'écran
+et écarté du calculateur.
+
+**Éditeur d'aliment, côté Grocy.** Bouton sur une carte du frigo,
+`POST /api/mon-frigo/aliment` écrit les neuf champs personnalisés. Le nom et
+l'état de référence sont verrouillés : Grocy est maître du premier, et le
+second s'y déduit de la catégorie au lieu d'être stocké. Une valeur absente
+est écrite vide et non omise, sans quoi effacer une fibre saisie par erreur
+serait impossible.
+
+**Détection des kilojoules.** Les étiquettes affichent « 1473 kJ / 352 kcal »,
+les kJ en premier. Deux garde-fous : le plafond de 900 kcal pour 100 g, et le
+rapport aux macros quand il serre 4,184 à 10 % près. Un bouton convertit.
+Aucun des deux n'attrape un aliment peu calorique saisi sans macros.
+
+**Inventaire.** Mode dédié dans l'onglet Frigo, pour les deux sources. Champs
+préremplis avec le stock connu, case « vérifié » purement visuelle, envoi
+explicite en fin de parcours et des seuls écarts. Les appels Grocy partent en
+parallèle, plafonnés à 60 lignes par envoi.
 
 **Chronomètre de repos.** Cocher une série relance le décompte sur la durée
 choisie. Le redémarrage passe par une propriété `relance` et non par un
@@ -43,20 +67,32 @@ choisie. Le redémarrage passe par une propriété `relance` et non par un
 
 ## Ce qui reste
 
-**Brancher l'éditeur d'aliment.** `front/src/composants/editeurAliment.tsx`
-et `front/src/calcul/nutrition.ts` existent et sont testés, mais aucun bouton
-ne les ouvre et rien ne les enregistre. Il faut : un bouton d'ajout et
-d'édition sur l'écran Mon frigo, l'écriture dans les champs personnalisés
-Grocy pour l'administrateur et dans la table `aliment` pour les autres.
+**L'éditeur d'aliment côté base.** Il n'existe que pour Grocy. Un compte
+ordinaire n'a aucun bouton pour créer ni corriger un aliment :
+`POST /api/mon-frigo/aliment` lui répond 409, et l'écran ne l'affiche pas.
+Les fondations sont posées — `POST /api/aliments` accepte les fibres et les
+deux pesées, `AlimentProcessor` pose propriétaire et confidentialité,
+`FiltreAliment` restreint la lecture — il manque l'écran et l'appel.
 
-**Champs manquants côté Grocy.** Les fibres et les deux pesées du ratio ne
-sont pas posés par `ciqual_vers_grocy.py`.
+**Rien n'a été essayé avec un compte ordinaire.** Le frigo, le stock et
+l'inventaire sont écrits pour les deux sources et compilent, mais aucun test
+n'a été fait autrement qu'avec le compte Grocy. À vérifier avant de s'y fier.
+
+**Champs Grocy remplis à la main.** Les trois champs personnalisés
+`fibres100`, `pesee_avant` et `pesee_apres` existent désormais dans Grocy et
+l'éditeur les écrit, mais `ciqual_vers_grocy.py` ne les pose toujours pas à
+l'import.
 
 **Calculateur de repas.** Toujours branché sur des données de démonstration ;
 il doit lire `/api/mon-frigo`. Et l'écran s'ouvre vide — il faudrait
 reprendre la composition du dernier repas du même type.
 
-**Ajout d'ingrédients au frigo** pour les comptes ordinaires.
+**Ajout d'ingrédients au frigo** pour les comptes ordinaires. Ils ne peuvent
+aujourd'hui que fixer la quantité des 50 aliments communs, pas en créer.
+
+**`nutrition.ts` et `frigo.ts` sans tests permanents.** `tsconfig.tests.json`
+ne compile que `src/solveur` : la détection des kilojoules et le calcul des
+écarts d'inventaire ont été vérifiés à la main, une fois, hors de `npm test`.
 
 **Déploiement NAS.** Image Docker, webhook Gitea vers n8n, sauvegarde
 automatisée de la base.
@@ -96,6 +132,24 @@ comme supposé initialement.
 **Deux dossiers SQL.** `db/` ne contient que ce qui s'applique à une base
 vierge — PostgreSQL ne le joue qu'à la création. `db/manuel/` contient les
 évolutions ultérieures, jouées par `installer.sh`, et doit rester idempotent.
+
+**Aucune unité n'est convertie à l'aveugle.** Le kilogramme et la pièce se
+ramènent au gramme quand Grocy porte la conversion, et seulement alors. Le
+litre et le pack ne se convertissent pas : il faudrait une densité ou un
+poids unitaire qu'on n'a pas. Un aliment sans poids connu est nommé à l'écran
+et écarté du calculateur, jamais deviné. L'inventaire, lui, reste dans
+l'unité native — on compte 6 œufs, on écrit 6, Grocy reçoit 6 pièces, donc
+aucun aller-retour de conversion où glisser une erreur.
+
+**Un champ d'inventaire vide n'est pas un zéro.** Vide veut dire « pas encore
+compté » et ne part pas ; zéro veut dire « il n'y en a plus » et part.
+Confondre les deux viderait le frigo de tout ce qu'on n'a pas eu le temps de
+peser. Seuil d'écart à 0,001 : en deçà c'est l'arrondi d'affichage.
+
+**Un champ de saisie garde le texte, pas le nombre.** Piloter l'input avec
+`String(parseFloat(v))` interdisait « 0,8 » : il faut traverser « 0 » puis
+« 0, », deux états que `parseFloat` écrase. Le bug a vécu jusqu'à ce que
+l'éditeur serve pour de bon.
 
 **Les champs personnalisés Grocy se lisent dans `/objects/products`**, jamais
 produit par produit. Grocy les renvoie déjà sous la clé `userfields` de chaque
