@@ -7,6 +7,10 @@ dist/
 build/
 /api/var/
 /front/.expo/
+# régénéré par « tsc -p tsconfig.tests.json » avant chaque npm test
+/front/dist-tests/
+# correctifs échangés à la main, jamais versionnés
+*.patch
 
 # ---------- secrets et configuration locale ----------
 .env
