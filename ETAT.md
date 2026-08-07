@@ -21,6 +21,17 @@ réordonnancement par glisser-déposer.
 **Séances.** Saisie des séries, trois modes (charge, tenue, chrono),
 chronomètre de repos et chronomètre d'effort, 1RM Epley, courbes de
 progression, sauvegarde automatique, notes repliables, conversion en modèle.
+La sauvegarde automatique ne navigue plus : elle greffe les identifiants
+rendus par le serveur sur l'état local, ce qui évite de jeter la saisie des
+deux secondes et demie d'attente. Le motif d'un échec est affiché en clair.
+
+**Mesure d'effort qui survit au changement de mode.** L'état vit dans
+`src/composants/etatMesure.ts`, pas dans le composant. Basculer Charge /
+Tenue / Chrono, replier l'exercice ou faire défiler la séance n'interrompt
+plus le décompte ; un bandeau en haut de l'écran le garde sous les yeux et
+porte le verrou d'écran. Le temps garde sa destination d'origine — une tenue
+lancée sur la série 2 s'écrit dans la série 2. Une seule mesure à la fois.
+Six tests, dont le réordonnancement pendant la mesure.
 
 **Modèles.** Glisser-déposer, propagation de l'ordre aux séances existantes,
 suppression.
@@ -53,10 +64,16 @@ les kJ en premier. Deux garde-fous : le plafond de 900 kcal pour 100 g, et le
 rapport aux macros quand il serre 4,184 à 10 % près. Un bouton convertit.
 Aucun des deux n'attrape un aliment peu calorique saisi sans macros.
 
-**Inventaire.** Mode dédié dans l'onglet Frigo, pour les deux sources. Champs
-préremplis avec le stock connu, case « vérifié » purement visuelle, envoi
-explicite en fin de parcours et des seuls écarts. Les appels Grocy partent en
-parallèle, plafonnés à 60 lignes par envoi.
+**Frigo à deux modes.** Un seul écran, deux boutons « stock » / « inventaire ».
+Même en-tête, même liste, même barre basse dans les deux : basculer ne donne
+plus l'impression de changer de page. La quantité ne se saisit qu'en mode
+inventaire ; cocher une ligne barre son nom.
+
+**Inventaire.** Pour les deux sources. Champs préremplis avec le stock connu,
+case « vérifié » purement visuelle, envoi explicite en fin de parcours et des
+seuls écarts. Les appels Grocy partent en parallèle, plafonnés à 60 lignes par
+envoi. Mettre une quantité à zéro conserve la ligne et son emplacement, sans
+quoi l'aliment perdait son rangement dès qu'il était épuisé.
 
 **Aliments d'un compte ordinaire.** Ajout depuis un catalogue de référence —
 on tape, il propose, les macros arrivent préremplies — ou création de zéro.
@@ -68,7 +85,32 @@ garnissage. Éprouvé sur un compte d'essai, neuf cas passés.
 **Chronomètre de repos.** Cocher une série relance le décompte sur la durée
 choisie. Le redémarrage passe par une propriété `relance` et non par un
 `key` : un remontage réinitialisait aussi le préréglage, qui retombait à
-1:30 dès la première série cochée.
+1:30 dès la première série cochée. L'état vit dans
+`src/composants/etatChrono.ts` : quitter l'écran de séance n'arrête plus le
+repos. Le décompte se lit sur une heure de fin, pas sur un compteur
+décrémenté — l'application mise en arrière-plan ne le fige plus.
+
+**Alarme de fin de repos portée par Android.** Une notification locale est
+programmée à l'heure de fin et annulée si le chrono est arrêté ou relancé.
+Ça sonne et ça vibre application fermée, téléphone verrouillé. Au premier
+plan c'est l'application qui sonne, avec la sonnerie choisie ; la
+notification est alors rendue muette pour ne pas doubler le signal. Si le
+retour se fait plus d'une seconde et demie après zéro, on ne re-sonne pas :
+c'est l'alarme qui a fait le travail.
+
+**Sonneries.** Cinq sons dans `front/assets/sons/`, choisis dans
+« Mon compte → Réglages de l'app », `buzzer` par défaut. Le choix est
+enregistré sur l'appareil, pas sur le compte : une sonnerie dépend du
+téléphone et de son volume, pas de qui s'y connecte.
+
+**En-tête maison.** `src/composants/enTete.tsx`, branché une seule fois dans
+`app/_layout.tsx`. Remplace l'en-tête natif de `react-native-screens`, qui
+passait sous l'horloge et les icônes de notification.
+
+**Verrou d'écran.** `src/composants/ecranEveille.ts` détient le verrou et le
+relâche quand l'application passe en arrière-plan. Ferme la course entre
+l'activation asynchrone et la désactivation synchrone, qui laissait l'écran
+allumé indéfiniment.
 
 ---
 
@@ -83,20 +125,32 @@ l'import.
 il doit lire `/api/mon-frigo`. Et l'écran s'ouvre vide — il faudrait
 reprendre la composition du dernier repas du même type.
 
-**`nutrition.ts` et `frigo.ts` sans tests permanents.** `tsconfig.tests.json`
-ne compile que `src/solveur` : la détection des kilojoules et le calcul des
-écarts d'inventaire ont été vérifiés à la main, une fois, hors de `npm test`.
+**`nutrition.ts` et `frigo.ts` sans tests permanents.** La détection des
+kilojoules et le calcul des écarts d'inventaire ont été vérifiés à la main,
+une fois, hors de `npm test`. Le blocage est levé : `tsconfig.tests.json`
+prend maintenant des fichiers hors de `src/solveur`, il suffit d'écrire les
+tests.
+
+**`fusionnerIdentifiants` est inerte.** Dans `app/seance/[id].tsx`. L'API
+renvoie désormais les identifiants correctement ; la fonction ne greffe plus
+rien. Code mort à retirer.
 
 **Déploiement NAS.** Image Docker, webhook Gitea vers n8n, sauvegarde
-automatisée de la base.
+automatisée de la base. Un dev build EAS fait partie du lot.
+
+**Sonnerie personnalisée hors de l'application.** Impossible sous Expo Go :
+Android ne joue, sur une notification, qu'un fichier empaqueté dans les
+ressources natives. Et comme un canal est figé à sa création, offrir cinq
+sonneries au choix demandera cinq canaux, un par son. À faire avec le dev
+build.
 
 ---
 
 ## Bugs connus
 
-**Zones basses masquées par Android.** La barre d'onglets a été corrigée avec
-`useSafeAreaInsets`. Reste à vérifier la barre de chrono de la séance et la
-barre de bilan du calculateur.
+**Zones masquées par Android.** Barre d'onglets, barre d'envoi du frigo,
+barre de chrono de la séance et en-tête : corrigés avec `useSafeAreaInsets`.
+Reste à vérifier la barre de bilan du calculateur.
 
 ---
 
@@ -104,7 +158,9 @@ barre de bilan du calculateur.
 
 **Aliments.** Les 50 de référence sont communs et vérifiés ; ceux créés par un
 utilisateur lui restent privés. Sur des valeurs nutritionnelles, l'erreur de
-l'un ne doit pas fausser la diète des autres.
+l'un ne doit pas fausser la diète des autres. **Le frigo d'un compte ordinaire
+ne montre que ses propres aliments** : les 50 de référence servent de
+suggestions à la création, pas de garnissage. Tout le monde part de zéro.
 
 **Macros saisies à la main**, pas d'Open Food Facts ni de code-barres : les
 écarts entre deux marques suffisent à fausser une diète, l'emballage fait foi.
@@ -137,7 +193,45 @@ partiel : le doublon se rattrape à l'insertion, dans `AlimentProcessor`.
 Doctrine passe avant la réflexion PHP dans `property_info` et déclare un
 `DECIMAL` comme `string` : le dénormaliseur refuse un nombre. La lecture, elle,
 passe par les accesseurs typés `float`. L'asymétrie est assumée et tient dans
-`versDecimales()`, côté front.
+`versDecimales()` pour les aliments, `seanceEnEcriture()` et
+`modeleEnEcriture()` pour `poids` et `poidsCible`, côté front. **Toute
+nouvelle colonne `DECIMAL` doit passer par là**, sinon l'écriture échoue avec
+« The type of the "x" attribute must be "string" ».
+
+**« series » est invariant pour l'inflecteur Symfony.** API Platform cherche
+donc `addSeries()` / `removeSeries()`, quand Doctrine génère `addSery()` /
+`removeSery()`. Sans les alias, une séance s'enregistrait avec
+`"series": []` — les séries partaient à la poubelle en silence. Les alias
+sont dans `SeanceExercice` et `ModeleExercice`.
+
+**Les contraintes d'ordre sont DIFFERABLE INITIALLY DEFERRED.** Quand
+Doctrine remplace une collection, il émet les INSERT avant les DELETE : deux
+lignes portent la même `(seance_id, ordre)` le temps d'un instant, et une
+contrainte ordinaire, vérifiée à chaque instruction, refuse. Le même piège
+frappe un simple réordonnancement. Voir
+`db/manuel/11-contraintes-differables.sql`.
+
+**Un canal de notification Android est figé à sa création.** Ni le son, ni
+l'importance, ni la vibration ne se modifient ensuite — seuls le nom et la
+description. Corriger un réglage impose de créer un canal au nom nouveau et
+de supprimer l'ancien. Et le champ `sound` attend le nom d'un **fichier**
+empaqueté : y mettre « default » fait chercher un fichier de ce nom,
+introuvable, et le canal devient muet. Absent, Android retient le son de
+notification du téléphone.
+
+**Les notifications locales marchent dans Expo Go, pas les push.** Retirées
+d'Expo Go sur Android au SDK 53. `expo-notifications` le signale par un
+`console.error` au chargement du module, que LogBox affiche en rouge plein
+écran alors qu'aucune erreur n'a eu lieu. Filtré, et lui seul, dans
+`src/composants/silenceExpoGo.ts`.
+
+**Ce qui doit survivre à un démontage ne vit pas dans un composant.** Chrono
+de repos, mesure d'effort : leur état est dans un module qui expose un
+abonnement, et le composant n'en est que la vue. C'est ce qui permet de
+quitter l'écran, de changer de mode ou de replier une carte sans perdre ce
+qui court. Un décompte se lit toujours sur une heure de fin, jamais sur un
+compteur décrémenté par un minuteur — Android gèle les minuteurs en
+arrière-plan.
 
 **Aucune unité n'est convertie à l'aveugle.** Le kilogramme et la pièce se
 ramènent au gramme quand Grocy porte la conversion, et seulement alors. Le
