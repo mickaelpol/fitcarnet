@@ -35,17 +35,27 @@ final readonly class AlimentSuppressionProcessor implements ProcessorInterface
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
         if ($data instanceof Aliment && null !== $data->getId()) {
-            $lignes = (int) $this->cnx->fetchOne(
-                'SELECT count(*) FROM stock WHERE aliment_id = :aliment',
+            // Seules les quantites NON NULLES bloquent. Une ligne a zero ne
+            // dit plus « il en reste », seulement « il se range ici » : elle
+            // survit a l'epuisement pour ne pas perdre l'emplacement.
+            $restant = (int) $this->cnx->fetchOne(
+                'SELECT count(*) FROM stock WHERE aliment_id = :aliment AND quantite > 0',
                 ['aliment' => $data->getId()],
             );
 
-            if ($lignes > 0) {
+            if ($restant > 0) {
                 throw new ConflictHttpException(\sprintf(
                     'Cet aliment est encore dans un frigo (%d ligne%s de stock). '
                     . 'Mets sa quantité à zéro avant de le supprimer.',
-                    $lignes, $lignes > 1 ? 's' : ''));
+                    $restant, $restant > 1 ? 's' : ''));
             }
+
+            // Les lignes a zero restent referencees par une cle etrangere en
+            // RESTRICT : sans ce menage, PostgreSQL refuserait la suppression.
+            $this->cnx->executeStatement(
+                'DELETE FROM stock WHERE aliment_id = :aliment',
+                ['aliment' => $data->getId()],
+            );
         }
 
         return $this->removeProcessor->process($data, $operation, $uriVariables, $context);

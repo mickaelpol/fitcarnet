@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useAliments, useCreerAliment, useDefinirStock, useEnregistrerAliment,
   useEnvoyerInventaire, useFrigoIncomplets, useMajAliment, useMonFrigo,
@@ -12,8 +13,7 @@ import {
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { EditeurAliment, type AlimentSaisi } from '@/composants/editeurAliment';
-import { ModeInventaire } from '@/composants/inventaire';
-import { filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
+import { ecartsInventaire, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
 import { controler } from '@/calcul/nutrition';
 import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
 
@@ -31,140 +31,159 @@ const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
   prot100: a.prot100,
   gluc100: a.gluc100,
   lip100: a.lip100,
-  fibres100: a.fibres100,
+  fibres100: a.fibres100 ?? null,
   ratio: a.ratio,
   etatReference: a.etatReference,
-  peseeAvant: a.peseeAvant,
-  peseeApres: a.peseeApres,
+  peseeAvant: a.peseeAvant ?? null,
+  peseeApres: a.peseeApres ?? null,
 });
 
+/**
+ * Champs d'inventaire préremplis avec le stock connu.
+ *
+ * La valeur exacte, pas son affichage arrondi : préremplir « 1234,6 » pour un
+ * stock de 1234,56 créerait un écart de 0,04 sur une ligne que personne n'a
+ * touchée, et l'enverrait.
+ */
+const stocksInitiaux = (aliments: AlimentDisponible[]): Record<string, string> =>
+  Object.fromEntries(aliments.map((a) => [a.reference, String(a.stock)]));
+
+/**
+ * Mon frigo : une seule liste, deux modes.
+ *
+ * « Stock » consulte et corrige les fiches ; « Inventaire » compte. Le passage
+ * de l'un à l'autre ne change ni la liste, ni son ordre, ni son regroupement —
+ * seules une case à cocher et une saisie de quantité apparaissent. Deux écrans
+ * séparés obligeaient à retrouver sa place après chaque bascule.
+ */
 export default function MonFrigo() {
+  const insets = useSafeAreaInsets();
+
   const frigo = useMonFrigo();
   const definir = useDefinirStock();
   const enregistrer = useEnregistrerAliment();
   const envoyer = useEnvoyerInventaire();
-  const [tout, setTout] = useState(false);
-  const [ouvert, setOuvert] = useState<string | null>(null);
-  const [saisie, setSaisie] = useState('');
-  const [edite, setEdite] = useState<AlimentDisponible | null>(null);
-  const [inventaire, setInventaire] = useState(false);
-  const [recherche, setRecherche] = useState('');
-
-  /* Parcours d'ajout pour les comptes lisant la base : on choisit d'abord un
-     aliment de référence — ou rien — puis on ajuste dans l'éditeur. Repartir
-     d'une fiche Ciqual évite de ressaisir six valeurs à la main. */
   const catalogue = useAliments();
   const creer = useCreerAliment();
   const majAliment = useMajAliment();
   const supprimer = useSupprimerAliment();
-  const [choixModele, setChoixModele] = useState(false);
+
+  const [mode, setMode] = useState<'stock' | 'inventaire'>('stock');
+  const [ouvert, setOuvert] = useState<string | null>(null);
+  const [recherche, setRecherche] = useState('');
+
+  const [saisies, setSaisies] = useState<Record<string, string>>({});
+  const [vus, setVus] = useState<Record<string, boolean>>({});
+
+  const [edite, setEdite] = useState<AlimentDisponible | null>(null);
   const [nouveau, setNouveau] = useState<AlimentSaisi | null>(null);
+  const [quantiteNouvelle, setQuantiteNouvelle] = useState('');
+  const [choixModele, setChoixModele] = useState(false);
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
 
+  /** Les comptes lisant Grocy gèrent leurs fiches et leurs quantités là-bas. */
   const modifiable = frigo.data?.source === 'base';
   const incomplets = useFrigoIncomplets(frigo.data?.source === 'grocy');
 
+  const tous = frigo.data?.aliments ?? [];
+
   const sections = useMemo(
-    () => grouperParEmplacement(filtrerFrigo(
-      (frigo.data?.aliments ?? []).filter((a) => tout || a.stock > 0), recherche)),
-    [frigo.data, tout, recherche],
+    () => grouperParEmplacement(filtrerFrigo(tous, recherche)),
+    [tous, recherche],
   );
+
+  /* Les écarts se calculent sur TOUT le frigo, pas sur ce que la recherche
+     laisse voir : filtrer puis envoyer perdrait les lignes déjà saisies. */
+  const ecarts = useMemo(() => ecartsInventaire(tous, saisies), [tous, saisies]);
+
+  const enStock = tous.filter((a) => a.stock > 0).length;
+  const comptes = Object.values(vus).filter(Boolean).length;
 
   /* Les macros sont données pour 100 g. Une autre unité ne pose problème que
      si son poids est inconnu : le kilogramme et la pièce se convertissent dès
      que Grocy porte la conversion, le litre et le pack non. */
-  /* Les noms deja presents dans le frigo, pour ne pas les reproposer. */
+  const sansPoids = useMemo(() => tous.filter((a) => a.grammesParUnite === null), [tous]);
+
+  /** Les noms déjà présents, pour ne pas les reproposer au catalogue. */
   const dejaChezMoi = useMemo(
-    () => new Set((frigo.data?.aliments ?? []).map((a) => a.nom.trim().toLowerCase())),
-    [frigo.data],
+    () => new Set(tous.map((a) => a.nom.trim().toLowerCase())),
+    [tous],
   );
 
-  const sansPoids = useMemo(
-    () => (frigo.data?.aliments ?? []).filter((a) => a.grammesParUnite === null),
-    [frigo.data],
-  );
+  const entrerInventaire = () => {
+    envoyer.reset();
+    setSaisies(stocksInitiaux(tous));
+    setVus({});
+    setOuvert(null);
+    setMode('inventaire');
+  };
 
   if (frigo.isLoading) return <Chargement texte="Lecture de ton frigo…" />;
   if (frigo.isError) {
     return <Erreur message={frigo.error.message} onReessayer={() => void frigo.refetch()} />;
   }
 
-  /* L'inventaire porte sur TOUT le frigo, pas seulement sur ce qui est en
-     stock : un produit à zéro qu'on retrouve au fond du placard est
-     précisément ce qu'un inventaire sert à rattraper. */
-  if (inventaire) {
-    return (
-      <ModeInventaire
-        aliments={frigo.data?.aliments ?? []}
-        enCours={envoyer.isPending}
-        erreur={envoyer.error?.message ?? null}
-        onQuitter={() => { envoyer.reset(); setInventaire(false); }}
-        onEnvoyer={(lignes) => envoyer.mutate(lignes, {
-          onSuccess: (r) => { if (r.echecs.length === 0) setInventaire(false); },
-        })}
-      />
-    );
-  }
-
-  const enStock = (frigo.data?.aliments ?? []).filter((a) => a.stock > 0).length;
-  const total = (frigo.data?.aliments ?? []).length;
-
   return (
     <View style={{ flex: 1 }}>
       <View style={s.tete}>
-        {/* Deux segments visibles plutôt qu'un bouton qui change de nom : sur
-            une bascule à libellé unique, on ne sait ni qu'elle se clique, ni si
-            le mot désigne l'état courant ou ce qu'on obtiendra en cliquant. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: E.s }}>
           <View style={s.segmente}>
             <Pressable
-              onPress={() => setTout(false)}
-              style={[s.segment, !tout && s.segmentActif]}
+              onPress={() => setMode('stock')}
+              style={[s.segment, mode === 'stock' && s.segmentActif]}
               accessibilityRole="button"
-              accessibilityState={{ selected: !tout }}
+              accessibilityState={{ selected: mode === 'stock' }}
             >
-              <Discret style={!tout ? s.segmentTexteActif : s.segmentTexte}>
-                En stock · {enStock}
+              <Discret style={mode === 'stock' ? s.segmentTexteActif : s.segmentTexte}>
+                Stock
               </Discret>
             </Pressable>
             <Pressable
-              onPress={() => setTout(true)}
-              style={[s.segment, tout && s.segmentActif]}
+              onPress={entrerInventaire}
+              style={[s.segment, mode === 'inventaire' && s.segmentActif]}
               accessibilityRole="button"
-              accessibilityState={{ selected: tout }}
+              accessibilityState={{ selected: mode === 'inventaire' }}
             >
-              <Discret style={tout ? s.segmentTexteActif : s.segmentTexte}>
-                Tout · {total}
+              <Discret style={mode === 'inventaire' ? s.segmentTexteActif : s.segmentTexte}>
+                Inventaire
               </Discret>
             </Pressable>
           </View>
-
-          <Bouton
-            variante="contour"
-            onPress={() => { envoyer.reset(); setInventaire(true); }}
-          >
-            Inventaire
-          </Bouton>
         </View>
 
-        {modifiable && (
-          <Bouton
-            onPress={() => { creer.reset(); setChoixModele(true); }}
-          >
-            Ajouter un aliment
-          </Bouton>
-        )}
-
-        <Discret style={{ fontSize: 11, lineHeight: 16 }}>
-          « Tout » ajoute les aliments à zéro, ceux qu'il reste à racheter.
-          {frigo.data?.source === 'grocy' ? ' Stock tenu dans Grocy.' : ''}
+        <Discret style={{ fontSize: 11.5 }}>
+          {mode === 'stock'
+            ? `${enStock} en stock sur ${tous.length}`
+            : `${comptes}/${tous.length} vérifiés · ${ecarts.length} écart${ecarts.length > 1 ? 's' : ''}`}
+          {frigo.data?.source === 'grocy' ? ' · depuis Grocy' : ''}
         </Discret>
 
+        {/* L'en-tête est volontairement IDENTIQUE dans les deux modes : mêmes
+            éléments, même hauteur, seul le texte du compteur change. Un bouton
+            qui apparaissait ici et une aide qui disparaissait là faisaient
+            sauter la liste, et la bascule ressemblait à un changement de page. */}
         <Champ
           valeur={recherche}
           onChange={setRecherche}
           placeholder="Chercher un aliment ou un emplacement"
         />
+
+        {supprimer.isError && (
+          <View style={s.alerte}>
+            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+              {supprimer.error.message}
+            </Discret>
+          </View>
+        )}
+
+        {definir.isError && (
+          <View style={s.alerte}>
+            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+              L'aliment a bien été créé, mais sa quantité n'a pas pu être posée :
+              {' '}{definir.error.message}. Renseigne-la depuis l'inventaire.
+            </Discret>
+          </View>
+        )}
 
         {sansPoids.length > 0 && (
           <View style={s.alerte}>
@@ -175,27 +194,6 @@ export default function MonFrigo() {
               Les macros sont données pour 100 g : le calculateur les écarte.
               Déclare la conversion dans Grocy — « 1 {sansPoids[0]?.unite} = … g »
               sur la fiche produit — ou passe-les au gramme.
-            </Discret>
-          </View>
-        )}
-
-        {/* Le refus d'une suppression s'affiche ici, en haut et non dans la
-            carte : la carte peut être refermée au moment où la réponse
-            arrive, et le message serait perdu. */}
-        {supprimer.isError && (
-          <View style={s.alerte}>
-            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
-              {supprimer.error.message}
-            </Discret>
-          </View>
-        )}
-
-        {envoyer.isSuccess && envoyer.data.echecs.length > 0 && (
-          <View style={s.alerte}>
-            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
-              {envoyer.data.corriges} produit(s) corrigé(s),
-              {' '}{envoyer.data.echecs.length} en échec :
-              {' '}{envoyer.data.echecs.map((e) => e.motif).join(' · ')}
             </Discret>
           </View>
         )}
@@ -223,141 +221,96 @@ export default function MonFrigo() {
         sections={sections}
         keyExtractor={(a) => a.reference}
         contentContainerStyle={s.page}
+        keyboardShouldPersistTaps="handled"
         refreshing={frigo.isRefetching}
-        onRefresh={() => void frigo.refetch()}
+        onRefresh={mode === 'stock' ? () => void frigo.refetch() : undefined}
         ListEmptyComponent={
-          <Vide message={tout
-            ? "Aucun aliment. Ajoute-les depuis l'écran de composition."
-            : 'Rien en stock. Bascule sur « Tout » pour voir le reste.'} />
+          <Vide message={recherche.trim() !== ''
+            ? `Aucun aliment ne correspond à « ${recherche} ».`
+            : 'Ton frigo est vide. Ajoute un aliment pour commencer.'} />
         }
         renderSectionHeader={({ section }) => (
-          <Discret style={s.section}>{section.titre}</Discret>
+          <Discret style={s.section}>{section.titre} · {section.data.length}</Discret>
         )}
-        renderItem={({ item }) => {
-          const est = ouvert === item.reference;
-          const controle = controler({
-            kcal: item.kcal100, prot: item.prot100, gluc: item.gluc100,
-            lip: item.lip100, fibres: item.fibres100,
-          });
-          const sec = item.etatReference === 'cuit' && item.ratio > 1;
-
-          return (
-            <Carte style={[s.carte, est && { borderColor: C.vif }]}>
-              <Pressable
-                onPress={() => {
-                  setOuvert(est ? null : item.reference);
-                  setSaisie(item.stock > 0 ? String(item.stock) : '');
+        renderItem={({ item }) => (
+          mode === 'inventaire'
+            ? (
+              <LigneInventaire
+                aliment={item}
+                texte={saisies[item.reference] ?? ''}
+                vu={vus[item.reference] === true}
+                ecart={ecarts.some((l) => l.reference === item.reference)}
+                onTexte={(v) => setSaisies((x) => ({ ...x, [item.reference]: v }))}
+                onCocher={() => setVus((v) => ({
+                  ...v, [item.reference]: !(v[item.reference] === true),
+                }))}
+              />
+            )
+            : (
+              <LigneStock
+                aliment={item}
+                ouvert={ouvert === item.reference}
+                modifiable={modifiable}
+                onOuvrir={() => setOuvert(ouvert === item.reference ? null : item.reference)}
+                onCorriger={() => {
+                  majAliment.reset();
+                  enregistrer.reset();
+                  setEdite(item);
                 }}
-                style={s.ligne}
-              >
-                <View style={[s.pastille, { backgroundColor: couleurRole(item.categorie) }]} />
-                <View style={{ flex: 1 }}>
-                  <Texte numberOfLines={1}>{item.nom}</Texte>
-                  <Discret style={{ fontSize: 11.5 }} numberOfLines={1}>
-                    {nb(item.kcal100)} kcal · {nb(item.prot100)} P · {nb(item.gluc100)} G
-                    {' · '}{nb(item.lip100)} L
-                  </Discret>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Chiffre taille={18} couleur={item.stock > 0 ? C.vif : C.discret}>
-                    {nb(item.stock)} {item.unite}
-                  </Chiffre>
-                  {item.unite !== 'g' && item.grammesParUnite !== null && (
-                    <Discret style={{ fontSize: 10 }}>
-                      soit {nb(item.stock * item.grammesParUnite)} g
-                    </Discret>
-                  )}
-                  {item.unite === 'g' && item.ratio !== 1 && (
-                    <Discret style={{ fontSize: 10 }}>
-                      {sec ? 'poids sec' : 'poids cru'}
-                    </Discret>
-                  )}
-                </View>
-              </Pressable>
-
-              {est && (
-                <View style={s.detail}>
-                  <View style={s.mesures}>
-                    <Mesure cle="Pour 100 g" valeur={`${nb(item.kcal100)} kcal`} />
-                    <Mesure cle="Protéines" valeur={`${nb(item.prot100)} g`} />
-                    <Mesure cle="Glucides" valeur={`${nb(item.gluc100)} g`} />
-                    <Mesure cle="Lipides" valeur={`${nb(item.lip100)} g`} />
-                    {item.fibres100 !== null && (
-                      <Mesure cle="Fibres" valeur={`${nb(item.fibres100)} g`} />
-                    )}
-                    <Mesure
-                      cle="À la cuisson"
-                      valeur={item.ratio === 1
-                        ? 'poids inchangé'
-                        : `100 g → ${Math.round(item.ratio * 100)} g`}
-                    />
-                  </View>
-
-                  {controle.verdict !== 'coherent' && (
-                    <Discret style={{ color: C.vif, fontSize: 11.5, lineHeight: 16 }}>
-                      {controle.message}
-                    </Discret>
-                  )}
-
-                  {modifiable ? (
-                    <View style={{ flexDirection: 'row', gap: E.s, alignItems: 'flex-end' }}>
-                      <Champ
-                        etiquette="Quantité en stock"
-                        valeur={saisie} onChange={setSaisie}
-                        unite={item.unite} numerique placeholder="0" style={{ flex: 1 }}
-                      />
-                      <Bouton
-                        onPress={() => definir.mutate({
-                          alimentId: Number(item.reference.split(':')[1]),
-                          quantite: parseFloat(saisie.replace(',', '.')) || 0,
-                        }, { onSuccess: () => setOuvert(null) })}
-                        desactive={definir.isPending}
-                      >
-                        Enregistrer
-                      </Bouton>
-                    </View>
-                  ) : null}
-
-                  {/* Le frigo d'un compte ordinaire ne contient que ses propres
-                      aliments : chaque carte est donc modifiable et supprimable. */}
-                  {modifiable && (
-                    <View style={{ flexDirection: 'row', gap: E.s }}>
-                      <Bouton
-                        variante="contour"
-                        onPress={() => { majAliment.reset(); setEdite(item); }}
-                        style={{ flex: 1 }}
-                      >
-                        Corriger les valeurs
-                      </Bouton>
-                      <Bouton
-                        variante="discret"
-                        onPress={() => { supprimer.reset(); setASupprimer(item); }}
-                      >
-                        <Discret style={{ color: C.erreur }}>Supprimer</Discret>
-                      </Bouton>
-                    </View>
-                  )}
-
-                  {!modifiable && (
-                    <View style={{ gap: E.s }}>
-                      <Discret style={{ fontSize: 11.5, lineHeight: 16 }}>
-                        Cette quantité vient de Grocy. Modifie-la là-bas, ou fais
-                        ton inventaire depuis ta page habituelle.
-                      </Discret>
-                      <Bouton
-                        variante="contour"
-                        onPress={() => { enregistrer.reset(); setEdite(item); }}
-                      >
-                        Corriger les valeurs nutritionnelles
-                      </Bouton>
-                    </View>
-                  )}
-                </View>
-              )}
-            </Carte>
-          );
-        }}
+                onSupprimer={() => { supprimer.reset(); setASupprimer(item); }}
+              />
+            )
+        )}
       />
+
+      {/* Barre du bas, présente dans les deux modes : c'est elle qui porte
+          l'action principale, à portée du pouce. Sa présence constante évite
+          que la liste ne se redimensionne au changement de mode. */}
+      {mode === 'stock' && modifiable && (
+        <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
+          <Bouton onPress={() => { creer.reset(); definir.reset(); setChoixModele(true); }}>
+            Ajouter un aliment
+          </Bouton>
+        </View>
+      )}
+
+      {mode === 'inventaire' && (
+        <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
+          {envoyer.isError && (
+            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+              {envoyer.error.message}
+            </Discret>
+          )}
+          {envoyer.isSuccess && envoyer.data.echecs.length > 0 && (
+            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+              {envoyer.data.corriges} corrigé(s), {envoyer.data.echecs.length} en échec :
+              {' '}{envoyer.data.echecs.map((e) => e.motif).join(' · ')}
+            </Discret>
+          )}
+          <View style={{ flexDirection: 'row', gap: E.s }}>
+            <Bouton
+              variante="contour"
+              onPress={() => { setSaisies(stocksInitiaux(tous)); setVus({}); }}
+              style={{ flex: 1 }}
+            >
+              Réinitialiser
+            </Bouton>
+            <Bouton
+              onPress={() => envoyer.mutate(ecarts, {
+                onSuccess: (r) => { if (r.echecs.length === 0) setMode('stock'); },
+              })}
+              desactive={ecarts.length === 0 || envoyer.isPending}
+              style={{ flex: 1.6 }}
+            >
+              {envoyer.isPending
+                ? 'Envoi…'
+                : ecarts.length === 0
+                  ? 'Aucun écart à envoyer'
+                  : `Enregistrer ${ecarts.length} correction${ecarts.length > 1 ? 's' : ''}`}
+            </Bouton>
+          </View>
+        </View>
+      )}
 
       {/* ---- compte Grocy : correction des macros, nom et état verrouillés ---- */}
       <EditeurAliment
@@ -366,9 +319,6 @@ export default function MonFrigo() {
         aliment={edite !== null ? versSaisie(edite) : undefined}
         enCours={enregistrer.isPending}
         erreur={enregistrer.error?.message ?? null}
-        // Grocy est maître du nom, et l'état de référence s'y déduit de la
-        // catégorie au lieu d'être stocké : les laisser modifiables ferait
-        // croire à une saisie qui ne serait jamais enregistrée.
         nomModifiable={false}
         etatModifiable={false}
         onFermer={() => setEdite(null)}
@@ -390,14 +340,18 @@ export default function MonFrigo() {
         }}
       />
 
-      {/* ---- compte ordinaire : création et correction, tout est modifiable ---- */}
+      {/* ---- compte ordinaire : création et correction ---- */}
       <EditeurAliment
         visible={modifiable && (nouveau !== null || edite !== null)}
         titre={nouveau !== null ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment')}
         aliment={nouveau ?? (edite !== null ? versSaisie(edite) : undefined)}
-        enCours={creer.isPending || majAliment.isPending}
+        enCours={creer.isPending || majAliment.isPending || definir.isPending}
         erreur={(creer.error ?? majAliment.error)?.message ?? null}
-        onFermer={() => { setNouveau(null); setEdite(null); }}
+        // la quantité ne se saisit qu'à la création : ailleurs elle se corrige
+        // dans l'inventaire, seul endroit où elle s'écrit
+        quantite={nouveau !== null ? quantiteNouvelle : undefined}
+        onQuantiteChange={nouveau !== null ? setQuantiteNouvelle : undefined}
+        onFermer={() => { setNouveau(null); setEdite(null); setQuantiteNouvelle(''); }}
         onEnregistrer={(v) => {
           const corps = {
             nom: v.nom.trim(),
@@ -415,9 +369,21 @@ export default function MonFrigo() {
 
           if (nouveau !== null) {
             creer.mutate(corps, {
-              // un aliment neuf n'a pas de stock : sans cette bascule il
-              // n'apparaîtrait nulle part et on croirait la création perdue
-              onSuccess: () => { setNouveau(null); setTout(true); },
+              onSuccess: (cree) => {
+                const q = parseFloat(quantiteNouvelle.replace(',', '.'));
+
+                setNouveau(null);
+                setQuantiteNouvelle('');
+
+                // On pose la quantité MÊME à zéro : c'est cet appel qui crée
+                // la ligne de stock, donc qui rattache l'aliment à un
+                // emplacement. Sans lui il resterait sous « Sans emplacement »,
+                // tout en bas, jusqu'au premier inventaire.
+                definir.mutate({
+                  alimentId: cree.id,
+                  quantite: Number.isNaN(q) ? 0 : q,
+                });
+              },
             });
 
             return;
@@ -442,8 +408,6 @@ export default function MonFrigo() {
             // On écarte ce qu'on possède déjà, par le nom. Le catalogue mêle
             // les aliments de référence et les siens ; proposer les siens
             // ferait créer un doublon, que l'unicité par propriétaire refuse.
-            // Le nom est le seul discriminant disponible : l'API omet les
-            // champs nuls, donc aucun indicateur de provenance n'arrive ici.
             .filter((a) => !dejaChezMoi.has(a.nom.trim().toLowerCase()))
             .map((a) => ({
               id: a.id,
@@ -458,6 +422,7 @@ export default function MonFrigo() {
           // « Créer de zéro » porte l'identifiant 0, qu'aucun aliment n'a
           const modele = (catalogue.data ?? []).find((a) => a.id === id);
 
+          setQuantiteNouvelle('');
           // « ?? null » n'est pas cosmétique : l'API omet les champs nuls, ils
           // arrivent donc en « undefined », que l'éditeur ne distingue pas
           // d'une valeur absente de son formulaire.
@@ -483,21 +448,161 @@ export default function MonFrigo() {
         message={
           'Il quittera définitivement ta liste d’aliments. '
           + 'La suppression est refusée s’il t’en reste en stock : '
-          + 'mets sa quantité à zéro d’abord.'
+          + 'mets sa quantité à zéro depuis l’inventaire d’abord.'
         }
         onAnnuler={() => setASupprimer(null)}
         onConfirmer={() => {
           if (aSupprimer === null) return;
 
           supprimer.mutate(Number(aSupprimer.reference.split(':')[1]), {
-            // en cas d'echec la carte reste ouverte : le motif s'affiche en
-            // haut de l'ecran, et on garde sous les yeux l'aliment concerne
+            // en cas d'échec la carte reste ouverte : le motif s'affiche en
+            // haut de l'écran, et on garde sous les yeux l'aliment concerné
             onSuccess: () => { setASupprimer(null); setOuvert(null); },
             onError: () => setASupprimer(null),
           });
         }}
       />
     </View>
+  );
+}
+
+/* ------------------------------------------------------------- mode stock */
+
+function LigneStock({
+  aliment, ouvert, modifiable, onOuvrir, onCorriger, onSupprimer,
+}: {
+  aliment: AlimentDisponible;
+  ouvert: boolean;
+  modifiable: boolean;
+  onOuvrir: () => void;
+  onCorriger: () => void;
+  onSupprimer: () => void;
+}) {
+  const controle = controler({
+    kcal: aliment.kcal100, prot: aliment.prot100, gluc: aliment.gluc100,
+    lip: aliment.lip100, fibres: aliment.fibres100,
+  });
+  const sec = aliment.etatReference === 'cuit' && aliment.ratio > 1;
+
+  return (
+    <Carte style={[s.carte, ouvert && { borderColor: C.vif }]}>
+      <Pressable onPress={onOuvrir} style={s.ligne}>
+        <View style={[s.pastille, { backgroundColor: couleurRole(aliment.categorie) }]} />
+        <View style={{ flex: 1 }}>
+          <Texte numberOfLines={2}>{aliment.nom}</Texte>
+          <Discret style={{ fontSize: 11.5 }} numberOfLines={1}>
+            {nb(aliment.kcal100)} kcal · {nb(aliment.prot100)} P
+            {' · '}{nb(aliment.gluc100)} G · {nb(aliment.lip100)} L
+          </Discret>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Chiffre taille={18} couleur={aliment.stock > 0 ? C.vif : C.discret}>
+            {nb(aliment.stock)} {aliment.unite}
+          </Chiffre>
+          {aliment.unite !== 'g' && aliment.grammesParUnite !== null && (
+            <Discret style={{ fontSize: 10 }}>
+              soit {nb(aliment.stock * aliment.grammesParUnite)} g
+            </Discret>
+          )}
+          {aliment.unite === 'g' && aliment.ratio !== 1 && (
+            <Discret style={{ fontSize: 10 }}>{sec ? 'poids sec' : 'poids cru'}</Discret>
+          )}
+        </View>
+      </Pressable>
+
+      {ouvert && (
+        <View style={s.detail}>
+          <View style={s.mesures}>
+            <Mesure cle="Pour 100 g" valeur={`${nb(aliment.kcal100)} kcal`} />
+            <Mesure cle="Protéines" valeur={`${nb(aliment.prot100)} g`} />
+            <Mesure cle="Glucides" valeur={`${nb(aliment.gluc100)} g`} />
+            <Mesure cle="Lipides" valeur={`${nb(aliment.lip100)} g`} />
+            {aliment.fibres100 !== null && aliment.fibres100 !== undefined && (
+              <Mesure cle="Fibres" valeur={`${nb(aliment.fibres100)} g`} />
+            )}
+            <Mesure
+              cle="À la cuisson"
+              valeur={aliment.ratio === 1
+                ? 'poids inchangé'
+                : `100 g → ${Math.round(aliment.ratio * 100)} g`}
+            />
+          </View>
+
+          {controle.verdict !== 'coherent' && (
+            <Discret style={{ color: C.vif, fontSize: 11.5, lineHeight: 16 }}>
+              {controle.message}
+            </Discret>
+          )}
+
+          <Discret style={{ fontSize: 11.5, lineHeight: 16 }}>
+            La quantité se modifie depuis l'inventaire.
+            {modifiable ? '' : ' Cet aliment vient de Grocy : sa fiche s’y modifie aussi.'}
+          </Discret>
+
+          <View style={{ flexDirection: 'row', gap: E.s }}>
+            <Bouton variante="contour" onPress={onCorriger} style={{ flex: 1 }}>
+              Corriger les valeurs
+            </Bouton>
+            {/* Supprimer reste réservé aux comptes lisant la base : un produit
+                Grocy se supprime dans Grocy. */}
+            {modifiable && (
+              <Bouton variante="discret" onPress={onSupprimer}>
+                <Discret style={{ color: C.erreur }}>Supprimer</Discret>
+              </Bouton>
+            )}
+          </View>
+        </View>
+      )}
+    </Carte>
+  );
+}
+
+/* -------------------------------------------------------- mode inventaire */
+
+function LigneInventaire({
+  aliment, texte, vu, ecart, onTexte, onCocher,
+}: {
+  aliment: AlimentDisponible;
+  texte: string;
+  vu: boolean;
+  ecart: boolean;
+  onTexte: (v: string) => void;
+  onCocher: () => void;
+}) {
+  return (
+    <Carte style={[s.carteInv, vu && s.carteVue, ecart && { borderColor: C.vif }]}>
+      <Pressable
+        onPress={onCocher}
+        style={s.case_}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: vu }}
+        accessibilityLabel={`${aliment.nom} vérifié`}
+      >
+        <View style={[s.carre, vu && { backgroundColor: C.ok, borderColor: C.ok }]}>
+          {vu && <Texte style={{ color: C.fond, fontSize: 12 }}>✓</Texte>}
+        </View>
+      </Pressable>
+
+      <View style={{ flex: 1 }}>
+        <Texte
+          numberOfLines={2}
+          style={[{ fontSize: 14 }, vu && s.barre]}
+        >
+          {aliment.nom}
+        </Texte>
+        {ecart && (
+          <Discret style={{ fontSize: 11, color: C.vif }}>
+            était {nb(aliment.stock)} {aliment.unite}
+          </Discret>
+        )}
+      </View>
+
+      <Champ valeur={texte} onChange={onTexte} numerique placeholder="—" style={s.saisie} />
+
+      {/* L'unité vit à côté du champ, pas dedans : à l'intérieur elle se fait
+          écraser par le nombre dès que celui-ci est long. */}
+      <Texte style={s.unite}>{aliment.unite}</Texte>
+    </Carte>
   );
 }
 
@@ -510,9 +615,9 @@ const Mesure = ({ cle, valeur }: { cle: string; valeur: string }) => (
 
 const s = StyleSheet.create({
   tete: { padding: E.m, gap: E.s, borderBottomWidth: 1, borderBottomColor: C.ligne },
+
   /* Sélecteur à deux segments : les deux choix restent lisibles, celui qui
-     est actif est plein. On voit d'un coup ce qu'on regarde et ce qu'on peut
-     obtenir en touchant l'autre. */
+     est actif est plein. */
   segmente: {
     flex: 1, flexDirection: 'row', padding: 2,
     borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
@@ -525,14 +630,14 @@ const s = StyleSheet.create({
   segmentActif: { backgroundColor: C.vif },
   segmentTexte: { fontSize: 12.5 },
   segmentTexteActif: { color: C.fond, fontFamily: P.fort, fontSize: 12.5 },
-  alerte: {
-    backgroundColor: 'rgba(227,178,60,0.10)', borderRadius: R.s, padding: E.s,
-  },
+
+  alerte: { backgroundColor: 'rgba(227,178,60,0.10)', borderRadius: R.s, padding: E.s },
   page: { padding: E.m, gap: 6, flexGrow: 1, paddingBottom: E.xl },
   section: {
     fontFamily: P.titre, fontSize: 14, letterSpacing: 1.2, textTransform: 'uppercase',
     marginTop: E.m, marginBottom: E.xs,
   },
+
   carte: { padding: 0, overflow: 'hidden' },
   ligne: { flexDirection: 'row', alignItems: 'center', gap: E.m, padding: E.m, minHeight: 56 },
   pastille: { width: 4, height: 30, borderRadius: 3, opacity: 0.7 },
@@ -542,4 +647,22 @@ const s = StyleSheet.create({
   },
   mesures: { flexDirection: 'row', flexWrap: 'wrap', gap: E.m },
   mesure: { minWidth: 78 },
+
+  carteInv: { flexDirection: 'row', alignItems: 'center', gap: E.s, padding: E.s },
+  carteVue: { opacity: 0.66 },
+  barre: { textDecorationLine: 'line-through' },
+  case_: { padding: 6 },
+  carre: {
+    width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, borderColor: C.ligne,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  saisie: { width: 96 },
+  unite: { fontSize: 13, color: C.attenue, minWidth: 30 },
+
+  /* Barre d'envoi collée en bas. Le retrait vient de useSafeAreaInsets :
+     sans lui, Android la glisse sous sa barre de navigation. */
+  pied: {
+    padding: E.m, gap: E.s,
+    borderTopWidth: 1, borderTopColor: C.ligne, backgroundColor: C.fond,
+  },
 });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Chiffre, Discret, Texte } from './base';
+import { useEcranEveille } from './ecranEveille';
 import { C, E, P, R, TOUCHE } from '@/theme';
 
 export const mmss = (s: number): string =>
@@ -30,10 +30,11 @@ export function ChronoEffort({
   const depart = useRef<number>(0);
   const tic = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  useEcranEveille(court, 'effort');
+
   useEffect(() => {
     if (!court) return;
 
-    void activateKeepAwakeAsync('effort');
     depart.current = Date.now() - ecoule * 1000;
     tic.current = setInterval(() => {
       setEcoule(Math.floor((Date.now() - depart.current) / 1000));
@@ -41,7 +42,6 @@ export function ChronoEffort({
 
     return () => {
       if (tic.current) clearInterval(tic.current);
-      void deactivateKeepAwake('effort');
     };
   }, [court]);
 

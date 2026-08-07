@@ -78,17 +78,24 @@ final readonly class FrigoBase
         float $quantite,
         ?int $idEmplacement = null,
     ): void {
-        // sans emplacement precise, on prend le premier defini
-        $emplacement = $idEmplacement ?? (int) $this->cnx->fetchOne(
-            'SELECT id FROM emplacement ORDER BY ordre, id LIMIT 1');
+        // A defaut d'emplacement precise on garde CELUI DEJA CONNU, et le
+        // premier defini seulement pour un aliment jamais range. Reprendre le
+        // premier a chaque fois deplacerait dans le frigo un produit du placard
+        // des qu'on corrige sa quantite.
+        $emplacement = $idEmplacement
+            ?? (int) ($this->cnx->fetchOne(
+                'SELECT emplacement_id FROM stock
+                 WHERE utilisateur_id = :u AND aliment_id = :a
+                 ORDER BY maj_le DESC LIMIT 1',
+                ['u' => $utilisateur->getId(), 'a' => $idAliment])
+                ?: $this->cnx->fetchOne(
+                    'SELECT id FROM emplacement ORDER BY ordre, id LIMIT 1'));
 
-        if ($quantite <= 0) {
-            $this->cnx->executeStatement(
-                'DELETE FROM stock WHERE utilisateur_id = :u AND aliment_id = :a',
-                ['u' => $utilisateur->getId(), 'a' => $idAliment]);
-
-            return;
-        }
+        // Une quantite nulle n'efface plus la ligne : elle la met a zero.
+        // L'emplacement appartient a la ligne de stock, pas a l'aliment —
+        // supprimer la ligne faisait oublier ou l'aliment se range, et le
+        // renvoyait sous « Sans emplacement » au moment precis ou l'on veut
+        // savoir ou le remettre apres l'avoir rachete.
 
         // la contrainte porte sur (utilisateur, aliment, emplacement) :
         // deplacer un aliment d'un emplacement a l'autre effacerait l'ancien

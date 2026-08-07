@@ -176,7 +176,8 @@ CREATE TABLE modele_exercice (
     mode        TEXT CHECK (mode IN ('charge','iso','chrono')),
     notes       TEXT,
     secondes_total_cible INTEGER,
-    UNIQUE (modele_id, ordre)
+    -- meme raison que sur seance_exercice
+    UNIQUE (modele_id, ordre) DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE TABLE modele_serie (
@@ -212,7 +213,11 @@ CREATE TABLE seance_exercice (
     -- un « 100 for time » dure 4:21 ET se compose de 93 rép à 32 kg puis
     -- 7 à 35 kg. Les deux comptent dans la progression.
     secondes_total INTEGER CHECK (secondes_total IS NULL OR secondes_total >= 0),
-    UNIQUE (seance_id, ordre)
+    -- DIFFERABLE : Doctrine emet les INSERT avant les DELETE quand il
+    -- remplace une collection, et un reordonnancement passe forcement par
+    -- un doublon transitoire. Verifiee au COMMIT, l'unicite tient sur
+    -- l'etat final sans refuser les etapes intermediaires.
+    UNIQUE (seance_id, ordre) DEFERRABLE INITIALLY DEFERRED
 );
 CREATE INDEX ON seance_exercice (exercice_id);   -- pour l'historique et les courbes
 

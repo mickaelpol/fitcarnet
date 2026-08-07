@@ -88,6 +88,21 @@ class SeanceExercice
     /** @return Collection<int, Serie> */
     public function getSeries(): Collection { return $this->series; }
 
+    /**
+     * « series » est INVARIABLE en anglais : le desingularisateur de Symfony
+     * le rend tel quel, et API Platform cherche donc addSeries()/removeSeries().
+     * Seuls addSery()/removeSery() existaient — noms devines a tort. Faute de
+     * mutateur reconnu, la collection etait tenue pour non inscriptible et les
+     * series envoyees a la creation disparaissaient SANS AUCUNE ERREUR : la
+     * reponse renvoyait « series: [] ».
+     *
+     * On expose les deux noms plutot que de renommer : les appels internes
+     * existants continuent de fonctionner.
+     */
+    public function addSeries(Serie $s): self { return $this->addSery($s); }
+
+    public function removeSeries(Serie $s): self { return $this->removeSery($s); }
+
     public function addSery(Serie $s): self
     {
         if (!$this->series->contains($s)) {

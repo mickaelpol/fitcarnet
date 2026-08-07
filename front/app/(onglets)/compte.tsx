@@ -32,6 +32,10 @@ export default function Compte() {
         Mes objectifs par repas
       </Bouton>
 
+      <Bouton variante="contour" onPress={() => router.push('/reglages')}>
+        Réglages de l’app
+      </Bouton>
+
       {data?.roles?.includes('ROLE_ADMIN') === true && (
         <>
           <Discret style={[s.etiquette, { marginTop: E.l }]}>Administration</Discret>

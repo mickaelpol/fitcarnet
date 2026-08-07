@@ -4,8 +4,14 @@ import { Platform } from 'react-native';
 const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080/api';
 const CLE_JETON = 'fitcarnet.jeton';
 
-/* SecureStore n'existe pas sur le web : on retombe sur localStorage. */
-const coffre = {
+/**
+ * SecureStore n'existe pas sur le web : on retombe sur localStorage.
+ *
+ * Exporté parce que les réglages de l'application s'y rangent aussi. Un
+ * second mécanisme de stockage à côté divergerait sur le web, où SecureStore
+ * est absent : une seule porte, une seule règle.
+ */
+export const coffre = {
   async lire(cle: string): Promise<string | null> {
     if (Platform.OS === 'web') return globalThis.localStorage?.getItem(cle) ?? null;
 

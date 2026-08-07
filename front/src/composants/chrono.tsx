@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useEffect, useReducer, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Chiffre, Discret, Texte } from './base';
+import { useEcranEveille } from './ecranEveille';
+import {
+  abonnerChrono, alarmeChronoPosee, arreterChrono, choisirDureeChrono, chronoCourt,
+  demarrerChrono, dureeChrono, relancerChrono, remettreChrono, resteChrono, terminerChrono,
+} from './etatChrono';
+import { jouerSonnerie } from './sonnerie';
 import { C, E, P, R, TOUCHE } from '@/theme';
 
 const PRESETS = [60, 90, 120, 180];
@@ -11,26 +16,24 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
  * Chrono de repos. L'écran reste allumé pendant le décompte : sans ça, le
  * téléphone se verrouille dans la poche et on rate la fin.
  *
+ * Le composant ne DÉTIENT rien : l'état vit dans `etatChrono`, pour qu'un
+ * changement d'écran n'arrête pas le repos en cours. Ici, on affiche, et on bat
+ * la seconde tant qu'on est visible. Quand on ne l'est pas, personne n'a besoin
+ * de compter : l'alarme système sonne, et l'heure de fin suffit à retrouver le
+ * reste au retour.
+ *
  * `relance` : compteur incrémenté par le parent à chaque série cochée. Toute
- * nouvelle valeur relance le décompte sur la durée choisie. Le redémarrage
- * passe par une propriété et non par un `key` : un remontage réinitialiserait
- * aussi la durée sélectionnée, qui doit survivre à la série.
+ * nouvelle valeur relance le décompte sur la durée choisie.
  */
 export function ChronoRepos({ relance, onCalculateur }: {
   relance?: number;
   onCalculateur?: () => void;
 }) {
-  const [duree, setDuree] = useState(90);
-  const [reste, setReste] = useState(90);
-  const [court, setCourt] = useState(false);
-  const tic = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // La durée vit dans une référence pour que la relance ne dépende que de
-  // `relance` : sans ça, changer de préréglage redémarrerait le décompte.
-  const dureeCourante = useRef(duree);
+  const [, redessiner] = useReducer((n: number) => n + 1, 0);
+  const [reste, setReste] = useState(resteChrono);
   const premierRendu = useRef(true);
 
-  useEffect(() => { dureeCourante.current = duree; }, [duree]);
+  useEffect(() => abonnerChrono(redessiner), []);
 
   useEffect(() => {
     if (premierRendu.current) {
@@ -39,40 +42,53 @@ export function ChronoRepos({ relance, onCalculateur }: {
       return;
     }
 
-    setReste(dureeCourante.current);
-    setCourt(true);
+    relancerChrono();
+    setReste(resteChrono());
   }, [relance]);
 
+  const court = chronoCourt();
+  const duree = dureeChrono();
+
+  useEcranEveille(court, 'chrono');
+
   useEffect(() => {
-    if (!court) return;
+    if (!court) {
+      setReste(resteChrono());
 
-    void activateKeepAwakeAsync('chrono');
-    tic.current = setInterval(() => {
-      setReste((r) => {
-        if (r <= 1) {
-          setCourt(false);
-          sonner();
+      return;
+    }
 
-          return 0;
-        }
+    /* Deux battements espacés de plus d'une seconde et demie : les minuteurs
+       ont été gelés — veille, ou autre application. C'est alors la
+       notification qui a sonné, pas nous, et il ne faut pas re-sonner au
+       retour : c'est exactement le bip en retard qu'on cherche à supprimer. */
+    let dernier = Date.now();
+    let continu = true;
 
-        return r - 1;
-      });
-    }, 1000);
+    const battre = () => {
+      const maintenant = Date.now();
+      if (maintenant - dernier > 1500) continu = false;
+      dernier = maintenant;
 
-    return () => {
-      if (tic.current) clearInterval(tic.current);
-      void deactivateKeepAwake('chrono');
+      const r = resteChrono();
+      setReste(r);
+      if (r !== 0) return;
+
+      const parLeSysteme = alarmeChronoPosee() && !continu;
+      terminerChrono();
+      if (!parLeSysteme) sonner();
     };
+
+    battre();
+    // quatre fois par seconde : au retour d'arrière-plan, l'affichage se
+    // remet à jour tout de suite au lieu d'attendre la seconde suivante
+    const tic = setInterval(battre, 250);
+
+    return () => { clearInterval(tic); };
   }, [court]);
 
-  const demarrer = () => { setReste(reste === 0 ? duree : reste); setCourt(true); };
-  const arreter = () => setCourt(false);
-  const remettre = () => { setCourt(false); setReste(duree); };
-
-  const choisir = (s: number) => { setDuree(s); setReste(s); setCourt(false); };
-
   const fini = reste === 0;
+  const agir = (f: () => void) => () => { f(); setReste(resteChrono()); };
 
   return (
     <View style={s.barre}>
@@ -80,11 +96,14 @@ export function ChronoRepos({ relance, onCalculateur }: {
         {mmss(reste)}
       </Chiffre>
 
-      <Pressable onPress={court ? arreter : demarrer} style={[s.go, court && s.goStop]}>
+      <Pressable
+        onPress={agir(court ? arreterChrono : demarrerChrono)}
+        style={[s.go, court && s.goStop]}
+      >
         <Texte style={{ color: C.fond, fontFamily: P.fort }}>{court ? 'Stop' : 'Go'}</Texte>
       </Pressable>
 
-      <Pressable onPress={remettre} style={s.reset}>
+      <Pressable onPress={agir(remettreChrono)} style={s.reset}>
         <Texte style={{ color: C.attenue, fontSize: 16 }}>↺</Texte>
       </Pressable>
 
@@ -98,7 +117,7 @@ export function ChronoRepos({ relance, onCalculateur }: {
         {PRESETS.map((p) => (
           <Pressable
             key={p}
-            onPress={() => choisir(p)}
+            onPress={agir(() => choisirDureeChrono(p))}
             style={[s.preset, duree === p && s.presetActif]}
           >
             <Discret style={duree === p ? { color: C.encre } : undefined}>
@@ -111,32 +130,16 @@ export function ChronoRepos({ relance, onCalculateur }: {
   );
 }
 
-/** Signal de fin : audible même par-dessus de la musique, autant que possible. */
+/**
+ * Signal de fin : un son ET une vibration.
+ *
+ * Les deux, parce qu'ils ne servent pas au même moment — le son quand le
+ * téléphone est posé sur le banc, la vibration quand il est dans la poche
+ * sous une musique. La sonnerie se choisit dans les réglages.
+ */
 function sonner() {
-  if (Platform.OS === 'web') {
-    try {
-      const Ctx = (globalThis as unknown as { AudioContext?: typeof AudioContext }).AudioContext;
-      if (!Ctx) return;
-      const ctx = new Ctx();
-      const t0 = ctx.currentTime;
-      const comp = ctx.createDynamicsCompressor();
-      comp.connect(ctx.destination);
-      for (let i = 0; i < 6; i++) {
-        const d = t0 + i * 0.34;
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = 'square';
-        o.frequency.setValueAtTime(i % 2 ? 1560 : 1180, d);
-        o.connect(g); g.connect(comp);
-        g.gain.setValueAtTime(0.0001, d);
-        g.gain.exponentialRampToValueAtTime(0.5, d + 0.008);
-        g.gain.setValueAtTime(0.5, d + 0.18);
-        g.gain.exponentialRampToValueAtTime(0.0001, d + 0.25);
-        o.start(d); o.stop(d + 0.27);
-      }
-    } catch { /* pas de son : le décompte reste visible */ }
-  }
-  // sur mobile, la vibration prend le relais
+  jouerSonnerie();
+
   const nav = globalThis as unknown as { navigator?: { vibrate?: (p: number[]) => void } };
   nav.navigator?.vibrate?.([300, 120, 300, 120, 300, 120, 500]);
 }

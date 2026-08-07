@@ -63,7 +63,7 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
  */
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
-  nomModifiable = true, etatModifiable = true,
+  quantite, onQuantiteChange, nomModifiable = true, etatModifiable = true,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -73,6 +73,13 @@ export function EditeurAliment({
   enCours?: boolean;
   /** message d'échec de l'enregistrement ; la saisie reste à l'écran */
   erreur?: string | null;
+  /**
+   * Quantité déjà possédée, saisie à la création seulement.
+   * Le champ n'apparaît que si `onQuantiteChange` est fourni : ailleurs la
+   * quantité se corrige dans l'inventaire, seul endroit où elle s'écrit.
+   */
+  quantite?: string;
+  onQuantiteChange?: (v: string) => void;
   /** faux quand le nom appartient à une source externe, Grocy par exemple */
   nomModifiable?: boolean;
   /** faux quand l'état de référence est déduit de la catégorie, non stocké */
@@ -177,6 +184,22 @@ export function EditeurAliment({
                   <Discret style={s.aide}>
                     Le nom vient de Grocy. Renomme le produit là-bas si besoin :
                     le modifier ici ne changerait rien.
+                  </Discret>
+                </>
+              )}
+
+              {onQuantiteChange !== undefined && (
+                <>
+                  <Champ
+                    etiquette="Quantité déjà en stock (facultatif)"
+                    unite="g" numerique style={{ marginTop: E.s }}
+                    valeur={quantite ?? ''}
+                    onChange={onQuantiteChange}
+                    placeholder="0"
+                  />
+                  <Discret style={s.aide}>
+                    Laisse vide si tu n'en as pas encore. L'aliment sera créé à
+                    zéro et se remplira au prochain inventaire.
                   </Discret>
                 </>
               )}

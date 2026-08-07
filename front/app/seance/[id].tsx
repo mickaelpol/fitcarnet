@@ -24,6 +24,44 @@ const iri = (v: Exercice | string) => (typeof v === 'string' ? v : v['@id']);
 const idDe = (v: Exercice | string) =>
   typeof v === 'string' ? Number(v.split('/').pop()) : v.id;
 
+/**
+ * Recopie les identifiants attribues par le serveur dans l'etat local.
+ *
+ * Sans eux, l'enregistrement suivant renvoie les exercices comme s'ils etaient
+ * neufs : Doctrine tente de les INSERER, et se heurte a la contrainte
+ * UNIQUE (seance_id, ordre) — « duplicate key (12, 0) already exists ».
+ *
+ * On ne remplace pas l'etat par la reponse : ce qui a ete tape pendant les
+ * deux secondes et demie d'attente serait perdu. On greffe donc les seuls
+ * identifiants manquants, sur les elements que l'on retrouve avec CERTITUDE.
+ *
+ * L'appariement se fait sur l'ordre ET l'exercice, jamais sur la position
+ * seule : si l'on a retire un exercice pendant l'envoi, les positions ont
+ * glisse, et greffer un identifiant a l'aveugle ecraserait la mauvaise ligne.
+ * Sans correspondance sure, on ne greffe rien — la ligne sera recreee.
+ */
+function fusionnerIdentifiants(locale: Seance, distante: Seance): Seance {
+  return {
+    ...locale,
+    id: locale.id ?? distante.id,
+    exercices: locale.exercices.map((bloc) => {
+      if (bloc.id !== undefined) return bloc;
+
+      const jumeau = distante.exercices.find(
+        (d) => d.ordre === bloc.ordre && iri(d.exercice) === iri(bloc.exercice));
+      if (jumeau === undefined) return bloc;
+
+      return {
+        ...bloc,
+        id: jumeau.id,
+        series: bloc.series.map((serie) => serie.id !== undefined
+          ? serie
+          : { ...serie, id: jumeau.series.find((x) => x.ordre === serie.ordre)?.id }),
+      };
+    }),
+  };
+}
+
 export default function DetailSeance() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const nouvelle = id === 'nouvelle';
@@ -50,14 +88,21 @@ export default function DetailSeance() {
   /* La séance s'enregistre toute seule deux secondes et demie après la
      dernière modification. Tant qu'elle n'a pas d'identifiant, on ne
      déclenche rien : c'est le premier enregistrement qui la crée. */
-  const { etat } = useSauvegardeAuto(
+  const { etat, motif } = useSauvegardeAuto(
     seance,
     async (s) => {
       const enregistree = await enregistrer.mutateAsync(s);
-      if (s.id === undefined && enregistree.id !== undefined) {
-        setSeance(enregistree);
-        router.replace(`/seance/${enregistree.id}`);
-      }
+
+      /* On greffe l'identifiant sur l'état LOCAL, sans naviguer.
+         Auparavant on remplaçait la route par /seance/{id} : l'écran se
+         remontait et relisait la séance depuis l'API. Tout ce qui avait été
+         saisi pendant les deux secondes et demie d'attente — une série
+         ajoutée, une charge tapée — était jeté avec l'ancien état, sans que
+         rien ne le signale. C'est ce qui donnait l'impression de changer de
+         page et de retrouver l'exercice vidé de ses séries. */
+      setSeance((courante) => (courante === null
+        ? enregistree
+        : fusionnerIdentifiants(courante, enregistree)));
     },
     { actif: seance !== null && seance.exercices.length > 0 },
   );
@@ -146,17 +191,22 @@ export default function DetailSeance() {
     });
   };
 
+  /* Même règle que la sauvegarde automatique : on ne remplace pas la route.
+     Un remontage jetterait la saisie en cours. */
   const enregistrerSeance = () => {
     enregistrer.mutate(seance, {
       onSuccess: (s) => {
-        setSeance(s);
-        if (nouvelle && s.id) router.replace(`/seance/${s.id}`);
+        setSeance((courante) => (courante === null ? s : fusionnerIdentifiants(courante, s)));
       },
     });
   };
 
   return (
     <View style={{ flex: 1 }}>
+      {/* La liste occupe la place restante, la barre de chrono garde la sienne
+          en bas. La contrainte vit ici et non dans ListeDeplacable : ce
+          composant sert aussi aux modèles, où rien ne le suit. */}
+      <View style={{ flex: 1 }}>
       <ListeDeplacable
         elements={seance.exercices}
         cle={(b, i) => String(b.id ?? `n${i}`)}
@@ -195,6 +245,14 @@ export default function DetailSeance() {
                   }]} />
                   <Discret style={{ fontSize: 11.5 }}>{libelleEtat(etat)}</Discret>
                 </View>
+              )}
+
+              {/* Le motif, en clair. Sans lui, une seance qui ne s'enregistre
+                  pas se perd en silence et rien n'indique quoi corriger. */}
+              {etat === 'erreur' && motif !== null && (
+                <Discret style={{ color: C.erreur, fontSize: 11.5, lineHeight: 16 }}>
+                  {motif}
+                </Discret>
               )}
 
               {avancement.total > 0 && (
@@ -282,6 +340,7 @@ export default function DetailSeance() {
           />
         )}
       />
+      </View>
 
       <ChronoRepos relance={relance} onCalculateur={() => setCalculateur(true)} />
 

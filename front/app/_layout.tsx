@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { chargerJeton } from '@/api/client';
 import { Chargement } from '@/composants/base';
+import { EnTete } from '@/composants/enTete';
 import { C } from '@/theme';
 
 /**
@@ -51,9 +52,9 @@ export default function Racine() {
         <StatusBar style="light" />
         <Stack
           screenOptions={{
-            headerStyle: { backgroundColor: C.fond },
-            headerTintColor: C.encre,
-            headerTitleStyle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 21 },
+            /* En-tête dessiné par nous : celui de react-native-screens passait
+               sous la barre d'état. Voir src/composants/enTete.tsx. */
+            header: (props) => <EnTete {...props} />,
             contentStyle: { backgroundColor: C.fond },
             animation: 'slide_from_right',
           }}
@@ -64,6 +65,7 @@ export default function Racine() {
           <Stack.Screen name="seance/[id]" options={{ title: 'Séance' }} />
           <Stack.Screen name="modele/[id]" options={{ title: 'Modèle' }} />
           <Stack.Screen name="objectifs" options={{ title: 'Mes objectifs' }} />
+          <Stack.Screen name="reglages" options={{ title: 'Réglages de l’app' }} />
           <Stack.Screen name="admin-videos" options={{ title: 'Vidéos des exercices' }} />
           <Stack.Screen name="admin-fusion" options={{ title: 'Fusionner des exercices' }} />
         </Stack>

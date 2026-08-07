@@ -13,10 +13,15 @@ export function useSauvegardeAuto<T>(
   valeur: T | null,
   enregistrer: (v: T) => Promise<unknown>,
   options: { delai?: number; actif?: boolean } = {},
-): { etat: EtatSauvegarde; forcer: () => void } {
+): { etat: EtatSauvegarde; motif: string | null; forcer: () => void } {
   const { delai = 2500, actif = true } = options;
 
   const [etat, setEtat] = useState<EtatSauvegarde>('repos');
+  /* Le MOTIF de l'echec, pas seulement le fait qu'il ait eu lieu. Un point
+     rouge et « echec de l'enregistrement » ne disent pas si le reseau est
+     tombe, si l'API refuse la donnee ou si le jeton a expire — et pendant
+     ce temps la seance se perd sans qu'on sache quoi corriger. */
+  const [motif, setMotif] = useState<string | null>(null);
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const derniereEnvoyee = useRef<string | null>(null);
   const enCours = useRef(false);
@@ -36,8 +41,10 @@ export function useSauvegardeAuto<T>(
     try {
       await enregistrer(v);
       derniereEnvoyee.current = signature;
+      setMotif(null);
       setEtat('enregistre');
-    } catch {
+    } catch (e) {
+      setMotif(e instanceof Error ? e.message : String(e));
       setEtat('erreur');
     } finally {
       enCours.current = false;
@@ -69,7 +76,7 @@ export function useSauvegardeAuto<T>(
     void envoyer();
   };
 
-  return { etat, forcer };
+  return { etat, motif, forcer };
 }
 
 export const libelleEtat = (e: EtatSauvegarde): string => ({

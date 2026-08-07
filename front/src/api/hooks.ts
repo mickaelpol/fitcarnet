@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, definirJeton, membres } from './client';
 import type {
   Aliment, Cible, Emplacement, Exercice, LigneStock, Modele, MonFrigo,
-  Seance, Utilisateur,
+  Seance, Serie, Utilisateur,
 } from './types';
 
 /* ---------- authentification ---------- */
@@ -394,6 +394,39 @@ export const useSeance = (id?: number) =>
   });
 
 /**
+ * Même règle que pour les aliments : `poids` et `poidsCible` sont des DECIMAL
+ * côté Doctrine, donc des `string` pour le dénormaliseur. Un nombre déclenche
+ * « The type of the "poids" attribute must be "null|string", "integer" given ».
+ *
+ * On ne touche qu'aux séries : ni `SeanceExercice` ni `ModeleExercice` n'ont
+ * de colonne décimale, et `reps` / `secondes` sont des entiers.
+ */
+const nombreEnTexte = (v: number | null): string | null =>
+  v === null ? null : String(v);
+
+const serieEnEcriture = (s: Serie): Record<string, unknown> => ({
+  ...s,
+  poids: nombreEnTexte(s.poids),
+  poidsCible: nombreEnTexte(s.poidsCible),
+});
+
+const seanceEnEcriture = (s: Seance): Record<string, unknown> => ({
+  ...s,
+  exercices: s.exercices.map((bloc) => ({
+    ...bloc,
+    series: bloc.series.map(serieEnEcriture),
+  })),
+});
+
+const modeleEnEcriture = (m: Modele): Record<string, unknown> => ({
+  ...m,
+  exercices: m.exercices.map((bloc) => ({
+    ...bloc,
+    series: bloc.series.map((s) => ({ ...s, poidsCible: nombreEnTexte(s.poidsCible) })),
+  })),
+});
+
+/**
  * Une séance s'écrit d'un bloc : exercices et séries compris.
  * C'est ce qui évite la dizaine d'appels qu'imposeraient des ressources
  * imbriquées — décisif en salle avec une connexion médiocre.
@@ -404,8 +437,8 @@ export function useEnregistrerSeance() {
   return useMutation({
     mutationFn: (s: Seance) =>
       s.id
-        ? api<Seance>(`/seances/${s.id}`, { methode: 'PATCH', corps: s })
-        : api<Seance>('/seances', { methode: 'POST', corps: s }),
+        ? api<Seance>(`/seances/${s.id}`, { methode: 'PATCH', corps: seanceEnEcriture(s) })
+        : api<Seance>('/seances', { methode: 'POST', corps: seanceEnEcriture(s) }),
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: ['seances'] });
       if (s.id) qc.invalidateQueries({ queryKey: ['seance', s.id] });
@@ -435,7 +468,7 @@ export function useSeanceVersModele() {
             ordre: j,
             // ce qui a été fait devient l'objectif ; à défaut, l'objectif d'origine
             repsCible: s.reps ?? s.repsCible,
-            poidsCible: s.poids ?? s.poidsCible,
+            poidsCible: nombreEnTexte(s.poids ?? s.poidsCible),
             secondesCible: s.secondes ?? s.secondesCible,
           })),
         })),
@@ -498,8 +531,8 @@ export function useEnregistrerModele() {
   return useMutation({
     mutationFn: (m: Modele) =>
       m.id
-        ? api<Modele>(`/modeles/${m.id}`, { methode: 'PATCH', corps: m })
-        : api<Modele>('/modeles', { methode: 'POST', corps: m }),
+        ? api<Modele>(`/modeles/${m.id}`, { methode: 'PATCH', corps: modeleEnEcriture(m) })
+        : api<Modele>('/modeles', { methode: 'POST', corps: modeleEnEcriture(m) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['modeles'] }),
   });
 }
