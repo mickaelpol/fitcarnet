@@ -58,6 +58,13 @@ préremplis avec le stock connu, case « vérifié » purement visuelle, envoi
 explicite en fin de parcours et des seuls écarts. Les appels Grocy partent en
 parallèle, plafonnés à 60 lignes par envoi.
 
+**Aliments d'un compte ordinaire.** Ajout depuis un catalogue de référence —
+on tape, il propose, les macros arrivent préremplies — ou création de zéro.
+Correction et suppression depuis la carte. La suppression est refusée tant
+qu'il reste du stock, avec le motif à l'écran. Le frigo ne contient que ses
+propres aliments : les 50 de référence servent de point de départ, pas de
+garnissage. Éprouvé sur un compte d'essai, neuf cas passés.
+
 **Chronomètre de repos.** Cocher une série relance le décompte sur la durée
 choisie. Le redémarrage passe par une propriété `relance` et non par un
 `key` : un remontage réinitialisait aussi le préréglage, qui retombait à
@@ -67,17 +74,6 @@ choisie. Le redémarrage passe par une propriété `relance` et non par un
 
 ## Ce qui reste
 
-**L'éditeur d'aliment côté base.** Il n'existe que pour Grocy. Un compte
-ordinaire n'a aucun bouton pour créer ni corriger un aliment :
-`POST /api/mon-frigo/aliment` lui répond 409, et l'écran ne l'affiche pas.
-Les fondations sont posées — `POST /api/aliments` accepte les fibres et les
-deux pesées, `AlimentProcessor` pose propriétaire et confidentialité,
-`FiltreAliment` restreint la lecture — il manque l'écran et l'appel.
-
-**Rien n'a été essayé avec un compte ordinaire.** Le frigo, le stock et
-l'inventaire sont écrits pour les deux sources et compilent, mais aucun test
-n'a été fait autrement qu'avec le compte Grocy. À vérifier avant de s'y fier.
-
 **Champs Grocy remplis à la main.** Les trois champs personnalisés
 `fibres100`, `pesee_avant` et `pesee_apres` existent désormais dans Grocy et
 l'éditeur les écrit, mais `ciqual_vers_grocy.py` ne les pose toujours pas à
@@ -86,9 +82,6 @@ l'import.
 **Calculateur de repas.** Toujours branché sur des données de démonstration ;
 il doit lire `/api/mon-frigo`. Et l'écran s'ouvre vide — il faudrait
 reprendre la composition du dernier repas du même type.
-
-**Ajout d'ingrédients au frigo** pour les comptes ordinaires. Ils ne peuvent
-aujourd'hui que fixer la quantité des 50 aliments communs, pas en créer.
 
 **`nutrition.ts` et `frigo.ts` sans tests permanents.** `tsconfig.tests.json`
 ne compile que `src/solveur` : la détection des kilojoules et le calcul des
@@ -132,6 +125,19 @@ comme supposé initialement.
 **Deux dossiers SQL.** `db/` ne contient que ce qui s'applique à une base
 vierge — PostgreSQL ne le joue qu'à la création. `db/manuel/` contient les
 évolutions ultérieures, jouées par `installer.sh`, et doit rester idempotent.
+
+**L'unicité du nom d'un aliment est PAR PROPRIÉTAIRE.** Deux index partiels,
+pas une contrainte globale : un nom commun est unique parmi les communs, un
+nom privé l'est chez son propriétaire seulement. La contrainte globale
+d'origine rendait le modèle des aliments privés inapplicable — deux comptes
+ne pouvaient pas nommer pareil. Doctrine ne sait pas exprimer un index
+partiel : le doublon se rattrape à l'insertion, dans `AlimentProcessor`.
+
+**Les décimaux se lisent en nombres et s'écrivent en chaînes.** L'extracteur
+Doctrine passe avant la réflexion PHP dans `property_info` et déclare un
+`DECIMAL` comme `string` : le dénormaliseur refuse un nombre. La lecture, elle,
+passe par les accesseurs typés `float`. L'asymétrie est assumée et tient dans
+`versDecimales()`, côté front.
 
 **Aucune unité n'est convertie à l'aveugle.** Le kilogramme et la pièce se
 ramènent au gramme quand Grocy porte la conversion, et seulement alors. Le
