@@ -7,11 +7,13 @@ namespace App\Entity;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\State\AlimentProcessor;
+use App\State\AlimentSuppressionProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -30,7 +32,21 @@ use Symfony\Component\Validator\Constraints as Assert;
         new GetCollection(),
         new Get(),
         new Post(security: "is_granted('ROLE_USER')", processor: AlimentProcessor::class),
-        new Patch(security: "is_granted('ROLE_ADMIN')"),
+        // Chacun corrige ses propres aliments ; l'administrateur reste seul
+        // a pouvoir toucher aux 50 de reference, qui n'appartiennent a personne.
+        // Meme processeur qu'a la creation : il ne pose le proprietaire que
+        // s'il manque, et rattrape le doublon de nom pour les deux operations.
+        new Patch(
+            security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user",
+            processor: AlimentProcessor::class,
+        ),
+        // Supprimer n'est possible que sur SES aliments. Un commun ne se
+        // supprime jamais : d'autres comptes s'en servent comme reference.
+        // Un compte lisant Grocy n'a rien ici — tout s'y passe dans Grocy.
+        new Delete(
+            security: 'object.getCreePar() == user',
+            processor: AlimentSuppressionProcessor::class,
+        ),
     ],
     normalizationContext: ['groups' => ['aliment:lire']],
     denormalizationContext: ['groups' => ['aliment:ecrire']],
@@ -48,7 +64,13 @@ class Aliment
     #[Groups(['aliment:lire'])]
     private ?int $id = null;
 
-    #[ORM\Column(type: Types::TEXT, unique: true)]
+    /**
+     * Pas de « unique: true » ici : l'unicite n'est plus globale mais PAR
+     * PROPRIETAIRE, portee par deux index partiels que Doctrine ne sait pas
+     * exprimer (voir db/manuel/10-aliment-unicite-par-proprietaire.sql).
+     * Deux comptes peuvent nommer pareil ; un compte ne le peut pas deux fois.
+     */
+    #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank]
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $nom = '';
@@ -60,22 +82,18 @@ class Aliment
 
     #[ORM\Column(name: 'kcal_100', type: Types::DECIMAL, precision: 7, scale: 2)]
     #[Assert\PositiveOrZero]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $kcal100 = '0';
 
     #[ORM\Column(name: 'prot_100', type: Types::DECIMAL, precision: 6, scale: 2)]
     #[Assert\PositiveOrZero]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $prot100 = '0';
 
     #[ORM\Column(name: 'gluc_100', type: Types::DECIMAL, precision: 6, scale: 2)]
     #[Assert\PositiveOrZero]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $gluc100 = '0';
 
     #[ORM\Column(name: 'lip_100', type: Types::DECIMAL, precision: 6, scale: 2)]
     #[Assert\PositiveOrZero]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $lip100 = '0';
 
     /**
@@ -85,12 +103,10 @@ class Aliment
      */
     #[ORM\Column(name: 'fibres_100', type: Types::DECIMAL, precision: 6, scale: 2, nullable: true)]
     #[Assert\PositiveOrZero]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private ?string $fibres100 = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 3, options: ['default' => 1])]
     #[Assert\Positive]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $ratio = '1';
 
     /**
@@ -100,12 +116,10 @@ class Aliment
      */
     #[ORM\Column(name: 'pesee_avant', type: Types::DECIMAL, precision: 7, scale: 1, nullable: true)]
     #[Assert\Positive]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private ?string $peseeAvant = null;
 
     #[ORM\Column(name: 'pesee_apres', type: Types::DECIMAL, precision: 7, scale: 1, nullable: true)]
     #[Assert\Positive]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private ?string $peseeApres = null;
 
     #[ORM\Column(name: 'etat_reference', type: Types::TEXT, options: ['default' => 'cuit'])]
@@ -134,25 +148,41 @@ class Aliment
 
     public function __construct() { $this->creeLe = new \DateTimeImmutable(); }
 
+    /*
+     * Les groupes des champs decimaux vivent sur les ACCESSEURS, pas sur les
+     * proprietes. Doctrine hydrate un DECIMAL en chaine : la propriete est
+     * donc typee string, et le serialiseur en deduisait « kcal100 doit etre
+     * une chaine » — refusant 150 envoye par l'application, et renvoyant des
+     * chaines la ou le front attend des nombres. Les accesseurs, eux, sont
+     * typés float : le contrat de l'API redevient numerique dans les deux sens.
+     */
     public function getId(): ?int { return $this->id; }
     public function getNom(): string { return $this->nom; }
     public function setNom(string $v): self { $this->nom = $v; return $this; }
     public function getCategorie(): string { return $this->categorie; }
     public function setCategorie(string $v): self { $this->categorie = $v; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getKcal100(): float { return (float) $this->kcal100; }
     public function setKcal100(float|string $v): self { $this->kcal100 = (string) $v; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getProt100(): float { return (float) $this->prot100; }
     public function setProt100(float|string $v): self { $this->prot100 = (string) $v; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getGluc100(): float { return (float) $this->gluc100; }
     public function setGluc100(float|string $v): self { $this->gluc100 = (string) $v; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getLip100(): float { return (float) $this->lip100; }
     public function setLip100(float|string $v): self { $this->lip100 = (string) $v; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getFibres100(): ?float { return null !== $this->fibres100 ? (float) $this->fibres100 : null; }
     public function setFibres100(float|string|null $v): self { $this->fibres100 = null !== $v ? (string) $v : null; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getRatio(): float { return (float) $this->ratio; }
     public function setRatio(float|string $v): self { $this->ratio = (string) $v; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getPeseeAvant(): ?float { return null !== $this->peseeAvant ? (float) $this->peseeAvant : null; }
     public function setPeseeAvant(float|string|null $v): self { $this->peseeAvant = null !== $v ? (string) $v : null; return $this; }
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getPeseeApres(): ?float { return null !== $this->peseeApres ? (float) $this->peseeApres : null; }
     public function setPeseeApres(float|string|null $v): self { $this->peseeApres = null !== $v ? (string) $v : null; return $this; }
     public function getEtatReference(): string { return $this->etatReference; }

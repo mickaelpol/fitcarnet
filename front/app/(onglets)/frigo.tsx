@@ -1,18 +1,27 @@
 import { useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
 import {
-  useDefinirStock, useEnregistrerAliment, useEnvoyerInventaire,
-  useFrigoIncomplets, useMonFrigo,
+  useAliments, useCreerAliment, useDefinirStock, useEnregistrerAliment,
+  useEnvoyerInventaire, useFrigoIncomplets, useMajAliment, useMonFrigo,
+  useSupprimerAliment,
 } from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import {
   Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide,
 } from '@/composants/base';
+import { ChoixDansListe } from '@/composants/choixAliment';
+import { Confirmer } from '@/composants/confirmer';
 import { EditeurAliment, type AlimentSaisi } from '@/composants/editeurAliment';
 import { ModeInventaire } from '@/composants/inventaire';
 import { filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
 import { controler } from '@/calcul/nutrition';
 import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
+
+/** Point de départ d'une création sans modèle. */
+const ALIMENT_VIDE: AlimentSaisi = {
+  nom: '', categorie: 'prot', kcal100: 0, prot100: 0, gluc100: 0, lip100: 0,
+  fibres100: null, ratio: 1, etatReference: 'cru', peseeAvant: null, peseeApres: null,
+};
 
 /** Un aliment du frigo tel que l'éditeur l'attend. */
 const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
@@ -41,6 +50,17 @@ export default function MonFrigo() {
   const [inventaire, setInventaire] = useState(false);
   const [recherche, setRecherche] = useState('');
 
+  /* Parcours d'ajout pour les comptes lisant la base : on choisit d'abord un
+     aliment de référence — ou rien — puis on ajuste dans l'éditeur. Repartir
+     d'une fiche Ciqual évite de ressaisir six valeurs à la main. */
+  const catalogue = useAliments();
+  const creer = useCreerAliment();
+  const majAliment = useMajAliment();
+  const supprimer = useSupprimerAliment();
+  const [choixModele, setChoixModele] = useState(false);
+  const [nouveau, setNouveau] = useState<AlimentSaisi | null>(null);
+  const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
+
   const modifiable = frigo.data?.source === 'base';
   const incomplets = useFrigoIncomplets(frigo.data?.source === 'grocy');
 
@@ -53,6 +73,12 @@ export default function MonFrigo() {
   /* Les macros sont données pour 100 g. Une autre unité ne pose problème que
      si son poids est inconnu : le kilogramme et la pièce se convertissent dès
      que Grocy porte la conversion, le litre et le pack non. */
+  /* Les noms deja presents dans le frigo, pour ne pas les reproposer. */
+  const dejaChezMoi = useMemo(
+    () => new Set((frigo.data?.aliments ?? []).map((a) => a.nom.trim().toLowerCase())),
+    [frigo.data],
+  );
+
   const sansPoids = useMemo(
     () => (frigo.data?.aliments ?? []).filter((a) => a.grammesParUnite === null),
     [frigo.data],
@@ -121,6 +147,14 @@ export default function MonFrigo() {
           </Bouton>
         </View>
 
+        {modifiable && (
+          <Bouton
+            onPress={() => { creer.reset(); setChoixModele(true); }}
+          >
+            Ajouter un aliment
+          </Bouton>
+        )}
+
         <Discret style={{ fontSize: 11, lineHeight: 16 }}>
           « Tout » ajoute les aliments à zéro, ceux qu'il reste à racheter.
           {frigo.data?.source === 'grocy' ? ' Stock tenu dans Grocy.' : ''}
@@ -141,6 +175,17 @@ export default function MonFrigo() {
               Les macros sont données pour 100 g : le calculateur les écarte.
               Déclare la conversion dans Grocy — « 1 {sansPoids[0]?.unite} = … g »
               sur la fiche produit — ou passe-les au gramme.
+            </Discret>
+          </View>
+        )}
+
+        {/* Le refus d'une suppression s'affiche ici, en haut et non dans la
+            carte : la carte peut être refermée au moment où la réponse
+            arrive, et le message serait perdu. */}
+        {supprimer.isError && (
+          <View style={s.alerte}>
+            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+              {supprimer.error.message}
             </Discret>
           </View>
         )}
@@ -271,7 +316,29 @@ export default function MonFrigo() {
                         Enregistrer
                       </Bouton>
                     </View>
-                  ) : (
+                  ) : null}
+
+                  {/* Le frigo d'un compte ordinaire ne contient que ses propres
+                      aliments : chaque carte est donc modifiable et supprimable. */}
+                  {modifiable && (
+                    <View style={{ flexDirection: 'row', gap: E.s }}>
+                      <Bouton
+                        variante="contour"
+                        onPress={() => { majAliment.reset(); setEdite(item); }}
+                        style={{ flex: 1 }}
+                      >
+                        Corriger les valeurs
+                      </Bouton>
+                      <Bouton
+                        variante="discret"
+                        onPress={() => { supprimer.reset(); setASupprimer(item); }}
+                      >
+                        <Discret style={{ color: C.erreur }}>Supprimer</Discret>
+                      </Bouton>
+                    </View>
+                  )}
+
+                  {!modifiable && (
                     <View style={{ gap: E.s }}>
                       <Discret style={{ fontSize: 11.5, lineHeight: 16 }}>
                         Cette quantité vient de Grocy. Modifie-la là-bas, ou fais
@@ -292,8 +359,9 @@ export default function MonFrigo() {
         }}
       />
 
+      {/* ---- compte Grocy : correction des macros, nom et état verrouillés ---- */}
       <EditeurAliment
-        visible={edite !== null}
+        visible={edite !== null && !modifiable}
         titre={edite?.nom ?? 'Aliment'}
         aliment={edite !== null ? versSaisie(edite) : undefined}
         enCours={enregistrer.isPending}
@@ -319,6 +387,114 @@ export default function MonFrigo() {
             peseeAvant: v.peseeAvant ?? null,
             peseeApres: v.peseeApres ?? null,
           }, { onSuccess: () => setEdite(null) });
+        }}
+      />
+
+      {/* ---- compte ordinaire : création et correction, tout est modifiable ---- */}
+      <EditeurAliment
+        visible={modifiable && (nouveau !== null || edite !== null)}
+        titre={nouveau !== null ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment')}
+        aliment={nouveau ?? (edite !== null ? versSaisie(edite) : undefined)}
+        enCours={creer.isPending || majAliment.isPending}
+        erreur={(creer.error ?? majAliment.error)?.message ?? null}
+        onFermer={() => { setNouveau(null); setEdite(null); }}
+        onEnregistrer={(v) => {
+          const corps = {
+            nom: v.nom.trim(),
+            categorie: v.categorie,
+            kcal100: v.kcal100,
+            prot100: v.prot100,
+            gluc100: v.gluc100,
+            lip100: v.lip100,
+            fibres100: v.fibres100,
+            ratio: v.ratio,
+            etatReference: v.etatReference,
+            peseeAvant: v.peseeAvant ?? null,
+            peseeApres: v.peseeApres ?? null,
+          };
+
+          if (nouveau !== null) {
+            creer.mutate(corps, {
+              // un aliment neuf n'a pas de stock : sans cette bascule il
+              // n'apparaîtrait nulle part et on croirait la création perdue
+              onSuccess: () => { setNouveau(null); setTout(true); },
+            });
+
+            return;
+          }
+
+          if (edite === null) return;
+
+          majAliment.mutate(
+            { id: Number(edite.reference.split(':')[1]), ...corps },
+            { onSuccess: () => setEdite(null) },
+          );
+        }}
+      />
+
+      {/* ---- point de départ d'une création ---- */}
+      <ChoixDansListe
+        visible={choixModele}
+        titre="Partir d'un aliment de référence"
+        elements={[
+          { id: 0, nom: 'Créer de zéro', detail: 'aucune valeur préremplie' },
+          ...(catalogue.data ?? [])
+            // On écarte ce qu'on possède déjà, par le nom. Le catalogue mêle
+            // les aliments de référence et les siens ; proposer les siens
+            // ferait créer un doublon, que l'unicité par propriétaire refuse.
+            // Le nom est le seul discriminant disponible : l'API omet les
+            // champs nuls, donc aucun indicateur de provenance n'arrive ici.
+            .filter((a) => !dejaChezMoi.has(a.nom.trim().toLowerCase()))
+            .map((a) => ({
+              id: a.id,
+              nom: a.nom,
+              detail: `${nb(a.kcal100)} kcal · ${nb(a.prot100)} P · ${nb(a.gluc100)} G`
+                + ` · ${nb(a.lip100)} L`,
+              couleur: couleurRole(a.categorie),
+            })),
+        ]}
+        onFermer={() => setChoixModele(false)}
+        onChoisir={(id) => {
+          // « Créer de zéro » porte l'identifiant 0, qu'aucun aliment n'a
+          const modele = (catalogue.data ?? []).find((a) => a.id === id);
+
+          // « ?? null » n'est pas cosmétique : l'API omet les champs nuls, ils
+          // arrivent donc en « undefined », que l'éditeur ne distingue pas
+          // d'une valeur absente de son formulaire.
+          setNouveau(modele === undefined ? ALIMENT_VIDE : {
+            nom: modele.nom,
+            categorie: modele.categorie,
+            kcal100: modele.kcal100,
+            prot100: modele.prot100,
+            gluc100: modele.gluc100,
+            lip100: modele.lip100,
+            fibres100: modele.fibres100 ?? null,
+            ratio: modele.ratio,
+            etatReference: modele.etatReference,
+            peseeAvant: modele.peseeAvant ?? null,
+            peseeApres: modele.peseeApres ?? null,
+          });
+        }}
+      />
+
+      <Confirmer
+        visible={aSupprimer !== null}
+        titre={`Supprimer « ${aSupprimer?.nom ?? ''} » ?`}
+        message={
+          'Il quittera définitivement ta liste d’aliments. '
+          + 'La suppression est refusée s’il t’en reste en stock : '
+          + 'mets sa quantité à zéro d’abord.'
+        }
+        onAnnuler={() => setASupprimer(null)}
+        onConfirmer={() => {
+          if (aSupprimer === null) return;
+
+          supprimer.mutate(Number(aSupprimer.reference.split(':')[1]), {
+            // en cas d'echec la carte reste ouverte : le motif s'affiche en
+            // haut de l'ecran, et on garde sous les yeux l'aliment concerne
+            onSuccess: () => { setASupprimer(null); setOuvert(null); },
+            onError: () => setASupprimer(null),
+          });
         }}
       />
     </View>

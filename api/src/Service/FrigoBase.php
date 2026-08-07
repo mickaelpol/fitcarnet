@@ -39,7 +39,12 @@ final readonly class FrigoBase
                     ON  s.aliment_id = a.id
                     AND s.utilisateur_id = :utilisateur
              LEFT   JOIN emplacement e ON e.id = s.emplacement_id
-             WHERE  a.cree_par IS NULL OR a.cree_par = :utilisateur
+             -- UNIQUEMENT ses aliments. Les 50 de reference restent lisibles
+             -- par /api/aliments, ou ils servent de point de depart a une
+             -- creation, mais ils n encombrent pas le frigo : on y verrait
+             -- des aliments qu on n a jamais mis, et creer sa propre version
+             -- d un commun donnerait deux lignes pour la meme chose.
+             WHERE  a.cree_par = :utilisateur
              GROUP  BY a.id
              ORDER  BY a.nom',
             ['utilisateur' => $utilisateur->getId()],

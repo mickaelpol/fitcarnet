@@ -8,8 +8,10 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Aliment;
 use App\Entity\Utilisateur;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
  * Un aliment cree depuis l'application appartient a son auteur et lui reste prive.
@@ -40,6 +42,17 @@ final readonly class AlimentProcessor implements ProcessorInterface
             }
         }
 
-        return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        try {
+            return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        } catch (UniqueConstraintViolationException $e) {
+            // L'unicite par proprietaire vit dans deux index partiels, que
+            // Doctrine ne sait pas verifier avant l'insertion : il n'existe pas
+            // de contrainte d'entite equivalente. On rattrape donc l'erreur SQL
+            // plutot que de laisser remonter « SQLSTATE[23505] » a l'ecran.
+            throw new UnprocessableEntityHttpException(\sprintf(
+                'Tu as déjà un aliment nommé « %s ». Choisis un autre nom, '
+                . 'ou corrige celui qui existe.',
+                $data instanceof Aliment ? $data->getNom() : '?'), $e);
+        }
     }
 }

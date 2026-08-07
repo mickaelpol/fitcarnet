@@ -157,6 +157,92 @@ export function useEnregistrerAliment() {
   });
 }
 
+/** Ce qu'un aliment de la base attend en écriture. */
+export interface AlimentEcriture {
+  nom: string;
+  categorie: string;
+  kcal100: number;
+  prot100: number;
+  gluc100: number;
+  lip100: number;
+  fibres100: number | null;
+  ratio: number;
+  etatReference: 'cru' | 'cuit';
+  peseeAvant: number | null;
+  peseeApres: number | null;
+}
+
+/**
+ * Les décimaux partent en CHAÎNES, et c'est voulu.
+ *
+ * Doctrine mappe ces colonnes en DECIMAL, que son extracteur de types déclare
+ * `string` — et cet extracteur passe avant la réflexion PHP dans la chaîne de
+ * `property_info`. Le dénormaliseur refuse donc un nombre : « The type of the
+ * "kcal100" attribute must be "string", "double" given ».
+ *
+ * En lecture l'API renvoie bien des nombres, puisque la normalisation appelle
+ * les accesseurs typés `float`. L'asymétrie est réelle mais tient dans cette
+ * seule fonction : le reste de l'application ne manipule que des nombres.
+ */
+const versDecimales = (v: AlimentEcriture): Record<string, unknown> => ({
+  ...v,
+  kcal100: String(v.kcal100),
+  prot100: String(v.prot100),
+  gluc100: String(v.gluc100),
+  lip100: String(v.lip100),
+  fibres100: v.fibres100 === null ? null : String(v.fibres100),
+  ratio: String(v.ratio),
+  peseeAvant: v.peseeAvant === null ? null : String(v.peseeAvant),
+  peseeApres: v.peseeApres === null ? null : String(v.peseeApres),
+});
+
+/**
+ * Crée un aliment. Le propriétaire et la confidentialité sont posés par
+ * l'API depuis le jeton, jamais transmis d'ici.
+ */
+export function useCreerAliment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (v: AlimentEcriture) =>
+      api<Aliment>('/aliments', { methode: 'POST', corps: versDecimales(v) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['aliments'] });
+      void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
+    },
+  });
+}
+
+/** Corrige un aliment. L'API refuse si ce n'est pas le sien. */
+export function useMajAliment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...v }: AlimentEcriture & { id: number }) =>
+      api<Aliment>(`/aliments/${id}`, { methode: 'PATCH', corps: versDecimales(v) }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['aliments'] });
+      void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
+    },
+  });
+}
+
+/**
+ * Supprime un aliment. L'API répond 409 s'il est encore dans un frigo :
+ * il faut d'abord mettre sa quantité à zéro.
+ */
+export function useSupprimerAliment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api<null>(`/aliments/${id}`, { methode: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['aliments'] });
+      void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
+    },
+  });
+}
+
 /**
  * Applique un inventaire. Une seule requête, en fin de saisie, avec les
  * seules lignes dont le poids réel diffère du théorique.
