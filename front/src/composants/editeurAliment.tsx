@@ -5,7 +5,7 @@ import {
 import { Bouton, Champ, Discret, Texte } from './base';
 import {
   CATEGORIES, RATIOS_GUIDES, controler, etatParDefaut, expliquerRatio,
-  provenanceRatio, ratioDepuisPesees, ratioVraisemblable,
+  provenanceRatio, ratioDepuisPesees, ratioVraisemblable, soupconKilojoules,
 } from '@/calcul/nutrition';
 import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
 
@@ -31,6 +31,29 @@ const vide: AlimentSaisi = {
   peseeAvant: null, peseeApres: null,
 };
 
+type CleNombre = 'kcal100' | 'prot100' | 'gluc100' | 'lip100' | 'fibres100';
+
+/**
+ * Texte de départ des champs numériques.
+ *
+ * Sur un aliment existant, un zéro est une valeur : l'huile n'a pas de
+ * protéines et doit afficher « 0 », pas un champ vide. Sur une création,
+ * tout part vide pour laisser parler les indications de saisie.
+ */
+const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
+  if (aliment === undefined) {
+    return { kcal100: '', prot100: '', gluc100: '', lip100: '', fibres100: '' };
+  }
+
+  return {
+    kcal100: String(aliment.kcal100),
+    prot100: String(aliment.prot100),
+    gluc100: String(aliment.gluc100),
+    lip100: String(aliment.lip100),
+    fibres100: aliment.fibres100 === null ? '' : String(aliment.fibres100),
+  };
+};
+
 /**
  * Saisie d'un aliment et de ses valeurs nutritionnelles.
  *
@@ -39,7 +62,8 @@ const vide: AlimentSaisi = {
  * mieux qu'une base contributive.
  */
 export function EditeurAliment({
-  visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours,
+  visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
+  nomModifiable = true, etatModifiable = true,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -47,6 +71,12 @@ export function EditeurAliment({
   onEnregistrer: (a: AlimentSaisi) => void;
   onFermer: () => void;
   enCours?: boolean;
+  /** message d'échec de l'enregistrement ; la saisie reste à l'écran */
+  erreur?: string | null;
+  /** faux quand le nom appartient à une source externe, Grocy par exemple */
+  nomModifiable?: boolean;
+  /** faux quand l'état de référence est déduit de la catégorie, non stocké */
+  etatModifiable?: boolean;
 }) {
   const [a, setA] = useState<AlimentSaisi>(aliment ?? vide);
   const [mesurer, setMesurer] = useState(false);
@@ -54,10 +84,18 @@ export function EditeurAliment({
   const [apres, setApres] = useState('');
   const [etatTouche, setEtatTouche] = useState(false);
 
+  /* Le texte saisi vit à part du nombre.
+     Piloter l'input avec String(nombre) rendait la saisie impossible : « 0 »
+     redonnait '', « 0,8 » repassait par « 0 » puis « 0, » que parseFloat
+     ramenait à 0, et le séparateur disparaissait sous les doigts. Le champ
+     garde donc le texte tel quel ; le nombre n'en est que la lecture. */
+  const [textes, setTextes] = useState<Record<CleNombre, string>>(textesDe(aliment));
+
   useEffect(() => {
     if (visible) {
       const depart = aliment ?? vide;
       setA(depart);
+      setTextes(textesDe(aliment));
       setMesurer(false);
       // une mesure antérieure se retrouve, pour la vérifier ou la refaire
       setAvant(depart.peseeAvant ? String(depart.peseeAvant) : '');
@@ -68,16 +106,33 @@ export function EditeurAliment({
 
   const maj = (champs: Partial<AlimentSaisi>) => setA({ ...a, ...champs });
 
+  /** Saisie d'un champ numérique : on conserve le texte, on en déduit le nombre. */
+  const majNombre = (cle: CleNombre, texte: string) => {
+    setTextes((t) => ({ ...t, [cle]: texte }));
+
+    if ('fibres100' === cle) {
+      // les fibres sont facultatives : vide veut dire « non renseigné », pas zéro
+      maj({ fibres100: texte.trim() === '' ? null : nombre(texte) });
+
+      return;
+    }
+
+    maj({ [cle]: nombre(texte) });
+  };
+
   /* L'état de référence suit la catégorie tant que l'utilisateur n'y a pas
      touché : sur un emballage, les valeurs sont celles du produit tel que
      vendu — sec pour le riz, cru pour la viande. */
   const changerCategorie = (categorie: string) =>
     maj(etatTouche ? { categorie } : { categorie, etatReference: etatParDefaut(categorie) });
 
-  const controle = controler({
+  const macros = {
     kcal: a.kcal100, prot: a.prot100, gluc: a.gluc100,
     lip: a.lip100, fibres: a.fibres100,
-  });
+  };
+
+  const controle = controler(macros);
+  const kilojoules = soupconKilojoules(macros);
 
   const ratioMesure = ratioDepuisPesees(
     parseFloat(avant.replace(',', '.')), parseFloat(apres.replace(',', '.')));
@@ -108,12 +163,23 @@ export function EditeurAliment({
             <Texte style={s.titre}>{titre}</Texte>
 
             <ScrollView style={{ marginTop: E.m }} keyboardShouldPersistTaps="handled">
-              <Champ
-                etiquette="Nom"
-                valeur={a.nom}
-                onChange={(v) => maj({ nom: v })}
-                placeholder="Skyr nature Milbona"
-              />
+              {nomModifiable ? (
+                <Champ
+                  etiquette="Nom"
+                  valeur={a.nom}
+                  onChange={(v) => maj({ nom: v })}
+                  placeholder="Skyr nature Milbona"
+                />
+              ) : (
+                <>
+                  <Discret style={[s.section, { marginTop: 0 }]}>Nom</Discret>
+                  <Texte>{a.nom}</Texte>
+                  <Discret style={s.aide}>
+                    Le nom vient de Grocy. Renomme le produit là-bas si besoin :
+                    le modifier ici ne changerait rien.
+                  </Discret>
+                </>
+              )}
 
               <Discret style={s.section}>Catégorie</Discret>
               <View style={s.categories}>
@@ -146,31 +212,58 @@ export function EditeurAliment({
 
               <View style={s.paire}>
                 <Champ etiquette="Calories" unite="kcal" numerique style={{ flex: 1 }}
-                  valeur={a.kcal100 ? String(a.kcal100) : ''}
-                  onChange={(v) => maj({ kcal100: nombre(v) })} placeholder="0" />
+                  valeur={textes.kcal100}
+                  onChange={(v) => majNombre('kcal100', v)} placeholder="0" />
                 <Champ etiquette="Protéines" unite="g" numerique style={{ flex: 1 }}
-                  valeur={a.prot100 ? String(a.prot100) : ''}
-                  onChange={(v) => maj({ prot100: nombre(v) })} placeholder="0" />
+                  valeur={textes.prot100}
+                  onChange={(v) => majNombre('prot100', v)} placeholder="0" />
               </View>
               <View style={[s.paire, { marginTop: E.s }]}>
                 <Champ etiquette="Glucides" unite="g" numerique style={{ flex: 1 }}
-                  valeur={a.gluc100 ? String(a.gluc100) : ''}
-                  onChange={(v) => maj({ gluc100: nombre(v) })} placeholder="0" />
+                  valeur={textes.gluc100}
+                  onChange={(v) => majNombre('gluc100', v)} placeholder="0" />
                 <Champ etiquette="Lipides" unite="g" numerique style={{ flex: 1 }}
-                  valeur={a.lip100 ? String(a.lip100) : ''}
-                  onChange={(v) => maj({ lip100: nombre(v) })} placeholder="0" />
+                  valeur={textes.lip100}
+                  onChange={(v) => majNombre('lip100', v)} placeholder="0" />
               </View>
+
+              <Discret style={s.aide}>
+                Les calories se saisissent en <Texte style={{ fontSize: 11 }}>kcal</Texte>,
+                jamais en kJ. Une étiquette européenne affiche les deux, les
+                kilojoules en premier et en plus gros : sur « 1473 kJ / 352 kcal »,
+                c'est 352 qu'il faut reprendre. Un paquet qui écrit « cal » ou
+                « Calories » parle déjà de kcal.
+              </Discret>
 
               <Discret style={s.aide}>
                 « Dont sucres » fait partie des glucides : ne l'ajoute pas.
                 Idem pour les acides gras saturés, compris dans les lipides.
               </Discret>
 
+              {kilojoules !== null && (
+                <View style={[s.controle, { borderColor: C.vif }]}>
+                  <Discret style={{ color: C.vif, fontSize: 12.5, lineHeight: 18 }}>
+                    {kilojoules.motif === 'plafond'
+                      ? `${nb(kilojoules.saisi)} kcal pour 100 g est impossible : rien ne dépasse `
+                        + '900 kcal, la densité de la matière grasse pure. '
+                      : `${nb(kilojoules.saisi)} est exactement 4,18 fois ce que donnent tes macros. `}
+                    Tu as probablement recopié les kilojoules.
+                  </Discret>
+                  <Bouton
+                    variante="contour"
+                    onPress={() => majNombre('kcal100', String(kilojoules.converti))}
+                    style={{ marginTop: E.s }}
+                  >
+                    {`Convertir : ${nb(kilojoules.saisi)} kJ = ${nb(kilojoules.converti)} kcal`}
+                  </Bouton>
+                </View>
+              )}
+
               <Champ
                 etiquette="Fibres (facultatif)"
                 unite="g" numerique style={{ marginTop: E.s }}
-                valeur={a.fibres100 === null ? '' : String(a.fibres100)}
-                onChange={(v) => maj({ fibres100: v === '' ? null : nombre(v) })}
+                valeur={textes.fibres100}
+                onChange={(v) => majNombre('fibres100', v)}
                 placeholder="—"
               />
               {a.fibres100 === null && (
@@ -271,24 +364,45 @@ export function EditeurAliment({
 
               {/* ---- état de référence ---- */}
               <Discret style={s.section}>Ces valeurs sont celles du produit</Discret>
-              <View style={s.mini}>
-                {(['cru', 'cuit'] as const).map((e) => (
-                  <Pressable
-                    key={e}
-                    onPress={() => { maj({ etatReference: e }); setEtatTouche(true); }}
-                    style={[s.miniBouton, a.etatReference === e && s.miniActif]}
-                  >
-                    <Discret style={a.etatReference === e ? { color: C.encre } : undefined}>
-                      {e === 'cru' ? 'cru ou sec' : 'déjà cuit'}
-                    </Discret>
-                  </Pressable>
-                ))}
-              </View>
-              <Discret style={s.aide}>
-                Sur un emballage, ce sont presque toujours les valeurs du produit
-                tel qu'il est vendu : sec pour le riz, cru pour la viande.
-              </Discret>
+              {etatModifiable ? (
+                <>
+                  <View style={s.mini}>
+                    {(['cru', 'cuit'] as const).map((e) => (
+                      <Pressable
+                        key={e}
+                        onPress={() => { maj({ etatReference: e }); setEtatTouche(true); }}
+                        style={[s.miniBouton, a.etatReference === e && s.miniActif]}
+                      >
+                        <Discret style={a.etatReference === e ? { color: C.encre } : undefined}>
+                          {e === 'cru' ? 'cru ou sec' : 'déjà cuit'}
+                        </Discret>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <Discret style={s.aide}>
+                    Sur un emballage, ce sont presque toujours les valeurs du produit
+                    tel qu'il est vendu : sec pour le riz, cru pour la viande.
+                  </Discret>
+                </>
+              ) : (
+                <>
+                  <Texte>{a.etatReference === 'cru' ? 'cru ou sec' : 'déjà cuit'}</Texte>
+                  <Discret style={s.aide}>
+                    Déduit de la catégorie : protéines et féculents sont pris crus
+                    ou secs, le reste cuit. Grocy ne stocke pas cette information,
+                    change la catégorie pour la changer.
+                  </Discret>
+                </>
+              )}
             </ScrollView>
+
+            {erreur !== null && erreur !== undefined && erreur !== '' && (
+              <View style={[s.controle, { borderColor: C.erreur }]}>
+                <Discret style={{ color: C.erreur, fontSize: 12.5, lineHeight: 18 }}>
+                  {erreur}
+                </Discret>
+              </View>
+            )}
 
             <View style={{ flexDirection: 'row', gap: E.s, marginTop: E.m }}>
               <Bouton variante="contour" onPress={onFermer} style={{ flex: 1 }}>

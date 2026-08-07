@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\State;
+
+use ApiPlatform\Metadata\Operation;
+use ApiPlatform\State\ProcessorInterface;
+use App\Entity\Aliment;
+use App\Entity\Utilisateur;
+use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+
+/**
+ * Un aliment cree depuis l'application appartient a son auteur et lui reste prive.
+ *
+ * Decision arretee : les aliments de reference sont communs et verifies, ceux
+ * qu'un utilisateur saisit ne sortent pas de chez lui. Sur des valeurs
+ * nutritionnelles, l'erreur de l'un ne doit pas fausser la diete des autres.
+ *
+ * Le client ne transmet ni « creePar » ni « public » : les deux viennent du
+ * jeton, jamais du corps de la requete, sinon la regle serait contournable.
+ */
+final readonly class AlimentProcessor implements ProcessorInterface
+{
+    public function __construct(
+        #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
+        private ProcessorInterface $persistProcessor,
+        private Security $security,
+    ) {
+    }
+
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
+    {
+        if ($data instanceof Aliment && null === $data->getCreePar()) {
+            $utilisateur = $this->security->getUser();
+            if ($utilisateur instanceof Utilisateur) {
+                $data->setCreePar($utilisateur);
+                $data->setPublic(false);
+            }
+        }
+
+        return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+    }
+}

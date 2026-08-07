@@ -133,6 +133,45 @@ export function useDefinirStock() {
   });
 }
 
+/**
+ * Écrit les valeurs nutritionnelles d'un aliment du frigo.
+ * Réservé aux comptes lisant Grocy ; l'API répond 409 pour les autres.
+ */
+export function useEnregistrerAliment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (v: {
+      reference: string;
+      categorie: string;
+      kcal100: number;
+      prot100: number;
+      gluc100: number;
+      lip100: number;
+      fibres100: number | null;
+      ratio: number;
+      peseeAvant: number | null;
+      peseeApres: number | null;
+    }) => api<{ ok: boolean }>('/mon-frigo/aliment', { methode: 'POST', corps: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
+  });
+}
+
+/**
+ * Applique un inventaire. Une seule requête, en fin de saisie, avec les
+ * seules lignes dont le poids réel diffère du théorique.
+ */
+export function useEnvoyerInventaire() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (lignes: { reference: string; quantite: number }[]) =>
+      api<{ corriges: number; echecs: { reference: string; motif: string }[] }>(
+        '/mon-frigo/inventaire', { methode: 'POST', corps: { lignes } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
+  });
+}
+
 export const useStock = () =>
   useQuery({
     queryKey: ['stock'],

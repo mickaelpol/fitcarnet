@@ -34,6 +34,11 @@ ratios cru/cuit dérivés de la conservation de l'énergie.
 source : Grocy pour le compte administrateur, table `aliment` pour les
 autres. Écran branché dessus, groupé par emplacement.
 
+**Chronomètre de repos.** Cocher une série relance le décompte sur la durée
+choisie. Le redémarrage passe par une propriété `relance` et non par un
+`key` : un remontage réinitialisait aussi le préréglage, qui retombait à
+1:30 dès la première série cochée.
+
 ---
 
 ## Ce qui reste
@@ -59,11 +64,6 @@ automatisée de la base.
 ---
 
 ## Bugs connus
-
-**Le chronomètre de repos disparaît** quand on part d'un modèle. Cause
-identifiée : `key={relance}` sur `<ChronoRepos>` dans `app/seance/[id].tsx`
-remonte le composant à chaque changement d'état de la séance. Correction :
-faire redémarrer le chrono par une propriété plutôt que par un remontage.
 
 **Zones basses masquées par Android.** La barre d'onglets a été corrigée avec
 `useSafeAreaInsets`. Reste à vérifier la barre de chrono de la séance et la
@@ -96,6 +96,15 @@ comme supposé initialement.
 **Deux dossiers SQL.** `db/` ne contient que ce qui s'applique à une base
 vierge — PostgreSQL ne le joue qu'à la création. `db/manuel/` contient les
 évolutions ultérieures, jouées par `installer.sh`, et doit rester idempotent.
+
+**Les champs personnalisés Grocy se lisent dans `/objects/products`**, jamais
+produit par produit. Grocy les renvoie déjà sous la clé `userfields` de chaque
+produit. Les relire un par un sur `/userfields/products/{id}` coûtait un appel
+HTTP par produit : 62 appels à 1,5 s pour 59 produits, soit 93 s pour une
+limite PHP de 30 s. La lecture du frigo mourait en cours de route et renvoyait
+une page HTML sans en-tête CORS, ce qui donnait l'illusion d'un problème de
+CORS. Toute nouvelle donnée Grocy doit se prendre dans la liste, pas la
+détailler.
 
 **Les objectifs du coach sont incohérents** entre eux : le dîner annonce
 551,8 kcal pour des macros qui en font 580. L'application respecte les

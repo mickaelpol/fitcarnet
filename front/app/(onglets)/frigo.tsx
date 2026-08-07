@@ -1,48 +1,83 @@
 import { useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
-import { useDefinirStock, useFrigoIncomplets, useMonFrigo } from '@/api/hooks';
+import {
+  useDefinirStock, useEnregistrerAliment, useEnvoyerInventaire,
+  useFrigoIncomplets, useMonFrigo,
+} from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import {
   Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide,
 } from '@/composants/base';
+import { EditeurAliment, type AlimentSaisi } from '@/composants/editeurAliment';
+import { ModeInventaire } from '@/composants/inventaire';
+import { filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
 import { controler } from '@/calcul/nutrition';
 import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
 
-const ORDRE = ['Frigo', 'Congélateur', 'Congelateur', 'Placard'];
+/** Un aliment du frigo tel que l'éditeur l'attend. */
+const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
+  nom: a.nom,
+  categorie: a.categorie,
+  kcal100: a.kcal100,
+  prot100: a.prot100,
+  gluc100: a.gluc100,
+  lip100: a.lip100,
+  fibres100: a.fibres100,
+  ratio: a.ratio,
+  etatReference: a.etatReference,
+  peseeAvant: a.peseeAvant,
+  peseeApres: a.peseeApres,
+});
 
 export default function MonFrigo() {
   const frigo = useMonFrigo();
   const definir = useDefinirStock();
+  const enregistrer = useEnregistrerAliment();
+  const envoyer = useEnvoyerInventaire();
   const [tout, setTout] = useState(false);
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [saisie, setSaisie] = useState('');
+  const [edite, setEdite] = useState<AlimentDisponible | null>(null);
+  const [inventaire, setInventaire] = useState(false);
+  const [recherche, setRecherche] = useState('');
 
   const modifiable = frigo.data?.source === 'base';
   const incomplets = useFrigoIncomplets(frigo.data?.source === 'grocy');
 
-  const sections = useMemo(() => {
-    const aliments = (frigo.data?.aliments ?? [])
-      .filter((a) => tout || a.stock > 0);
+  const sections = useMemo(
+    () => grouperParEmplacement(filtrerFrigo(
+      (frigo.data?.aliments ?? []).filter((a) => tout || a.stock > 0), recherche)),
+    [frigo.data, tout, recherche],
+  );
 
-    const parLieu = new Map<string, AlimentDisponible[]>();
-    for (const a of aliments) {
-      const lieu = a.emplacement ?? 'Sans emplacement';
-      parLieu.set(lieu, [...(parLieu.get(lieu) ?? []), a]);
-    }
-
-    return [...parLieu.entries()]
-      .sort((a, b) => {
-        const ia = ORDRE.indexOf(a[0]);
-        const ib = ORDRE.indexOf(b[0]);
-
-        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a[0].localeCompare(b[0]);
-      })
-      .map(([titre, data]) => ({ titre, data }));
-  }, [frigo.data, tout]);
+  /* Les macros sont données pour 100 g. Une autre unité ne pose problème que
+     si son poids est inconnu : le kilogramme et la pièce se convertissent dès
+     que Grocy porte la conversion, le litre et le pack non. */
+  const sansPoids = useMemo(
+    () => (frigo.data?.aliments ?? []).filter((a) => a.grammesParUnite === null),
+    [frigo.data],
+  );
 
   if (frigo.isLoading) return <Chargement texte="Lecture de ton frigo…" />;
   if (frigo.isError) {
     return <Erreur message={frigo.error.message} onReessayer={() => void frigo.refetch()} />;
+  }
+
+  /* L'inventaire porte sur TOUT le frigo, pas seulement sur ce qui est en
+     stock : un produit à zéro qu'on retrouve au fond du placard est
+     précisément ce qu'un inventaire sert à rattraper. */
+  if (inventaire) {
+    return (
+      <ModeInventaire
+        aliments={frigo.data?.aliments ?? []}
+        enCours={envoyer.isPending}
+        erreur={envoyer.error?.message ?? null}
+        onQuitter={() => { envoyer.reset(); setInventaire(false); }}
+        onEnvoyer={(lignes) => envoyer.mutate(lignes, {
+          onSuccess: (r) => { if (r.echecs.length === 0) setInventaire(false); },
+        })}
+      />
+    );
   }
 
   const enStock = (frigo.data?.aliments ?? []).filter((a) => a.stock > 0).length;
@@ -51,17 +86,74 @@ export default function MonFrigo() {
   return (
     <View style={{ flex: 1 }}>
       <View style={s.tete}>
+        {/* Deux segments visibles plutôt qu'un bouton qui change de nom : sur
+            une bascule à libellé unique, on ne sait ni qu'elle se clique, ni si
+            le mot désigne l'état courant ou ce qu'on obtiendra en cliquant. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: E.s }}>
-          <Discret style={{ flex: 1, fontSize: 12.5 }}>
-            {enStock} aliment{enStock > 1 ? 's' : ''} en stock sur {total}
-            {frigo.data?.source === 'grocy' ? ' · depuis Grocy' : ''}
-          </Discret>
-          <Pressable onPress={() => setTout(!tout)} style={[s.bascule, tout && s.basculeActive]}>
-            <Discret style={tout ? { color: C.fond, fontFamily: P.fort, fontSize: 12 } : { fontSize: 12 }}>
-              {tout ? 'Tout' : 'En stock'}
-            </Discret>
-          </Pressable>
+          <View style={s.segmente}>
+            <Pressable
+              onPress={() => setTout(false)}
+              style={[s.segment, !tout && s.segmentActif]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: !tout }}
+            >
+              <Discret style={!tout ? s.segmentTexteActif : s.segmentTexte}>
+                En stock · {enStock}
+              </Discret>
+            </Pressable>
+            <Pressable
+              onPress={() => setTout(true)}
+              style={[s.segment, tout && s.segmentActif]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: tout }}
+            >
+              <Discret style={tout ? s.segmentTexteActif : s.segmentTexte}>
+                Tout · {total}
+              </Discret>
+            </Pressable>
+          </View>
+
+          <Bouton
+            variante="contour"
+            onPress={() => { envoyer.reset(); setInventaire(true); }}
+          >
+            Inventaire
+          </Bouton>
         </View>
+
+        <Discret style={{ fontSize: 11, lineHeight: 16 }}>
+          « Tout » ajoute les aliments à zéro, ceux qu'il reste à racheter.
+          {frigo.data?.source === 'grocy' ? ' Stock tenu dans Grocy.' : ''}
+        </Discret>
+
+        <Champ
+          valeur={recherche}
+          onChange={setRecherche}
+          placeholder="Chercher un aliment ou un emplacement"
+        />
+
+        {sansPoids.length > 0 && (
+          <View style={s.alerte}>
+            <Discret style={{ color: C.attenue, fontSize: 12, lineHeight: 17 }}>
+              {sansPoids.length} produit(s) sans poids connu
+              {' ('}{sansPoids.map((a) => `${a.nom} en ${a.unite}`).join(', ')}
+              {'). '}
+              Les macros sont données pour 100 g : le calculateur les écarte.
+              Déclare la conversion dans Grocy — « 1 {sansPoids[0]?.unite} = … g »
+              sur la fiche produit — ou passe-les au gramme.
+            </Discret>
+          </View>
+        )}
+
+        {envoyer.isSuccess && envoyer.data.echecs.length > 0 && (
+          <View style={s.alerte}>
+            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+              {envoyer.data.corriges} produit(s) corrigé(s),
+              {' '}{envoyer.data.echecs.length} en échec :
+              {' '}{envoyer.data.echecs.map((e) => e.motif).join(' · ')}
+            </Discret>
+          </View>
+        )}
 
         {frigo.data?.probleme !== null && frigo.data?.probleme !== undefined && (
           <View style={s.alerte}>
@@ -123,9 +215,14 @@ export default function MonFrigo() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Chiffre taille={18} couleur={item.stock > 0 ? C.vif : C.discret}>
-                    {nb(item.stock)} g
+                    {nb(item.stock)} {item.unite}
                   </Chiffre>
-                  {item.ratio !== 1 && (
+                  {item.unite !== 'g' && item.grammesParUnite !== null && (
+                    <Discret style={{ fontSize: 10 }}>
+                      soit {nb(item.stock * item.grammesParUnite)} g
+                    </Discret>
+                  )}
+                  {item.unite === 'g' && item.ratio !== 1 && (
                     <Discret style={{ fontSize: 10 }}>
                       {sec ? 'poids sec' : 'poids cru'}
                     </Discret>
@@ -162,7 +259,7 @@ export default function MonFrigo() {
                       <Champ
                         etiquette="Quantité en stock"
                         valeur={saisie} onChange={setSaisie}
-                        unite="g" numerique placeholder="0" style={{ flex: 1 }}
+                        unite={item.unite} numerique placeholder="0" style={{ flex: 1 }}
                       />
                       <Bouton
                         onPress={() => definir.mutate({
@@ -175,15 +272,53 @@ export default function MonFrigo() {
                       </Bouton>
                     </View>
                   ) : (
-                    <Discret style={{ fontSize: 11.5, lineHeight: 16 }}>
-                      Cette quantité vient de Grocy. Modifie-la là-bas, ou fais
-                      ton inventaire depuis ta page habituelle.
-                    </Discret>
+                    <View style={{ gap: E.s }}>
+                      <Discret style={{ fontSize: 11.5, lineHeight: 16 }}>
+                        Cette quantité vient de Grocy. Modifie-la là-bas, ou fais
+                        ton inventaire depuis ta page habituelle.
+                      </Discret>
+                      <Bouton
+                        variante="contour"
+                        onPress={() => { enregistrer.reset(); setEdite(item); }}
+                      >
+                        Corriger les valeurs nutritionnelles
+                      </Bouton>
+                    </View>
                   )}
                 </View>
               )}
             </Carte>
           );
+        }}
+      />
+
+      <EditeurAliment
+        visible={edite !== null}
+        titre={edite?.nom ?? 'Aliment'}
+        aliment={edite !== null ? versSaisie(edite) : undefined}
+        enCours={enregistrer.isPending}
+        erreur={enregistrer.error?.message ?? null}
+        // Grocy est maître du nom, et l'état de référence s'y déduit de la
+        // catégorie au lieu d'être stocké : les laisser modifiables ferait
+        // croire à une saisie qui ne serait jamais enregistrée.
+        nomModifiable={false}
+        etatModifiable={false}
+        onFermer={() => setEdite(null)}
+        onEnregistrer={(v) => {
+          if (edite === null) return;
+
+          enregistrer.mutate({
+            reference: edite.reference,
+            categorie: v.categorie,
+            kcal100: v.kcal100,
+            prot100: v.prot100,
+            gluc100: v.gluc100,
+            lip100: v.lip100,
+            fibres100: v.fibres100,
+            ratio: v.ratio,
+            peseeAvant: v.peseeAvant ?? null,
+            peseeApres: v.peseeApres ?? null,
+          }, { onSuccess: () => setEdite(null) });
         }}
       />
     </View>
@@ -199,12 +334,21 @@ const Mesure = ({ cle, valeur }: { cle: string; valeur: string }) => (
 
 const s = StyleSheet.create({
   tete: { padding: E.m, gap: E.s, borderBottomWidth: 1, borderBottomColor: C.ligne },
-  bascule: {
-    paddingHorizontal: E.m, minHeight: 34, borderRadius: R.s, borderWidth: 1,
-    borderColor: C.ligne, backgroundColor: C.surface2,
-    alignItems: 'center', justifyContent: 'center',
+  /* Sélecteur à deux segments : les deux choix restent lisibles, celui qui
+     est actif est plein. On voit d'un coup ce qu'on regarde et ce qu'on peut
+     obtenir en touchant l'autre. */
+  segmente: {
+    flex: 1, flexDirection: 'row', padding: 2,
+    borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
+    backgroundColor: C.surface2,
   },
-  basculeActive: { backgroundColor: C.vif, borderColor: C.vif },
+  segment: {
+    flex: 1, minHeight: TOUCHE - 8, borderRadius: R.s - 2,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: E.xs,
+  },
+  segmentActif: { backgroundColor: C.vif },
+  segmentTexte: { fontSize: 12.5 },
+  segmentTexteActif: { color: C.fond, fontFamily: P.fort, fontSize: 12.5 },
   alerte: {
     backgroundColor: 'rgba(227,178,60,0.10)', borderRadius: R.s, padding: E.s,
   },

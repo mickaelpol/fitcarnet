@@ -9,8 +9,12 @@ export interface Aliment {
   prot100: number;
   gluc100: number;
   lip100: number;
+  fibres100: number | null;
   ratio: number;
   etatReference: 'cru' | 'cuit';
+  /** pesées ayant servi à mesurer le ratio ; null s'il vient d'une valeur courante */
+  peseeAvant: number | null;
+  peseeApres: number | null;
   codeBarres: string | null;
 }
 
@@ -146,8 +150,21 @@ export interface AlimentDisponible {
   fibres100: number | null;
   ratio: number;
   etatReference: 'cru' | 'cuit';
-  /** quantité réellement disponible, en grammes */
+  /** quantité réellement disponible, exprimée dans l'unité ci-dessous */
   stock: number;
+  /**
+   * Unité du stock. « g » pour tout ce que le calculateur sait traiter — les
+   * macros sont pour 100 g. Une autre valeur (« Pieces », « Litres ») signale
+   * un produit que le solveur ne peut pas utiliser tel quel.
+   */
+  unite: string;
+  /**
+   * Combien de grammes vaut une unité de stock : 1 au gramme, 1000 au
+   * kilogramme, 55 pour un œuf dont la conversion est déclarée dans Grocy.
+   * `null` quand elle est inconnue — un litre ou un pack n'ont pas de poids,
+   * et l'aliment ne peut pas entrer dans un calcul de macros.
+   */
+  grammesParUnite: number | null;
   emplacement: string | null;
   peseeAvant: number | null;
   peseeApres: number | null;

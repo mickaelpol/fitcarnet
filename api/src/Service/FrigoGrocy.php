@@ -44,6 +44,28 @@ final readonly class FrigoGrocy
         $produits = $this->appeler('/objects/products');
         $stocks = $this->appeler('/stock');
         $emplacements = $this->appeler('/objects/locations');
+        $unites = $this->appeler('/objects/quantity_units');
+        $conversions = $this->appeler('/objects/quantity_unit_conversions_resolved');
+
+        $parUnite = [];
+        $idGramme = null;
+        foreach ($unites as $u) {
+            $abrege = self::normaliserUnite((string) $u['name']);
+            $parUnite[(int) $u['id']] = $abrege;
+            if ('g' === $abrege) {
+                $idGramme = (int) $u['id'];
+            }
+        }
+
+        // produit => unite de depart => facteur vers le gramme
+        $versGramme = [];
+        foreach ($conversions as $c) {
+            if (null === $idGramme || (int) ($c['to_qu_id'] ?? 0) !== $idGramme) {
+                continue;
+            }
+            $versGramme[(int) ($c['product_id'] ?? 0)][(int) ($c['from_qu_id'] ?? 0)]
+                = (float) ($c['factor'] ?? 0);
+        }
 
         $parEmplacement = [];
         foreach ($emplacements as $e) {
@@ -60,6 +82,7 @@ final readonly class FrigoGrocy
 
         foreach ($produits as $produit) {
             $id = (int) $produit['id'];
+            $uniteStock = (int) ($produit['qu_id_stock'] ?? 0);
             $champs = self::champsDe($produit);
 
             $manquants = \array_diff(self::CHAMPS, \array_keys(\array_filter(
@@ -89,6 +112,10 @@ final readonly class FrigoGrocy
                     ? (float) $champs['pesee_avant'] : null,
                 peseeApres: isset($champs['pesee_apres']) && '' !== $champs['pesee_apres']
                     ? (float) $champs['pesee_apres'] : null,
+                unite: $parUnite[$uniteStock] ?? '?',
+                grammesParUnite: $uniteStock === $idGramme
+                    ? 1.0
+                    : ($versGramme[$id][$uniteStock] ?? null),
             );
         }
 
@@ -135,6 +162,47 @@ final readonly class FrigoGrocy
     }
 
     /**
+     * Ecrit les valeurs nutritionnelles saisies dans l'application.
+     *
+     * Les cles posees ici sont exactement celles que relit champsDe() : en
+     * changer une sans l'autre rendrait le produit invisible au calculateur,
+     * puisqu'un champ manquant le fait ecarter.
+     *
+     * Une valeur absente est ecrite vide plutot qu'omise : Grocy conserve
+     * l'ancienne valeur des cles non transmises, donc effacer une fibre
+     * saisie par erreur serait impossible autrement.
+     */
+    public function enregistrerValeurs(
+        int $idProduit,
+        string $categorie,
+        float $kcal100,
+        float $prot100,
+        float $gluc100,
+        float $lip100,
+        ?float $fibres100,
+        float $ratio,
+        ?float $peseeAvant,
+        ?float $peseeApres,
+    ): void {
+        if (!$this->estConfigure()) {
+            throw new \RuntimeException(
+                "Grocy n'est pas configuré : renseigne GROCY_URL et GROCY_API_KEY.");
+        }
+
+        $this->enregistrer($idProduit, [
+            'cat' => $categorie,
+            'kcal100' => (string) $kcal100,
+            'prot100' => (string) $prot100,
+            'gluc100' => (string) $gluc100,
+            'lip100' => (string) $lip100,
+            'ratio' => (string) $ratio,
+            'fibres100' => null !== $fibres100 ? (string) $fibres100 : '',
+            'pesee_avant' => null !== $peseeAvant ? (string) $peseeAvant : '',
+            'pesee_apres' => null !== $peseeApres ? (string) $peseeApres : '',
+        ]);
+    }
+
+    /**
      * Les champs personnalises d'un produit, tels que /objects/products les
      * renvoie deja.
      *
@@ -147,6 +215,77 @@ final readonly class FrigoGrocy
      *
      * @return array<string, mixed>
      */
+    /**
+     * Corrige le stock reel de plusieurs produits d'un coup.
+     *
+     * Les appels partent EN PARALLELE : le client HTTP de Symfony ne declenche
+     * la requete qu'a la lecture de la reponse. Enchainer 60 appels a 1,5 s en
+     * sequentiel depasserait les 30 s de PHP, comme la lecture du frigo le
+     * faisait avant correction.
+     *
+     * Un echec n'arrete pas les autres : mieux vaut corriger 58 produits et
+     * nommer les 2 qui ont echoue que de tout annuler apres un inventaire fait
+     * a la main.
+     *
+     * @param array<int, float> $quantites id de produit => nouvelle quantite
+     *
+     * @return array<int, string> id de produit => motif de l'echec
+     */
+    public function inventorier(array $quantites): array
+    {
+        if (!$this->estConfigure()) {
+            throw new \RuntimeException(
+                "Grocy n'est pas configuré : renseigne GROCY_URL et GROCY_API_KEY.");
+        }
+
+        $enCours = [];
+        foreach ($quantites as $idProduit => $quantite) {
+            $enCours[$idProduit] = $this->http->request(
+                'POST',
+                \rtrim($this->url, '/') . '/api/stock/products/' . $idProduit . '/inventory',
+                [
+                    'headers' => [
+                        'GROCY-API-KEY' => $this->cle,
+                        'Accept' => 'application/json',
+                    ],
+                    'json' => ['new_amount' => $quantite],
+                ],
+            );
+        }
+
+        $echecs = [];
+        foreach ($enCours as $idProduit => $reponse) {
+            try {
+                $reponse->getContent();   // leve sur 4xx et 5xx
+            } catch (ExceptionInterface $e) {
+                $echecs[$idProduit] = $e->getMessage();
+            }
+        }
+
+        return $echecs;
+    }
+
+    /**
+     * Abrege l'unite Grocy pour l'affichage.
+     *
+     * Le gramme devient « g », seule unite que le calculateur sait traiter :
+     * les valeurs nutritionnelles sont pour 100 g. Les autres gardent leur nom
+     * en clair — « Pieces », « Litres » — pour qu'on voie tout de suite que ce
+     * produit n'entre pas dans un calcul de macros.
+     */
+    private static function normaliserUnite(string $nom): string
+    {
+        return match (\mb_strtolower($nom)) {
+            'gramme', 'grammes', 'g' => 'g',
+            'kilogramme', 'kilogrammes', 'kg' => 'kg',
+            'litre', 'litres', 'l' => 'L',
+            'millilitre', 'millilitres', 'ml' => 'mL',
+            // Piece, Pack et le reste gardent leur nom en clair : les abreger
+            // ferait croire a une unite de masse.
+            default => $nom,
+        };
+    }
+
     private static function champsDe(array $produit): array
     {
         $champs = $produit['userfields'] ?? null;

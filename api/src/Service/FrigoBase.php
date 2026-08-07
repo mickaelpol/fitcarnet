@@ -60,6 +60,9 @@ final readonly class FrigoBase
             emplacement: null !== $l['emplacement'] ? (string) $l['emplacement'] : null,
             peseeAvant: null !== $l['pesee_avant'] ? (float) $l['pesee_avant'] : null,
             peseeApres: null !== $l['pesee_apres'] ? (float) $l['pesee_apres'] : null,
+            // la colonne stock.quantite est en grammes, par construction du schema
+            unite: 'g',
+            grammesParUnite: 1.0,
         ), $lignes);
     }
 

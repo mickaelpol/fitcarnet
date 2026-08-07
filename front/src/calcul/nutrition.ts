@@ -103,6 +103,66 @@ export function controler(m: Macros): Controle {
   };
 }
 
+/* ------------------------------------------------------------ kilojoules */
+
+/** 1 kcal = 4,184 kJ. Facteur du règlement INCO. */
+export const KJ_PAR_KCAL = 4.184;
+
+/**
+ * Plafond physique pour 100 g : rien n'est plus dense que la matière grasse
+ * pure, à 9 kcal par gramme. Au-delà, la valeur saisie ne peut pas être des
+ * calories.
+ */
+export const KCAL_MAX_100G = 900;
+
+export interface SoupconKilojoules {
+  /** la valeur saisie, telle quelle */
+  saisi: number;
+  /** ce qu'elle vaudrait une fois convertie */
+  converti: number;
+  /** ce qui a déclenché le soupçon */
+  motif: 'plafond' | 'rapport';
+}
+
+/**
+ * La valeur saisie ressemble-t-elle à des kilojoules ?
+ *
+ * Les étiquettes européennes affichent les kJ AVANT les kcal : « 1473 kJ /
+ * 352 kcal ». Recopier la première ligne multiplie les calories par 4,18 sans
+ * que rien ne le signale, et l'aliment ressort quatre fois trop riche du
+ * solveur.
+ *
+ * Deux détections complémentaires :
+ *  - le PLAFOND fonctionne sans macros saisies, mais rate les aliments peu
+ *    caloriques : 50 kcal en kJ font 209, ce qui reste plausible ;
+ *  - le RAPPORT aux macros attrape n'importe quel niveau, mais exige qu'elles
+ *    soient renseignées.
+ *
+ * Aucune n'est infaillible : un aliment sans macros et sous 900 passera entre
+ * les mailles. C'est un garde-fou, pas une garantie.
+ */
+export function soupconKilojoules(m: Macros): SoupconKilojoules | null {
+  if (!(m.kcal > 0)) return null;
+
+  const converti = Math.round((m.kcal / KJ_PAR_KCAL) * 10) / 10;
+
+  if (m.kcal > KCAL_MAX_100G) {
+    return { saisi: m.kcal, converti, motif: 'plafond' };
+  }
+
+  const { calculees } = controler(m);
+  if (calculees <= 0) return null;
+
+  /* Le rapport doit serrer 4,184 de près. Au-delà de 10 % d'écart, c'est
+     une autre erreur de saisie, et proposer une conversion l'aggraverait. */
+  const rapport = m.kcal / calculees;
+  if (Math.abs(rapport - KJ_PAR_KCAL) / KJ_PAR_KCAL <= 0.1) {
+    return { saisi: m.kcal, converti, motif: 'rapport' };
+  }
+
+  return null;
+}
+
 /* ---------------------------------------------------------------- ratio */
 
 export interface ChoixRatio {

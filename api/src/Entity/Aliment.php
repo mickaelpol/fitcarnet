@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\State\AlimentProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -28,7 +29,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(),
         new Get(),
-        new Post(security: "is_granted('ROLE_USER')"),
+        new Post(security: "is_granted('ROLE_USER')", processor: AlimentProcessor::class),
         new Patch(security: "is_granted('ROLE_ADMIN')"),
     ],
     normalizationContext: ['groups' => ['aliment:lire']],
@@ -77,10 +78,35 @@ class Aliment
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $lip100 = '0';
 
+    /**
+     * Fibres pour 100 g, facultatif. Convention europeenne : comptees 2 kcal/g
+     * et separees des glucides. Sans elles, le controle « 4·P + 4·G + 2·F + 9·L
+     * = kcal » perd sa fiabilite sur les legumes et les cereales completes.
+     */
+    #[ORM\Column(name: 'fibres_100', type: Types::DECIMAL, precision: 6, scale: 2, nullable: true)]
+    #[Assert\PositiveOrZero]
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
+    private ?string $fibres100 = null;
+
     #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 3, options: ['default' => 1])]
     #[Assert\Positive]
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $ratio = '1';
+
+    /**
+     * Les deux pesees ayant servi a mesurer le ratio. NULL quand le ratio vient
+     * d'une valeur courante : l'application distingue ainsi une mesure propre au
+     * produit d'une estimation generique.
+     */
+    #[ORM\Column(name: 'pesee_avant', type: Types::DECIMAL, precision: 7, scale: 1, nullable: true)]
+    #[Assert\Positive]
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
+    private ?string $peseeAvant = null;
+
+    #[ORM\Column(name: 'pesee_apres', type: Types::DECIMAL, precision: 7, scale: 1, nullable: true)]
+    #[Assert\Positive]
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
+    private ?string $peseeApres = null;
 
     #[ORM\Column(name: 'etat_reference', type: Types::TEXT, options: ['default' => 'cuit'])]
     #[Assert\Choice(choices: ['cru', 'cuit'])]
@@ -121,8 +147,14 @@ class Aliment
     public function setGluc100(float|string $v): self { $this->gluc100 = (string) $v; return $this; }
     public function getLip100(): float { return (float) $this->lip100; }
     public function setLip100(float|string $v): self { $this->lip100 = (string) $v; return $this; }
+    public function getFibres100(): ?float { return null !== $this->fibres100 ? (float) $this->fibres100 : null; }
+    public function setFibres100(float|string|null $v): self { $this->fibres100 = null !== $v ? (string) $v : null; return $this; }
     public function getRatio(): float { return (float) $this->ratio; }
     public function setRatio(float|string $v): self { $this->ratio = (string) $v; return $this; }
+    public function getPeseeAvant(): ?float { return null !== $this->peseeAvant ? (float) $this->peseeAvant : null; }
+    public function setPeseeAvant(float|string|null $v): self { $this->peseeAvant = null !== $v ? (string) $v : null; return $this; }
+    public function getPeseeApres(): ?float { return null !== $this->peseeApres ? (float) $this->peseeApres : null; }
+    public function setPeseeApres(float|string|null $v): self { $this->peseeApres = null !== $v ? (string) $v : null; return $this; }
     public function getEtatReference(): string { return $this->etatReference; }
     public function setEtatReference(string $v): self { $this->etatReference = $v; return $this; }
     public function getCodeBarres(): ?string { return $this->codeBarres; }
