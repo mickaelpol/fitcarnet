@@ -4,7 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConnexion } from '@/api/hooks';
 import { Bouton, Champ, Discret, Texte, Titre } from '@/composants/base';
-import { C, E } from '@/theme';
+import { C, E, T } from '@/theme';
 
 export default function Connexion() {
   const router = useRouter();
@@ -50,7 +50,7 @@ export default function Connexion() {
         />
 
         {connexion.isError && (
-          <Texte style={{ color: C.erreur, marginTop: E.m, fontSize: 13.5 }}>
+          <Texte style={{ color: C.erreur, marginTop: E.m, fontSize: T.normal }}>
             {connexion.error.message}
           </Texte>
         )}
@@ -64,7 +64,7 @@ export default function Connexion() {
         </Bouton>
 
         <View style={{ height: E.xl }} />
-        <Discret style={{ fontSize: 12, textAlign: 'center' }}>
+        <Discret style={{ fontSize: T.petit, textAlign: 'center' }}>
           Les comptes sont créés par l'administrateur.
         </Discret>
       </ScrollView>

@@ -72,11 +72,32 @@ class Cible implements ProprieteUtilisateur
     #[Groups(['cible:lire', 'cible:ecrire'])]
     private string $lip = '0';
 
+    /**
+     * La cible en glucides comprend-elle les fibres ?
+     *
+     * Une quantite sans son unite est un bug qui attend son heure. « 61,8 g
+     * de glucides » ne veut pas dire la meme chose selon la convention : les
+     * plans nord-americains — USDA, Fitlog, MyFitnessPal — y comprennent les
+     * fibres, les etiquettes francaises les comptent a part. Huit grammes
+     * d'ecart par repas, sans que rien ne le signale.
+     *
+     * Le drapeau vit ICI et non sur le compte : c'est la cible qui porte son
+     * unite, et on peut changer de plan sans que les anciennes valeurs se
+     * mettent a vouloir dire autre chose.
+     *
+     * Faux par defaut : convention europeenne, celle des donnees de l'app.
+     */
+    #[ORM\Column(name: 'glucides_totaux', type: Types::BOOLEAN, options: ['default' => false])]
+    #[Groups(['cible:lire', 'cible:ecrire'])]
+    private bool $glucidesTotaux = false;
+
     public function getId(): ?int { return $this->id; }
     public function getUtilisateur(): ?Utilisateur { return $this->utilisateur; }
     public function setUtilisateur(?Utilisateur $u): self { $this->utilisateur = $u; return $this; }
     public function getRepas(): string { return $this->repas; }
     public function setRepas(string $r): self { $this->repas = $r; return $this; }
+    public function isGlucidesTotaux(): bool { return $this->glucidesTotaux; }
+    public function setGlucidesTotaux(bool $v): self { $this->glucidesTotaux = $v; return $this; }
     public function getKcal(): float { return (float) $this->kcal; }
     public function setKcal(float|string $v): self { $this->kcal = (string) $v; return $this; }
     public function getProt(): float { return (float) $this->prot; }

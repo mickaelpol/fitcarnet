@@ -18,7 +18,20 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class FrigoGrocy
 {
+    /** Sans l'un de ces champs, l'aliment ne peut PAS entrer dans un calcul. */
     private const CHAMPS = ['cat', 'kcal100', 'prot100', 'gluc100', 'lip100', 'ratio'];
+
+    /**
+     * Les fibres ne bloquent pas, mais leur absence n'est plus anodine.
+     *
+     * Un aliment sans fibres reste parfaitement utilisable tant que les
+     * cibles sont en convention europeenne. Il devient faux des que la cible
+     * est exprimee en glucides TOTAUX : l'application lit alors zero fibre,
+     * vise trop haut, et rien ne le signale — le silence est le probleme.
+     *
+     * On le rapporte donc a part, sans jamais ecarter l'aliment du frigo.
+     */
+    private const CHAMPS_SOUHAITES = ['fibres100'];
 
     public function __construct(
         private HttpClientInterface $http,
@@ -141,15 +154,24 @@ final readonly class FrigoGrocy
         $incomplets = [];
         foreach ($this->appeler('/objects/products') as $produit) {
             $champs = self::champsDe($produit);
-            $manquants = \array_diff(self::CHAMPS, \array_keys(\array_filter(
-                $champs, static fn ($v) => null !== $v && '' !== $v)));
-            if ([] !== $manquants) {
-                $incomplets[] = [
-                    'reference' => 'grocy:' . $produit['id'],
-                    'nom' => (string) $produit['name'],
-                    'manquants' => \array_values($manquants),
-                ];
+            $renseignes = \array_keys(\array_filter(
+                $champs, static fn ($v) => null !== $v && '' !== $v));
+
+            $manquants = \array_diff(self::CHAMPS, $renseignes);
+            $souhaites = \array_diff(self::CHAMPS_SOUHAITES, $renseignes);
+
+            if ([] === $manquants && [] === $souhaites) {
+                continue;
             }
+
+            $incomplets[] = [
+                'reference' => 'grocy:' . $produit['id'],
+                'nom' => (string) $produit['name'],
+                'manquants' => \array_values($manquants),
+                /* Distingues des precedents : l'aliment reste utilisable, mais
+                   fausse une cible exprimee en glucides totaux. */
+                'souhaites' => \array_values($souhaites),
+            ];
         }
 
         return $incomplets;

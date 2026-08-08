@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Discret } from './base';
-import { C, E, nb } from '@/theme';
+import { C, E, T, nb } from '@/theme';
 
 /**
  * Courbe de progression, dessinée sans dépendance graphique : chaque point
@@ -75,13 +75,13 @@ export function Sparkline({
 
 const s = StyleSheet.create({
   bloc: { gap: 3 },
-  libelle: { fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
+  libelle: { fontSize: T.minuscule, letterSpacing: 0.8, textTransform: 'uppercase' },
   courbe: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 3,
     backgroundColor: C.surface2, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 3,
   },
   barre: { flex: 1, borderRadius: 2, minWidth: 3 },
   pied: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  borne: { fontSize: 9.5, fontVariant: ['tabular-nums'] },
-  evolution: { fontSize: 10.5, fontVariant: ['tabular-nums'] },
+  borne: { fontSize: T.minuscule, fontVariant: ['tabular-nums'] },
+  evolution: { fontSize: T.minuscule, fontVariant: ['tabular-nums'] },
 });

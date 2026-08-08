@@ -3,7 +3,7 @@ import type { Serie } from '@/api/types';
 import { Champ, Discret, Texte } from './base';
 import { ChronoEffort } from './chronoSerie';
 import type { CibleMesure } from './etatMesure';
-import { C, E, R, TOUCHE, nb } from '@/theme';
+import { C, E, R, T, TOUCHE, nb } from '@/theme';
 
 /** « 42 » ou « 1:20 » -> secondes. */
 export const versSecondes = (t: string): number | null => {
@@ -52,7 +52,7 @@ export function LigneSerie({
     <View style={[s.ligne, serie.faite && s.faite]}>
       <Pressable onPress={cocher} style={s.case_} accessibilityLabel={`Série ${index + 1} faite`}>
         <View style={[s.carre, serie.faite && { backgroundColor: C.ok, borderColor: C.ok }]}>
-          {serie.faite && <Texte style={{ color: C.fond, fontSize: 12 }}>✓</Texte>}
+          {serie.faite && <Texte style={{ color: C.fond, fontSize: T.petit }}>✓</Texte>}
         </View>
       </Pressable>
 
@@ -88,7 +88,7 @@ export function LigneSerie({
       )}
 
       <Pressable onPress={onSupprimer} style={s.sup}>
-        <Discret style={{ fontSize: 17 }}>×</Discret>
+        <Discret style={{ fontSize: T.grand }}>×</Discret>
       </Pressable>
     </View>
   );

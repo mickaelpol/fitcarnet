@@ -3,7 +3,7 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSeances } from '@/api/hooks';
 import type { Seance } from '@/api/types';
 import { Bouton, Carte, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
-import { C, E, P, R } from '@/theme';
+import { C, E, N, P, R, T } from '@/theme';
 
 const COULEUR_TYPE: Record<string, string> = {
   Push: C.prot, Pull: C.fec, Legs: C.leg,
@@ -58,13 +58,13 @@ function Ligne({ seance, onPress }: { seance: Seance; onPress: () => void }) {
         <View style={[s.pastille, { backgroundColor: couleur }]} />
         <View style={{ flex: 1 }}>
           <Texte style={{ fontFamily: P.fort }}>{seance.type ?? 'Séance'}</Texte>
-          <Discret style={{ fontSize: 12.5 }}>{jour(seance.date)}</Discret>
+          <Discret style={{ fontSize: T.normal }}>{jour(seance.date)}</Discret>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Chiffre couleur={fini ? C.ok : C.vif} taille={19}>
+          <Chiffre couleur={fini ? C.ok : C.vif} taille={N.petit}>
             {av.faites}/{av.total}
           </Chiffre>
-          <Discret style={{ fontSize: 11 }}>séries</Discret>
+          <Discret style={{ fontSize: T.petit }}>séries</Discret>
         </View>
       </Carte>
     </Pressable>

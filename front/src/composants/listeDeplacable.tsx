@@ -4,7 +4,7 @@ import DraggableFlatList, {
   type RenderItemParams, ScaleDecorator,
 } from 'react-native-draggable-flatlist';
 import { Discret } from './base';
-import { C, E, R, TOUCHE } from '@/theme';
+import { C, E, R, T, TOUCHE } from '@/theme';
 
 /**
  * Version MOBILE : glisser-déposer natif de React Native.
@@ -45,14 +45,14 @@ export function ListeDeplacable<T>({
           style={s.saisir}
           accessibilityLabel="Maintenir pour déplacer"
         >
-          <Discret style={{ fontSize: 17, color: isActive ? C.vif : C.discret }}>⠿</Discret>
+          <Discret style={{ fontSize: T.grand, color: isActive ? C.vif : C.discret }}>⠿</Discret>
         </Pressable>
         <View>
           <Pressable onPress={() => deplacer(index, -1)} style={s.fleche} hitSlop={6}>
-            <Discret style={{ fontSize: 11 }}>▲</Discret>
+            <Discret style={{ fontSize: T.petit }}>▲</Discret>
           </Pressable>
           <Pressable onPress={() => deplacer(index, 1)} style={s.fleche} hitSlop={6}>
-            <Discret style={{ fontSize: 11 }}>▼</Discret>
+            <Discret style={{ fontSize: T.petit }}>▼</Discret>
           </Pressable>
         </View>
       </View>
@@ -92,7 +92,7 @@ const s = StyleSheet.create({
   },
   fleche: { width: 30, height: 22, alignItems: 'center', justifyContent: 'center' },
   actif: {
-    borderRadius: R.m, shadowColor: '#000', shadowOpacity: 0.45,
+    borderRadius: R.m, shadowColor: C.ombre, shadowOpacity: 0.45,
     shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 9,
   },
 });

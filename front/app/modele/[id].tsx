@@ -10,7 +10,7 @@ import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { lireFormat } from '@/composants/exerciceSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
-import { C, E, P, R, TOUCHE, nb } from '@/theme';
+import { C, E, P, R, T, TOUCHE, nb } from '@/theme';
 
 const TYPES = ['Push', 'Pull', 'Legs'] as const;
 const COULEUR: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
@@ -112,7 +112,7 @@ export default function DetailModele() {
             <Texte style={{ fontFamily: P.fort }} numberOfLines={1}>
               {ex?.nomFr ?? ex?.nom ?? '—'}
             </Texte>
-            <Discret style={{ fontSize: 12 }} numberOfLines={1}>
+            <Discret style={{ fontSize: T.petit }} numberOfLines={1}>
               {bloc.series.length} série{bloc.series.length > 1 ? 's' : ''}
               {ex?.formatPrescrit ? ` · ${ex.formatPrescrit}` : ''}
             </Discret>
@@ -148,7 +148,7 @@ export default function DetailModele() {
               })}
               style={s.sup}
             >
-              <Discret style={{ fontSize: 17 }}>×</Discret>
+              <Discret style={{ fontSize: T.grand }}>×</Discret>
             </Pressable>
           </View>
         ))}
@@ -167,7 +167,7 @@ export default function DetailModele() {
             + Série
           </Bouton>
           <Bouton variante="discret" onPress={() => setRetirer(i)}>
-            <Discret style={{ fontSize: 12.5 }}>Retirer</Discret>
+            <Discret style={{ fontSize: T.normal }}>Retirer</Discret>
           </Bouton>
         </View>
       </Carte>
@@ -197,7 +197,7 @@ export default function DetailModele() {
         ))}
       </View>
       {modele.exercices.length > 1 && (
-        <Discret style={{ fontSize: 11.5, lineHeight: 16 }}>
+        <Discret style={{ fontSize: T.petit, lineHeight: 16 }}>
           Touche ⠿ pour saisir un exercice, puis l'endroit où le déposer.
           Les flèches ▲▼ le déplacent d'un cran.
           L'ordre du modèle pourra ensuite être appliqué à tes séances.
@@ -327,7 +327,7 @@ const s = StyleSheet.create({
     flex: 1, minHeight: TOUCHE, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
     backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center',
   },
-  typeTexte: { fontFamily: P.chiffre, fontSize: 17, textTransform: 'uppercase', color: C.attenue },
+  typeTexte: { fontFamily: P.chiffre, fontSize: T.grand, textTransform: 'uppercase', color: C.attenue },
   tete: { flexDirection: 'row', alignItems: 'center', gap: E.xs, minHeight: TOUCHE },
   serie: { flexDirection: 'row', alignItems: 'center', gap: E.s },
   sup: { width: 32, minHeight: TOUCHE, alignItems: 'center', justifyContent: 'center' },

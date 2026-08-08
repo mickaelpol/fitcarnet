@@ -6,7 +6,7 @@ import { Bouton, Champ, Chiffre, Discret, Texte } from './base';
 import {
   arrondirCharge, estimerDepuisEssai, PALIERS, repsAu, REPS_MAX_POUR_1RM,
 } from '@/calcul/performance';
-import { C, E, P, R, nb } from '@/theme';
+import { C, E, N, P, R, T, nb } from '@/theme';
 
 const PAS = [1, 2.5, 5] as const;
 
@@ -51,7 +51,7 @@ export function ModaleCalculateurRM({
         <Pressable style={s.fond} onPress={onFermer}>
           <Pressable style={s.boite} onPress={(e) => e.stopPropagation()}>
             <Texte style={s.titre}>Calculateur de RM</Texte>
-            <Discret style={{ fontSize: 12.5 }} numberOfLines={1}>{nomExercice}</Discret>
+            <Discret style={{ fontSize: T.normal }} numberOfLines={1}>{nomExercice}</Discret>
 
             <ScrollView style={{ marginTop: E.m }} keyboardShouldPersistTaps="handled">
               {/* Deux champs empilés : côte à côte, ils s'écrasaient au point
@@ -70,7 +70,7 @@ export function ModaleCalculateurRM({
               </View>
 
               {tropLong && (
-                <Discret style={{ color: C.vif, fontSize: 12, marginTop: E.s, lineHeight: 17 }}>
+                <Discret style={{ color: C.vif, fontSize: T.petit, marginTop: E.s, lineHeight: 17 }}>
                   Au-delà de {REPS_MAX_POUR_1RM} répétitions, on mesure l'endurance :
                   l'estimation perdrait son sens. Refais un essai plus lourd.
                 </Discret>
@@ -79,14 +79,14 @@ export function ModaleCalculateurRM({
               {rm !== null && (
                 <>
                   <View style={s.resultat}>
-                    <Chiffre taille={38}>{nb(rm)}</Chiffre>
-                    <Discret style={{ fontSize: 11.5 }}>
+                    <Chiffre taille={N.grand}>{nb(rm)}</Chiffre>
+                    <Discret style={{ fontSize: T.petit }}>
                       kg au maximum{estime ? '' : ' · ton meilleur à ce jour'}
                     </Discret>
                   </View>
 
                   <View style={s.pas}>
-                    <Discret style={{ fontSize: 11.5 }}>Arrondi</Discret>
+                    <Discret style={{ fontSize: T.petit }}>Arrondi</Discret>
                     {PAS.map((x) => (
                       <Pressable
                         key={x}
@@ -149,14 +149,14 @@ export function ModaleCalculateurRM({
 
 const s = StyleSheet.create({
   fond: {
-    flex: 1, backgroundColor: 'rgba(10,11,13,0.78)',
+    flex: 1, backgroundColor: C.voile,
     alignItems: 'center', justifyContent: 'center', padding: E.m,
   },
   boite: {
     backgroundColor: C.surface, borderRadius: R.l, borderWidth: 1, borderColor: C.ligne,
     padding: E.m, maxHeight: '86%', width: '100%', maxWidth: 480,
   },
-  titre: { fontFamily: P.titre, fontSize: 20, letterSpacing: 0.8, textTransform: 'uppercase' },
+  titre: { fontFamily: P.titre, fontSize: T.titre, letterSpacing: 0.8, textTransform: 'uppercase' },
   resultat: { alignItems: 'center', gap: 2, paddingVertical: E.m },
   pas: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: E.s },
   pasBouton: {
@@ -168,13 +168,13 @@ const s = StyleSheet.create({
   entete: { flexDirection: 'row', paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: C.ligne },
   ligne: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(47,52,61,0.5)',
+    borderBottomWidth: 1, borderBottomColor: C.ligneVoile,
   },
-  zone: { backgroundColor: 'rgba(227,178,60,0.08)', borderRadius: 5 },
-  col: { fontSize: 11.5 },
+  zone: { backgroundColor: C.vifVoile, borderRadius: 5 },
+  col: { fontSize: T.petit },
   colPct: { flex: 1 },
   colKg: { flex: 1, textAlign: 'right' },
   colRep: { flex: 1, textAlign: 'right' },
-  valeur: { fontFamily: P.chiffre, fontSize: 15, fontVariant: ['tabular-nums'] },
-  note: { fontSize: 10.5, marginTop: E.s, lineHeight: 15 },
+  valeur: { fontFamily: P.chiffre, fontSize: T.moyen, fontVariant: ['tabular-nums'] },
+  note: { fontSize: T.minuscule, marginTop: E.s, lineHeight: 15 },
 });

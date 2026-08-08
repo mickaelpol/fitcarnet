@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Bouton, Carte, Discret, Texte } from '@/composants/base';
 import { SONNERIES, jouerSonnerie, useSonnerie } from '@/composants/sonnerie';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 /**
  * Réglages de l'application.
@@ -21,7 +21,7 @@ export default function Reglages() {
       <ScrollView contentContainerStyle={s.page}>
         <Carte>
           <Discret style={s.etiquette}>Sonnerie de fin de repos</Discret>
-          <Discret style={{ fontSize: 11.5, lineHeight: 16, marginBottom: E.s }}>
+          <Discret style={{ fontSize: T.petit, lineHeight: 16, marginBottom: E.s }}>
             Touche une ligne pour l'entendre. Le téléphone vibre en plus du son,
             pour les séances où il reste dans la poche.
           </Discret>
@@ -38,8 +38,8 @@ export default function Reglages() {
                 accessibilityState={{ selected: actif }}
               >
                 <View style={{ flex: 1 }}>
-                  <Texte style={{ fontSize: 14 }}>{son.libelle}</Texte>
-                  <Discret style={{ fontSize: 11 }}>{son.description}</Discret>
+                  <Texte style={{ fontSize: T.normal }}>{son.libelle}</Texte>
+                  <Discret style={{ fontSize: T.petit }}>{son.description}</Discret>
                 </View>
                 {actif && <Texte style={{ color: C.vif }}>✓</Texte>}
               </Pressable>
@@ -51,7 +51,7 @@ export default function Reglages() {
           Réécouter la sonnerie choisie
         </Bouton>
 
-        <Discret style={{ fontSize: 11, lineHeight: 16, marginTop: E.s }}>
+        <Discret style={{ fontSize: T.petit, lineHeight: 16, marginTop: E.s }}>
           Ce choix est enregistré sur cet appareil. Un autre téléphone gardera
           le sien.
         </Discret>
@@ -63,7 +63,7 @@ export default function Reglages() {
 const s = StyleSheet.create({
   page: { padding: E.m, gap: E.s },
   etiquette: {
-    fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase',
+    fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase',
     color: C.discret, marginBottom: E.xs,
   },
   choix: {

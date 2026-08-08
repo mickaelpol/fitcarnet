@@ -7,7 +7,7 @@ import {
   CATEGORIES, RATIOS_GUIDES, controler, etatParDefaut, expliquerRatio,
   provenanceRatio, ratioDepuisPesees, ratioVraisemblable, soupconKilojoules,
 } from '@/calcul/nutrition';
-import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
+import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 
 export interface AlimentSaisi {
   id?: number;
@@ -219,14 +219,14 @@ export function EditeurAliment({
                     ]}
                   >
                     <Discret style={a.categorie === c.cle
-                      ? { color: C.fond, fontFamily: P.fort, fontSize: 12 }
-                      : { fontSize: 12 }}>
+                      ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
+                      : { fontSize: T.petit }}>
                       {c.libelle}
                     </Discret>
                   </Pressable>
                 ))}
               </View>
-              <Discret style={{ fontSize: 11, marginTop: 4 }}>
+              <Discret style={{ fontSize: T.petit, marginTop: 4 }}>
                 {CATEGORIES.find((c) => c.cle === a.categorie)?.exemple}
               </Discret>
 
@@ -251,7 +251,7 @@ export function EditeurAliment({
               </View>
 
               <Discret style={s.aide}>
-                Les calories se saisissent en <Texte style={{ fontSize: 11 }}>kcal</Texte>,
+                Les calories se saisissent en <Texte style={{ fontSize: T.petit }}>kcal</Texte>,
                 jamais en kJ. Une étiquette européenne affiche les deux, les
                 kilojoules en premier et en plus gros : sur « 1473 kJ / 352 kcal »,
                 c'est 352 qu'il faut reprendre. Un paquet qui écrit « cal » ou
@@ -265,7 +265,7 @@ export function EditeurAliment({
 
               {kilojoules !== null && (
                 <View style={[s.controle, { borderColor: C.vif }]}>
-                  <Discret style={{ color: C.vif, fontSize: 12.5, lineHeight: 18 }}>
+                  <Discret style={{ color: C.vif, fontSize: T.normal, lineHeight: 18 }}>
                     {kilojoules.motif === 'plafond'
                       ? `${nb(kilojoules.saisi)} kcal pour 100 g est impossible : rien ne dépasse `
                         + '900 kcal, la densité de la matière grasse pure. '
@@ -301,7 +301,7 @@ export function EditeurAliment({
               {/* ---- contrôle ---- */}
               {(a.kcal100 > 0 || a.prot100 > 0) && (
                 <View style={[s.controle, { borderColor: couleurVerdict }]}>
-                  <Discret style={{ color: couleurVerdict, fontSize: 12.5, lineHeight: 18 }}>
+                  <Discret style={{ color: couleurVerdict, fontSize: T.normal, lineHeight: 18 }}>
                     {controle.message}
                   </Discret>
                 </View>
@@ -321,8 +321,8 @@ export function EditeurAliment({
                       style={[s.choixRatio, Math.abs(a.ratio - g.valeur) < 0.01 && s.choixActif]}
                     >
                       <View style={{ flex: 1 }}>
-                        <Texte style={{ fontSize: 14 }}>{g.libelle}</Texte>
-                        <Discret style={{ fontSize: 11 }}>{g.exemple}</Discret>
+                        <Texte style={{ fontSize: T.normal }}>{g.libelle}</Texte>
+                        <Discret style={{ fontSize: T.petit }}>{g.exemple}</Discret>
                       </View>
                       {Math.abs(a.ratio - g.valeur) < 0.01 && (
                         <Discret style={{ color: C.vif }}>✓</Discret>
@@ -330,17 +330,17 @@ export function EditeurAliment({
                     </Pressable>
                   ))}
                   <Bouton variante="discret" onPress={() => setMesurer(true)}>
-                    <Discret style={{ fontSize: 12.5, textDecorationLine: 'underline' }}>
+                    <Discret style={{ fontSize: T.normal, textDecorationLine: 'underline' }}>
                       Je préfère mesurer
                     </Discret>
                   </Bouton>
                 </>
               ) : (
                 <View style={s.mesure}>
-                  <Discret style={{ fontSize: 12.5, lineHeight: 18 }}>
-                    Pèse ton aliment <Texte style={{ fontSize: 12.5 }}>avant</Texte> de le
+                  <Discret style={{ fontSize: T.normal, lineHeight: 18 }}>
+                    Pèse ton aliment <Texte style={{ fontSize: T.normal }}>avant</Texte> de le
                     cuire, note le poids. Cuis-le, égoutte-le, et pèse-le
-                    {' '}<Texte style={{ fontSize: 12.5 }}>après</Texte>. L'app en déduit le reste.
+                    {' '}<Texte style={{ fontSize: T.normal }}>après</Texte>. L'app en déduit le reste.
                   </Discret>
                   <View style={[s.paire, { marginTop: E.s }]}>
                     <Champ etiquette="Poids avant cuisson" unite="g" numerique
@@ -367,7 +367,7 @@ export function EditeurAliment({
                     </Bouton>
                   )}
                   <Bouton variante="discret" onPress={() => setMesurer(false)}>
-                    <Discret style={{ fontSize: 12.5 }}>Revenir aux valeurs courantes</Discret>
+                    <Discret style={{ fontSize: T.normal }}>Revenir aux valeurs courantes</Discret>
                   </Bouton>
                 </View>
               )}
@@ -421,7 +421,7 @@ export function EditeurAliment({
 
             {erreur !== null && erreur !== undefined && erreur !== '' && (
               <View style={[s.controle, { borderColor: C.erreur }]}>
-                <Discret style={{ color: C.erreur, fontSize: 12.5, lineHeight: 18 }}>
+                <Discret style={{ color: C.erreur, fontSize: T.normal, lineHeight: 18 }}>
                   {erreur}
                 </Discret>
               </View>
@@ -448,16 +448,16 @@ export function EditeurAliment({
 
 const s = StyleSheet.create({
   fond: {
-    flex: 1, backgroundColor: 'rgba(10,11,13,0.78)',
+    flex: 1, backgroundColor: C.voile,
     alignItems: 'center', justifyContent: 'center', padding: E.m,
   },
   boite: {
     backgroundColor: C.surface, borderRadius: R.l, borderWidth: 1, borderColor: C.ligne,
     padding: E.m, maxHeight: '90%', width: '100%', maxWidth: 520,
   },
-  titre: { fontFamily: P.titre, fontSize: 20, letterSpacing: 0.8, textTransform: 'uppercase' },
+  titre: { fontFamily: P.titre, fontSize: T.titre, letterSpacing: 0.8, textTransform: 'uppercase' },
   section: {
-    fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase',
+    fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase',
     marginTop: E.l, marginBottom: E.xs,
   },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
@@ -467,7 +467,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   paire: { flexDirection: 'row', gap: E.s },
-  aide: { fontSize: 11, lineHeight: 16, marginTop: 6 },
+  aide: { fontSize: T.petit, lineHeight: 16, marginTop: 6 },
   controle: {
     borderWidth: 1, borderRadius: R.s, padding: E.s, marginTop: E.m,
     backgroundColor: C.surface2,

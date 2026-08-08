@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { resoudre, arrondir } from './algebre';
-import { calculer, pourObtenirCuit } from './solveur';
+import { calculer, pourObtenirCuit, versReference } from './solveur';
 import { A, CIBLES } from './aliments.test-data';
 import type { Fixe } from './types';
 
@@ -504,5 +504,61 @@ describe('un aliment ajustable devenu inutile', () => {
     assert.ok(r.diagnostics.some((d) => d.code === 'apport_negligeable'),
       'l\'app doit prévenir que les amandes ne servent plus à rien');
     assert.equal(r.ok, true, 'les macros restent atteintes');
+  });
+});
+
+describe('cible exprimée en glucides TOTAUX', () => {
+  /* Un plan nord-américain écrit « 60 g de glucides » en y comprenant les
+     fibres. Les données de l'app, elles, sont européennes : fibres à part. */
+  const rizFibre = { ...A.riz, fibres100: 3 };
+  const legumeFibre = { ...A.courgettes, fibres100: 2 };
+  const cibles = { kcal: 600, prot: 40, gluc: 60, lip: 20 };
+
+  it('ne change rien quand l\'aliment n\'a pas de fibres connues', () => {
+    const sans = calculer(cibles, { proteine: A.poulet, glucide: A.riz, lipide: A.amandes });
+    const avec = calculer(
+      cibles, { proteine: A.poulet, glucide: A.riz, lipide: A.amandes },
+      [], { glucidesTotaux: true });
+
+    assert.deepEqual(avec.quantites.map((q) => q.aCuire), sans.quantites.map((q) => q.aCuire));
+  });
+
+  it('met MOINS de féculent quand la cible comprend les fibres', () => {
+    const variables = { proteine: A.poulet, glucide: rizFibre, lipide: A.amandes };
+    const europeen = calculer(cibles, variables);
+    const totaux = calculer(cibles, variables, [], { glucidesTotaux: true });
+
+    const riz = (r: typeof europeen) =>
+      r.quantites.find((q) => q.aliment.id === rizFibre.id)!.aCuire;
+
+    assert.ok(riz(totaux) < riz(europeen),
+      `${riz(totaux)} devrait être inférieur à ${riz(europeen)}`);
+  });
+
+  /* Le point qui compte : glucides + fibres tombent sur la cible. */
+  it('atteint la cible en glucides + fibres', () => {
+    const variables = { proteine: A.poulet, glucide: rizFibre, lipide: A.amandes };
+    const r = calculer(cibles, variables, [], { glucidesTotaux: true });
+
+    const totalAvecFibres = r.quantites.reduce((n, q) => {
+      const ref = versReference(q.aliment, q.aCuire, 'cru');
+      const a = q.aliment as typeof rizFibre;
+
+      return n + ((a.gluc100 + (a.fibres100 ?? 0)) * ref) / 100;
+    }, 0);
+
+    assert.ok(Math.abs(totalAvecFibres - cibles.gluc) < 2.5,
+      `${totalAvecFibres.toFixed(1)} g pour une cible de ${cibles.gluc} g`);
+  });
+
+  it('compte aussi les fibres des quantités imposées', () => {
+    const variables = { proteine: A.poulet, glucide: rizFibre, lipide: A.amandes };
+    const fixes = [{ aliment: legumeFibre, grammes: 200, unite: 'cuit' as const }];
+
+    const riz = (totaux: boolean) => calculer(cibles, variables, fixes, { glucidesTotaux: totaux })
+      .quantites.find((q) => q.aliment.id === rizFibre.id)!.aCuire;
+
+    assert.ok(riz(true) < riz(false),
+      'les 4 g de fibres du légume comptent dans la cible et laissent moins de place au riz');
   });
 });

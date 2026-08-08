@@ -7,6 +7,14 @@ export interface Aliment {
   prot100: number;
   gluc100: number;
   lip100: number;
+  /**
+   * Fibres pour 100 g, convention européenne : elles ne sont PAS comprises
+   * dans `gluc100`. Facultatif — absentes, elles valent zéro.
+   *
+   * Elles n'entrent dans aucune cible, mais servent à comparer une
+   * prescription exprimée en glucides TOTAUX. Voir `Options.glucidesTotaux`.
+   */
+  fibres100?: number;
   /** féculents : cuit/sec (riz 3) · protéines : cuit/cru (0,85 poisson, 0,75 volaille) */
   ratio: number;
   /** état auquel se rapportent les valeurs ci-dessus */
@@ -59,6 +67,23 @@ export interface Options {
   arrondi?: { proteine?: number; glucide?: number; lipide?: number };
   /** tolérance d'écart acceptée, par macro */
   tolerance?: Partial<Macros>;
+  /**
+   * La cible en glucides comprend-elle les fibres ?
+   *
+   * Les plans nord-américains — USDA, MyFitnessPal, Fitlog — écrivent un
+   * « Total Carbohydrate » qui INCLUT les fibres ; les étiquettes françaises
+   * et cette application les comptent à part. Viser 61,8 g de glucides
+   * européens quand la prescription dit 61,8 g de glucides totaux revient à
+   * en manger huit de trop.
+   *
+   * Activé, le calcul compare la cible à `glucides + fibres` de chaque
+   * aliment. Rien d'autre ne change : ni les données saisies, qui restent
+   * européennes, ni les autres macros, qui ne dépendent d'aucune convention.
+   *
+   * Les fibres utilisées sont les VRAIES, celles des aliments — pas celles
+   * que le plan d'origine déclare, souvent incomplètes.
+   */
+  glucidesTotaux?: boolean;
 }
 
 export type Gravite = 'info' | 'avertissement' | 'blocage';

@@ -2,7 +2,7 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-
 import { WebView } from 'react-native-webview';
 import type { Exercice } from '@/api/types';
 import { Bouton, Discret, Texte } from './base';
-import { C, E, P, R } from '@/theme';
+import { C, E, P, R, T } from '@/theme';
 
 /** Extrait l'identifiant d'une URL YouTube, quelle qu'en soit la forme. */
 export function identifiantYoutube(url: string | null): string | null {
@@ -46,7 +46,7 @@ export function ModaleExercice({
         <Pressable style={s.feuille} onPress={(e) => e.stopPropagation()}>
           <Texte style={s.titre}>{nom}</Texte>
           {exercice.nomFr !== null && exercice.nomFr !== undefined && (
-            <Discret style={{ fontSize: 12, marginTop: -6 }}>{exercice.nom}</Discret>
+            <Discret style={{ fontSize: T.petit, marginTop: -6 }}>{exercice.nom}</Discret>
           )}
 
           <ScrollView style={{ marginTop: E.m }} contentContainerStyle={{ gap: E.m }}>
@@ -99,7 +99,7 @@ export function ModaleExercice({
               && exercice.instructions !== '' && (
               <View>
                 <Discret style={s.section}>Exécution</Discret>
-                <Texte style={{ fontSize: 14, lineHeight: 21 }}>{exercice.instructions}</Texte>
+                <Texte style={{ fontSize: T.normal, lineHeight: 21 }}>{exercice.instructions}</Texte>
               </View>
             )}
           </ScrollView>
@@ -115,8 +115,8 @@ export function ModaleExercice({
 
 const Ligne = ({ cle, valeur }: { cle: string; valeur: string }) => (
   <View style={s.ligne}>
-    <Discret style={{ flex: 1, fontSize: 12.5 }}>{cle}</Discret>
-    <Texte style={{ flex: 2, fontSize: 13.5 }}>{valeur}</Texte>
+    <Discret style={{ flex: 1, fontSize: T.normal }}>{cle}</Discret>
+    <Texte style={{ flex: 2, fontSize: T.normal }}>{valeur}</Texte>
   </View>
 );
 
@@ -125,17 +125,17 @@ const s = StyleSheet.create({
      verticalement, avec une marge suffisante pour qu'il reste toujours une
      zone cliquable au-dessus et en dessous. */
   fond: {
-    flex: 1, backgroundColor: 'rgba(10,11,13,0.78)',
+    flex: 1, backgroundColor: C.voile,
     alignItems: 'center', justifyContent: 'center', padding: E.m,
   },
   feuille: {
     backgroundColor: C.surface, borderRadius: R.l, borderWidth: 1, borderColor: C.ligne,
     padding: E.m, maxHeight: '82%', width: '100%', maxWidth: 560,
   },
-  titre: { fontFamily: P.titre, fontSize: 20, letterSpacing: 0.8, textTransform: 'uppercase' },
+  titre: { fontFamily: P.titre, fontSize: T.titre, letterSpacing: 0.8, textTransform: 'uppercase' },
   video: {
     width: '100%', aspectRatio: 16 / 9, borderRadius: 10,
-    overflow: 'hidden', backgroundColor: '#000',
+    overflow: 'hidden', backgroundColor: C.ombre,
   },
   sansVideo: {
     width: '100%', aspectRatio: 16 / 9, borderRadius: 10, backgroundColor: C.surface2,
@@ -145,6 +145,6 @@ const s = StyleSheet.create({
   infos: { gap: 6 },
   ligne: { flexDirection: 'row', alignItems: 'flex-start', gap: E.s },
   section: {
-    fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5,
+    fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5,
   },
 });

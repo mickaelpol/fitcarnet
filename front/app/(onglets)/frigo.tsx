@@ -15,7 +15,7 @@ import { Confirmer } from '@/composants/confirmer';
 import { EditeurAliment, type AlimentSaisi } from '@/composants/editeurAliment';
 import { ecartsInventaire, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
 import { controler } from '@/calcul/nutrition';
-import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
+import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 
 /** Point de départ d'une création sans modèle. */
 const ALIMENT_VIDE: AlimentSaisi = {
@@ -85,6 +85,12 @@ export default function MonFrigo() {
   const modifiable = frigo.data?.source === 'base';
   const incomplets = useFrigoIncomplets(frigo.data?.source === 'grocy');
 
+  /* Sans macros, l'aliment est écarté du frigo ; sans fibres, il y reste. Les
+     deux listes n'appellent donc pas le même message. */
+  const bloquants = (incomplets.data?.produits ?? []).filter((p) => p.manquants.length > 0);
+  const sansFibres = (incomplets.data?.produits ?? [])
+    .filter((p) => p.manquants.length === 0 && (p.souhaites ?? []).length > 0);
+
   const tous = frigo.data?.aliments ?? [];
 
   const sections = useMemo(
@@ -151,7 +157,7 @@ export default function MonFrigo() {
           </View>
         </View>
 
-        <Discret style={{ fontSize: 11.5 }}>
+        <Discret style={{ fontSize: T.petit }}>
           {mode === 'stock'
             ? `${enStock} en stock sur ${tous.length}`
             : `${comptes}/${tous.length} vérifiés · ${ecarts.length} écart${ecarts.length > 1 ? 's' : ''}`}
@@ -170,7 +176,7 @@ export default function MonFrigo() {
 
         {supprimer.isError && (
           <View style={s.alerte}>
-            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+            <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 17 }}>
               {supprimer.error.message}
             </Discret>
           </View>
@@ -178,7 +184,7 @@ export default function MonFrigo() {
 
         {definir.isError && (
           <View style={s.alerte}>
-            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+            <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 17 }}>
               L'aliment a bien été créé, mais sa quantité n'a pas pu être posée :
               {' '}{definir.error.message}. Renseigne-la depuis l'inventaire.
             </Discret>
@@ -187,7 +193,7 @@ export default function MonFrigo() {
 
         {sansPoids.length > 0 && (
           <View style={s.alerte}>
-            <Discret style={{ color: C.attenue, fontSize: 12, lineHeight: 17 }}>
+            <Discret style={{ color: C.attenue, fontSize: T.petit, lineHeight: 17 }}>
               {sansPoids.length} produit(s) sans poids connu
               {' ('}{sansPoids.map((a) => `${a.nom} en ${a.unite}`).join(', ')}
               {'). '}
@@ -200,18 +206,34 @@ export default function MonFrigo() {
 
         {frigo.data?.probleme !== null && frigo.data?.probleme !== undefined && (
           <View style={s.alerte}>
-            <Discret style={{ color: C.vif, fontSize: 12.5, lineHeight: 18 }}>
+            <Discret style={{ color: C.vif, fontSize: T.normal, lineHeight: 18 }}>
               {frigo.data.probleme}
             </Discret>
           </View>
         )}
 
-        {(incomplets.data?.produits.length ?? 0) > 0 && (
+        {/* Deux manques, deux conséquences opposées. Un aliment sans macros
+            disparaît — on le voit. Un aliment sans fibres reste là et fausse
+            en silence une cible exprimée en glucides totaux : c'est le plus
+            dangereux des deux, et il mérite sa propre alerte. */}
+        {bloquants.length > 0 && (
           <View style={s.alerte}>
-            <Discret style={{ color: C.attenue, fontSize: 12, lineHeight: 17 }}>
-              {incomplets.data!.produits.length} produit(s) Grocy sans valeurs
-              nutritionnelles : ils n'apparaissent pas ici et restent invisibles
-              au calculateur. Renseigne-les dans Grocy pour les utiliser.
+            <Discret style={{ color: C.attenue, fontSize: T.petit, lineHeight: 17 }}>
+              {bloquants.length} produit(s) Grocy sans valeurs nutritionnelles :
+              ils n'apparaissent pas ici et restent invisibles au calculateur.
+              Renseigne-les dans Grocy pour les utiliser.
+            </Discret>
+          </View>
+        )}
+
+        {sansFibres.length > 0 && (
+          <View style={[s.alerte, { borderColor: C.vif }]}>
+            <Discret style={{ color: C.vif, fontSize: T.petit, lineHeight: 17 }}>
+              ⚠ {sansFibres.length} aliment(s) sans fibres renseignées :
+              {' '}{sansFibres.slice(0, 4).map((p) => p.nom).join(', ')}
+              {sansFibres.length > 4 ? '…' : ''}. Ils restent utilisables, mais
+              une cible en glucides totaux les compte à zéro fibre et vise trop
+              haut, sans rien signaler.
             </Discret>
           </View>
         )}
@@ -277,12 +299,12 @@ export default function MonFrigo() {
       {mode === 'inventaire' && (
         <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
           {envoyer.isError && (
-            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+            <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 17 }}>
               {envoyer.error.message}
             </Discret>
           )}
           {envoyer.isSuccess && envoyer.data.echecs.length > 0 && (
-            <Discret style={{ color: C.erreur, fontSize: 12, lineHeight: 17 }}>
+            <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 17 }}>
               {envoyer.data.corriges} corrigé(s), {envoyer.data.echecs.length} en échec :
               {' '}{envoyer.data.echecs.map((e) => e.motif).join(' · ')}
             </Discret>
@@ -490,22 +512,22 @@ function LigneStock({
         <View style={[s.pastille, { backgroundColor: couleurRole(aliment.categorie) }]} />
         <View style={{ flex: 1 }}>
           <Texte numberOfLines={2}>{aliment.nom}</Texte>
-          <Discret style={{ fontSize: 11.5 }} numberOfLines={1}>
+          <Discret style={{ fontSize: T.petit }} numberOfLines={1}>
             {nb(aliment.kcal100)} kcal · {nb(aliment.prot100)} P
             {' · '}{nb(aliment.gluc100)} G · {nb(aliment.lip100)} L
           </Discret>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Chiffre taille={18} couleur={aliment.stock > 0 ? C.vif : C.discret}>
+          <Chiffre taille={N.petit} couleur={aliment.stock > 0 ? C.vif : C.discret}>
             {nb(aliment.stock)} {aliment.unite}
           </Chiffre>
           {aliment.unite !== 'g' && aliment.grammesParUnite !== null && (
-            <Discret style={{ fontSize: 10 }}>
+            <Discret style={{ fontSize: T.minuscule }}>
               soit {nb(aliment.stock * aliment.grammesParUnite)} g
             </Discret>
           )}
           {aliment.unite === 'g' && aliment.ratio !== 1 && (
-            <Discret style={{ fontSize: 10 }}>{sec ? 'poids sec' : 'poids cru'}</Discret>
+            <Discret style={{ fontSize: T.minuscule }}>{sec ? 'poids sec' : 'poids cru'}</Discret>
           )}
         </View>
       </Pressable>
@@ -529,12 +551,12 @@ function LigneStock({
           </View>
 
           {controle.verdict !== 'coherent' && (
-            <Discret style={{ color: C.vif, fontSize: 11.5, lineHeight: 16 }}>
+            <Discret style={{ color: C.vif, fontSize: T.petit, lineHeight: 16 }}>
               {controle.message}
             </Discret>
           )}
 
-          <Discret style={{ fontSize: 11.5, lineHeight: 16 }}>
+          <Discret style={{ fontSize: T.petit, lineHeight: 16 }}>
             La quantité se modifie depuis l'inventaire.
             {modifiable ? '' : ' Cet aliment vient de Grocy : sa fiche s’y modifie aussi.'}
           </Discret>
@@ -579,19 +601,19 @@ function LigneInventaire({
         accessibilityLabel={`${aliment.nom} vérifié`}
       >
         <View style={[s.carre, vu && { backgroundColor: C.ok, borderColor: C.ok }]}>
-          {vu && <Texte style={{ color: C.fond, fontSize: 12 }}>✓</Texte>}
+          {vu && <Texte style={{ color: C.fond, fontSize: T.petit }}>✓</Texte>}
         </View>
       </Pressable>
 
       <View style={{ flex: 1 }}>
         <Texte
           numberOfLines={2}
-          style={[{ fontSize: 14 }, vu && s.barre]}
+          style={[{ fontSize: T.normal }, vu && s.barre]}
         >
           {aliment.nom}
         </Texte>
         {ecart && (
-          <Discret style={{ fontSize: 11, color: C.vif }}>
+          <Discret style={{ fontSize: T.petit, color: C.vif }}>
             était {nb(aliment.stock)} {aliment.unite}
           </Discret>
         )}
@@ -608,8 +630,8 @@ function LigneInventaire({
 
 const Mesure = ({ cle, valeur }: { cle: string; valeur: string }) => (
   <View style={s.mesure}>
-    <Discret style={{ fontSize: 10 }}>{cle}</Discret>
-    <Texte style={{ fontSize: 13, fontFamily: P.chiffre }}>{valeur}</Texte>
+    <Discret style={{ fontSize: T.minuscule }}>{cle}</Discret>
+    <Texte style={{ fontSize: T.normal, fontFamily: P.chiffre }}>{valeur}</Texte>
   </View>
 );
 
@@ -628,13 +650,13 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: E.xs,
   },
   segmentActif: { backgroundColor: C.vif },
-  segmentTexte: { fontSize: 12.5 },
-  segmentTexteActif: { color: C.fond, fontFamily: P.fort, fontSize: 12.5 },
+  segmentTexte: { fontSize: T.normal },
+  segmentTexteActif: { color: C.fond, fontFamily: P.fort, fontSize: T.normal },
 
-  alerte: { backgroundColor: 'rgba(227,178,60,0.10)', borderRadius: R.s, padding: E.s },
+  alerte: { backgroundColor: C.vifFond, borderRadius: R.s, padding: E.s },
   page: { padding: E.m, gap: 6, flexGrow: 1, paddingBottom: E.xl },
   section: {
-    fontFamily: P.titre, fontSize: 14, letterSpacing: 1.2, textTransform: 'uppercase',
+    fontFamily: P.titre, fontSize: T.normal, letterSpacing: 1.2, textTransform: 'uppercase',
     marginTop: E.m, marginBottom: E.xs,
   },
 
@@ -657,7 +679,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   saisie: { width: 96 },
-  unite: { fontSize: 13, color: C.attenue, minWidth: 30 },
+  unite: { fontSize: T.normal, color: C.attenue, minWidth: 30 },
 
   /* Barre d'envoi collée en bas. Le retrait vient de useSafeAreaInsets :
      sans lui, Android la glisse sous sa barre de navigation. */

@@ -23,9 +23,13 @@
     "src/calcul/nutrition.test.ts",
     "src/calcul/frigo.ts",
     "src/calcul/frigo.test.ts",
+    "src/calcul/planCoach.ts",
+    "src/calcul/planCoach.test.ts",
     "src/composants/etatMesure.ts",
     "src/composants/etatMesure.test.ts",
     "src/api/uneSeuleFois.ts",
-    "src/api/uneSeuleFois.test.ts"
+    "src/api/uneSeuleFois.test.ts",
+    "src/theme/index.ts",
+    "src/theme/charte.test.ts"
   ]
 }

@@ -50,6 +50,16 @@ if not FICHIERS:
 
 CIQUAL = FICHIERS[0]
 
+if not os.path.isfile(CIQUAL):
+    voisins = sorted(f for f in os.listdir('.') if f.lower().endswith(('.xlsx', '.xls')))
+    sys.exit(
+        f"Fichier introuvable : {CIQUAL}\n"
+        + (f"Tableurs presents ici : {', '.join(voisins)}\n" if voisins
+           else "Aucun tableur dans ce dossier.\n")
+        + "Telecharge la table au format EXCEL depuis\n"
+        "  https://ciqual.anses.fr/#/cms/download/node/20\n"
+        "et pose-la a cote de ce script.")
+
 # ---------------------------------------------------------------------
 #  Correspondance : produit Grocy -> aliment Ciqual
 #
@@ -212,7 +222,13 @@ def api(methode, chemin, corps=None):
 
 def lire_ciqual(chemin):
     print(f"Lecture de {chemin}…")
-    classeur = load_workbook(chemin, read_only=True, data_only=True)
+    try:
+        classeur = load_workbook(chemin, read_only=True, data_only=True)
+    except Exception as e:
+        # Un fichier .xls ancien, un ZIP corrompu, un telechargement interrompu :
+        # tous finissent ici, et une trace Python n'aide personne.
+        sys.exit(f"Lecture impossible de {chemin} : {e}\n"
+                 "Attendu : le format EXCEL (.xlsx) de la table Ciqual.")
     feuille = classeur[classeur.sheetnames[0]]
     lignes = feuille.iter_rows(values_only=True)
 
@@ -326,6 +342,12 @@ def candidats_pour(aliments, motifs: str, combien: int = 6):
     return trouves[:combien]
 
 
+# Au-dela, une pesee ne corrige plus le ratio : elle le contredit. Cinquante
+# pour cent laisse toute la place aux differences reelles — eau, feu, temps de
+# cuisson — sans laisser passer un facteur deux.
+ECART_PESEE_MAX = 0.5
+
+
 def pesees_de(produit) -> tuple[float, float] | None:
     """
     Les deux pesées deja saisies dans Grocy, si elles tiennent debout.
@@ -371,6 +393,7 @@ def main() -> int:
 
     trouves, sans_correspondance, introuvables, suspects = [], [], [], []
     ratios_corriges, depuis_etiquette, ratios_mesures = [], [], []
+    pesees_ecartees = []
 
     for produit in produits:
         cle = normaliser(produit["name"])
@@ -428,10 +451,26 @@ def main() -> int:
         # nationale ne vaut pas deux pesees faites sur TON riz, avec TON eau
         # et TON temps de cuisson. On ne les ecrase donc jamais, on les
         # utilise.
+        #
+        # Sauf quand la mesure contredit la physique. La cuisson n'ajoute que
+        # de l'eau : l'energie se conserve. Une pesee qui doublerait le ratio
+        # attendu impliquerait un aliment deux fois moins calorique une fois
+        # cuit, ce qui n'arrive pas — c'est une erreur de saisie, une pesee
+        # faite apres rincage, ou l'eau restee dans la casserole.
+        #
+        # Ecrire ce ratio-la fausserait toutes les quantites de cet aliment,
+        # en silence. On garde donc l'ancien et on le dit.
         pesees = pesees_de(produit)
         if pesees is not None:
             mesure = round(pesees[1] / pesees[0], 2)
-            if 0.4 <= mesure <= 5:
+            if not (0.4 <= mesure <= 5):
+                pesees_ecartees.append(
+                    (produit["name"], mesure, ratio, pesees, "hors de tout ordre de grandeur"))
+            elif abs(mesure - ratio) / ratio > ECART_PESEE_MAX:
+                pesees_ecartees.append(
+                    (produit["name"], mesure, ratio, pesees,
+                     f"{abs(mesure - ratio) / ratio:.0%} d'ecart avec Ciqual"))
+            else:
                 if abs(mesure - ratio) / ratio > 0.02:
                     ratios_mesures.append((produit["name"], ratio, mesure, pesees))
                 ratio = mesure
@@ -470,6 +509,13 @@ def main() -> int:
         for nom, avant, apres, (pa, pb) in ratios_mesures:
             print(f"  {nom[:26]:28} {avant} -> {apres}   ({pa:g} g avant → {pb:g} g après)")
         print("  Ces pesées ne sont pas réécrites : le script ne mesure rien.")
+
+    if pesees_ecartees:
+        print(f"\n{len(pesees_ecartees)} pesee(s) ECARTEE(S) — le ratio de Ciqual est conserve :")
+        for nom, mesure, garde, (pa, pb), motif in pesees_ecartees:
+            print(f"  ! {nom[:26]:28} {pa:g} g -> {pb:g} g donnerait {mesure}, "
+                  f"on garde {garde}")
+            print(f"    {motif}. Repese, ou corrige les deux champs dans Grocy.")
 
     if depuis_etiquette:
         print(f"\n{len(depuis_etiquette)} valeur(s) venue(s) d'un emballage :")

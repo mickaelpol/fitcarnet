@@ -43,6 +43,13 @@ export interface Cible {
   prot: number;
   gluc: number;
   lip: number;
+  /**
+   * La cible en glucides comprend-elle les fibres ?
+   *
+   * Vrai pour un plan nord-américain, faux pour la convention européenne.
+   * Une quantité sans son unité est un bug qui attend son heure.
+   */
+  glucidesTotaux?: boolean;
 }
 
 export interface Exercice {

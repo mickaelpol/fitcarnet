@@ -1,351 +1,555 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useAliments, useCibles } from '@/api/hooks';
-import type { Aliment as AlimentApi } from '@/api/types';
-import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte } from '@/composants/base';
-import { calculer, pourObtenirCuit } from '@/solveur/solveur';
+import { useCibles, useMonFrigo } from '@/api/hooks';
+import type { AlimentDisponible } from '@/api/types';
+import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
+import { ChoixDansListe } from '@/composants/choixAliment';
+import {
+  HUILE_PAR_PORTION, LEGUME_PAR_PORTION, NOM_REPAS, REPAS,
+  type Repas, type Role, composer, resoudreAuMieux, roleDe,
+} from '@/solveur/composer';
+import { versReference } from '@/solveur/solveur';
 import type { Aliment, Fixe } from '@/solveur/types';
-import { C, E, P, R, TOUCHE, couleurRole, nb } from '@/theme';
+import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 
-const REPAS = [
-  { cle: 'R1' as const, court: 'Matin' },
-  { cle: 'R2' as const, court: 'Midi' },
-  { cle: 'R3' as const, court: '16 h' },
-  { cle: 'R4' as const, court: 'Soir' },
+/**
+ * Le calculateur : l'application compose, tu corriges, elle recalcule.
+ *
+ * Étape 1 du parcours décrit dans CALCULATEUR.md — aujourd'hui seulement. Le
+ * calendrier et le batch cooking viennent après ; il n'y a donc volontairement
+ * aucun sélecteur « plusieurs jours » ici plutôt qu'un bouton mort.
+ */
+
+/* L'ordre d'affichage. `fixe` dit la quantité par personne quand le rôle
+   n'est pas une variable du solveur — l'huile et le légume. */
+/* Mêmes seuils que le solveur : au-delà, l'écart n'est plus de l'arrondi. */
+const TOLERANCE = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 };
+
+const ROLES: { cle: Role; titre: string; cat: string; fixe?: number }[] = [
+  { cle: 'proteine', titre: 'Protéine', cat: 'prot' },
+  { cle: 'glucide', titre: 'Glucide', cat: 'fec' },
+  { cle: 'lipide', titre: 'Oléagineux', cat: 'ole' },
+  { cle: 'huile', titre: 'Huile', cat: 'huile', fixe: HUILE_PAR_PORTION },
+  { cle: 'legume', titre: 'Légume', cat: 'leg', fixe: LEGUME_PAR_PORTION },
 ];
 
-const GROUPES = [
-  { titre: 'Protéines', article: 'une protéine', cle: 'prot', cats: ['prot', 'lait'] },
-  { titre: 'Glucides', article: 'un glucide', cle: 'fec', cats: ['fec', 'fruit'] },
-  { titre: 'Lipides', article: 'un lipide', cle: 'lip', cats: ['ole', 'huile'] },
-  { titre: 'Légumes', article: 'un légume', cle: 'leg', cats: ['leg'] },
-];
-const groupeDe = (cat: string) => Math.max(0, GROUPES.findIndex((g) => g.cats.includes(cat)));
-
-interface Ligne {
-  uid: string;
-  alimentId: number;
-  stock: string;          // saisi par l'utilisateur, TOTAL pour tous les convives
-  unite: 'cru' | 'cuit';
-  ecouler: boolean;
+/** Un repas composé, tel que l'utilisateur peut encore le corriger. */
+interface Compose {
+  roles: Partial<Record<Role, Aliment>>;
+  /** l'aliment dont on a un reste, avec ce qu'il en reste */
+  restes: Record<string, { grammes: string; unite: 'cru' | 'cuit' }>;
+  /** les rôles que l'utilisateur a décidés lui-même : jamais remplacés d'office */
+  verrous: Role[];
 }
 
-const vers = (a: AlimentApi): Aliment => ({
-  id: a.id, nom: a.nom, categorie: a.categorie,
+const vers = (a: AlimentDisponible): Aliment => ({
+  id: a.reference, nom: a.nom, categorie: a.categorie,
   kcal100: a.kcal100, prot100: a.prot100, gluc100: a.gluc100, lip100: a.lip100,
+  /* Les fibres ne servent au calcul que si la cible les comprend — voir
+     `glucidesTotaux`. Elles sont toujours transmises : c'est la cible qui
+     décide de s'en servir, pas l'aliment. */
+  fibres100: a.fibres100 ?? 0,
   ratio: a.ratio, etatReference: a.etatReference,
 });
 
-export default function Repas() {
-  const aliments = useAliments();
+export default function Calculateur() {
+  const frigo = useMonFrigo();
   const cibles = useCibles();
-  const [repas, setRepas] = useState<'R1' | 'R2' | 'R3' | 'R4'>('R2');
-  const [portions, setPortions] = useState(1);
-  const [lignes, setLignes] = useState<Ligne[]>([]);
-  const [ouvert, setOuvert] = useState<string | null>(null);
 
-  const parId = useMemo(() => {
-    const m = new Map<number, Aliment>();
-    for (const a of aliments.data ?? []) m.set(a.id, vers(a));
+  const [choisis, setChoisis] = useState<Record<Repas, boolean>>(
+    { R1: false, R2: false, R3: false, R4: false });
+  const [portions, setPortions] = useState<Record<Repas, number>>(
+    { R1: 1, R2: 1, R3: 1, R4: 1 });
+  const [plan, setPlan] = useState<Partial<Record<Repas, Compose>> | null>(null);
+  const [ouvert, setOuvert] = useState<Repas | null>(null);
+  const [remplacer, setRemplacer] = useState<{ repas: Repas; role: Role } | null>(null);
 
-    return m;
-  }, [aliments.data]);
-
-  const cible = useMemo(
-    () => (cibles.data ?? []).find((c) => c.repas === repas),
-    [cibles.data, repas],
+  /* Le calculateur ne travaille qu'avec ce qui a un poids connu : un litre ou
+     un pack n'entrent pas dans un calcul de macros pour 100 g. Un aliment sans
+     énergie non plus — l'écrire à zéro fausserait tout le repas. */
+  const stock = useMemo(
+    () => (frigo.data?.aliments ?? [])
+      .filter((a) => a.grammesParUnite !== null && a.stock > 0 && a.kcal100 > 0)
+      .map(vers),
+    [frigo.data],
   );
 
-  /* Trois aliments servent de variables : celui qui domine chaque macro. */
-  const resultat = useMemo(() => {
-    if (!cible || parId.size === 0) return null;
+  /* Combien il y en a VRAIMENT, en grammes à cuire. C'est ce qui empêche le
+     calculateur de réclamer 327 g de saumon quand il n'y en a que 200. */
+  const grammesEnStock = useMemo(() => {
+    const m = new Map<number | string, number>();
+    for (const a of frigo.data?.aliments ?? []) {
+      if (a.grammesParUnite !== null) m.set(a.reference, a.stock * a.grammesParUnite);
+    }
 
-    const libres = lignes.filter((l) => !l.ecouler);
-    const pris = new Set<string>();
-    const dominant = (cle: 'prot100' | 'gluc100' | 'lip100') => {
-      let best: Ligne | null = null;
-      let score = -1;
-      for (const l of libres) {
-        if (pris.has(l.uid)) continue;
-        const a = parId.get(l.alimentId);
-        if (!a) continue;
-        const tot = a.prot100 + a.gluc100 + a.lip100 || 1;
-        const part = a[cle] / tot;
-        if (part < 0.15) continue;
-        if (part > score) { score = part; best = l; }
+    return m;
+  }, [frigo.data]);
+
+  const stockDe = useCallback(
+    (a: Aliment) => grammesEnStock.get(a.id) ?? 0, [grammesEnStock]);
+
+  /* Les fibres ne sont pas des macros pour le solveur — elles n'entrent dans
+     aucune cible — mais elles pèsent 2 kcal par gramme. Sans elles à l'écran,
+     le total de calories d'un repas paraît sorti de nulle part. */
+  const fibresPar100 = useMemo(() => {
+    const m = new Map<number | string, number>();
+    for (const a of frigo.data?.aliments ?? []) m.set(a.reference, a.fibres100 ?? 0);
+
+    return m;
+  }, [frigo.data]);
+
+  const fibresDe = useCallback(
+    (a: Aliment) => fibresPar100.get(a.id) ?? 0, [fibresPar100]);
+
+  const cibleDe = (repas: Repas) => (cibles.data ?? []).find((c) => c.repas === repas);
+
+  /** Compose tous les repas cochés, en évitant de resservir le même aliment. */
+  const composerTout = () => {
+    const servis = new Set<number | string>();
+    const suite: Partial<Record<Repas, Compose>> = {};
+
+    for (const repas of REPAS) {
+      if (!choisis[repas]) continue;
+      const c = composer(stock, portions[repas], servis);
+
+      const roles: Partial<Record<Role, Aliment>> = {};
+      for (const cle of ['proteine', 'glucide', 'lipide'] as const) {
+        const a = c.variables[cle];
+        if (a) { roles[cle] = a; servis.add(a.id); }
       }
-      if (best) pris.add(best.uid);
+      /* L'huile et le légume ne comptent pas dans « déjà servi » : les
+         resservir à tous les repas est normal, on ne varie pas d'huile. */
+      if (c.huile) roles.huile = c.huile;
+      if (c.legume) roles.legume = c.legume;
 
-      return best;
-    };
+      suite[repas] = { roles, restes: {}, verrous: [] };
+    }
 
-    const vP = dominant('prot100');
-    const vG = dominant('gluc100');
-    const vL = dominant('lip100');
-    const ajustables = new Set([vP, vG, vL].filter(Boolean).map((l) => l!.uid));
+    setPlan(suite);
+    setOuvert(REPAS.find((r) => choisis[r]) ?? null);
+  };
 
-    const fixes: Fixe[] = lignes
-      .filter((l) => !ajustables.has(l.uid))
-      .map((l) => ({ ligne: l, aliment: parId.get(l.alimentId) }))
-      .filter((x) => x.aliment && (Number(x.ligne.stock) || 0) > 0)
-      .map((x) => ({
-        aliment: x.aliment!,
-        grammes: (Number(x.ligne.stock) || 0) / portions,
-        unite: x.ligne.unite,
-      }));
-
-    const variables: { proteine?: Aliment; glucide?: Aliment; lipide?: Aliment } = {};
-    if (vP) variables.proteine = parId.get(vP.alimentId);
-    if (vG) variables.glucide = parId.get(vG.alimentId);
-    if (vL) variables.lipide = parId.get(vL.alimentId);
-
-    return { calcul: calculer(cible, variables, fixes), ajustables };
-  }, [cible, lignes, parId, portions]);
-
-  if (aliments.isLoading || cibles.isLoading) return <Chargement />;
-  if (aliments.isError) {
-    return <Erreur message={aliments.error.message} onReessayer={() => void aliments.refetch()} />;
+  if (frigo.isLoading || cibles.isLoading) return <Chargement />;
+  if (frigo.isError) {
+    return <Erreur message={frigo.error.message} onReessayer={() => void frigo.refetch()} />;
   }
-  if (!cible) {
+
+  const aucunCoche = REPAS.every((r) => !choisis[r]);
+
+  /* ------------------------------------------------ paramétrage */
+
+  if (plan === null) {
     return (
-      <View style={s.centre}>
-        <Discret style={{ textAlign: 'center' }}>
-          Aucun objectif défini pour ce repas. Renseigne-les depuis ton compte.
-        </Discret>
-      </View>
+      <ScrollView contentContainerStyle={s.page}>
+        <Carte style={{ gap: E.s }}>
+          <Texte style={{ fontFamily: P.fort }}>Aujourd'hui</Texte>
+          <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
+            Coche les repas à cuisiner et dis pour combien de personnes.
+            L'application composera à partir de ton frigo.
+          </Discret>
+        </Carte>
+
+        {REPAS.map((repas) => {
+          const cible = cibleDe(repas);
+
+          return (
+            <Carte key={repas} style={s.ligneRepas}>
+              <Pressable
+                onPress={() => setChoisis((c) => ({ ...c, [repas]: !c[repas] }))}
+                style={s.coche}
+                accessibilityLabel={`Cuisiner le repas ${NOM_REPAS[repas]}`}
+              >
+                <View style={[s.carre, choisis[repas] && { backgroundColor: C.ok, borderColor: C.ok }]}>
+                  {choisis[repas] && <Texte style={{ color: C.fond, fontSize: T.petit }}>✓</Texte>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Texte style={{ fontFamily: P.fort }}>{NOM_REPAS[repas]}</Texte>
+                  <Discret style={{ fontSize: T.petit }}>
+                    {cible
+                      ? `${nb(cible.kcal)} kcal · ${nb(cible.prot)} P · ${nb(cible.gluc)} G · ${nb(cible.lip)} L`
+                      : 'aucun objectif défini'}
+                  </Discret>
+                </View>
+              </Pressable>
+
+              {choisis[repas] && (
+                <View style={s.pers}>
+                  <Pressable
+                    onPress={() => setPortions((p) => ({ ...p, [repas]: Math.max(1, p[repas] - 1) }))}
+                    style={s.persBouton}
+                  >
+                    <Texte style={{ fontSize: T.grand, color: C.attenue }}>−</Texte>
+                  </Pressable>
+                  <Chiffre taille={N.petit}>{portions[repas]}</Chiffre>
+                  <Pressable
+                    onPress={() => setPortions((p) => ({ ...p, [repas]: Math.min(12, p[repas] + 1) }))}
+                    style={s.persBouton}
+                  >
+                    <Texte style={{ fontSize: T.grand, color: C.attenue }}>+</Texte>
+                  </Pressable>
+                </View>
+              )}
+            </Carte>
+          );
+        })}
+
+        {stock.length === 0 && (
+          <Vide message="Ton frigo est vide, ou aucun aliment n'a de poids et de macros connus. Le calculateur ne devine rien." />
+        )}
+
+        <Bouton onPress={composerTout} desactive={aucunCoche || stock.length === 0}>
+          Composer les repas
+        </Bouton>
+      </ScrollView>
     );
   }
 
-  const modifier = (uid: string, champs: Partial<Ligne>) =>
-    setLignes((l) => l.map((x) => (x.uid === uid ? { ...x, ...champs } : x)));
+  /* ------------------------------------------- correction du plan */
 
-  const ajouter = (indexGroupe: number) => {
-    const cats = GROUPES[indexGroupe]!.cats;
-    const deja = new Set(lignes.map((l) => l.alimentId));
-    const choix = (aliments.data ?? []).find((a) => cats.includes(a.categorie) && !deja.has(a.id))
-      ?? (aliments.data ?? []).find((a) => cats.includes(a.categorie));
-    if (!choix) return;
-    const uid = `l${Date.now().toString(36)}`;
-    setLignes((l) => [...l, {
-      uid, alimentId: choix.id, stock: '', unite: choix.etatReference, ecouler: false,
-    }]);
-    setOuvert(uid);
-  };
-
-  const triees = [...lignes].sort((a, b) => {
-    const ga = groupeDe(parId.get(a.alimentId)?.categorie ?? 'autre');
-    const gb = groupeDe(parId.get(b.alimentId)?.categorie ?? 'autre');
-
-    return ga - gb;
-  });
+  /* Les aliments proposés en remplacement : même rôle, en stock, et pas
+     celui qui est déjà là. Rien d'autre n'est écarté — remplacer n'exclut
+     jamais un aliment d'un repas, ni maintenant ni plus tard. */
+  const remplacants = remplacer === null ? [] : stock.filter(
+    (a) => roleDe(a) === remplacer.role
+      && a.id !== plan[remplacer.repas]?.roles[remplacer.role]?.id);
 
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={s.page}>
-        {/* ---- repas et convives ---- */}
-        <View style={s.tete}>
-          <View style={s.seg}>
-            {REPAS.map((r) => (
-              <Pressable
-                key={r.cle}
-                onPress={() => { setRepas(r.cle); setPortions(1); }}
-                style={[s.segBouton, repas === r.cle && s.segActif]}
-              >
-                <Texte style={[s.segTexte, repas === r.cle && { color: C.fond }]}>{r.court}</Texte>
-              </Pressable>
-            ))}
-          </View>
-          <View style={s.pers}>
-            <Pressable onPress={() => setPortions((p) => Math.max(1, p - 1))} style={s.persBouton}>
-              <Texte style={{ fontSize: 19, color: C.attenue }}>−</Texte>
-            </Pressable>
-            <Chiffre taille={21}>{portions}</Chiffre>
-            <Pressable onPress={() => setPortions((p) => Math.min(12, p + 1))} style={s.persBouton}>
-              <Texte style={{ fontSize: 19, color: C.attenue }}>+</Texte>
-            </Pressable>
-          </View>
-        </View>
+        <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
+          Remplace ce qui ne va pas : les quantités du repas se recalculent
+          pour retomber sur tes objectifs. Un reste déclaré fige la quantité —
+          mets 0 pour écarter un aliment de ce repas.
+        </Discret>
 
-        {/* ---- une section par catégorie ---- */}
-        {GROUPES.map((groupe, ig) => {
-          const dedans = triees.filter(
-            (l) => groupeDe(parId.get(l.alimentId)?.categorie ?? 'autre') === ig,
-          );
+        {REPAS.filter((r) => plan[r] !== undefined).map((repas) => (
+          <CarteRepas
+            key={repas}
+            repas={repas}
+            compose={plan[repas]!}
+            cible={cibleDe(repas)}
+            portions={portions[repas]}
+            stockDe={stockDe}
+            catalogue={stock}
+            fibresDe={fibresDe}
+            ouvert={ouvert === repas}
+            onOuvrir={() => setOuvert(ouvert === repas ? null : repas)}
+            onRemplacer={(role) => setRemplacer({ repas, role })}
+            onReste={(cle, valeurs) => setPlan((p) => ({
+              ...p!,
+              [repas]: { ...p![repas]!, restes: { ...p![repas]!.restes, [cle]: valeurs } },
+            }))}
+          />
+        ))}
 
-          return (
-            <View key={groupe.cle} style={[s.bloc, { borderLeftColor: couleurRole(groupe.cats[0]!) }]}>
-              <Texte style={[s.blocTitre, { color: couleurRole(groupe.cats[0]!) }]}>
-                {groupe.titre}
-                <Discret style={{ fontSize: 11 }}>
-                  {'  '}{dedans.length === 0 ? 'aucun' : `${dedans.length} aliment${dedans.length > 1 ? 's' : ''}`}
-                </Discret>
-              </Texte>
-
-              {dedans.map((ligne) => (
-                <LigneAliment
-                  key={ligne.uid}
-                  ligne={ligne}
-                  aliment={parId.get(ligne.alimentId)}
-                  resultat={resultat}
-                  portions={portions}
-                  ouvert={ouvert === ligne.uid}
-                  onOuvrir={() => setOuvert(ouvert === ligne.uid ? null : ligne.uid)}
-                  onModifier={(c) => modifier(ligne.uid, c)}
-                  onRetirer={() => {
-                    setLignes((l) => l.filter((x) => x.uid !== ligne.uid));
-                    setOuvert(null);
-                  }}
-                />
-              ))}
-
-              <Bouton variante="discret" onPress={() => ajouter(ig)} style={s.ajouter}>
-                + Ajouter {groupe.article}
-              </Bouton>
-            </View>
-          );
-        })}
+        <Bouton variante="contour" onPress={() => setPlan(null)}>
+          ← Modifier la sélection
+        </Bouton>
       </ScrollView>
 
-      {/* ---- bilan collé en bas ---- */}
-      <View style={s.barre}>
-        <View style={s.macs}>
-          {(['prot', 'gluc', 'lip', 'kcal'] as const).map((k) => {
-            const tol = { prot: 1.5, gluc: 2.5, lip: 1.2, kcal: 45 }[k];
-            const obtenu = resultat?.calcul.macros[k] ?? 0;
-            const bon = Math.abs(obtenu - cible[k]) <= tol;
+      <ChoixDansListe
+        visible={remplacer !== null}
+        titre={remplacer ? `Remplacer ${ROLES.find((r) => r.cle === remplacer.role)?.titre.toLowerCase()}` : ''}
+        /* La liste de choix travaille avec des identifiants numériques ; ceux
+           du frigo sont des références (« grocy:12 »). On passe donc par la
+           position, résolue juste en dessous. */
+        elements={remplacants.map((a, i) => ({
+          id: i, nom: a.nom, couleur: couleurRole(a.categorie),
+        }))}
+        onChoisir={(index) => {
+          if (remplacer === null) return;
+          const choisi = remplacants[index];
+          if (!choisi) return;
 
-            return (
-              <View key={k} style={s.mac}>
-                <Chiffre taille={19} couleur={bon ? C.ok : C.erreur}>{nb(obtenu)}</Chiffre>
-                <Discret style={{ fontSize: 9.5, textTransform: 'uppercase' }}>
-                  {{ prot: 'prot.', gluc: 'gluc.', lip: 'lip.', kcal: 'kcal' }[k]}
-                </Discret>
-              </View>
-            );
-          })}
-        </View>
-        {resultat?.calcul.diagnostics.find((d) => d.gravite !== 'info') && (
-          <Discret style={s.alerte} numberOfLines={3}>
-            ⚠ {resultat.calcul.diagnostics.find((d) => d.gravite !== 'info')!.message}
-          </Discret>
-        )}
-      </View>
+          setPlan((p) => {
+            const courant = p![remplacer.repas]!;
+
+            return {
+              ...p!,
+              [remplacer.repas]: {
+                ...courant,
+                roles: { ...courant.roles, [remplacer.role]: choisi },
+                /* Ce que tu viens de choisir est verrouillé : le calculateur
+                   ne le remplacera pas dans ton dos pour gagner un gramme. */
+                verrous: courant.verrous.includes(remplacer.role)
+                  ? courant.verrous
+                  : [...courant.verrous, remplacer.role],
+              },
+            };
+          });
+        }}
+        onFermer={() => setRemplacer(null)}
+      />
     </View>
   );
 }
 
-/* ---------------------------------------------------------------- */
+/* ------------------------------------------------------ une carte de repas */
 
-function LigneAliment({
-  ligne, aliment, resultat, portions, ouvert, onOuvrir, onModifier, onRetirer,
+function CarteRepas({
+  repas, compose, cible, portions, stockDe, catalogue, fibresDe,
+  ouvert, onOuvrir, onRemplacer, onReste,
 }: {
-  ligne: Ligne;
-  aliment?: Aliment;
-  resultat: { calcul: ReturnType<typeof calculer>; ajustables: Set<string> } | null;
+  repas: Repas;
+  compose: Compose;
+  cible: {
+    kcal: number; prot: number; gluc: number; lip: number; glucidesTotaux?: boolean;
+  } | undefined;
   portions: number;
+  stockDe: (a: Aliment) => number;
+  catalogue: Aliment[];
+  /** grammes de fibres pour 100 g, dans l'état de référence de l'aliment */
+  fibresDe: (a: Aliment) => number;
   ouvert: boolean;
   onOuvrir: () => void;
-  onModifier: (c: Partial<Ligne>) => void;
-  onRetirer: () => void;
+  onRemplacer: (role: Role) => void;
+  onReste: (cle: string, valeurs: { grammes: string; unite: 'cru' | 'cuit' }) => void;
 }) {
-  if (!aliment) return null;
+  /* Les cibles sont PAR PERSONNE : on les multiplie, et tout ce qui s'affiche
+     ensuite est le total à cuisiner. La part d'une personne se relit sur la
+     dernière colonne. */
+  const resultat = useMemo(() => {
+    if (!cible) return null;
 
-  const stock = Number(ligne.stock) || 0;
-  const sec = aliment.etatReference === 'cuit' && aliment.ratio > 1;
-  const q = resultat?.calcul.quantites.find((x) => x.aliment.nom === aliment.nom);
-  const ajustable = resultat?.ajustables.has(ligne.uid) ?? false;
+    const total = {
+      kcal: cible.kcal * portions, prot: cible.prot * portions,
+      gluc: cible.gluc * portions, lip: cible.lip * portions,
+    };
 
-  /* Le gros chiffre est celui sur lequel on peut AGIR. */
-  let gros = '—';
-  let petit = 'pas utilisé';
-  let couleur: (typeof C)[keyof typeof C] = C.vif;
+    const fixes: Fixe[] = [];
+      const variables: { proteine?: Aliment; glucide?: Aliment; lipide?: Aliment } = {};
 
-  if (q && q.assiette > 0) {
-    const cuireTotal = q.aCuire * portions;
-    const besoin = (ligne.unite === 'cuit' ? q.assiette : q.aCuire) * portions;
-    const manque = besoin - stock;
-    const uSec = sec ? ' sec' : aliment.etatReference === 'cru' ? ' cru' : '';
+    for (const { cle, fixe } of ROLES) {
+      const aliment = compose.roles[cle];
+      if (!aliment) continue;
 
-    if (ligne.ecouler || (stock > 0 && !ajustable)) {
-      gros = `${nb(stock)} g`;
-      petit = `déjà là, ${ligne.unite}`;
-      couleur = C.ok;
-    } else if (stock <= 0) {
-      gros = `${nb(cuireTotal)} g`;
-      petit = (portions > 1 ? 'à cuisiner' : 'à peser') + uSec;
-    } else if (manque > 0.5) {
-      const sup = ligne.unite === 'cuit' ? pourObtenirCuit(aliment, manque) : manque;
-      gros = `+${nb(sup)} g`;
-      petit = `à préparer${uSec}, en plus de tes ${nb(stock)} g`;
-    } else if (manque < -0.5) {
-      gros = `${nb(besoin)} g`;
-      petit = `à prélever sur tes ${nb(stock)} g`;
-      couleur = C.ok;
-    } else {
-      gros = `${nb(stock)} g`;
-      petit = 'pile ce qu’il faut';
-      couleur = C.ok;
+      const reste = compose.restes[String(aliment.id)];
+      const saisi = (reste?.grammes ?? '').trim();
+      const grammes = Number(saisi.replace(',', '.'));
+
+      /* Un reste déclaré fige la quantité : l'aliment sort des variables et
+         le repas se recompose autour de lui. C'est le comportement d'origine
+         du solveur, il n'a pas bougé.
+         Zéro est une valeur COMME UNE AUTRE — « je n'en mets pas » — et non
+         un champ vide. C'est ce qui permet d'écarter un aliment sans le
+         remplacer, et le repas se recalcule autour des autres. */
+      if (saisi !== '' && Number.isFinite(grammes) && grammes >= 0) {
+        fixes.push({ aliment, grammes, unite: reste!.unite });
+      } else if (fixe !== undefined) {
+        fixes.push({
+          aliment, grammes: fixe * portions,
+          unite: cle === 'legume' ? 'cuit' : 'cru',
+        });
+      } else if (cle === 'proteine' || cle === 'glucide' || cle === 'lipide') {
+        variables[cle] = aliment;
+      }
     }
+
+    /* Le stock a le dernier mot, et le calculateur essaie d'autres aliments
+       plutôt que de renvoyer l'utilisateur corriger à la main. */
+    return resoudreAuMieux(
+      { variables, fixes }, total, stockDe, catalogue, new Set(compose.verrous),
+      cible.glucidesTotaux === true);
+  }, [cible, compose, portions, stockDe, catalogue]);
+
+  if (!cible) {
+    return (
+      <Carte>
+        <Texte style={{ fontFamily: P.fort }}>{NOM_REPAS[repas]}</Texte>
+        <Discret style={{ fontSize: T.petit }}>
+          Aucun objectif défini pour ce repas. Renseigne-les depuis ton compte.
+        </Discret>
+      </Carte>
+    );
   }
 
+  const macros = resultat?.resultat.macros;
+
+  /* Les fibres du repas, et ce qu'elles pèsent. C'est ce qui explique qu'un
+     repas juste en protéines, glucides et lipides affiche plus de calories
+     que ne le donne le calcul 4/4/9 : la convention européenne les compte à
+     part, à 2 kcal le gramme. */
+  const fibres = (resultat?.resultat.quantites ?? []).reduce(
+    (n, q) => n + (fibresDe(q.aliment) * versReference(q.aliment, q.aCuire, 'cru')) / 100, 0);
+
   return (
-    <Carte style={[s.rang, ouvert && { borderColor: C.vif }]}>
-      <Pressable onPress={onOuvrir} style={s.tap}>
-        <View style={[s.pastille, { backgroundColor: couleurRole(aliment.categorie) }]} />
+    <Carte style={{ gap: E.s }}>
+      <Pressable onPress={onOuvrir} style={s.tete}>
         <View style={{ flex: 1 }}>
-          <Texte style={{ fontFamily: P.fort }} numberOfLines={1}>{aliment.nom}</Texte>
-          <Discret style={{ fontSize: 12 }} numberOfLines={1}>{petit}</Discret>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Chiffre couleur={couleur}>{gros}</Chiffre>
-          {q && q.assiette > 0 && (
-            <Discret style={{ fontSize: 11 }}>{nb(q.assiette)} g par assiette</Discret>
+          <Texte style={{ fontFamily: P.fort }}>
+            {NOM_REPAS[repas]}
+            <Discret style={{ fontSize: T.petit }}>
+              {portions > 1 ? `  ·  ${portions} personnes` : '  ·  1 personne'}
+            </Discret>
+          </Texte>
+          {/* Affiché PAR PERSONNE, comme les objectifs du compte. Le total
+              cuisiné pour trois — 1772 kcal — ne se compare à rien : cette
+              ligne sert à dire si la cible est tenue, pas à cumuler. Les
+              quantités à peser, elles, restent en total dans le tableau.
+
+              Chaque macro porte SA couleur : un repas juste en protéines et
+              raté en lipides ne doit pas s'afficher tout en jaune, sinon on
+              ne sait pas quoi corriger. */}
+          {macros && resultat && (
+            <View style={{ flexDirection: 'row', gap: E.s, alignItems: 'center' }}>
+              {([
+                ['kcal', 'kcal'], ['prot', 'P'], ['gluc', 'G'], ['lip', 'L'],
+              ] as const).map(([cle, suffixe]) => (
+                <Discret
+                  key={cle}
+                  style={{
+                    fontSize: T.petit,
+                    /* L'écart est celui du repas entier : on le ramène à la
+                       personne avant de le comparer à une tolérance qui,
+                       elle, vaut pour une assiette. */
+                    color: Math.abs(resultat.resultat.ecarts[cle]) / portions <= TOLERANCE[cle]
+                      ? C.ok : C.vif,
+                  }}
+                >
+                  {nb(macros[cle] / portions)} {suffixe}
+                </Discret>
+              ))}
+              {portions > 1 && (
+                <Discret style={{ fontSize: T.minuscule }}>/ pers.</Discret>
+              )}
+            </View>
+          )}
+
+          {fibres > 0.5 && (
+            <Discret style={{ fontSize: T.minuscule }}>
+              + {nb(fibres / portions)} g de fibres, soit {nb((fibres * 2) / portions)} kcal
+              hors cible
+            </Discret>
           )}
         </View>
+        <Discret>{ouvert ? '▲' : '▼'}</Discret>
       </Pressable>
 
       {ouvert && (
-        <View style={s.detail}>
-          <View style={s.rangee}>
-            <Champ
-              etiquette={portions > 1 ? "J'en ai en tout" : "J'en ai"}
-              valeur={ligne.stock}
-              onChange={(v) => onModifier({ stock: v, ...(Number(v) > 0 ? {} : { ecouler: false }) })}
-              placeholder="0"
-              unite="g"
-              numerique
-              style={{ flex: 1 }}
-            />
-            <View style={s.mini}>
-              {(['cuit', 'cru'] as const).map((u) => (
-                <Pressable
-                  key={u}
-                  onPress={() => onModifier({ unite: u })}
-                  style={[s.miniBouton, ligne.unite === u && s.miniActif]}
-                >
-                  <Discret style={ligne.unite === u ? { color: C.encre } : undefined}>
-                    {u === 'cuit' ? 'cuit' : sec ? 'sec' : 'cru'}
-                  </Discret>
-                </Pressable>
-              ))}
-            </View>
+        <View style={{ gap: E.s }}>
+          <View style={s.entete}>
+            <Discret style={[s.col, { flex: 2 }]}>aliment</Discret>
+            <Discret style={s.col}>à cuire</Discret>
+            <Discret style={s.col}>cuit</Discret>
+            <Discret style={s.col}>1 pers.</Discret>
           </View>
 
-          {stock > 0 && (
-            <Pressable
-              onPress={() => onModifier({ ecouler: !ligne.ecouler })}
-              style={s.coche}
-            >
-              <View style={[s.case_, ligne.ecouler && { backgroundColor: C.vif, borderColor: C.vif }]}>
-                {ligne.ecouler && <Texte style={{ color: C.fond, fontSize: 12 }}>✓</Texte>}
-              </View>
-              <Discret>Je n’en ai pas plus : écouler tout</Discret>
-            </Pressable>
-          )}
+          {ROLES.map(({ cle, titre, cat }) => {
+            const aliment = compose.roles[cle];
 
-          <Bouton variante="discret" onPress={onRetirer} style={{ alignSelf: 'flex-start' }}>
-            Retirer du repas
-          </Bouton>
+            /* Les renforts de CE rôle : ce que le plafonnement du stock ou un
+               échange automatique a fait entrer. Ils s'affichent juste sous
+               la ligne qu'ils complètent, pas en bas de la carte — c'est là
+               qu'on les cherche. */
+            const renforts = (resultat?.resultat.quantites ?? []).filter(
+              (q) => q.aliment.id !== aliment?.id
+                /* Un aliment qui tient déjà sa propre ligne n'est pas
+                   réaffiché ici : quand l'huile prend en charge les lipides,
+                   elle apparaissait deux fois, avec la même quantité. */
+                && !ROLES.some(({ cle: autre }) => compose.roles[autre]?.id === q.aliment.id)
+                && ((resultat?.plafonnes ?? []).some(
+                  (pl) => pl.role === cle && pl.releve?.id === q.aliment.id)
+                  || (resultat?.echanges ?? []).some(
+                    (e) => e.role === cle && e.mis.id === q.aliment.id)));
+
+            const notes = (resultat?.plafonnes ?? []).filter((pl) => pl.role === cle);
+            const echange = (resultat?.echanges ?? []).find((e) => e.role === cle);
+
+            if (!aliment) {
+              /* L'huile et le légume sont facultatifs : leur absence n'est pas
+                 un manque, inutile d'alarmer. */
+              if (cle === 'huile' || cle === 'legume') return null;
+
+              return (
+                <View key={cle} style={s.ligne}>
+                  <Discret style={{ flex: 1, fontSize: T.petit }}>
+                    Aucun {titre.toLowerCase()} utilisable dans ton frigo.
+                  </Discret>
+                </View>
+              );
+            }
+
+            const q = resultat?.resultat.quantites.find((x) => x.aliment.id === aliment.id);
+            const reste = compose.restes[String(aliment.id)];
+
+            return (
+              <View key={cle} style={{ gap: 4 }}>
+                <View style={s.ligne}>
+                  <View style={{ flex: 2 }}>
+                    <Texte style={{ fontSize: T.normal }} numberOfLines={1}>{aliment.nom}</Texte>
+                    <Discret style={{ fontSize: T.minuscule, color: couleurRole(cat) }}>{titre}</Discret>
+                  </View>
+                  <Texte style={s.val}>{q ? nb(q.aCuire) : '—'}</Texte>
+                  <Texte style={s.val}>{q ? nb(q.assiette) : '—'}</Texte>
+                  <Texte style={[s.val, { color: C.vif }]}>
+                    {q ? nb(q.assiette / portions) : '—'}
+                  </Texte>
+                </View>
+
+                <View style={s.actions}>
+                  <Pressable onPress={() => onRemplacer(cle)} style={s.action}>
+                    <Discret style={{ fontSize: T.petit, color: C.vif }}>↻ Remplacer</Discret>
+                  </Pressable>
+                  <Champ
+                    valeur={reste?.grammes ?? ''}
+                    onChange={(v) => onReste(String(aliment.id),
+                      { grammes: v, unite: reste?.unite ?? 'cuit' })}
+                    placeholder="reste"
+                    unite="g" numerique style={{ width: 92 }}
+                  />
+                  <Pressable
+                    onPress={() => onReste(String(aliment.id), {
+                      grammes: reste?.grammes ?? '',
+                      unite: reste?.unite === 'cru' ? 'cuit' : 'cru',
+                    })}
+                    style={s.action}
+                  >
+                    <Discret style={{ fontSize: T.petit }}>{reste?.unite ?? 'cuit'}</Discret>
+                  </Pressable>
+                </View>
+
+                {renforts.map((q) => (
+                  <View key={String(q.aliment.id)} style={[s.ligne, s.renfort]}>
+                    <View style={{ flex: 2 }}>
+                      <Texte style={{ fontSize: T.normal }} numberOfLines={1}>{q.aliment.nom}</Texte>
+                      <Discret style={{ fontSize: T.minuscule, color: C.ok }}>
+                        {echange?.mis.id === q.aliment.id ? 'À la place' : 'Complément'}
+                      </Discret>
+                    </View>
+                    <Texte style={s.val}>{nb(q.aCuire)}</Texte>
+                    <Texte style={s.val}>{nb(q.assiette)}</Texte>
+                    <Texte style={[s.val, { color: C.vif }]}>{nb(q.assiette / portions)}</Texte>
+                  </View>
+                ))}
+
+                {notes.map((pl) => (
+                  <Discret key={String(pl.aliment.id)} style={s.plafond}>
+                    {pl.aliment.nom} : {nb(pl.grammes)} g, c'est tout ce que tu as.
+                    {pl.releve
+                      ? ` Le reste est porté par ${pl.releve.nom}.`
+                      : ' Rien d\'autre ne peut prendre le relais.'}
+                  </Discret>
+                ))}
+
+                {echange && (
+                  <Discret style={s.plafond}>
+                    {echange.retire.nom} ne permettait pas de tenir les objectifs :
+                    {ROLES.some(({ cle: autre }) => compose.roles[autre]?.id === echange.mis.id)
+                      ? ` c'est ${echange.mis.nom} qui s'en charge, sur sa propre ligne.`
+                      : ` remplacé par ${echange.mis.nom}.`} Tu peux revenir dessus.
+                  </Discret>
+                )}
+              </View>
+            );
+          })}
+
+          {(resultat?.resultat.diagnostics ?? [])
+            .filter((d) => d.gravite !== 'info')
+            .map((d) => (
+              <Discret key={d.code} style={{ fontSize: T.petit, color: C.vif, lineHeight: 16 }}>
+                ⚠ {d.message}
+              </Discret>
+            ))}
         </View>
       )}
     </Carte>
@@ -353,53 +557,32 @@ function LigneAliment({
 }
 
 const s = StyleSheet.create({
-  page: { padding: E.m, paddingBottom: 130 },
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: E.xl },
-
-  tete: { flexDirection: 'row', gap: E.s, marginBottom: E.l },
-  seg: {
-    flex: 1, flexDirection: 'row', backgroundColor: C.surface2,
-    borderColor: C.ligne, borderWidth: 1, borderRadius: R.m, padding: 3,
-  },
-  segBouton: { flex: 1, minHeight: TOUCHE, alignItems: 'center', justifyContent: 'center', borderRadius: R.s },
-  segActif: { backgroundColor: C.vif },
-  segTexte: { fontFamily: P.chiffre, fontSize: 16, textTransform: 'uppercase', color: C.attenue },
-  pers: {
-    flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3,
-    backgroundColor: C.surface2, borderColor: C.ligne, borderWidth: 1, borderRadius: R.m,
-  },
-  persBouton: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center' },
-
-  bloc: { borderLeftWidth: 3, paddingLeft: E.m, marginBottom: E.xl, gap: E.s },
-  blocTitre: { fontFamily: P.titre, fontSize: 15, letterSpacing: 1.2, textTransform: 'uppercase' },
-  ajouter: {
-    borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.ligne,
-    borderRadius: R.m, minHeight: TOUCHE + 2,
-  },
-
-  rang: { padding: 0, overflow: 'hidden' },
-  tap: { flexDirection: 'row', alignItems: 'center', gap: E.m, padding: E.m, minHeight: 58 },
-  pastille: { width: 4, height: 30, borderRadius: 3, opacity: 0.6 },
-  detail: { padding: E.m, paddingTop: 0, gap: E.m, borderTopWidth: 1, borderTopColor: C.ligne },
-  rangee: { flexDirection: 'row', alignItems: 'flex-end', gap: E.s },
-  mini: { flexDirection: 'row', backgroundColor: C.surface2, borderColor: C.ligne, borderWidth: 1, borderRadius: R.s, padding: 2 },
-  miniBouton: { paddingHorizontal: E.m, minHeight: TOUCHE - 4, alignItems: 'center', justifyContent: 'center', borderRadius: R.s - 2 },
-  miniActif: { backgroundColor: C.ligne },
-  coche: { flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: TOUCHE },
-  case_: {
-    width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: C.ligne,
+  page: { padding: E.m, gap: E.s, paddingBottom: E.l },
+  ligneRepas: { flexDirection: 'row', alignItems: 'center', gap: E.s },
+  coche: { flexDirection: 'row', alignItems: 'center', gap: E.s, flex: 1, minHeight: TOUCHE },
+  carre: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: C.ligne,
     alignItems: 'center', justifyContent: 'center',
   },
-
-  barre: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: C.fond, borderTopColor: C.ligne, borderTopWidth: 1,
-    padding: E.s, paddingBottom: E.m, gap: E.s,
+  pers: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  persBouton: {
+    width: 34, minHeight: TOUCHE - 6, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
+    alignItems: 'center', justifyContent: 'center',
   },
-  macs: { flexDirection: 'row', gap: 6 },
-  mac: {
-    flex: 1, backgroundColor: C.surface2, borderColor: C.ligne, borderWidth: 1,
-    borderRadius: R.s, paddingVertical: 7, alignItems: 'center',
+  tete: { flexDirection: 'row', alignItems: 'center', minHeight: TOUCHE },
+  entete: { flexDirection: 'row', gap: 4, borderBottomWidth: 1, borderBottomColor: C.ligne, paddingBottom: 4 },
+  col: { flex: 1, fontSize: T.minuscule, textTransform: 'uppercase', textAlign: 'right' },
+  ligne: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  val: { flex: 1, fontFamily: P.chiffre, fontSize: T.moyen, textAlign: 'right' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: E.s, paddingBottom: E.s },
+  action: {
+    minHeight: TOUCHE - 10, justifyContent: 'center', paddingHorizontal: E.s,
+    borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
   },
-  alerte: { fontSize: 12, color: C.vif, paddingHorizontal: E.xs },
+  renfort: { paddingLeft: E.m, borderLeftWidth: 2, borderLeftColor: C.ok },
+  plafond: {
+    fontSize: T.petit, lineHeight: 16, color: C.ok,
+    backgroundColor: C.okFond, borderRadius: R.s,
+    paddingHorizontal: E.s, paddingVertical: 6,
+  },
 });

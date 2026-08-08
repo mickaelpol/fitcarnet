@@ -5,7 +5,7 @@ import { Chiffre } from './base';
 import { mmss } from './chronoSerie';
 import { useEcranEveille } from './ecranEveille';
 import { abonnerMesure, arreterMesure, cibleMesuree, ecouleMesure } from './etatMesure';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, N, P, R, T, TOUCHE } from '@/theme';
 
 /**
  * Bandeau « mesure en cours », en haut de l'écran de séance.
@@ -41,20 +41,20 @@ export function BandeauMesure() {
       <View style={s.point} />
 
       <View style={{ flex: 1 }}>
-        <Texte style={{ fontSize: 13, fontFamily: P.fort }} numberOfLines={1}>
+        <Texte style={{ fontSize: T.normal, fontFamily: P.fort }} numberOfLines={1}>
           {cible.libelle}
         </Texte>
-        <Discret style={{ fontSize: 11 }}>
+        <Discret style={{ fontSize: T.petit }}>
           {cible.serieOrdre === null
             ? 'temps total de l’exercice'
             : `série ${cible.serieOrdre + 1}`}
         </Discret>
       </View>
 
-      <Chiffre taille={24} couleur={C.vif}>{mmss(ecouleMesure())}</Chiffre>
+      <Chiffre taille={N.normal} couleur={C.vif}>{mmss(ecouleMesure())}</Chiffre>
 
       <Pressable onPress={arreterMesure} style={s.stop} accessibilityLabel="Arrêter la mesure">
-        <Texte style={{ color: C.fond, fontFamily: P.fort, fontSize: 13 }}>Stop</Texte>
+        <Texte style={{ color: C.fond, fontFamily: P.fort, fontSize: T.normal }}>Stop</Texte>
       </Pressable>
     </View>
   );

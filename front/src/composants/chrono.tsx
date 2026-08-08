@@ -7,7 +7,7 @@ import {
   demarrerChrono, dureeChrono, relancerChrono, remettreChrono, resteChrono, terminerChrono,
 } from './etatChrono';
 import { jouerSonnerie } from './sonnerie';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, N, P, R, T, TOUCHE } from '@/theme';
 
 const PRESETS = [60, 90, 120, 180];
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -92,7 +92,7 @@ export function ChronoRepos({ relance, onCalculateur }: {
 
   return (
     <View style={s.barre}>
-      <Chiffre taille={34} couleur={fini ? C.erreur : court ? C.vif : C.encre}>
+      <Chiffre taille={N.grand} couleur={fini ? C.erreur : court ? C.vif : C.encre}>
         {mmss(reste)}
       </Chiffre>
 
@@ -104,12 +104,12 @@ export function ChronoRepos({ relance, onCalculateur }: {
       </Pressable>
 
       <Pressable onPress={agir(remettreChrono)} style={s.reset}>
-        <Texte style={{ color: C.attenue, fontSize: 16 }}>↺</Texte>
+        <Texte style={{ color: C.attenue, fontSize: T.moyen }}>↺</Texte>
       </Pressable>
 
       {onCalculateur !== undefined && (
         <Pressable onPress={onCalculateur} style={s.calc} accessibilityLabel="Calculateur de RM">
-          <Texte style={{ color: C.vif, fontSize: 13, fontFamily: P.fort }}>⚖ RM</Texte>
+          <Texte style={{ color: C.vif, fontSize: T.normal, fontFamily: P.fort }}>⚖ RM</Texte>
         </Pressable>
       )}
 
@@ -161,7 +161,7 @@ const s = StyleSheet.create({
   },
   calc: {
     minWidth: 56, minHeight: TOUCHE, borderRadius: R.s, borderWidth: 1,
-    borderColor: 'rgba(227,178,60,0.4)', alignItems: 'center', justifyContent: 'center',
+    borderColor: C.vifBord, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: E.s,
   },
   presets: { flexDirection: 'row', gap: 5, flexGrow: 1, flexBasis: '100%' },

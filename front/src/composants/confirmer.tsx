@@ -1,6 +1,6 @@
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Bouton, Texte } from './base';
-import { C, E, P, R } from '@/theme';
+import { C, E, P, R, T } from '@/theme';
 
 /**
  * Confirmation avant une suppression. Volontairement modale : une suppression
@@ -39,19 +39,19 @@ export function Confirmer({
 
 const s = StyleSheet.create({
   fond: {
-    flex: 1, backgroundColor: 'rgba(10,11,13,0.75)',
+    flex: 1, backgroundColor: C.voile,
     alignItems: 'center', justifyContent: 'center', padding: E.l,
   },
   boite: {
     backgroundColor: C.surface, borderColor: C.ligne, borderWidth: 1,
     borderRadius: R.l, padding: E.l, gap: E.m, width: '100%', maxWidth: 420,
   },
-  titre: { fontFamily: P.titre, fontSize: 19, letterSpacing: 0.8, textTransform: 'uppercase' },
-  message: { color: C.attenue, fontSize: 14, lineHeight: 20 },
+  titre: { fontFamily: P.titre, fontSize: T.grand, letterSpacing: 0.8, textTransform: 'uppercase' },
+  message: { color: C.attenue, fontSize: T.normal, lineHeight: 20 },
   actions: { flexDirection: 'row', gap: E.s, marginTop: E.xs },
   danger: {
     flex: 1, minHeight: 44, borderRadius: R.s, backgroundColor: C.erreur,
     alignItems: 'center', justifyContent: 'center',
   },
-  dangerTexte: { color: '#ffffff', fontFamily: P.fort, fontSize: 14.5 },
+  dangerTexte: { color: C.blanc, fontFamily: P.fort, fontSize: T.moyen },
 });

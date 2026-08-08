@@ -4,7 +4,7 @@ import { Chiffre, Discret, Texte } from './base';
 import {
   type CibleMesure, abonnerMesure, arreterMesure, demarrerMesure, ecouleMesure, mesureSur,
 } from './etatMesure';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, N, P, R, T, TOUCHE } from '@/theme';
 
 export const mmss = (s: number): string =>
   `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -52,10 +52,10 @@ export function ChronoEffort({
   return (
     <View style={[s.barre, compact && { gap: 6 }]}>
       {etiquette !== undefined && !compact && (
-        <Discret style={{ fontSize: 11 }}>{etiquette}</Discret>
+        <Discret style={{ fontSize: T.petit }}>{etiquette}</Discret>
       )}
 
-      <Chiffre taille={compact ? 20 : 27} couleur={court ? C.vif : C.encre}>
+      <Chiffre taille={compact ? N.petit : N.normal} couleur={court ? C.vif : C.encre}>
         {mmss(affiche)}
       </Chiffre>
 
@@ -64,14 +64,14 @@ export function ChronoEffort({
         style={[s.bouton, court && s.boutonStop, compact && s.boutonCompact]}
         accessibilityLabel={court ? 'Arrêter le chronomètre' : 'Démarrer le chronomètre'}
       >
-        <Texte style={{ color: C.fond, fontFamily: P.fort, fontSize: compact ? 12.5 : 14 }}>
+        <Texte style={{ color: C.fond, fontFamily: P.fort, fontSize: compact ? T.petit : T.petit }}>
           {court ? 'Stop' : '⏱ Go'}
         </Texte>
       </Pressable>
 
       {!court && affiche > 0 && (
         <Pressable onPress={onEffacer} style={s.effacer}>
-          <Discret style={{ fontSize: 15 }}>×</Discret>
+          <Discret style={{ fontSize: T.moyen }}>×</Discret>
         </Pressable>
       )}
     </View>

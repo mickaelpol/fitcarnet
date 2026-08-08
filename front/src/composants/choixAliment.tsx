@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Bouton, Carte, Champ, Discret, Texte } from './base';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 interface Element { id: number; nom: string; detail?: string; couleur?: string }
 
@@ -63,7 +63,7 @@ export function ChoixDansListe({
                 <View style={{ flex: 1 }}>
                   <Texte numberOfLines={1}>{item.nom}</Texte>
                   {item.detail !== undefined && item.detail !== '' && (
-                    <Discret style={{ fontSize: 11.5 }}>{item.detail}</Discret>
+                    <Discret style={{ fontSize: T.petit }}>{item.detail}</Discret>
                   )}
                 </View>
               </Pressable>
@@ -77,13 +77,13 @@ export function ChoixDansListe({
 }
 
 const s = StyleSheet.create({
-  fond: { flex: 1, backgroundColor: 'rgba(10,11,13,0.72)', justifyContent: 'flex-end' },
+  fond: { flex: 1, backgroundColor: C.voile, justifyContent: 'flex-end' },
   feuille: {
     backgroundColor: C.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18,
     padding: E.m, paddingBottom: E.xl, maxHeight: '82%', width: '100%',
     maxWidth: 560, alignSelf: 'center', gap: E.s,
   },
-  titre: { fontFamily: P.titre, fontSize: 19, letterSpacing: 1, textTransform: 'uppercase' },
+  titre: { fontFamily: P.titre, fontSize: T.grand, letterSpacing: 1, textTransform: 'uppercase' },
   ligne: {
     flexDirection: 'row', alignItems: 'center', gap: E.m, minHeight: TOUCHE + 6,
     paddingHorizontal: E.s, borderBottomWidth: 1, borderBottomColor: C.ligne,

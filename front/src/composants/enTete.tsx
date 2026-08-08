@@ -2,7 +2,7 @@ import type { NativeStackHeaderProps } from '@react-navigation/native-stack';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Texte } from './base';
-import { C, E, P, TOUCHE } from '@/theme';
+import { C, E, P, T, TOUCHE } from '@/theme';
 
 /**
  * En-tête de l'application.
@@ -63,12 +63,12 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fleche: { color: C.encre, fontSize: 30, lineHeight: 32 },
+  fleche: { color: C.encre, fontSize: T.geant, lineHeight: 32 },
   titre: {
     flex: 1,
     textAlign: 'center',
     color: C.encre,
     fontFamily: P.titre,
-    fontSize: 21,
+    fontSize: T.titre,
   },
 });

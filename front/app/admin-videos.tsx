@@ -6,7 +6,7 @@ import { useExercices, useMajExercice, useMoi } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { identifiantYoutube, ModaleExercice } from '@/composants/modaleExercice';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 type Filtre = 'sans_video' | 'avec_video' | 'sans_nom_fr' | 'perso' | 'tous';
 
@@ -95,7 +95,7 @@ export default function AdminVideos() {
       style={{ flex: 1, backgroundColor: C.fond }}
     >
       <View style={s.tete}>
-        <Discret style={{ fontSize: 12.5 }}>
+        <Discret style={{ fontSize: T.normal }}>
           {avecVideo} vidéo{avecVideo > 1 ? 's' : ''} · {avecNomFr} nom{avecNomFr > 1 ? 's' : ''}
           {' '}traduit{avecNomFr > 1 ? 's' : ''} · {total} exercices
         </Discret>
@@ -114,7 +114,7 @@ export default function AdminVideos() {
             >
               <Discret
                 numberOfLines={1}
-                style={filtre === f.cle ? { color: C.fond, fontFamily: P.fort, fontSize: 11.5 } : { fontSize: 11.5 }}
+                style={filtre === f.cle ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit } : { fontSize: T.petit }}
               >
                 {f.libelle}
               </Discret>
@@ -143,7 +143,7 @@ export default function AdminVideos() {
                   <Texte style={{ fontFamily: P.fort }} numberOfLines={1}>
                     {item.nomFr ?? item.nom}
                   </Texte>
-                  <Discret style={{ fontSize: 11.5 }} numberOfLines={1}>
+                  <Discret style={{ fontSize: T.petit }} numberOfLines={1}>
                     {item.source === 'perso' ? '★ ' : ''}
                     {item.nomFr !== null && item.nomFr !== undefined ? `${item.nom} · ` : ''}
                     {item.partieCorps ?? '—'}
@@ -151,7 +151,7 @@ export default function AdminVideos() {
                 </View>
                 {item.videoUrl !== null && item.videoUrl !== undefined && (
                   <Pressable onPress={() => setApercu(item)} style={s.oeil}>
-                    <Discret style={{ fontSize: 16 }}>▶</Discret>
+                    <Discret style={{ fontSize: T.moyen }}>▶</Discret>
                   </Pressable>
                 )}
               </View>
@@ -163,7 +163,7 @@ export default function AdminVideos() {
                 placeholder="https://www.youtube.com/watch?v=…"
               />
               {!videoValide && (
-                <Discret style={{ color: C.erreur, fontSize: 12 }}>
+                <Discret style={{ color: C.erreur, fontSize: T.petit }}>
                   Ce lien n'est pas reconnu comme une vidéo YouTube.
                 </Discret>
               )}

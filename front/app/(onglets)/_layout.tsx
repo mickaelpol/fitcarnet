@@ -1,11 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, P } from '@/theme';
+import { C, P, T } from '@/theme';
 
 /** Icônes textuelles : aucune dépendance, et lisibles sur tous les fonds. */
 const Icone = ({ signe, actif }: { signe: string; actif: boolean }) => (
-  <Text style={{ fontSize: 17, color: actif ? C.vif : C.discret }}>{signe}</Text>
+  <Text style={{ fontSize: T.grand, color: actif ? C.vif : C.discret }}>{signe}</Text>
 );
 
 export default function Onglets() {
@@ -18,7 +18,7 @@ export default function Onglets() {
       screenOptions={{
         headerStyle: { backgroundColor: C.fond },
         headerTintColor: C.encre,
-        headerTitleStyle: { fontFamily: P.titre, fontSize: 21, letterSpacing: 1 },
+        headerTitleStyle: { fontFamily: P.titre, fontSize: T.titre, letterSpacing: 1 },
         tabBarStyle: {
           backgroundColor: C.fond,
           borderTopColor: C.ligne,
@@ -28,7 +28,7 @@ export default function Onglets() {
         },
         tabBarActiveTintColor: C.vif,
         tabBarInactiveTintColor: C.discret,
-        tabBarLabelStyle: { fontFamily: P.texte, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: P.texte, fontSize: T.petit },
         sceneStyle: { backgroundColor: C.fond },
       }}
     >

@@ -5,7 +5,7 @@ import type { Exercice } from '@/api/types';
 import { Bouton, Carte, Chargement, Discret, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
-import { C, E, P, R } from '@/theme';
+import { C, E, P, R, T } from '@/theme';
 
 /** Distance de Levenshtein, pour proposer les correspondances probables. */
 function proximite(a: string, b: string): number {
@@ -87,7 +87,7 @@ export default function AdminFusion() {
           <Discret>▾</Discret>
         </Pressable>
         {ancien && (
-          <Discret style={{ fontSize: 11.5 }}>
+          <Discret style={{ fontSize: T.petit }}>
             {ancien.source === 'perso' ? '★ ' : ''}{ancien.nom}
             {ancien.formatPrescrit !== null ? ` · ${ancien.formatPrescrit}` : ''}
           </Discret>
@@ -99,10 +99,10 @@ export default function AdminFusion() {
           <Discret style={s.etiquette}>Correspondances probables</Discret>
           {suggestions.map(({ e, score }) => (
             <Pressable key={e.id} onPress={() => setNouveau(e)} style={s.suggestion}>
-              <Texte style={{ flex: 1, fontSize: 14 }} numberOfLines={1}>
+              <Texte style={{ flex: 1, fontSize: T.normal }} numberOfLines={1}>
                 {e.nomFr ?? e.nom}
               </Texte>
-              <Discret style={{ fontSize: 11 }}>{Math.round(score * 100)} %</Discret>
+              <Discret style={{ fontSize: T.petit }}>{Math.round(score * 100)} %</Discret>
             </Pressable>
           ))}
         </Carte>
@@ -117,7 +117,7 @@ export default function AdminFusion() {
           <Discret>▾</Discret>
         </Pressable>
         {nouveau && (
-          <Discret style={{ fontSize: 11.5 }}>
+          <Discret style={{ fontSize: T.petit }}>
             {nouveau.nom}{nouveau.partieCorps !== null ? ` · ${nouveau.partieCorps}` : ''}
           </Discret>
         )}
@@ -132,7 +132,7 @@ export default function AdminFusion() {
 
       {fusion.isSuccess && (
         <Carte style={{ borderColor: C.ok }}>
-          <Texte style={{ color: C.ok, fontSize: 13.5, lineHeight: 20 }}>
+          <Texte style={{ color: C.ok, fontSize: T.normal, lineHeight: 20 }}>
             {fusion.data.message}
           </Texte>
         </Carte>
@@ -176,7 +176,7 @@ export default function AdminFusion() {
 
 const s = StyleSheet.create({
   page: { padding: E.m, gap: E.m, maxWidth: 560, width: '100%', alignSelf: 'center' },
-  etiquette: { fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase' },
+  etiquette: { fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase' },
   choix: {
     flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: 46,
     backgroundColor: C.surface2, borderColor: C.ligne, borderWidth: 1,

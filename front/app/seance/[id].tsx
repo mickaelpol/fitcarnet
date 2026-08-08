@@ -16,7 +16,7 @@ import { abonnerMesure, appliquerResultats, prendreResultats } from '@/composant
 import { CarteExercice, lireFormat } from '@/composants/exerciceSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
 import { libelleEtat, useSauvegardeAuto } from '@/composants/sauvegardeAuto';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 const TYPES = ['Push', 'Pull', 'Legs'] as const;
 const COULEUR: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
@@ -241,14 +241,14 @@ export default function DetailSeance() {
                     backgroundColor: etat === 'enregistre' ? C.ok
                       : etat === 'erreur' ? C.erreur : C.vif,
                   }]} />
-                  <Discret style={{ fontSize: 11.5 }}>{libelleEtat(etat)}</Discret>
+                  <Discret style={{ fontSize: T.petit }}>{libelleEtat(etat)}</Discret>
                 </View>
               )}
 
               {/* Le motif, en clair. Sans lui, une seance qui ne s'enregistre
                   pas se perd en silence et rien n'indique quoi corriger. */}
               {etat === 'erreur' && motif !== null && (
-                <Discret style={{ color: C.erreur, fontSize: 11.5, lineHeight: 16 }}>
+                <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 16 }}>
                   {motif}
                 </Discret>
               )}
@@ -261,7 +261,7 @@ export default function DetailSeance() {
                       backgroundColor: avancement.faites === avancement.total ? C.vif : C.ok,
                     }]} />
                   </View>
-                  <Discret style={{ fontSize: 12, marginTop: 5 }}>
+                  <Discret style={{ fontSize: T.petit, marginTop: 5 }}>
                     {avancement.faites}/{avancement.total} séries
                   </Discret>
                 </View>
@@ -395,7 +395,7 @@ const s = StyleSheet.create({
     flex: 1, minHeight: TOUCHE, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
     backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center',
   },
-  typeTexte: { fontFamily: P.chiffre, fontSize: 17, textTransform: 'uppercase', color: C.attenue },
+  typeTexte: { fontFamily: P.chiffre, fontSize: T.grand, textTransform: 'uppercase', color: C.attenue },
   etat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   point: { width: 7, height: 7, borderRadius: 4 },
   jauge: { height: 6, backgroundColor: C.surface2, borderRadius: 99, overflow: 'hidden' },

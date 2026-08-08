@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Chiffre, Discret, Texte } from './base';
-import { C, E, P, R } from '@/theme';
+import { C, E, N, P, R, T } from '@/theme';
 
 export type Tendance = 'hausse' | 'stable' | 'baisse' | 'inconnue';
 
@@ -27,10 +27,10 @@ export function tendanceDe(actuel: number, precedent: number | null): Tendance {
 }
 
 export const COULEUR_TENDANCE: Record<Tendance, string> = {
-  hausse: '#3d9a5c',    // vert : tu progresses
-  stable: '#e3b23c',    // jaune : tu tiens
-  baisse: '#d8352a',    // rouge : tu recules
-  inconnue: '#5d646e',  // gris : pas de point de comparaison
+  hausse: C.ok,    // vert : tu progresses
+  stable: C.vif,    // jaune : tu tiens
+  baisse: C.erreur,    // rouge : tu recules
+  inconnue: C.discret,  // gris : pas de point de comparaison
 };
 
 const SIGNE: Record<Tendance, string> = {
@@ -69,7 +69,7 @@ export function DisqueRM({
       accessibilityLabel={`1RM ${valeur} kg, ${libelle}`}
     >
       <View style={[s.disque, { borderColor: couleur }]}>
-        <Chiffre taille={17} couleur={C.encre}>{
+        <Chiffre taille={N.petit} couleur={C.encre}>{
           Math.abs(valeur - Math.round(valeur)) < 0.05 ? Math.round(valeur) : valeur.toFixed(1)
         }</Chiffre>
         <Discret style={s.unite}>{unite}</Discret>
@@ -120,7 +120,7 @@ export function PaliersRM({ rm }: { rm: number }) {
           <View key={l.pourcent} style={[s.ligne, l.zone && s.zone]}>
             <View style={[s.colPct, s.cellePct]}>
               <View style={[s.point, l.zone && { backgroundColor: C.vif }]} />
-              <Texte style={{ fontFamily: P.chiffre, fontSize: 15 }}>{l.pourcent} %</Texte>
+              <Texte style={{ fontFamily: P.chiffre, fontSize: T.moyen }}>{l.pourcent} %</Texte>
             </View>
             <Texte style={[s.col, s.colKg, s.valeur, l.zone && { color: C.vif }]}>
               {l.charge % 1 === 0 ? l.charge : l.charge.toFixed(1)} kg
@@ -142,23 +142,23 @@ const s = StyleSheet.create({
     width: 62, height: 62, borderRadius: 31, borderWidth: 5,
     backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center',
   },
-  unite: { fontSize: 8.5, letterSpacing: 0.4, marginTop: -2 },
-  ecart: { fontSize: 10.5, textAlign: 'center', marginTop: 3, fontVariant: ['tabular-nums'] },
-  chevron: { fontSize: 10, textAlign: 'center', marginTop: 1 },
+  unite: { fontSize: T.minuscule, letterSpacing: 0.4, marginTop: -2 },
+  ecart: { fontSize: T.minuscule, textAlign: 'center', marginTop: 3, fontVariant: ['tabular-nums'] },
+  chevron: { fontSize: T.minuscule, textAlign: 'center', marginTop: 1 },
 
   table: { marginTop: E.s, backgroundColor: C.surface2, borderRadius: R.s, padding: E.s },
   entete: { flexDirection: 'row', paddingBottom: 5, borderBottomWidth: 1, borderBottomColor: C.ligne },
   ligne: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(47,52,61,0.5)',
+    borderBottomWidth: 1, borderBottomColor: C.ligneVoile,
   },
-  zone: { backgroundColor: 'rgba(227,178,60,0.08)', borderRadius: 5 },
-  col: { fontSize: 12 },
+  zone: { backgroundColor: C.vifVoile, borderRadius: 5 },
+  col: { fontSize: T.petit },
   colPct: { flex: 1.1 },
   colKg: { flex: 1, textAlign: 'right' },
   colRep: { flex: 1, textAlign: 'right' },
   cellePct: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   point: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.ligne },
-  valeur: { fontFamily: P.chiffre, fontSize: 15, fontVariant: ['tabular-nums'] },
-  note: { fontSize: 10.5, marginTop: E.s, lineHeight: 15 },
+  valeur: { fontFamily: P.chiffre, fontSize: T.moyen, fontVariant: ['tabular-nums'] },
+  note: { fontSize: T.minuscule, marginTop: E.s, lineHeight: 15 },
 });

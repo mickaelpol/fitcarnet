@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextProps, type TextStyle, type ViewStyle,
 } from 'react-native';
-import { C, E, P, R, TOUCHE } from '@/theme';
+import { C, E, N, P, R, T, TOUCHE } from '@/theme';
 
 /* ---------- textes ---------- */
 
@@ -20,7 +20,7 @@ export const Discret = ({ children, style, ...props }: TextProps) => (
 );
 
 /** Chiffre mis en avant : police condensée, alignement des colonnes. */
-export const Chiffre = ({ children, couleur, taille = 22 }: {
+export const Chiffre = ({ children, couleur, taille = N.normal }: {
   children: ReactNode; couleur?: string; taille?: number;
 }) => (
   <Text style={[s.chiffre, { color: couleur ?? C.vif, fontSize: taille }]}>{children}</Text>
@@ -127,11 +127,11 @@ export const Vide = ({ message }: { message: string }) => (
 
 const s = StyleSheet.create({
   titre: {
-    color: C.encre, fontFamily: P.titre, fontSize: 26,
+    color: C.encre, fontFamily: P.titre, fontSize: T.geant,
     letterSpacing: 1, textTransform: 'uppercase',
   },
-  texte: { color: C.encre, fontFamily: P.texte, fontSize: 15 },
-  discret: { color: C.attenue, fontFamily: P.texte, fontSize: 13 },
+  texte: { color: C.encre, fontFamily: P.texte, fontSize: T.moyen },
+  discret: { color: C.attenue, fontFamily: P.texte, fontSize: T.normal },
   chiffre: { fontFamily: P.chiffre, fontVariant: ['tabular-nums'] },
 
   carte: {
@@ -148,11 +148,11 @@ const s = StyleSheet.create({
   boutonDiscret: { backgroundColor: 'transparent' },
   boutonInactif: { opacity: 0.4 },
   boutonEnfonce: { opacity: 0.75 },
-  boutonTexte: { color: C.encre, fontFamily: P.fort, fontSize: 14.5 },
+  boutonTexte: { color: C.encre, fontFamily: P.fort, fontSize: T.moyen },
 
   champBloc: { gap: E.xs },
   etiquette: {
-    color: C.discret, fontFamily: P.texte, fontSize: 10.5,
+    color: C.discret, fontFamily: P.texte, fontSize: T.minuscule,
     letterSpacing: 1, textTransform: 'uppercase',
   },
   champCadre: {
@@ -160,10 +160,10 @@ const s = StyleSheet.create({
     backgroundColor: C.surface2, borderColor: C.ligne, borderWidth: 1,
     borderRadius: R.s, paddingHorizontal: E.m, minHeight: TOUCHE + 2,
   },
-  champ: { flex: 1, color: C.encre, fontFamily: P.texte, fontSize: 15, paddingVertical: E.s },
-  champNombre: { fontFamily: P.fort, fontSize: 17 },
-  unite: { color: C.discret, fontFamily: P.texte, fontSize: 13, marginLeft: E.xs },
+  champ: { flex: 1, color: C.encre, fontFamily: P.texte, fontSize: T.moyen, paddingVertical: E.s },
+  champNombre: { fontFamily: P.fort, fontSize: T.grand },
+  unite: { color: C.discret, fontFamily: P.texte, fontSize: T.normal, marginLeft: E.xs },
 
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: E.xl, gap: E.s },
-  erreur: { color: C.erreur, fontFamily: P.texte, fontSize: 14, textAlign: 'center' },
+  erreur: { color: C.erreur, fontFamily: P.texte, fontSize: T.normal, textAlign: 'center' },
 });

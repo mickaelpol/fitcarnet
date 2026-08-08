@@ -1,7 +1,7 @@
 import { type ReactNode, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Discret } from './base';
-import { C, E, R, TOUCHE } from '@/theme';
+import { C, E, R, T, TOUCHE } from '@/theme';
 
 /**
  * Version WEB : glisser-déposer natif du navigateur.
@@ -52,14 +52,14 @@ export function ListeDeplacable<T>({
   const poigneeDe = (index: number) => (
     <View style={s.poignees}>
       <View style={s.saisir}>
-        <Discret style={{ fontSize: 17, color: saisi === index ? C.vif : C.discret }}>⠿</Discret>
+        <Discret style={{ fontSize: T.grand, color: saisi === index ? C.vif : C.discret }}>⠿</Discret>
       </View>
       <View>
         <Pressable onPress={() => deplacer(index, index - 1)} style={s.fleche} hitSlop={4}>
-          <Discret style={{ fontSize: 11 }}>▲</Discret>
+          <Discret style={{ fontSize: T.petit }}>▲</Discret>
         </Pressable>
         <Pressable onPress={() => deplacer(index, index + 1)} style={s.fleche} hitSlop={4}>
-          <Discret style={{ fontSize: 11 }}>▼</Discret>
+          <Discret style={{ fontSize: T.petit }}>▼</Discret>
         </Pressable>
       </View>
     </View>

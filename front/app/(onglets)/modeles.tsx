@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useModeles } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
-import { C, E, P } from '@/theme';
+import { C, E, P, T } from '@/theme';
 
 const COULEUR_TYPE: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
 
@@ -30,7 +30,7 @@ export default function Modeles() {
             <View style={[s.pastille, { backgroundColor: COULEUR_TYPE[item.type ?? ''] ?? C.ligne }]} />
             <View style={{ flex: 1 }}>
               <Texte style={{ fontFamily: P.fort }}>{item.nom ?? item.type ?? 'Modèle'}</Texte>
-              <Discret style={{ fontSize: 12.5 }}>
+              <Discret style={{ fontSize: T.normal }}>
                 {item.exercices.length} exercice{item.exercices.length > 1 ? 's' : ''}
               </Discret>
             </View>

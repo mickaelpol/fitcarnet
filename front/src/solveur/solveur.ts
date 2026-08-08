@@ -34,10 +34,21 @@ export function pourObtenirCuit(a: Aliment, grammesCuits: number): number {
   return grammesCuits / r;
 }
 
-const macrosDe = (a: Aliment, g: number): Macros => ({
+/**
+ * Les glucides d'un aliment, tels que la CIBLE les entend.
+ *
+ * En convention européenne — celle des données de l'application — les fibres
+ * sont hors des glucides. Une prescription nord-américaine, elle, les compte
+ * dedans. Quand la cible vient d'un tel plan, on ajoute donc les fibres au
+ * moment de comparer, et seulement à ce moment-là.
+ */
+const glucidesDe = (a: Aliment, totaux: boolean): number =>
+  a.gluc100 + (totaux ? (a.fibres100 ?? 0) : 0);
+
+const macrosDe = (a: Aliment, g: number, glucidesTotaux = false): Macros => ({
   kcal: (a.kcal100 * g) / 100,
   prot: (a.prot100 * g) / 100,
-  gluc: (a.gluc100 * g) / 100,
+  gluc: (glucidesDe(a, glucidesTotaux) * g) / 100,
   lip: (a.lip100 * g) / 100,
 });
 
@@ -92,13 +103,14 @@ export function calculer(
   const diagnostics: Diagnostic[] = [];
   const arrondi = { ...ARRONDI_DEFAUT, ...options.arrondi };
   const tolerance = { ...TOLERANCE_DEFAUT, ...options.tolerance };
+  const glucidesTotaux = options.glucidesTotaux === true;
 
   // chaque quantité déjà possédée est ramenée à l'état de référence de son aliment
   const fixesRef = fixes.map((f) => ({
     aliment: f.aliment,
     reference: versReference(f.aliment, f.grammes, f.unite),
   }));
-  const macrosFixes = somme(fixesRef.map((f) => macrosDe(f.aliment, f.reference)));
+  const macrosFixes = somme(fixesRef.map((f) => macrosDe(f.aliment, f.reference, glucidesTotaux)));
 
   // Chaque variable est rattachée à la macro qu'elle pilote. On ne résout que
   // le sous-système correspondant aux variables réellement disponibles : avec
@@ -122,7 +134,9 @@ export function calculer(
     });
   } else {
     const par100 = (a: Aliment, m: 'prot' | 'gluc' | 'lip') =>
-      (m === 'prot' ? a.prot100 : m === 'gluc' ? a.gluc100 : a.lip100) / 100;
+      (m === 'prot' ? a.prot100
+        : m === 'gluc' ? glucidesDe(a, glucidesTotaux)
+          : a.lip100) / 100;
 
     const A = actifs.map((eq) => actifs.map((v) => par100(variables[v.cle]!, eq.macro)));
     const b = actifs.map((eq) => cibles[eq.macro] - macrosFixes[eq.macro]);
@@ -180,7 +194,7 @@ export function calculer(
   };
 
   const quantites: Quantite[] = [];
-  const toutes: Macros[] = fixesRef.map((f) => macrosDe(f.aliment, f.reference));
+  const toutes: Macros[] = fixesRef.map((f) => macrosDe(f.aliment, f.reference, glucidesTotaux));
 
   fixesRef.forEach((f) => {
     quantites.push({ aliment: f.aliment, ...convertir(f.aliment, f.reference), impose: true });
@@ -191,7 +205,7 @@ export function calculer(
     if (!aliment) return;
     const q = arrondis[nom];
     if (q <= 0) return;
-    toutes.push(macrosDe(aliment, q));
+    toutes.push(macrosDe(aliment, q, glucidesTotaux));
     quantites.push({ aliment, ...convertir(aliment, q), impose: false });
   });
 
@@ -209,11 +223,14 @@ export function calculer(
       diagnostics.push({
         gravite: 'blocage',
         code: 'lipides_incompressibles',
+        /* On compare le gras TOTAL du repas à l'objectif. L'ancienne version
+           n'annonçait que celui de la protéine — « apporte déjà 1,2 g alors
+           que l'objectif est de 51,6 g » — un rapprochement qui ne voulait
+           rien dire et laissait croire à un bug. */
         message:
-          `Trop gras : ${variables.proteine?.nom.toLowerCase() ?? 'ce repas'} apporte déjà ` +
-          `${(variables.proteine ? macrosDe(variables.proteine, arrondis.proteine).lip : macrosFixes.lip).toFixed(1)} g de gras, ` +
-          `alors que l'objectif est de ${cibles.lip} g. ` +
-          'Choisis une viande ou un poisson plus maigre.',
+          `Trop gras de ${ecarts.lip.toFixed(1)} g : ce repas en apporte ` +
+          `${macros.lip.toFixed(1)} g pour un objectif de ${cibles.lip} g, ` +
+          'sans le moindre oléagineux. Choisis une viande ou un poisson plus maigre.',
       });
     } else {
       diagnostics.push({

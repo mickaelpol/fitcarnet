@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useDeconnexion, useMoi } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Texte } from '@/composants/base';
-import { C, E, P } from '@/theme';
+import { C, E, P, T } from '@/theme';
 
 export default function Compte() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function Compte() {
     <ScrollView contentContainerStyle={s.page}>
       <Carte>
         <Discret style={s.etiquette}>Compte</Discret>
-        <Texte style={{ fontFamily: P.fort, fontSize: 17 }}>{data?.nom ?? '—'}</Texte>
+        <Texte style={{ fontFamily: P.fort, fontSize: T.grand }}>{data?.nom ?? '—'}</Texte>
         <Discret>{data?.email ?? ''}</Discret>
 
         <View style={s.separateur} />
@@ -62,7 +62,7 @@ export default function Compte() {
 const s = StyleSheet.create({
   page: { padding: E.m, gap: E.s },
   etiquette: {
-    fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase',
+    fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase',
     color: C.discret, marginBottom: E.xs,
   },
   separateur: { height: 1, backgroundColor: C.ligne, marginVertical: E.m },

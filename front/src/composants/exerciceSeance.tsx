@@ -9,7 +9,7 @@ import { ModaleExercice } from './modaleExercice';
 import { Sparkline } from './sparkline';
 import { LigneSerie } from './serie';
 import { performanceDe } from '@/calcul/performance';
-import { C, E, P, R, TOUCHE, nb } from '@/theme';
+import { C, E, N, P, R, T, TOUCHE, nb } from '@/theme';
 
 const MODES = [
   { cle: 'charge' as const, court: 'Charge' },
@@ -136,12 +136,12 @@ export function CarteExercice({
                 accessibilityLabel="Comment faire cet exercice"
               >
                 <View style={s.info}>
-                  <Discret style={{ fontSize: 11, color: C.vif }}>i</Discret>
+                  <Discret style={{ fontSize: T.petit, color: C.vif }}>i</Discret>
                 </View>
               </Pressable>
             )}
           </View>
-          <Discret style={{ fontSize: 12 }}>
+          <Discret style={{ fontSize: T.petit }}>
             {faites}/{visibles.length} série{visibles.length > 1 ? 's' : ''}
             {exercice?.formatPrescrit ? ` · ${exercice.formatPrescrit}` : ''}
           </Discret>
@@ -183,7 +183,7 @@ export function CarteExercice({
                 style={s.appliquer}
                 accessibilityLabel="Recharger les valeurs de la dernière séance"
               >
-                <Discret style={{ color: C.vif, fontSize: 12 }} numberOfLines={1}>
+                <Discret style={{ color: C.vif, fontSize: T.petit }} numberOfLines={1}>
                   ↓ {apercuDerniereFois}
                 </Discret>
               </Pressable>
@@ -231,27 +231,27 @@ export function CarteExercice({
             <View style={s.bilan}>
               {perf.reps > 0 && (
                 <View style={s.mesure}>
-                  <Chiffre taille={17} couleur={C.encre}>{perf.reps}</Chiffre>
-                  <Discret style={{ fontSize: 9.5 }}>RÉPÉTITIONS</Discret>
+                  <Chiffre taille={N.petit} couleur={C.encre}>{perf.reps}</Chiffre>
+                  <Discret style={{ fontSize: T.minuscule }}>RÉPÉTITIONS</Discret>
                 </View>
               )}
               {perf.volume > 0 && (
                 <View style={s.mesure}>
-                  <Chiffre taille={17} couleur={C.encre}>{perf.volume}</Chiffre>
-                  <Discret style={{ fontSize: 9.5 }}>KG SOULEVÉS</Discret>
+                  <Chiffre taille={N.petit} couleur={C.encre}>{perf.volume}</Chiffre>
+                  <Discret style={{ fontSize: T.minuscule }}>KG SOULEVÉS</Discret>
                 </View>
               )}
               {perf.secondes !== null && (
                 <View style={s.mesure}>
-                  <Chiffre taille={17} couleur={C.encre}>{mmss(perf.secondes)}</Chiffre>
-                  <Discret style={{ fontSize: 9.5 }}>TEMPS</Discret>
+                  <Chiffre taille={N.petit} couleur={C.encre}>{mmss(perf.secondes)}</Chiffre>
+                  <Discret style={{ fontSize: T.minuscule }}>TEMPS</Discret>
                 </View>
               )}
             </View>
           )}
 
           {perf.seriesLongues > 0 && (
-            <Discret style={{ fontSize: 11, lineHeight: 16 }}>
+            <Discret style={{ fontSize: T.petit, lineHeight: 16 }}>
               {perf.seriesLongues} série{perf.seriesLongues > 1 ? 's' : ''} de plus de
               15 répétitions : comptée{perf.seriesLongues > 1 ? 's' : ''} dans le volume,
               mais écartée{perf.seriesLongues > 1 ? 's' : ''} du 1RM — au-delà, on mesure
@@ -260,12 +260,12 @@ export function CarteExercice({
           )}
 
           <Pressable onPress={() => setNotesOuvertes(!notesOuvertes)} style={s.replier}>
-            <Discret style={{ fontSize: 12 }}>
+            <Discret style={{ fontSize: T.petit }}>
               {notesOuvertes ? '▲' : '▼'} Notes
             </Discret>
             {!notesOuvertes && aDesNotes && (
               <View style={s.puce}>
-                <Discret style={{ fontSize: 10.5, color: C.vif }} numberOfLines={1}>
+                <Discret style={{ fontSize: T.minuscule, color: C.vif }} numberOfLines={1}>
                   ✎ {bloc.notes}
                 </Discret>
               </View>
@@ -285,7 +285,7 @@ export function CarteExercice({
               + Série
             </Bouton>
             <Bouton variante="discret" onPress={() => setSupprimerExercice(true)}>
-              <Discret style={{ fontSize: 12.5 }}>Retirer l'exercice</Discret>
+              <Discret style={{ fontSize: T.normal }}>Retirer l'exercice</Discret>
             </Bouton>
           </View>
         </View>
@@ -333,7 +333,7 @@ const s = StyleSheet.create({
   modeActif: { backgroundColor: C.ligne },
   appliquer: {
     paddingHorizontal: E.m, minHeight: 38, borderRadius: R.s, borderWidth: 1,
-    borderColor: 'rgba(227,178,60,0.4)', alignItems: 'center', justifyContent: 'center',
+    borderColor: C.vifBord, alignItems: 'center', justifyContent: 'center',
   },
   total: {
     backgroundColor: C.surface2, borderRadius: R.s, padding: E.s,
@@ -347,7 +347,7 @@ const s = StyleSheet.create({
   poignee: { position: 'absolute', top: 4, right: 4, opacity: 0.75 },
   replier: { flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: 36 },
   puce: {
-    flex: 1, backgroundColor: 'rgba(227,178,60,0.12)', borderRadius: 6,
+    flex: 1, backgroundColor: C.vifFond, borderRadius: 6,
     paddingHorizontal: 8, paddingVertical: 4,
   },
   pied: { flexDirection: 'row', alignItems: 'center', gap: E.s },

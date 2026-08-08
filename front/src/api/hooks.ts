@@ -140,8 +140,16 @@ export const useMonFrigo = () =>
 export const useFrigoIncomplets = (actif: boolean) =>
   useQuery({
     queryKey: ['mon-frigo', 'incomplets'],
-    queryFn: () => api<{ produits: { reference: string; nom: string; manquants: string[] }[] }>(
-      '/mon-frigo/incomplets'),
+    queryFn: () => api<{
+      produits: {
+        reference: string;
+        nom: string;
+        /** champs sans lesquels l'aliment ne peut PAS servir au calcul */
+        manquants: string[];
+        /** champs souhaitables — les fibres — dont l'absence fausse en silence */
+        souhaites?: string[];
+      }[];
+    }>('/mon-frigo/incomplets'),
     enabled: actif,
   });
 
@@ -293,14 +301,31 @@ export const useCibles = () =>
     queryFn: async () => membres(await api<{ member: Cible[] }>('/cibles')),
   });
 
+/**
+ * Les quatre macros d'une cible sont des DECIMAL : elles s'écrivent en
+ * chaînes, comme partout ailleurs. Voir `versDecimales` plus haut — c'est la
+ * même règle, oubliée ici, et l'API répondait « The type of the "kcal"
+ * attribute must be "string", "integer" given ».
+ */
+const cibleEnEcriture = (c: Partial<Cible> & { repas: string }): Record<string, unknown> => {
+  const sortie: Record<string, unknown> = { ...c };
+  for (const macro of ['kcal', 'prot', 'gluc', 'lip'] as const) {
+    const v = c[macro];
+    if (typeof v === 'number') sortie[macro] = String(v);
+  }
+
+  return sortie;
+};
+
 export function useEnregistrerCible() {
   const qc = useQueryClient();
 
   return useMutation({
     mutationFn: (c: Partial<Cible> & { repas: string }) =>
       c['@id']
-        ? api<Cible>(c['@id'].replace('/api', ''), { methode: 'PATCH', corps: c })
-        : api<Cible>('/cibles', { methode: 'POST', corps: c }),
+        ? api<Cible>(c['@id'].replace('/api', ''),
+            { methode: 'PATCH', corps: cibleEnEcriture(c) })
+        : api<Cible>('/cibles', { methode: 'POST', corps: cibleEnEcriture(c) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cibles'] }),
   });
 }
