@@ -23,6 +23,16 @@ security:
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
+        # Prolonger ou terminer une session se fait SANS pare-feu JWT.
+        # On appelle ces routes justement quand le jeton d'acces est perime :
+        # le pare-feu `api` repondrait 401 avant d'atteindre le controleur des
+        # qu'un en-tete Authorization invalide traine dans la requete. Elles
+        # s'authentifient par le jeton de rafraichissement, dans le corps.
+        # Doit rester AVANT `api` : le premier motif qui correspond gagne.
+        session:
+            pattern: ^/api/(jeton/rafraichir|deconnexion)$
+            security: false
+
         api:
             pattern: ^/api
             stateless: true
@@ -35,6 +45,8 @@ security:
 
     access_control:
         - { path: ^/api/connexion, roles: PUBLIC_ACCESS }
+        - { path: ^/api/jeton/rafraichir, roles: PUBLIC_ACCESS }
+        - { path: ^/api/deconnexion, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api$, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

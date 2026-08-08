@@ -12,6 +12,13 @@ FrankenPHP, front Expo SDK 54 (Android, iOS, web). Installation complète en
 une commande : `./installer.sh --email …`, avec `--repartir-de-zero` pour
 une remise à plat. Sauvegarde et restauration par `./sauvegarde.sh`.
 
+**Sessions.** Une session se termine sur un clic « Se déconnecter », et sur
+rien d'autre. Le jeton JWT dure une heure ; à son expiration l'application le
+renouvelle en silence à partir d'un jeton de rafraîchissement gardé en base,
+rejoue l'appel, et l'utilisateur ne voit rien. Les appels simultanés partagent
+un seul renouvellement. Si le renouvellement est refusé — jeton révoqué,
+échéance dépassée — retour à l'écran de connexion et cache vidé.
+
 **Exercices.** 1 338 au catalogue — 20 personnels avec leurs formats
 prescrits, 1 318 importés d'un jeu de données en français. Vidéos YouTube
 renseignées par l'administrateur, fiche « i » avec instructions et muscles
@@ -41,8 +48,9 @@ macros, restes à écouler saisissables en cru ou en cuit, calcul souple quand
 il manque des variables. Valeurs nutritionnelles issues de Ciqual (Anses),
 ratios cru/cuit dérivés de la conservation de l'énergie.
 
-**Tests.** 79 au total, tous dans `npm test` : 47 pour le solveur, 26 pour
-`nutrition.ts` et `frigo.ts`, 6 pour la mesure d'effort.
+**Tests.** 84 au total, tous dans `npm test` : 47 pour le solveur, 26 pour
+`nutrition.ts` et `frigo.ts`, 6 pour la mesure d'effort, 5 pour le
+regroupement des renouvellements de jeton.
 `tsconfig.tests.json` liste les fichiers testés — **toute nouvelle cible doit
 y être ajoutée**, sinon le test compile mais ne s'exécute jamais.
 
@@ -177,6 +185,28 @@ oléagineux par quatre.
 on mesure l'endurance, et aucune formule ne tient : 93 répétitions à 32 kg
 donneraient un 1RM supérieur à 7 répétitions à 35 kg. La progression des
 efforts longs se lit sur le volume et le temps.
+
+**Un JWT ne se révoque pas.** Il vaut jusqu'à son échéance, même après une
+déconnexion. C'est pourquoi il dure une heure et non un jour, et pourquoi ce
+qui tient la session ouverte est un jeton de rafraîchissement gardé en base,
+lui révocable. La table n'en garde que le SHA-256 : une fuite ne livre aucune
+session utilisable.
+
+**Le jeton de rafraîchissement n'est PAS remplacé à chaque usage.** La
+rotation détecterait un vol, mais déconnecterait définitivement à chaque
+réponse perdue entre le serveur et le téléphone — coupure de réseau,
+application tuée au mauvais moment. Sur une application qui promet de ne
+déconnecter que sur demande, ce compromis se paie trop cher. L'échéance est
+repoussée à chaque usage : une application qui sert ne déconnecte jamais, un
+téléphone abandonné finit par expirer au bout d'un an.
+
+**Renouveler et se déconnecter passent hors du pare-feu JWT.** Un pare-feu
+`jwt` répond 401 avant d'atteindre le contrôleur dès qu'un en-tête
+`Authorization` invalide traîne dans la requête — or c'est précisément le cas
+quand on appelle ces routes. D'où un pare-feu `session` en `security: false`,
+placé **avant** `api` dans `security.yaml` : le premier motif qui correspond
+gagne. Ces routes s'authentifient par le jeton de rafraîchissement, dans le
+corps et jamais dans l'URL, qui finirait dans les journaux du serveur.
 
 **Le script d'import n'écrit jamais `pesee_avant` ni `pesee_apres`.**
 L'application les présente comme « mesuré : 100 g avant cuisson → 187 g

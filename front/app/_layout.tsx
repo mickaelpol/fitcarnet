@@ -1,13 +1,13 @@
 import { BarlowCondensed_600SemiBold, BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed';
 import { Inter_400Regular, Inter_600SemiBold, useFonts } from '@expo-google-fonts/inter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { chargerJeton } from '@/api/client';
+import { chargerJeton, surSessionFinie } from '@/api/client';
 import { Chargement } from '@/composants/base';
 import { EnTete } from '@/composants/enTete';
 import { C } from '@/theme';
@@ -33,8 +33,25 @@ export default function Racine() {
     BarlowCondensed_600SemiBold, BarlowCondensed_700Bold,
   });
   const [pret, setPret] = useState(false);
+  const routeur = useRouter();
 
   useEffect(() => { void chargerJeton().then(() => setPret(true)); }, []);
+
+  /* Quand le renouvellement échoue — jeton révoqué, échéance dépassée — la
+     session est finie pour de bon : on ramène à la connexion plutôt que de
+     laisser des écrans vides derrière un message rouge. `replace` et non
+     `push` : revenir en arrière sur une session morte n'a pas de sens.
+
+     Le cache est vidé au passage, sans quoi les données du compte précédent
+     réapparaîtraient une fraction de seconde à la connexion suivante. */
+  useEffect(() => {
+    surSessionFinie(() => {
+      client.clear();
+      routeur.replace('/connexion');
+    });
+
+    return () => { surSessionFinie(null); };
+  }, [routeur]);
 
   if (!polices || !pret) {
     return <View style={{ flex: 1, backgroundColor: C.fond }}><Chargement /></View>;

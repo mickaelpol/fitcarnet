@@ -2,4 +2,8 @@ lexik_jwt_authentication:
     secret_key: '%kernel.project_dir%/config/jwt/private.pem'
     public_key: '%kernel.project_dir%/config/jwt/public.pem'
     pass_phrase: '%env(JWT_PASSPHRASE)%'
-    token_ttl: 86400          # 24 h
+    # Court EXPRES. Un JWT ne se revoque pas : il vaut jusqu'a son echeance,
+    # meme apres une deconnexion. Ce qui tient la session ouverte, c'est le
+    # jeton de rafraichissement — revocable, lui, et garde en base. Voir
+    # App\Service\JetonsRafraichissement.
+    token_ttl: 3600           # 1 h

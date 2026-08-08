@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, definirJeton, membres } from './client';
+import {
+  api, definirJeton, definirRafraichissement, lireRafraichissement, membres,
+} from './client';
 import type {
   Aliment, Cible, Emplacement, Exercice, LigneStock, Modele, MonFrigo,
   Seance, Serie, Utilisateur,
@@ -12,10 +14,13 @@ export function useConnexion() {
 
   return useMutation({
     mutationFn: async (identifiants: { email: string; motDePasse: string }) => {
-      const r = await api<{ token: string }>('/connexion', {
+      const r = await api<{ token: string; jetonRafraichissement?: string }>('/connexion', {
         methode: 'POST', corps: identifiants, sansJeton: true,
       });
       await definirJeton(r.token);
+      /* Le serveur joint un jeton de rafraîchissement : c'est LUI qui tient
+         la session ouverte. Le jeton d'accès, lui, ne dure qu'une heure. */
+      if (r.jetonRafraichissement) await definirRafraichissement(r.jetonRafraichissement);
 
       return r;
     },
@@ -23,11 +28,29 @@ export function useConnexion() {
   });
 }
 
+/**
+ * Se déconnecter pour de bon.
+ *
+ * Effacer les jetons du téléphone ne suffit pas : tant que la ligne existe en
+ * base, une copie du jeton de rafraîchissement rouvrirait la session. On
+ * prévient donc le serveur d'abord — et on efface quand même si l'appel
+ * échoue, sans quoi une coupure de réseau interdirait de se déconnecter.
+ */
 export function useDeconnexion() {
   const qc = useQueryClient();
 
   return async () => {
-    await definirJeton(null);
+    const cle = await lireRafraichissement();
+    if (cle !== null) {
+      try {
+        await api<void>('/deconnexion', {
+          methode: 'POST', corps: { jetonRafraichissement: cle }, sansJeton: true,
+        });
+      } catch {
+        // hors ligne : le jeton reste en base jusqu'à son échéance, tant pis
+      }
+    }
+    await Promise.all([definirJeton(null), definirRafraichissement(null)]);
     qc.clear();
   };
 }
