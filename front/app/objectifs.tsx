@@ -39,7 +39,11 @@ export default function Objectifs() {
 
   const existante = (cibles.data ?? []).find((c) => c.repas === repas);
 
-  /* On recharge les champs à chaque changement de repas. */
+  /* On recharge les champs à chaque changement de repas.
+     Le panneau de recopie se vide AUSSI, et se referme : il gardait les
+     chiffres du repas précédent, si bien qu'on croyait saisir le midi en
+     regardant ceux du matin. Un formulaire qui garde des valeurs d'un autre
+     contexte ne prête pas à confusion, il la garantit. */
   useEffect(() => {
     setSaisie(existante
       ? {
@@ -48,6 +52,8 @@ export default function Objectifs() {
         }
       : vide);
     setTotaux(existante?.glucidesTotaux === true);
+    setPlan(planVide);
+    setConvertisseur(false);
   }, [repas, existante?.id]);
 
   if (cibles.isLoading) return <Chargement />;
@@ -83,16 +89,28 @@ export default function Objectifs() {
   const converti = planLisible ? convertir(chiffresPlan) : null;
   const fibresSuspectes = planLisible && fibresDouteuses(chiffresPlan);
 
+  /**
+   * Reporte le plan tel qu'il est imprimé, et coche la case.
+   *
+   * Il a existé un second chemin : retrancher des glucides les fibres que le
+   * plan déclare, pour obtenir une cible européenne. Il a été retiré. Non
+   * parce qu'il était faux, mais parce qu'il dépendait entièrement d'un
+   * chiffre que les plans remplissent mal — celui de référence annonce 14 g
+   * de fibres par jour pour un contenu réel proche de 48.
+   *
+   * Garder le chiffre du plan et laisser le calculateur ajouter les fibres
+   * RÉELLES des aliments ne dépend, lui, d'aucune déclaration. Deux chemins
+   * pour un même but, dont l'un est moins sûr, c'en était un de trop.
+   */
   const appliquerConversion = () => {
     if (converti === null) return;
-    /* En mode « glucides totaux », le chiffre du plan se reporte TEL QUEL :
-       c'est le calculateur qui ajoutera les fibres réelles des aliments. Y
-       retrancher les fibres déclarées le rabaisserait deux fois. */
     setSaisie({
       prot: String(converti.prot),
-      gluc: String(totaux ? chiffresPlan.glucides : converti.gluc),
-      lip: String(converti.lip), kcal: String(converti.kcal),
+      gluc: String(chiffresPlan.glucides),
+      lip: String(converti.lip),
+      kcal: String(converti.kcalAnnoncees),
     });
+    setTotaux(true);
     setConvertisseur(false);
   };
 
@@ -148,6 +166,7 @@ export default function Objectifs() {
           <Pressable onPress={() => setConvertisseur(!convertisseur)} style={s.replier}>
             <Discret style={{ color: C.vif, fontSize: T.normal }}>
               {convertisseur ? '▲' : '▼'} Recopier depuis un plan américain
+              {' — '}{REPAS.find((r) => r.cle === repas)?.long.toLowerCase()}
             </Discret>
           </Pressable>
 
@@ -155,9 +174,11 @@ export default function Objectifs() {
             <View style={s.convertisseur}>
               <Discret style={{ fontSize: T.petit, lineHeight: 18 }}>
                 Les plans américains — MyFitnessPal, USDA, la plupart des coachs
-                anglophones — comptent les fibres DANS les glucides. Les étiquettes
-                françaises et cette application les comptent à part. Recopie les
-                chiffres tels qu'ils sont imprimés : la conversion est faite ici.
+                anglophones — comptent les fibres DANS les glucides. Recopie les
+                chiffres tels qu'ils sont imprimés : ils sont enregistrés tels
+                quels, et le calculateur y ajoutera les fibres réelles de tes
+                aliments. Rien n'est déduit des fibres que ton plan déclare —
+                elles sont presque toujours sous-estimées.
               </Discret>
 
               <View style={s.paire}>
@@ -183,26 +204,26 @@ export default function Objectifs() {
               {converti !== null && (
                 <>
                   <Discret style={{ fontSize: T.petit, lineHeight: 18 }}>
-                    En convention française : <Texte style={{ fontFamily: P.fort }}>
-                      {nb(converti.prot)} P · {nb(converti.gluc)} G · {nb(converti.lip)} L
-                      · {converti.kcal} kcal
+                    Sera enregistré : <Texte style={{ fontFamily: P.fort }}>
+                      {nb(converti.prot)} P · {nb(chiffresPlan.glucides)} G fibres comprises
+                      · {nb(converti.lip)} L · {converti.kcalAnnoncees} kcal
                     </Texte>
-                    {'\n'}Les {nb(converti.fibres)} g de fibres sortent des glucides ; elles
-                    restent comptées à 2 kcal, d'où {converti.kcal} kcal au lieu des
-                    {' '}{converti.kcalAnnoncees} annoncées.
+                    {'\n'}À titre indicatif, hors fibres ces glucides valent
+                    {' '}{nb(converti.gluc)} g — mais ce n'est PAS ce qu'on enregistre :
+                    le calculateur retranchera les fibres de tes aliments, qui sont
+                    connues, plutôt que celles de ton plan, qui ne le sont pas.
                   </Discret>
 
                   {fibresSuspectes && (
                     <Discret style={{ color: C.vif, fontSize: T.petit, lineHeight: 18 }}>
                       ⚠ {nb(chiffresPlan.fibres)} g de fibres pour {nb(chiffresPlan.glucides)} g
-                      de glucides : c'est peu, et beaucoup de plans ne les comptent qu'à
-                      moitié. Vérifie ce chiffre auprès de ton coach — s'il est
-                      sous-estimé, les glucides convertis resteront trop hauts.
+                      de glucides : ton plan les sous-estime. Sans conséquence ici —
+                      c'est justement pour ça qu'on ne s'en sert pas.
                     </Discret>
                   )}
 
                   <Bouton variante="contour" onPress={appliquerConversion}>
-                    Reporter dans les objectifs
+                    Reporter et cocher « fibres comprises »
                   </Bouton>
                 </>
               )}

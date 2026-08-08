@@ -31,13 +31,15 @@ export const NOM_REPAS: Record<Repas, string> = {
  * seule l'intention diffère, et l'application ne la connaît pas. Remplacer
  * n'engage donc que le repas qu'on regarde.
  */
-export type Role = 'proteine' | 'glucide' | 'lipide' | 'huile' | 'legume';
+export type Role = 'proteine' | 'glucide' | 'fruit' | 'lipide' | 'huile' | 'legume';
 
+/* Le fruit a son propre rôle depuis qu'un petit-déjeuner doit pouvoir porter
+   un féculent ET un fruit. Confondus sous « glucide », l'un chassait l'autre. */
 const ROLE_DE: Record<Aliment['categorie'], Role | null> = {
   prot: 'proteine',
   lait: 'proteine',
   fec: 'glucide',
-  fruit: 'glucide',
+  fruit: 'fruit',
   ole: 'lipide',
   huile: 'huile',
   leg: 'legume',
@@ -60,14 +62,76 @@ export const LEGUME_PAR_PORTION = 150;
  */
 export const HUILE_PAR_PORTION = 10;
 
+/**
+ * Grammes de fruit par personne, PAR REPAS.
+ *
+ * Ce ne sont pas des valeurs inventees : 55 g de fraises au petit-dejeuner et
+ * 83 g de banane a la collation, ce sont les quantites du plan lui-meme. Une
+ * moyenne des deux — 80 g — obligeait le reste du repas a compenser et
+ * eloignait le resultat du plan d'origine.
+ */
+export const FRUIT_PAR_PORTION: Record<Repas, number> = {
+  R1: 55, R2: 0, R3: 83, R4: 0,
+};
+
+/**
+ * De quoi se compose chaque repas.
+ *
+ * Ce n'est PAS une regle devinee : c'est la façon dont Mickaël mange, dictee
+ * par lui. Un petit-dejeuner ne porte ni legume ni huile mais un fruit ; un
+ * dejeuner porte l'inverse. Une table qui pretendrait deduire ça des
+ * categories se tromperait — c'est une habitude, pas une propriete des
+ * aliments.
+ *
+ * Trois variables au plus : le solveur resout trois macros. Le reste est
+ * impose, avec une quantite par personne que l'utilisateur peut changer.
+ *
+ * **C'est ici qu'on modifie la forme d'un repas**, et nulle part ailleurs.
+ */
+export interface ModeleRepas {
+  /** ce qui s'ajuste pour atteindre les cibles — trois au maximum */
+  variables: Role[];
+  /** ce qui est servi en quantite fixe, en grammes par personne */
+  imposes: { role: Role; grammes: number }[];
+}
+
+export const MODELE: Record<Repas, ModeleRepas> = {
+  // Matin : oeufs, flocons d'avoine, un fruit, des amandes.
+  R1: {
+    variables: ['proteine', 'glucide', 'lipide'],
+    imposes: [{ role: 'fruit', grammes: FRUIT_PAR_PORTION.R1 }],
+  },
+  // Midi : proteine, feculent, oleagineux, huile, legume.
+  R2: {
+    variables: ['proteine', 'glucide', 'lipide'],
+    imposes: [
+      { role: 'huile', grammes: HUILE_PAR_PORTION },
+      { role: 'legume', grammes: LEGUME_PAR_PORTION },
+    ],
+  },
+  // Collation : comme le matin. La seconde proteine — le skyr a cote des
+  // blancs d'oeufs — s'ajoute a la main : sa quantite n'appartient qu'a toi.
+  R3: {
+    variables: ['proteine', 'glucide', 'lipide'],
+    imposes: [{ role: 'fruit', grammes: FRUIT_PAR_PORTION.R3 }],
+  },
+  R4: {
+    variables: ['proteine', 'glucide', 'lipide'],
+    imposes: [
+      { role: 'huile', grammes: HUILE_PAR_PORTION },
+      { role: 'legume', grammes: LEGUME_PAR_PORTION },
+    ],
+  },
+};
+
+
 export interface Composition {
   variables: Variables;
   fixes: Fixe[];
   /** ce qui a manqué pour composer un repas complet */
   manquants: Role[];
-  /** l'huile, quand elle est une quantité fixe et non la variable lipide */
-  huile?: Aliment;
-  legume?: Aliment;
+  /** les aliments servis en quantité fixe, par rôle */
+  imposes: Partial<Record<Role, Aliment>>;
 }
 
 /**
@@ -82,6 +146,7 @@ export function composer(
   disponibles: Aliment[],
   portions: number,
   precedents: ReadonlySet<number | string> = new Set(),
+  repas: Repas = 'R2',
 ): Composition {
   const utilisables = disponibles.filter((a) => roleDe(a) !== null);
 
@@ -97,9 +162,10 @@ export function composer(
     return (neufs.length > 0 ? neufs : candidats)[0];
   };
 
+  const modele = MODELE[repas];
+
   const proteine = choisir('proteine');
   const glucide = choisir('glucide');
-  const legume = choisir('legume');
   const huile = choisir('huile');
 
   /* L'oléagineux pilote les lipides. À défaut — aucun en stock — c'est
@@ -107,30 +173,38 @@ export function composer(
      sans elle, plus rien ne porterait les lipides. */
   const oleagineux = choisir('lipide');
   const lipide = oleagineux ?? huile;
-  const huileFixe = oleagineux === undefined ? undefined : huile;
 
   const variables: Variables = {};
   if (proteine) variables.proteine = proteine;
   if (glucide) variables.glucide = glucide;
   if (lipide) variables.lipide = lipide;
 
-  /* Quantités IMPOSÉES, pas des variables. Le légume pèse peu sur les macros,
-     et le laisser s'ajuster ferait apparaître des « 40 g de brocolis » qui ne
-     veulent rien dire dans une assiette. L'huile, elle, est figée pour que le
-     système reste déterminé — voir HUILE_PAR_PORTION. */
+  /* Quantités IMPOSÉES, pas des variables : elles pèsent peu sur les macros,
+     et les laisser s'ajuster ferait apparaître des « 40 g de brocolis » qui ne
+     veulent rien dire dans une assiette. Ce que le modèle du repas ne demande
+     pas n'apparaît pas — pas de brocoli à 16 h, pas de fruit au dîner. */
   const fixes: Fixe[] = [];
-  if (huileFixe) {
-    fixes.push({ aliment: huileFixe, grammes: HUILE_PAR_PORTION * portions, unite: 'cru' });
-  }
-  if (legume) {
-    fixes.push({ aliment: legume, grammes: LEGUME_PAR_PORTION * portions, unite: 'cuit' });
+  const imposes: Partial<Record<Role, Aliment>> = {};
+
+  for (const { role, grammes } of modele.imposes) {
+    // l'huile qui porte les lipides n'est plus une quantité fixe
+    if (role === 'huile' && lipide?.id === huile?.id) continue;
+
+    const aliment = choisir(role);
+    if (aliment === undefined) continue;
+
+    imposes[role] = aliment;
+    /* Sans `unite`, la quantité s'entend dans l'état de référence de
+       l'aliment : cuit pour un légume, une huile, un fruit. C'est ce qu'on
+       SERT. Le poids à peser en découle, il n'est jamais saisi ici. */
+    fixes.push({ aliment, grammes: grammes * portions });
   }
 
   const manquants = ([
     ['proteine', proteine], ['glucide', glucide], ['lipide', lipide],
   ] as const).filter(([, a]) => a === undefined).map(([r]) => r as Role);
 
-  return { variables, fixes, manquants, huile: huileFixe, legume };
+  return { variables, fixes, manquants, imposes };
 }
 
 /* ------------------------------------------------ le stock fait la loi */

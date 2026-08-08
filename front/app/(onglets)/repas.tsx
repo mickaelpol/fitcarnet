@@ -5,7 +5,7 @@ import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import {
-  HUILE_PAR_PORTION, LEGUME_PAR_PORTION, NOM_REPAS, REPAS,
+  FRUIT_PAR_PORTION, HUILE_PAR_PORTION, LEGUME_PAR_PORTION, NOM_REPAS, REPAS,
   type Repas, type Role, composer, resoudreAuMieux, roleDe,
 } from '@/solveur/composer';
 import { versReference } from '@/solveur/solveur';
@@ -25,9 +25,10 @@ import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 /* Mêmes seuils que le solveur : au-delà, l'écart n'est plus de l'arrondi. */
 const TOLERANCE = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 };
 
-const ROLES: { cle: Role; titre: string; cat: string; fixe?: number }[] = [
+const ROLES: { cle: Role; titre: string; cat: string; fixe?: number | Record<Repas, number> }[] = [
   { cle: 'proteine', titre: 'Protéine', cat: 'prot' },
   { cle: 'glucide', titre: 'Glucide', cat: 'fec' },
+  { cle: 'fruit', titre: 'Fruit', cat: 'fruit', fixe: FRUIT_PAR_PORTION },
   { cle: 'lipide', titre: 'Oléagineux', cat: 'ole' },
   { cle: 'huile', titre: 'Huile', cat: 'huile', fixe: HUILE_PAR_PORTION },
   { cle: 'legume', titre: 'Légume', cat: 'leg', fixe: LEGUME_PAR_PORTION },
@@ -36,6 +37,16 @@ const ROLES: { cle: Role; titre: string; cat: string; fixe?: number }[] = [
 /** Un repas composé, tel que l'utilisateur peut encore le corriger. */
 interface Compose {
   roles: Partial<Record<Role, Aliment>>;
+  /**
+   * Aliments ajoutés à la main, en plus des rôles.
+   *
+   * Un vrai petit-déjeuner porte deux protéines — skyr ET blancs d'œufs — et
+   * deux glucides — avoine ET banane. Un aliment par rôle ne sait pas écrire
+   * ça. Ces ajouts sont des quantités IMPOSÉES, que l'utilisateur saisit :
+   * quatre aliments ajustables pour trois macros n'auraient pas de solution
+   * unique. Le repas se recalcule autour d'eux.
+   */
+  ajouts: Aliment[];
   /** l'aliment dont on a un reste, avec ce qu'il en reste */
   restes: Record<string, { grammes: string; unite: 'cru' | 'cuit' }>;
   /** les rôles que l'utilisateur a décidés lui-même : jamais remplacés d'office */
@@ -63,6 +74,7 @@ export default function Calculateur() {
   const [plan, setPlan] = useState<Partial<Record<Repas, Compose>> | null>(null);
   const [ouvert, setOuvert] = useState<Repas | null>(null);
   const [remplacer, setRemplacer] = useState<{ repas: Repas; role: Role } | null>(null);
+  const [ajouter, setAjouter] = useState<Repas | null>(null);
 
   /* Le calculateur ne travaille qu'avec ce qui a un poids connu : un litre ou
      un pack n'entrent pas dans un calcul de macros pour 100 g. Un aliment sans
@@ -110,19 +122,20 @@ export default function Calculateur() {
 
     for (const repas of REPAS) {
       if (!choisis[repas]) continue;
-      const c = composer(stock, portions[repas], servis);
+      const c = composer(stock, portions[repas], servis, repas);
 
       const roles: Partial<Record<Role, Aliment>> = {};
       for (const cle of ['proteine', 'glucide', 'lipide'] as const) {
         const a = c.variables[cle];
         if (a) { roles[cle] = a; servis.add(a.id); }
       }
-      /* L'huile et le légume ne comptent pas dans « déjà servi » : les
-         resservir à tous les repas est normal, on ne varie pas d'huile. */
-      if (c.huile) roles.huile = c.huile;
-      if (c.legume) roles.legume = c.legume;
+      /* Les quantités imposées ne comptent pas dans « déjà servi » : resservir
+         la même huile à tous les repas est normal. */
+      for (const [role, aliment] of Object.entries(c.imposes)) {
+        roles[role as Role] = aliment;
+      }
 
-      suite[repas] = { roles, restes: {}, verrous: [] };
+      suite[repas] = { roles, restes: {}, verrous: [], ajouts: [] };
     }
 
     setPlan(suite);
@@ -235,6 +248,14 @@ export default function Calculateur() {
             ouvert={ouvert === repas}
             onOuvrir={() => setOuvert(ouvert === repas ? null : repas)}
             onRemplacer={(role) => setRemplacer({ repas, role })}
+            onAjouter={() => setAjouter(repas)}
+            onRetirerAjout={(id) => setPlan((p) => ({
+              ...p!,
+              [repas]: {
+                ...p![repas]!,
+                ajouts: p![repas]!.ajouts.filter((a) => a.id !== id),
+              },
+            }))}
             onReste={(cle, valeurs) => setPlan((p) => ({
               ...p!,
               [repas]: { ...p![repas]!, restes: { ...p![repas]!.restes, [cle]: valeurs } },
@@ -280,6 +301,31 @@ export default function Calculateur() {
         }}
         onFermer={() => setRemplacer(null)}
       />
+
+      <ChoixDansListe
+        visible={ajouter !== null}
+        titre="Ajouter un aliment"
+        elements={(ajouter === null ? [] : stock.filter((a) => {
+          const c = plan[ajouter]!;
+
+          return !ROLES.some(({ cle }) => c.roles[cle]?.id === a.id)
+            && !c.ajouts.some((x) => x.id === a.id);
+        })).map((a, i) => ({ id: i, nom: a.nom, couleur: couleurRole(a.categorie) }))}
+        onChoisir={(index) => {
+          if (ajouter === null) return;
+          const c = plan[ajouter]!;
+          const possibles = stock.filter((a) => !ROLES.some(({ cle }) => c.roles[cle]?.id === a.id)
+            && !c.ajouts.some((x) => x.id === a.id));
+          const choisi = possibles[index];
+          if (!choisi) return;
+
+          setPlan((p) => ({
+            ...p!,
+            [ajouter]: { ...p![ajouter]!, ajouts: [...p![ajouter]!.ajouts, choisi] },
+          }));
+        }}
+        onFermer={() => setAjouter(null)}
+      />
     </View>
   );
 }
@@ -288,7 +334,7 @@ export default function Calculateur() {
 
 function CarteRepas({
   repas, compose, cible, portions, stockDe, catalogue, fibresDe,
-  ouvert, onOuvrir, onRemplacer, onReste,
+  ouvert, onOuvrir, onRemplacer, onAjouter, onRetirerAjout, onReste,
 }: {
   repas: Repas;
   compose: Compose;
@@ -303,6 +349,8 @@ function CarteRepas({
   ouvert: boolean;
   onOuvrir: () => void;
   onRemplacer: (role: Role) => void;
+  onAjouter: () => void;
+  onRetirerAjout: (id: number | string) => void;
   onReste: (cle: string, valeurs: { grammes: string; unite: 'cru' | 'cuit' }) => void;
 }) {
   /* Les cibles sont PAR PERSONNE : on les multiplie, et tout ce qui s'affiche
@@ -318,6 +366,19 @@ function CarteRepas({
 
     const fixes: Fixe[] = [];
       const variables: { proteine?: Aliment; glucide?: Aliment; lipide?: Aliment } = {};
+
+    /* Un ajout n'a de sens qu'avec une quantité : sans elle, il ne pèse rien
+       et n'apparaît pas dans le résultat. On le pose donc à zéro tant que
+       l'utilisateur n'a pas tapé son chiffre. */
+    for (const aliment of compose.ajouts) {
+      const saisi = (compose.restes[String(aliment.id)]?.grammes ?? '').trim();
+      const g = Number(saisi.replace(',', '.'));
+      fixes.push({
+        aliment,
+        grammes: saisi !== '' && Number.isFinite(g) && g >= 0 ? g : 0,
+        unite: compose.restes[String(aliment.id)]?.unite ?? 'cru',
+      });
+    }
 
     for (const { cle, fixe } of ROLES) {
       const aliment = compose.roles[cle];
@@ -336,10 +397,10 @@ function CarteRepas({
       if (saisi !== '' && Number.isFinite(grammes) && grammes >= 0) {
         fixes.push({ aliment, grammes, unite: reste!.unite });
       } else if (fixe !== undefined) {
-        fixes.push({
-          aliment, grammes: fixe * portions,
-          unite: cle === 'legume' ? 'cuit' : 'cru',
-        });
+        // même règle que `composer` : la quantité s'entend dans l'état de
+        // référence de l'aliment, donc ce qu'on sert.
+        const parPersonne = typeof fixe === 'number' ? fixe : fixe[repas];
+        fixes.push({ aliment, grammes: parPersonne * portions });
       } else if (cle === 'proteine' || cle === 'glucide' || cle === 'lipide') {
         variables[cle] = aliment;
       }
@@ -369,8 +430,14 @@ function CarteRepas({
      repas juste en protéines, glucides et lipides affiche plus de calories
      que ne le donne le calcul 4/4/9 : la convention européenne les compte à
      part, à 2 kcal le gramme. */
-  const fibres = (resultat?.resultat.quantites ?? []).reduce(
-    (n, q) => n + (fibresDe(q.aliment) * versReference(q.aliment, q.aCuire, 'cru')) / 100, 0);
+  const fibres = (resultat?.resultat.quantites ?? []).reduce((n, q) => {
+    /* Les macros valent pour l'état de référence : le poids cru d'une viande,
+       le poids cuit d'un féculent. Prendre la mauvaise colonne fausserait les
+       fibres du double du ratio de cuisson. */
+    const reference = q.aliment.etatReference === 'cru' ? q.aCuire : q.assiette;
+
+    return n + (fibresDe(q.aliment) * reference) / 100;
+  }, 0);
 
   return (
     <Carte style={{ gap: E.s }}>
@@ -434,7 +501,7 @@ function CarteRepas({
             <Discret style={s.col}>1 pers.</Discret>
           </View>
 
-          {ROLES.map(({ cle, titre, cat }) => {
+          {ROLES.map(({ cle, titre, cat, fixe }) => {
             const aliment = compose.roles[cle];
 
             /* Les renforts de CE rôle : ce que le plafonnement du stock ou un
@@ -456,9 +523,10 @@ function CarteRepas({
             const echange = (resultat?.echanges ?? []).find((e) => e.role === cle);
 
             if (!aliment) {
-              /* L'huile et le légume sont facultatifs : leur absence n'est pas
-                 un manque, inutile d'alarmer. */
-              if (cle === 'huile' || cle === 'legume') return null;
+              /* Une quantité imposée absente n'est pas un manque : ou bien le
+                 modèle du repas ne la demande pas — pas de légume à 16 h — ou
+                 bien le frigo n'en a pas. Inutile d'alarmer. */
+              if (fixe !== undefined) return null;
 
               return (
                 <View key={cle} style={s.ligne}>
@@ -543,6 +611,57 @@ function CarteRepas({
             );
           })}
 
+          {compose.ajouts.map((a) => {
+            const q = resultat?.resultat.quantites.find((x) => x.aliment.id === a.id);
+            const reste = compose.restes[String(a.id)];
+
+            return (
+              <View key={String(a.id)} style={{ gap: 4 }}>
+                <View style={s.ligne}>
+                  <View style={{ flex: 2 }}>
+                    <Texte style={{ fontSize: T.petit }} numberOfLines={1}>{a.nom}</Texte>
+                    <Discret style={{ fontSize: T.minuscule, color: couleurRole(a.categorie) }}>
+                      Ajouté
+                    </Discret>
+                  </View>
+                  <Texte style={s.val}>{q ? nb(q.aCuire) : '—'}</Texte>
+                  <Texte style={s.val}>{q ? nb(q.assiette) : '—'}</Texte>
+                  <Texte style={[s.val, { color: C.vif }]}>
+                    {q ? nb(q.assiette / portions) : '—'}
+                  </Texte>
+                </View>
+
+                <View style={s.actions}>
+                  <Pressable onPress={() => onRetirerAjout(a.id)} style={s.action}>
+                    <Discret style={{ fontSize: T.petit, color: C.erreur }}>× Retirer</Discret>
+                  </Pressable>
+                  <Champ
+                    valeur={reste?.grammes ?? ''}
+                    onChange={(v) => onReste(String(a.id),
+                      { grammes: v, unite: reste?.unite ?? 'cru' })}
+                    placeholder="quantité"
+                    unite="g" numerique style={{ width: 112 }}
+                  />
+                  <Pressable
+                    onPress={() => onReste(String(a.id), {
+                      grammes: reste?.grammes ?? '',
+                      unite: reste?.unite === 'cru' ? 'cuit' : 'cru',
+                    })}
+                    style={s.action}
+                  >
+                    <Discret style={{ fontSize: T.petit }}>{reste?.unite ?? 'cru'}</Discret>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
+
+          {/* Un repas ne tient pas toujours en un aliment par rôle : un
+              petit-déjeuner porte souvent deux protéines et deux glucides. */}
+          <Bouton variante="discret" onPress={onAjouter} style={s.ajouterAliment}>
+            + Ajouter un aliment
+          </Bouton>
+
           {(resultat?.resultat.diagnostics ?? [])
             .filter((d) => d.gravite !== 'info')
             .map((d) => (
@@ -580,6 +699,9 @@ const s = StyleSheet.create({
     borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
   },
   renfort: { paddingLeft: E.m, borderLeftWidth: 2, borderLeftColor: C.ok },
+  ajouterAliment: {
+    borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.ligne, borderRadius: R.s,
+  },
   plafond: {
     fontSize: T.petit, lineHeight: 16, color: C.ok,
     backgroundColor: C.okFond, borderRadius: R.s,

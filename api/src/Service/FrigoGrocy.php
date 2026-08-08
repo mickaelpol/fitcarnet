@@ -118,7 +118,18 @@ final readonly class FrigoGrocy
                 fibres100: isset($champs['fibres100']) && '' !== $champs['fibres100']
                     ? (float) $champs['fibres100'] : null,
                 ratio: (float) $champs['ratio'] ?: 1.0,
-                etatReference: \in_array($categorie, ['prot', 'fec'], true) ? 'cru' : 'cuit',
+                /* Seules les PROTEINES sont renseignees a l'etat cru : le
+                   script d'import apparie « Blanc de poulet » a « Poulet,
+                   filet sans peau CRU », « Saumon » a « Saumon, CRU ».
+
+                   Les feculents, eux, sont apparies a leur etat CUIT — « Riz
+                   blanc, cuit », « Quinoa, cuit », « Patate douce, cuite ».
+                   Les declarer crus faisait lire les macros du riz cuit comme
+                   si elles valaient pour du riz sec : l'application annoncait
+                   220 g a peser pour 73 g de glucides, alors que 220 g de riz
+                   SEC en apportent 165. Plus du double de la cible, sans que
+                   rien ne le signale. */
+                etatReference: 'prot' === $categorie ? 'cru' : 'cuit',
                 stock: $quantites[$id] ?? 0.0,
                 emplacement: $parEmplacement[(int) ($produit['location_id'] ?? 0)] ?? null,
                 peseeAvant: isset($champs['pesee_avant']) && '' !== $champs['pesee_avant']

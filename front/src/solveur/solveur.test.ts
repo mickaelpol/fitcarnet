@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { resoudre, arrondir } from './algebre';
-import { calculer, pourObtenirCuit, versReference } from './solveur';
+import { calculer, convertir, pourObtenirCuit, versReference } from './solveur';
 import { A, CIBLES } from './aliments.test-data';
 import type { Fixe } from './types';
 
@@ -560,5 +560,42 @@ describe('cible exprimée en glucides TOTAUX', () => {
 
     assert.ok(riz(true) < riz(false),
       'les 4 g de fibres du légume comptent dans la cible et laissent moins de place au riz');
+  });
+});
+
+describe('etat de reference : ce qu on pese vs ce qu on sert', () => {
+  /* Le bug qui a failli faire manger 165 g de glucides au lieu de 73.
+     Les macros d'un feculent valent pour son etat CUIT : 100 g de riz cuit
+     portent 33 g de glucides. Les lire comme si elles valaient pour du riz
+     SEC multiplie tout par le ratio de cuisson. */
+  const rizCuit = {
+    id: 'riz', nom: 'Riz basmati', categorie: 'fec' as const,
+    kcal100: 155, prot100: 3.1, gluc100: 33.2, lip100: 0.7,
+    ratio: 2.26, etatReference: 'cuit' as const,
+  };
+
+  it('pese le riz SEC et le sert cuit', () => {
+    const { aCuire, assiette } = convertir(rizCuit, 220);
+
+    assert.ok(Math.abs(aCuire - 97) < 1, `${aCuire} g secs pour 220 g cuits`);
+    assert.equal(assiette, 220, 'l assiette porte bien les 220 g qui font 73 g de glucides');
+  });
+
+  it('donne les grammes a peser pour la cible', () => {
+    const r = calculer(
+      { kcal: 340, prot: 7, gluc: 73, lip: 1.5 },
+      { glucide: rizCuit });
+
+    const q = r.quantites.find((x) => x.aliment.id === 'riz')!;
+    assert.ok(q.aCuire < q.assiette, 'un feculent pese moins sec que cuit');
+    assert.ok(Math.abs(q.aCuire - 97) < 5, `${q.aCuire} g a peser, environ 97 attendus`);
+  });
+
+  /* La protéine fait l'inverse : on pese le cru, l'assiette pese moins. */
+  it('pese la viande CRUE et en sert moins', () => {
+    const { aCuire, assiette } = convertir(A.poulet, 150);
+
+    assert.equal(aCuire, 150, 'on pese 150 g de poulet cru');
+    assert.ok(assiette < aCuire, 'il en reste moins apres cuisson');
   });
 });

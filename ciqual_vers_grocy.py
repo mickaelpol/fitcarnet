@@ -99,6 +99,21 @@ AUTRE_ETAT = {
     "pates completes":  "Pâtes sèches, semi-complètes, crues",
     "semoule complete": "Semoule de blé dur, crue",
     "boulgour":         "Boulgour de blé, cru",
+
+    # Legumes et tubercules. Ils etaient tous a 1, ce qui revenait a dire
+    # qu'un legume ne perd pas d'eau a la cuisson — faux pour la plupart, et
+    # tres faux pour l'epinard. Comme leurs valeurs sont celles de l'etat
+    # CUIT, un ratio de 1 faisait peser du cru en croyant peser du cuit.
+    "patate douce":     "Patate douce, crue",
+    "pommes de terre":  "Pomme de terre, crue",
+    "brocoli":          "Brocoli, cru",
+    "courgette":        "Courgette, crue",
+    "epinard":          "Épinard, cru",
+    "carotte":          "Carotte, crue",
+    "chou fleur":       "Chou-fleur, cru",
+    "poireau":          "Poireau, cru",
+    "haricots verts":   "Haricot vert, cru",
+    "petits pois":      "Petits pois, crus",
 }
 
 # Aliments absents de Ciqual : valeurs relevées sur l'emballage.

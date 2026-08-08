@@ -14,7 +14,7 @@ describe('rôles déduits de la catégorie', () => {
     assert.equal(roleDe(A.poulet), 'proteine');
     assert.equal(roleDe(A.skyr), 'proteine', 'un laitage sert de protéine');
     assert.equal(roleDe(A.riz), 'glucide');
-    assert.equal(roleDe(A.banane), 'glucide', 'un fruit sert de glucide');
+    assert.equal(roleDe(A.banane), 'fruit', 'un fruit a son propre rôle');
     assert.equal(roleDe(A.amandes), 'lipide');
     assert.equal(roleDe(A.huile), 'huile', 'l\'huile a son propre rôle');
     assert.equal(roleDe(A.courgettes), 'legume');
@@ -22,6 +22,27 @@ describe('rôles déduits de la catégorie', () => {
 });
 
 describe('composition d\'un repas', () => {
+  /* Le modèle du repas décide de sa forme : midi porte huile et légume,
+     le matin porte un fruit et ni l'un ni l'autre. */
+  it('suit le modèle du repas — midi', () => {
+    const { fixes } = composer(STOCK, 1, new Set(), 'R2');
+
+    assert.deepEqual(fixes.map((f) => f.aliment.nom).sort(),
+      [A.courgettes.nom, A.huile.nom].sort());
+  });
+
+  it('suit le modèle du repas — matin : un fruit, pas de légume ni d\'huile', () => {
+    const { fixes } = composer(STOCK, 1, new Set(), 'R1');
+
+    assert.deepEqual(fixes.map((f) => f.aliment.nom), [A.banane.nom]);
+  });
+
+  it('ne met pas de brocoli à la collation', () => {
+    const { fixes } = composer(STOCK, 1, new Set(), 'R3');
+
+    assert.equal(fixes.some((f) => roleDe(f.aliment) === 'legume'), false);
+  });
+
   it('prend un aliment par rôle', () => {
     const { variables, fixes, manquants } = composer(STOCK, 1);
 
@@ -38,7 +59,8 @@ describe('composition d\'un repas', () => {
 
     assert.equal(de(A.huile).grammes, HUILE_PAR_PORTION * 3);
     assert.equal(de(A.courgettes).grammes, LEGUME_PAR_PORTION * 3);
-    assert.equal(de(A.courgettes).unite, 'cuit');
+    assert.equal(de(A.courgettes).unite, undefined,
+      'sans unité : la quantité s\'entend dans l\'état de référence, donc cuit');
   });
 
   it('se passe de légume quand il n\'y en a pas en stock', () => {
@@ -52,19 +74,19 @@ describe('composition d\'un repas', () => {
   /* Le point demandé : les deux lipides figurent au repas, mais un seul
      s'ajuste — trois macros ne déterminent que trois inconnues. */
   it('fait figurer l\'huile ET l\'oléagineux', () => {
-    const { variables, fixes, huile } = composer(STOCK, 1);
+    const { variables, fixes, imposes } = composer(STOCK, 1);
 
     assert.equal(variables.lipide, A.amandes, 'l\'oléagineux porte les lipides');
-    assert.equal(huile, A.huile);
+    assert.equal(imposes.huile, A.huile);
     assert.ok(fixes.some((f) => f.aliment === A.huile), 'l\'huile est une quantité fixe');
   });
 
   it('confie les lipides à l\'huile quand aucun oléagineux n\'est en stock', () => {
     const sansOle = STOCK.filter((a) => a.categorie !== 'ole');
-    const { variables, fixes, huile, manquants } = composer(sansOle, 1);
+    const { variables, fixes, imposes, manquants } = composer(sansOle, 1);
 
     assert.equal(variables.lipide, A.huile, 'sans elle, rien ne porterait les lipides');
-    assert.equal(huile, undefined, 'elle cesse alors d\'être une quantité fixe');
+    assert.equal(imposes.huile, undefined, 'elle cesse alors d\'être une quantité fixe');
     assert.equal(fixes.some((f) => f.aliment === A.huile), false);
     assert.deepEqual(manquants, []);
   });
