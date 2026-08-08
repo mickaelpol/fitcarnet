@@ -27,42 +27,21 @@ const idDe = (v: Exercice | string) =>
   typeof v === 'string' ? Number(v.split('/').pop()) : v.id;
 
 /**
- * Recopie les identifiants attribues par le serveur dans l'etat local.
+ * Recopie le seul identifiant qui compte : celui de la séance.
  *
- * Sans eux, l'enregistrement suivant renvoie les exercices comme s'ils etaient
- * neufs : Doctrine tente de les INSERER, et se heurte a la contrainte
- * UNIQUE (seance_id, ordre) — « duplicate key (12, 0) already exists ».
+ * Sans lui, l'enregistrement suivant repartirait sur un POST et créerait une
+ * deuxième séance. On ne remplace pas l'état par la réponse : ce qui a été
+ * tapé pendant les deux secondes et demie d'attente serait perdu.
  *
- * On ne remplace pas l'etat par la reponse : ce qui a ete tape pendant les
- * deux secondes et demie d'attente serait perdu. On greffe donc les seuls
- * identifiants manquants, sur les elements que l'on retrouve avec CERTITUDE.
- *
- * L'appariement se fait sur l'ordre ET l'exercice, jamais sur la position
- * seule : si l'on a retire un exercice pendant l'envoi, les positions ont
- * glisse, et greffer un identifiant a l'aveugle ecraserait la mauvaise ligne.
- * Sans correspondance sure, on ne greffe rien — la ligne sera recreee.
+ * Les identifiants des exercices et des séries ne sont PAS recopiés, et c'est
+ * volontaire. Ils ne figurent que dans le groupe `seance:lire` — le front ne
+ * les renvoie jamais, l'API remplace la collection entière à chaque écriture.
+ * Ils ne servaient donc qu'à fabriquer les clés de liste, où les greffer
+ * faisait passer une ligne de « n0 » à « 12 » : React la remontait, et le
+ * champ en cours de saisie perdait le focus au beau milieu d'une frappe.
  */
-function fusionnerIdentifiants(locale: Seance, distante: Seance): Seance {
-  return {
-    ...locale,
-    id: locale.id ?? distante.id,
-    exercices: locale.exercices.map((bloc) => {
-      if (bloc.id !== undefined) return bloc;
-
-      const jumeau = distante.exercices.find(
-        (d) => d.ordre === bloc.ordre && iri(d.exercice) === iri(bloc.exercice));
-      if (jumeau === undefined) return bloc;
-
-      return {
-        ...bloc,
-        id: jumeau.id,
-        series: bloc.series.map((serie) => serie.id !== undefined
-          ? serie
-          : { ...serie, id: jumeau.series.find((x) => x.ordre === serie.ordre)?.id }),
-      };
-    }),
-  };
-}
+const avecIdentifiantSeance = (locale: Seance, distante: Seance): Seance =>
+  (locale.id === undefined ? { ...locale, id: distante.id } : locale);
 
 export default function DetailSeance() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -104,7 +83,7 @@ export default function DetailSeance() {
          page et de retrouver l'exercice vidé de ses séries. */
       setSeance((courante) => (courante === null
         ? enregistree
-        : fusionnerIdentifiants(courante, enregistree)));
+        : avecIdentifiantSeance(courante, enregistree)));
     },
     { actif: seance !== null && seance.exercices.length > 0 },
   );
@@ -211,7 +190,7 @@ export default function DetailSeance() {
   const enregistrerSeance = () => {
     enregistrer.mutate(seance, {
       onSuccess: (s) => {
-        setSeance((courante) => (courante === null ? s : fusionnerIdentifiants(courante, s)));
+        setSeance((courante) => (courante === null ? s : avecIdentifiantSeance(courante, s)));
       },
     });
   };

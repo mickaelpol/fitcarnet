@@ -326,6 +326,22 @@ def candidats_pour(aliments, motifs: str, combien: int = 6):
     return trouves[:combien]
 
 
+def pesees_de(produit) -> tuple[float, float] | None:
+    """
+    Les deux pesées deja saisies dans Grocy, si elles tiennent debout.
+
+    Grocy renvoie les champs personnalises sous « userfields » de chaque
+    produit — jamais un par un, ce qui couterait un appel HTTP par produit.
+    """
+    champs = produit.get("userfields") or {}
+    avant = nombre(champs.get("pesee_avant"))
+    apres = nombre(champs.get("pesee_apres"))
+    if not avant or not apres or avant <= 0 or apres <= 0:
+        return None
+
+    return avant, apres
+
+
 def coherent(a) -> tuple[bool, float]:
     """Vérifie l'énergie : 4·P + 4·G + 2·fibres + 9·L, convention européenne."""
     if a["kcal"] is None or a["kcal"] <= 0:
@@ -354,7 +370,7 @@ def main() -> int:
     produits = api("GET", "/objects/products")
 
     trouves, sans_correspondance, introuvables, suspects = [], [], [], []
-    ratios_corriges, depuis_etiquette = [], []
+    ratios_corriges, depuis_etiquette, ratios_mesures = [], [], []
 
     for produit in produits:
         cle = normaliser(produit["name"])
@@ -408,6 +424,18 @@ def main() -> int:
                             (produit["name"], ratio, calcule, sec["nom"]))
                     ratio = calcule
 
+        # TA balance passe avant Ciqual : un ratio derive d'une moyenne
+        # nationale ne vaut pas deux pesees faites sur TON riz, avec TON eau
+        # et TON temps de cuisson. On ne les ecrase donc jamais, on les
+        # utilise.
+        pesees = pesees_de(produit)
+        if pesees is not None:
+            mesure = round(pesees[1] / pesees[0], 2)
+            if 0.4 <= mesure <= 5:
+                if abs(mesure - ratio) / ratio > 0.02:
+                    ratios_mesures.append((produit["name"], ratio, mesure, pesees))
+                ratio = mesure
+
         # Ciqual laisse des trous : une énergie nulle n'est pas une donnée,
         # et l'écrire fausserait silencieusement tous les repas concernés
         if not aliment["kcal"] or aliment["kcal"] <= 0:
@@ -436,6 +464,12 @@ def main() -> int:
         for nom, avant, apres, libelle in ratios_corriges:
             print(f"  {nom[:26]:28} {avant} -> {apres}   (d'après « {libelle[:38]} »)")
         print("  Le ratio dit combien pèsent 100 g de sec une fois cuits.")
+
+    if ratios_mesures:
+        print(f"\n{len(ratios_mesures)} ratio(s) repris de TES pesées :")
+        for nom, avant, apres, (pa, pb) in ratios_mesures:
+            print(f"  {nom[:26]:28} {avant} -> {apres}   ({pa:g} g avant → {pb:g} g après)")
+        print("  Ces pesées ne sont pas réécrites : le script ne mesure rien.")
 
     if depuis_etiquette:
         print(f"\n{len(depuis_etiquette)} valeur(s) venue(s) d'un emballage :")
@@ -467,14 +501,30 @@ def main() -> int:
 
     print("\nÉcriture dans Grocy…")
     for index, (produit, aliment, categorie, ratio, _) in enumerate(trouves, 1):
-        api("PUT", f"/userfields/products/{produit['id']}", {
+        champs = {
             "cat": categorie,
             "kcal100": round(aliment["kcal"] or 0, 1),
             "prot100": round(aliment["prot"] or 0, 2),
             "gluc100": round(aliment["gluc"] or 0, 2),
             "lip100": round(aliment["lip"] or 0, 2),
             "ratio": ratio,
-        })
+        }
+
+        # Les fibres sont une VALEUR CIQUAL, au meme titre que les glucides :
+        # elles s'ecrivent. Absentes de la table, on ecrit une chaine vide et
+        # non zero — « inconnu » et « aucune fibre » ne se valent pas, et le
+        # controle de coherence du front en tient compte.
+        champs["fibres100"] = (round(aliment["fibres"], 2)
+                               if aliment.get("fibres") is not None else "")
+
+        # pesee_avant et pesee_apres ne sont PAS ecrites, et c'est un choix.
+        # L'application les presente comme « mesure : 100 g avant cuisson ->
+        # 187 g apres ». Or le script ne pese rien : il divise deux energies
+        # Ciqual. Y poser 100 et 187 ferait passer une derivation pour une
+        # mesure, et effacerait au passage les pesees reelles a chaque
+        # reimport. Le ratio, lui, est bien ecrit — c'est la valeur utile.
+
+        api("PUT", f"/userfields/products/{produit['id']}", champs)
         if index % 10 == 0:
             print(f"  [{index}/{len(trouves)}]", flush=True)
 

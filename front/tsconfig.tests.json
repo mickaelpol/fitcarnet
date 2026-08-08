@@ -19,6 +19,10 @@
   },
   "include": [
     "src/solveur/**/*.ts",
+    "src/calcul/nutrition.ts",
+    "src/calcul/nutrition.test.ts",
+    "src/calcul/frigo.ts",
+    "src/calcul/frigo.test.ts",
     "src/composants/etatMesure.ts",
     "src/composants/etatMesure.test.ts"
   ]

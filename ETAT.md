@@ -41,6 +41,16 @@ macros, restes à écouler saisissables en cru ou en cuit, calcul souple quand
 il manque des variables. Valeurs nutritionnelles issues de Ciqual (Anses),
 ratios cru/cuit dérivés de la conservation de l'énergie.
 
+**Tests.** 79 au total, tous dans `npm test` : 47 pour le solveur, 26 pour
+`nutrition.ts` et `frigo.ts`, 6 pour la mesure d'effort.
+`tsconfig.tests.json` liste les fichiers testés — **toute nouvelle cible doit
+y être ajoutée**, sinon le test compile mais ne s'exécute jamais.
+
+**Import Ciqual.** `ciqual_vers_grocy.py` écrit `fibres100` avec les autres
+macros. Absente de la table, la valeur part vide et non à zéro : « inconnu »
+et « aucune fibre » ne se valent pas. Les deux pesées ne sont jamais écrites
+par le script — voir les décisions.
+
 **Frigo.** `/api/mon-frigo` renvoie une forme unique quelle que soit la
 source : Grocy pour le compte administrateur, table `aliment` pour les
 autres. Écran branché dessus, groupé par emplacement, avec recherche sur le
@@ -116,24 +126,9 @@ allumé indéfiniment.
 
 ## Ce qui reste
 
-**Champs Grocy remplis à la main.** Les trois champs personnalisés
-`fibres100`, `pesee_avant` et `pesee_apres` existent désormais dans Grocy et
-l'éditeur les écrit, mais `ciqual_vers_grocy.py` ne les pose toujours pas à
-l'import.
-
 **Calculateur de repas.** Toujours branché sur des données de démonstration ;
 il doit lire `/api/mon-frigo`. Et l'écran s'ouvre vide — il faudrait
 reprendre la composition du dernier repas du même type.
-
-**`nutrition.ts` et `frigo.ts` sans tests permanents.** La détection des
-kilojoules et le calcul des écarts d'inventaire ont été vérifiés à la main,
-une fois, hors de `npm test`. Le blocage est levé : `tsconfig.tests.json`
-prend maintenant des fichiers hors de `src/solveur`, il suffit d'écrire les
-tests.
-
-**`fusionnerIdentifiants` est inerte.** Dans `app/seance/[id].tsx`. L'API
-renvoie désormais les identifiants correctement ; la fonction ne greffe plus
-rien. Code mort à retirer.
 
 **Déploiement NAS.** Image Docker, webhook Gitea vers n8n, sauvegarde
 automatisée de la base. Un dev build EAS fait partie du lot.
@@ -148,9 +143,18 @@ build.
 
 ## Bugs connus
 
-**Zones masquées par Android.** Barre d'onglets, barre d'envoi du frigo,
-barre de chrono de la séance et en-tête : corrigés avec `useSafeAreaInsets`.
-Reste à vérifier la barre de bilan du calculateur.
+**Zones masquées par Android : rien ne reste.** Barre d'onglets, barre
+d'envoi du frigo, barre de chrono de la séance et en-tête : corrigés avec
+`useSafeAreaInsets`. La barre de bilan du calculateur n'avait pas de
+problème — vérifié dans `BottomTabView` : les écrans d'onglet sont rendus
+dans un conteneur `flex: 1` **au-dessus** de la barre d'onglets, jamais
+dessous. Un `bottom: 0` dans un écran d'onglet s'arrête donc au sommet de la
+barre, qui porte déjà le retrait système.
+
+**Retrait redondant dans le frigo.** Conséquence du point ci-dessus : la
+barre d'envoi ajoute `insets.bottom` alors que la barre d'onglets le compte
+déjà. Ça laisse quelques dizaines de pixels de vide au bas de l'écran.
+Cosmétique, non corrigé — la barre reste accessible.
 
 ---
 
@@ -173,6 +177,15 @@ oléagineux par quatre.
 on mesure l'endurance, et aucune formule ne tient : 93 répétitions à 32 kg
 donneraient un 1RM supérieur à 7 répétitions à 35 kg. La progression des
 efforts longs se lit sur le volume et le temps.
+
+**Le script d'import n'écrit jamais `pesee_avant` ni `pesee_apres`.**
+L'application les présente comme « mesuré : 100 g avant cuisson → 187 g
+après ». Or le script ne pèse rien : il divise deux énergies Ciqual. Y poser
+100 et 187 ferait passer une dérivation pour une mesure, et effacerait les
+pesées réelles à chaque réimport. Le ratio, lui, est bien écrit — c'est la
+valeur utile. **L'inverse est vrai aussi** : quand les deux pesées existent
+dans Grocy, le script en tire le ratio et ignore celui de Ciqual. Une mesure
+faite sur ton riz vaut mieux qu'une moyenne nationale.
 
 **Ratio cru/cuit dérivé de l'énergie.** La cuisson n'ajoute que de l'eau :
 riz complet à 350 kcal secs et 187 cuits donne un ratio de 1,87, et non 3
