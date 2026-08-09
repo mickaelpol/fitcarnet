@@ -36,6 +36,8 @@ export const C = {
   vifBord: 'rgba(227,178,60,0.4)',
   /** fond d'une mention rassurante — un complément, un plafond respecté */
   okFond: 'rgba(120,180,120,0.10)',
+  /** fond d'une mention grave : une donnée sur laquelle on ne peut pas compter */
+  erreurFond: 'rgba(216,53,42,0.12)',
   /** séparateur atténué, à l'intérieur d'une carte */
   ligneVoile: 'rgba(47,52,61,0.5)',
   /** l'ombre portée, et le blanc pur : deux valeurs qui ne sont pas des gris */

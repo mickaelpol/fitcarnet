@@ -118,18 +118,18 @@ final readonly class FrigoGrocy
                 fibres100: isset($champs['fibres100']) && '' !== $champs['fibres100']
                     ? (float) $champs['fibres100'] : null,
                 ratio: (float) $champs['ratio'] ?: 1.0,
-                /* Seules les PROTEINES sont renseignees a l'etat cru : le
-                   script d'import apparie « Blanc de poulet » a « Poulet,
-                   filet sans peau CRU », « Saumon » a « Saumon, CRU ».
+                /* L'etat de reference n'est plus decide ici. La regle etait
+                   juste — seules les proteines sont renseignees crues — mais
+                   elle etait ECRITE ICI, et FrigoBase en appliquait une autre.
+                   Elle vit desormais dans EtatReference, et AlimentDisponible
+                   la derive : les deux sources ne peuvent plus diverger.
 
-                   Les feculents, eux, sont apparies a leur etat CUIT — « Riz
-                   blanc, cuit », « Quinoa, cuit », « Patate douce, cuite ».
-                   Les declarer crus faisait lire les macros du riz cuit comme
-                   si elles valaient pour du riz sec : l'application annoncait
-                   220 g a peser pour 73 g de glucides, alors que 220 g de riz
-                   SEC en apportent 165. Plus du double de la cible, sans que
-                   rien ne le signale. */
-                etatReference: 'prot' === $categorie ? 'cru' : 'cuit',
+                   Pour memoire, l'erreur que cette regle evite : les feculents
+                   sont apparies a leur etat CUIT — « Riz blanc, cuit ». Les
+                   declarer crus faisait lire les macros du riz cuit comme si
+                   elles valaient pour du riz sec, et l'application annoncait
+                   220 g a peser pour 73 g de glucides quand 220 g de riz SEC
+                   en apportent 165. Plus du double, sans un mot. */
                 stock: $quantites[$id] ?? 0.0,
                 emplacement: $parEmplacement[(int) ($produit['location_id'] ?? 0)] ?? null,
                 peseeAvant: isset($champs['pesee_avant']) && '' !== $champs['pesee_avant']
@@ -232,6 +232,15 @@ final readonly class FrigoGrocy
             'fibres100' => null !== $fibres100 ? (string) $fibres100 : '',
             'pesee_avant' => null !== $peseeAvant ? (string) $peseeAvant : '',
             'pesee_apres' => null !== $peseeApres ? (string) $peseeApres : '',
+            /* Cette saisie vient de l'utilisateur, et elle le restera : le
+               script d'import laisse desormais intact tout produit marque
+               « moi ». Aucune table ne bat une etiquette lue sur la boite, et
+               Ciqual ne couvre pas tout — il n'a pas de sardine au naturel,
+               seulement du cru, du grille et cinq versions a l'huile.
+
+               Sans cette marque, prendre le temps de recopier une etiquette
+               ne servait a rien : le prochain import reprenait la main. */
+            'source_valeurs' => 'moi',
         ]);
     }
 

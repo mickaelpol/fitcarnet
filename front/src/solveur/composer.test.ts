@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { A, CIBLES } from './aliments.test-data';
 import {
-  HUILE_PAR_PORTION, LEGUME_PAR_PORTION, ajusterAuStock, composer, resoudreAuMieux, roleDe,
+  BLANCS_PAR_PORTION, HUILE_PAR_PORTION, LEGUME_PAR_PORTION,
+  ajusterAuStock, composer, resoudreAuMieux, roleDe,
 } from './composer';
 import { calculer } from './solveur';
 import type { Resultat } from './types';
@@ -12,7 +13,7 @@ const STOCK = [A.poulet, A.riz, A.avoine, A.amandes, A.huile, A.courgettes, A.sk
 describe('rôles déduits de la catégorie', () => {
   it('range chaque catégorie sous la macro qu\'elle pilote', () => {
     assert.equal(roleDe(A.poulet), 'proteine');
-    assert.equal(roleDe(A.skyr), 'proteine', 'un laitage sert de protéine');
+    assert.equal(roleDe(A.skyr), 'laitage', 'un laitage a son propre rôle');
     assert.equal(roleDe(A.riz), 'glucide');
     assert.equal(roleDe(A.banane), 'fruit', 'un fruit a son propre rôle');
     assert.equal(roleDe(A.amandes), 'lipide');
@@ -43,6 +44,45 @@ describe('composition d\'un repas', () => {
     assert.equal(fixes.some((f) => roleDe(f.aliment) === 'legume'), false);
   });
 
+  /* La collation porte DEUX sources de protéines : le laitage s'ajuste, les
+     blancs d'œufs sont figés. */
+  it('donne au laitage le rôle de variable protéique à la collation', () => {
+    const stock = [A.skyr, A.blancs, A.avoine, A.banane, A.amandes];
+    const { variables, fixes, imposes } = composer(stock, 1, new Set(), 'R3');
+
+    assert.equal(variables.proteine, A.skyr, 'le skyr s\'ajuste');
+    assert.equal(imposes.proteine, A.blancs, 'les blancs sont une quantité fixe');
+    assert.equal(fixes.find((f) => f.aliment === A.blancs)?.grammes, BLANCS_PAR_PORTION);
+    assert.equal(fixes.find((f) => f.aliment === A.banane)?.grammes, 83);
+  });
+
+  /* Le plan nomme ses aliments : la collation porte de l'avoine, pas du
+     boulgour, et aucune propriété nutritionnelle ne permet de le deviner. */
+  it('préfère l\'aliment nommé par le plan', () => {
+    const stock = [A.skyr, A.blancs, A.boulgour, A.avoine, A.banane, A.amandes];
+    const { variables } = composer(stock, 1, new Set(), 'R3');
+
+    assert.equal(variables.glucide, A.avoine, 'le boulgour passe avant dans le stock');
+  });
+
+  it('se rabat sur un autre aliment du rôle quand le préféré manque', () => {
+    const stock = [A.skyr, A.blancs, A.boulgour, A.banane, A.amandes];
+    const { variables } = composer(stock, 1, new Set(), 'R3');
+
+    assert.equal(variables.glucide, A.boulgour, 'une préférence n\'est pas une contrainte');
+  });
+
+  /* Le skyr epuise ne doit pas etre remplace par du blanc de poulet. */
+  it('ne remplace un laitage que par un laitage', () => {
+    const stock = [A.skyr, A.lait, A.poulet, A.blancs, A.avoine, A.banane, A.amandes];
+    const dispo = (x: { id: number | string }) => (x.id === A.skyr.id ? 50 : 100000);
+
+    const a = ajusterAuStock(composer(stock, 1, new Set(), 'R3'), CIBLES.R3, dispo, stock);
+
+    assert.equal(a.plafonnes[0]?.aliment, A.skyr);
+    assert.equal(a.plafonnes[0]?.releve, A.lait, 'un autre laitage, pas une viande');
+  });
+
   it('prend un aliment par rôle', () => {
     const { variables, fixes, manquants } = composer(STOCK, 1);
 
@@ -51,6 +91,14 @@ describe('composition d\'un repas', () => {
     assert.equal(roleDe(variables.lipide!), 'lipide');
     assert.equal(fixes.length, 2, 'huile et légume sont des quantités imposées');
     assert.deepEqual(manquants, []);
+  });
+
+  it('sert les quantites du plan : 200 g de legume, 5 g d\'huile', () => {
+    const { fixes } = composer(STOCK, 1, new Set(), 'R2');
+    const de = (a: { nom: string }) => fixes.find((f) => f.aliment.nom === a.nom)!;
+
+    assert.equal(de(A.courgettes).grammes, 200);
+    assert.equal(de(A.huile).grammes, 5);
   });
 
   it('impose huile et légume au prorata des portions', () => {
@@ -115,9 +163,12 @@ describe('composition d\'un repas', () => {
     assert.deepEqual(composer(STOCK, 1), composer(STOCK, 1));
   });
 
+  /* Depuis que le laitage a son propre rôle, STOCK ne contient qu'UNE
+     protéine : il en faut deux pour que la variété ait un sens. */
   it('évite de resservir ce qui a déjà servi dans la journée', () => {
-    const premier = composer(STOCK, 1);
-    const second = composer(STOCK, 1, new Set([premier.variables.proteine!.id]));
+    const varie = [...STOCK, A.thon];
+    const premier = composer(varie, 1);
+    const second = composer(varie, 1, new Set([premier.variables.proteine!.id]));
 
     assert.notEqual(second.variables.proteine!.id, premier.variables.proteine!.id);
   });

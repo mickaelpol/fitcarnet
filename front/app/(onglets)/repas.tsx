@@ -5,9 +5,10 @@ import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import {
-  FRUIT_PAR_PORTION, HUILE_PAR_PORTION, LEGUME_PAR_PORTION, NOM_REPAS, REPAS,
-  type Repas, type Role, composer, resoudreAuMieux, roleDe,
+  MODELE, NOM_REPAS, REPAS,
+  type Repas, type Role, composer, resoudreAuMieux, roleDe, rolesDuRepas,
 } from '@/solveur/composer';
+import { verifierCatalogue } from '@/calcul/plausibilite';
 import { versReference } from '@/solveur/solveur';
 import type { Aliment, Fixe } from '@/solveur/types';
 import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
@@ -25,14 +26,21 @@ import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 /* Mêmes seuils que le solveur : au-delà, l'écart n'est plus de l'arrondi. */
 const TOLERANCE = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 };
 
-const ROLES: { cle: Role; titre: string; cat: string; fixe?: number | Record<Repas, number> }[] = [
+/* Ordre d'affichage. La quantité d'un rôle imposé ne vit plus ici mais dans
+   le modèle du repas : elle change d'un repas à l'autre. */
+const ROLES: { cle: Role; titre: string; cat: string }[] = [
+  { cle: 'laitage', titre: 'Laitage', cat: 'lait' },
   { cle: 'proteine', titre: 'Protéine', cat: 'prot' },
   { cle: 'glucide', titre: 'Glucide', cat: 'fec' },
-  { cle: 'fruit', titre: 'Fruit', cat: 'fruit', fixe: FRUIT_PAR_PORTION },
+  { cle: 'fruit', titre: 'Fruit', cat: 'fruit' },
   { cle: 'lipide', titre: 'Oléagineux', cat: 'ole' },
-  { cle: 'huile', titre: 'Huile', cat: 'huile', fixe: HUILE_PAR_PORTION },
-  { cle: 'legume', titre: 'Légume', cat: 'leg', fixe: LEGUME_PAR_PORTION },
+  { cle: 'huile', titre: 'Huile', cat: 'huile' },
+  { cle: 'legume', titre: 'Légume', cat: 'leg' },
 ];
+
+/** Grammes par personne d'un rôle imposé à ce repas, ou undefined s'il varie. */
+const imposePour = (repas: Repas, cle: Role): number | undefined =>
+  MODELE[repas].imposes.find((i) => i.role === cle)?.grammes;
 
 /** Un repas composé, tel que l'utilisateur peut encore le corriger. */
 interface Compose {
@@ -113,6 +121,13 @@ export default function Calculateur() {
   const fibresDe = useCallback(
     (a: Aliment) => fibresPar100.get(a.id) ?? 0, [fibresPar100]);
 
+  /* Ce que les données racontent et qui ne peut pas être vrai.
+     Le solveur est juste ; il ne peut rien contre un aliment dont les valeurs
+     mentent. Un riz dont les macros sont celles du sec mais qu'on déclare
+     cuit se calcule parfaitement — et fait manger deux fois trop. On le dit
+     AVANT de composer, pas après avoir mangé. */
+  const anomalies = useMemo(() => verifierCatalogue(stock), [stock]);
+
   const cibleDe = (repas: Repas) => (cibles.data ?? []).find((c) => c.repas === repas);
 
   /** Compose tous les repas cochés, en évitant de resservir le même aliment. */
@@ -125,9 +140,11 @@ export default function Calculateur() {
       const c = composer(stock, portions[repas], servis, repas);
 
       const roles: Partial<Record<Role, Aliment>> = {};
-      for (const cle of ['proteine', 'glucide', 'lipide'] as const) {
-        const a = c.variables[cle];
-        if (a) { roles[cle] = a; servis.add(a.id); }
+      /* Une variable du solveur peut venir d'un rôle différent : à la
+         collation, c'est le laitage qui porte les protéines. */
+      for (const slot of ['proteine', 'glucide', 'lipide'] as const) {
+        const a = c.variables[slot];
+        if (a) { roles[MODELE[repas][slot]] = a; servis.add(a.id); }
       }
       /* Les quantités imposées ne comptent pas dans « déjà servi » : resservir
          la même huile à tous les repas est normal. */
@@ -208,6 +225,41 @@ export default function Calculateur() {
 
         {stock.length === 0 && (
           <Vide message="Ton frigo est vide, ou aucun aliment n'a de poids et de macros connus. Le calculateur ne devine rien." />
+        )}
+
+        {anomalies.length > 0 && (
+          <Carte style={{
+            gap: E.xs,
+            backgroundColor: anomalies[0]!.gravite === 'blocage' ? C.erreurFond : C.vifFond,
+          }}
+          >
+            <Texte style={{ fontFamily: P.fort, fontSize: T.normal }}>
+              {anomalies[0]!.gravite === 'blocage'
+                ? 'Des données de ton frigo rendent le calcul faux'
+                : 'Des données de ton frigo méritent une vérification'}
+            </Texte>
+            <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
+              Le calcul sera exact, mais il partira de valeurs qui ne peuvent pas
+              être vraies. Corrige-les dans Grocy avant de cuisiner.
+            </Discret>
+            {anomalies.slice(0, 6).map((d) => (
+              <Texte
+                key={`${d.code}-${d.message}`}
+                style={{
+                  fontSize: T.petit,
+                  lineHeight: 17,
+                  color: d.gravite === 'blocage' ? C.erreur : C.vif,
+                }}
+              >
+                • {d.message}
+              </Texte>
+            ))}
+            {anomalies.length > 6 && (
+              <Discret style={{ fontSize: T.petit }}>
+                … et {anomalies.length - 6} autre(s).
+              </Discret>
+            )}
+          </Carte>
         )}
 
         <Bouton onPress={composerTout} desactive={aucunCoche || stock.length === 0}>
@@ -380,9 +432,10 @@ function CarteRepas({
       });
     }
 
-    for (const { cle, fixe } of ROLES) {
+    for (const { cle } of ROLES) {
       const aliment = compose.roles[cle];
       if (!aliment) continue;
+      const fixe = imposePour(repas, cle);
 
       const reste = compose.restes[String(aliment.id)];
       const saisi = (reste?.grammes ?? '').trim();
@@ -399,10 +452,13 @@ function CarteRepas({
       } else if (fixe !== undefined) {
         // même règle que `composer` : la quantité s'entend dans l'état de
         // référence de l'aliment, donc ce qu'on sert.
-        const parPersonne = typeof fixe === 'number' ? fixe : fixe[repas];
-        fixes.push({ aliment, grammes: parPersonne * portions });
-      } else if (cle === 'proteine' || cle === 'glucide' || cle === 'lipide') {
-        variables[cle] = aliment;
+        fixes.push({ aliment, grammes: fixe * portions });
+      } else if (cle === MODELE[repas].proteine) {
+        variables.proteine = aliment;
+      } else if (cle === MODELE[repas].glucide) {
+        variables.glucide = aliment;
+      } else if (cle === MODELE[repas].lipide) {
+        variables.lipide = aliment;
       }
     }
 
@@ -482,10 +538,14 @@ function CarteRepas({
             </View>
           )}
 
+          {/* Quand la cible est exprimée en glucides TOTAUX, les fibres sont
+              DANS la cible : les annoncer « hors cible » serait faux. */}
           {fibres > 0.5 && (
             <Discret style={{ fontSize: T.minuscule }}>
-              + {nb(fibres / portions)} g de fibres, soit {nb((fibres * 2) / portions)} kcal
-              hors cible
+              dont {nb(fibres / portions)} g de fibres
+              {cible.glucidesTotaux === true
+                ? ', comprises dans la cible en glucides'
+                : `, soit ${nb((fibres * 2) / portions)} kcal hors cible`}
             </Discret>
           )}
         </View>
@@ -501,8 +561,9 @@ function CarteRepas({
             <Discret style={s.col}>1 pers.</Discret>
           </View>
 
-          {ROLES.map(({ cle, titre, cat, fixe }) => {
+          {ROLES.map(({ cle, titre, cat }) => {
             const aliment = compose.roles[cle];
+            const fixe = imposePour(repas, cle);
 
             /* Les renforts de CE rôle : ce que le plafonnement du stock ou un
                échange automatique a fait entrer. Ils s'affichent juste sous
@@ -526,7 +587,7 @@ function CarteRepas({
               /* Une quantité imposée absente n'est pas un manque : ou bien le
                  modèle du repas ne la demande pas — pas de légume à 16 h — ou
                  bien le frigo n'en a pas. Inutile d'alarmer. */
-              if (fixe !== undefined) return null;
+              if (fixe !== undefined || !rolesDuRepas(repas).has(cle)) return null;
 
               return (
                 <View key={cle} style={s.ligne}>

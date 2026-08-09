@@ -44,7 +44,19 @@ APPLIQUER = "--appliquer" in sys.argv
 FICHIERS = [a for a in sys.argv[1:] if not a.startswith("--")]
 
 if not GROCY_URL or not API_KEY:
-    sys.exit("Renseigne GROCY_URL et GROCY_API_KEY dans l'environnement.")
+    sys.exit(
+        "Renseigne GROCY_URL et GROCY_API_KEY dans l'environnement, en les\n"
+        "EXPORTANT — sans « export », le shell les garde pour lui :\n"
+        "  export GROCY_URL=https://grocy.exemple.fr\n"
+        "  export GROCY_API_KEY=...")
+
+# Sans schema, urllib remonte « unknown url type » au milieu du traitement,
+# apres avoir lu 3 500 lignes de tableur pour rien. On le dit tout de suite,
+# et on dit quoi taper.
+if not GROCY_URL.startswith(("http://", "https://")):
+    sys.exit(
+        f"GROCY_URL doit commencer par https:// — reçu « {GROCY_URL} ».\n"
+        f"  export GROCY_URL=https://{GROCY_URL}")
 if not FICHIERS:
     sys.exit("Indique le fichier Ciqual :  python3 ciqual_vers_grocy.py Table_Ciqual.xlsx")
 
@@ -78,18 +90,39 @@ EXACTS = {
     "semoule complete": "Semoule ou graine de couscous complète, cuite, sans sel ajouté",
     "boeuf hache 5":    "Boeuf, steak haché 5% MG cru",
     "blanc de poulet":  "Poulet, filet sans peau cru",
+    # Verifie : c'est bien du demi-ecreme. Sans cette ligne, le controle des
+    # mots decisifs signalait « ecreme » comme un desaccord possible — a
+    # raison, tant que personne n'avait tranche.
+    "lait":             "Lait demi-écrémé, UHT",
 }
 
 # ---------------------------------------------------------------------
-#  Ratios cuit / sec, dérivés de Ciqual plutôt que devinés.
+#  Ratios cuit / sec, dérivés de Ciqual — POUR LES GRAINS SECS UNIQUEMENT.
 #
-#  La cuisson n'ajoute que de l'eau : l'énergie totale se conserve. Donc
-#  100 g de riz sec à 350 kcal donnent, une fois cuits à 187 kcal/100 g,
-#  350 / 187 = 187 g... soit un ratio de 1,87 et non 3.
+#  L'hypothèse : la cuisson n'ajoute que de l'eau, donc l'énergie totale se
+#  conserve. 100 g de riz sec à 350 kcal qui deviennent un produit à 155
+#  kcal/100 g ont forcément gagné du poids d'un facteur 350 / 155 = 2,26.
 #
-#  Pour chaque féculent on indique son libellé À L'ÉTAT SEC ; le script
-#  calcule le ratio en divisant les deux énergies. Idem pour les viandes,
-#  où la cuisson RETIRE de l'eau et où le ratio est inférieur à 1.
+#  ELLE NE VAUT QUE POUR UN GRAIN SEC. Un grain absorbe l'eau et ne perd
+#  rien. Un légume à l'eau bouillante fait l'inverse : ses sucres et ses
+#  minéraux PARTENT dans la casserole. L'énergie n'est plus conservée, et le
+#  calcul rend n'importe quoi.
+#
+#  Ce n'est pas une inquiétude théorique, la version précédente l'a fait :
+#
+#      épinard   1 -> 1.70     (il faudrait donc en peser MOINS que ce qu'on sert)
+#      poireau   1 -> 1.23
+#      petits pois 1 -> 1.32
+#
+#  Un épinard à 1,70 dit qu'il faut peser 119 g crus pour en servir 200 g
+#  cuits. Un épinard perd 60 à 70 % de sa masse : il en faut 500 à 700 g.
+#  Facteur cinq, dans le mauvais sens, sur toutes les portions de légumes.
+#
+#  Les légumes et les tubercules sont donc SORTIS de cette table. Leur ratio
+#  reste à 1 — « ce qu'on pèse est ce qu'on sert » — ce qui est exact tant
+#  qu'on pèse la portion CUITE, et c'est la colonne que l'application affiche.
+#  Le jour où l'on pèse vraiment ses courgettes, la mesure prend le relais :
+#  c'est le seul chiffre qui vaille pour un légume.
 # ---------------------------------------------------------------------
 
 AUTRE_ETAT = {
@@ -99,22 +132,12 @@ AUTRE_ETAT = {
     "pates completes":  "Pâtes sèches, semi-complètes, crues",
     "semoule complete": "Semoule de blé dur, crue",
     "boulgour":         "Boulgour de blé, cru",
-
-    # Legumes et tubercules. Ils etaient tous a 1, ce qui revenait a dire
-    # qu'un legume ne perd pas d'eau a la cuisson — faux pour la plupart, et
-    # tres faux pour l'epinard. Comme leurs valeurs sont celles de l'etat
-    # CUIT, un ratio de 1 faisait peser du cru en croyant peser du cuit.
-    "patate douce":     "Patate douce, crue",
-    "pommes de terre":  "Pomme de terre, crue",
-    "brocoli":          "Brocoli, cru",
-    "courgette":        "Courgette, crue",
-    "epinard":          "Épinard, cru",
-    "carotte":          "Carotte, crue",
-    "chou fleur":       "Chou-fleur, cru",
-    "poireau":          "Poireau, cru",
-    "haricots verts":   "Haricot vert, cru",
-    "petits pois":      "Petits pois, crus",
 }
+
+# Garde-fou : cette table ne doit contenir QUE des grains secs. Le jour ou
+# quelqu'un y remet un legume, le script refuse de demarrer plutot que de
+# recalculer une portion cinq fois trop petite.
+GRAINS_SECS = set(AUTRE_ETAT)
 
 # Aliments absents de Ciqual : valeurs relevées sur l'emballage.
 # Renseigne ici ce que dit ta boîte, c'est toujours plus juste qu'une moyenne.
@@ -123,6 +146,21 @@ ETIQUETTES = {
     "skyr": ("lait", 54, 9.4, 4.0, 0, 1, "étiquette Milbona"),
 }
 
+# Les LEGUMES visent l'entree CRUE de Ciqual, pas la cuite.
+#
+# On pese ce qu'on sort du frigo : 200 g de brocoli sur la balance, 150 g dans
+# l'assiette apres la vapeur. Personne ne pese un legume APRES cuisson. Tant
+# qu'ils portaient leurs valeurs cuites, la colonne « a cuire » de l'ecran ne
+# pouvait etre juste qu'en connaissant leur rendement — et ce rendement n'est
+# pas derivable : a l'eau bouillante les sucres partent dans la casserole.
+#
+# Cela ne perd aucune precision, au contraire. A la vapeur, seule l'EAU part :
+# les proteines, glucides et fibres de 200 g de brocoli cru sont encore la
+# dans les 150 g cuits. Les compter sur le poids cru est exact.
+#
+# Leur ratio reste a 1 tant qu'aucune pesee n'existe — « je ne sais pas ce
+# qu'il perd ». Il n'AFFICHE que le poids attendu dans l'assiette et ne touche
+# plus aucune macro. Une pesee suffit a le rendre exact.
 CORRESPONDANCE = {
     # produit Grocy (mots-cles)   : (mots-cles Ciqual, categorie, ratio)
     "flocons d avoine":     ("flocons d'avoine",            "fec",  1),
@@ -134,7 +172,7 @@ CORRESPONDANCE = {
     "amandes":              ("amande",                      "ole",  1),
     "patate douce":         ("patate douce, cuite",         "fec",  1),
     "concombre":            ("concombre, cru",              "leg",  1),
-    "haricots verts":       ("haricot vert, cuit",          "leg",  1),
+    "haricots verts":       ("haricot vert, cru",           "leg",  1),
     "saumon":               ("saumon, cru",                 "prot", 0.85),
     "huile":                ("huile d'avocat",              "huile", 1),
     "blanc de poulet":      ("poulet, blanc, cru",          "prot", 0.75),
@@ -144,12 +182,12 @@ CORRESPONDANCE = {
     "pomme":                ("pomme, crue",                 "fruit", 1),
     "poire":                ("poire, crue",                 "fruit", 1),
     "ananas":               ("ananas, cru",                 "fruit", 1),
-    "brocoli":              ("brocoli, cuit",               "leg",  1),
-    "courgette":            ("courgette, cuite",            "leg",  1),
-    "epinard":              ("épinard, cuit",               "leg",  1),
-    "carotte":              ("carotte, cuite",              "leg",  1),
-    "chou fleur":           ("chou-fleur, cuit",            "leg",  1),
-    "poireau":              ("poireau, cuit",               "leg",  1),
+    "brocoli":              ("brocoli, cru",                "leg",  1),
+    "courgette":            ("courgette, crue",             "leg",  1),
+    "epinard":              ("épinard, cru",                "leg",  1),
+    "carotte":              ("carotte, crue",               "leg",  1),
+    "chou fleur":           ("chou-fleur, cru",             "leg",  1),
+    "poireau":              ("poireau, cru",                "leg",  1),
     "ratatouille":          ("ratatouille",                 "leg",  1),
     "pommes de terre":      ("pomme de terre, cuite",       "fec",  1),
     "truite":               ("truite, crue",                "prot", 0.85),
@@ -167,9 +205,8 @@ CORRESPONDANCE = {
     "pates completes":      ("pâtes complètes, cuites",     "fec",  2.2),
     "semoule complete":     ("semoule, cuite",              "fec",  3),
     "boulgour":             ("boulgour, cuit",              "fec",  2.5),
-    "sardines":             ("sardine, à l'huile",          "prot", 1),
     "thon au naturel":      ("thon, au naturel",            "prot", 1),
-    "petits pois":          ("petit pois, cuit",            "leg",  1),
+    "petits pois":          ("petit pois, cru",             "leg",  1),
     "jus de citron":        ("jus de citron",               "autre", 1),
     "lait":                 ("lait demi-écrémé",            "lait", 1),
     "camembert":            ("camembert",                   "lait", 1),
@@ -178,6 +215,10 @@ CORRESPONDANCE = {
 }
 
 # Ces produits n'ont pas leur place dans un calculateur de diete.
+# Produits que Ciqual ne couvre pas honnetement : il n'existe pas de sardine
+# « au naturel » dans la table — seulement du cru, du grille et cinq versions
+# a l'huile, de 194 a 224 kcal. Plutot que d'en choisir une au hasard, on
+# laisse l'aliment a son proprietaire : il a l'etiquette sous les yeux.
 EXCLUSIONS = ("glace", "sorbet", "coca", "orangina", "madeleine", "bonbon",
               "biscuit", "gateau", "chips", "soda")
 
@@ -357,10 +398,72 @@ def candidats_pour(aliments, motifs: str, combien: int = 6):
     return trouves[:combien]
 
 
-# Au-dela, une pesee ne corrige plus le ratio : elle le contredit. Cinquante
-# pour cent laisse toute la place aux differences reelles — eau, feu, temps de
-# cuisson — sans laisser passer un facteur deux.
+# A partir de cet ecart avec la table, une pesee ne decrit plus le meme
+# produit qu'elle : on ne peut plus melanger le rendement de l'un avec les
+# macros de l'autre.
+#
+# CE SEUIL NE SERT PLUS A JETER UNE PESEE. Il a longtemps fait exactement ca :
+# 84 g de riz sec pour 393 g cuits donnaient 4,68 la ou Ciqual disait 2,26, et
+# le script gardait 2,26 en silence — juste sous un commentaire affirmant que
+# « TA balance passe avant Ciqual ». La regle contredisait sa propre phrase.
+#
+# Ce qu'on a compris depuis : une pesee et une table ne se contredisent pas,
+# elles decrivent deux produits differents. 84 g de riz sec portent 73 g de
+# matiere seche ; qu'ils rendent 393 g veut dire que CE riz-la contient 81 %
+# d'eau, contre 70 % pour le riz moyen de la table. Les deux existent.
+#
+# Le seuil declenche donc desormais le RECALCUL des macros cuites depuis
+# l'etat sec, pour que le couple reste coherent. On ne jette plus rien.
 ECART_PESEE_MAX = 0.5
+
+
+def macros_depuis_le_sec(sec, mesure: float):
+    """
+    Les macros du produit CUIT que la pesee impose, a partir de l'etat SEC.
+
+    La cuisson n'ajoute que de l'eau : l'energie et les nutriments se
+    conservent, seule la masse change. 100 g de riz sec a 350 kcal qui rendent
+    `mesure` fois leur poids donnent un produit cuit a 350 / mesure kcal pour
+    100 g, et toutes les autres valeurs suivent le meme facteur.
+
+    C'est le calcul le plus honnete quand une pesee personnelle s'ecarte de la
+    table : la pesee est un fait mesure sur CE produit, la table est une
+    moyenne. On garde ce qui a ete mesure — le rendement — et ce qui est
+    stable — l'etiquette du sec — et on en deduit le reste.
+    """
+    if not mesure or mesure <= 0 or not sec or not sec.get("kcal"):
+        return None
+
+    return {
+        "nom": f"{sec['nom']} ÷ {mesure:.2f} (ta pesée)",
+        "cle": sec["cle"],
+        "kcal": sec["kcal"] / mesure,
+        "prot": (sec.get("prot") or 0) / mesure,
+        "gluc": (sec.get("gluc") or 0) / mesure,
+        "lip": (sec.get("lip") or 0) / mesure,
+        "fibres": (sec.get("fibres") or 0) / mesure,
+    }
+
+
+def sens_du_rendement(categorie: str, ratio: float):
+    """
+    Le rendement va-t-il dans le bon sens ? Meme regle que l'API.
+
+    Ce n'est pas une plage de tolerance, c'est un SENS : un feculent absorbe
+    de l'eau, une viande en perd. A contresens, les deux colonnes de l'ecran
+    s'inversent. Les bornes restent larges — 4,68 sur un riz tres hydrate et
+    0,53 sur une truite tres cuite sont des mesures, pas des fautes.
+    """
+    if ratio <= 0:
+        return "rendement nul ou negatif"
+    if categorie == "prot" and ratio > 1.05:
+        return f"rendement {ratio:.2f} : une viande ne gagne pas de poids en cuisant"
+    if categorie == "fec" and ratio < 1:
+        return f"rendement {ratio:.2f} : un feculent ne perd pas de poids en cuisant"
+    if not 0.3 <= ratio <= 6:
+        return f"rendement {ratio:.2f} : hors de tout ordre de grandeur"
+
+    return None
 
 
 def pesees_de(produit) -> tuple[float, float] | None:
@@ -377,6 +480,94 @@ def pesees_de(produit) -> tuple[float, float] | None:
         return None
 
     return avant, apres
+
+
+# ---------------------------------------------------------------------
+#  Les mots qui changent tout.
+#
+#  Ciqual distingue « Sardine, au naturel » et « Sardine, a l'huile » : 182
+#  kcal et 9,3 g de lipides d'un cote, 217 et 13,7 de l'autre. Une boite de
+#  100 g mal appariee, c'est 4,4 g de lipides comptes en trop — plus de trois
+#  fois la tolerance d'un repas ENTIER. Et rien ne le signalait : les deux
+#  libelles contiennent « sardine », la recherche par mots-cles tombait sur le
+#  premier venu.
+#
+#  Ces mots-la ne sont donc pas des details de libelle. Quand l'un figure d'un
+#  cote et pas de l'autre, l'appariement est probablement faux, et on le dit.
+#
+#  « cru » et « cuit » n'y sont PAS : ils different legitimement — « Blanc de
+#  poulet » vise « Poulet, filet sans peau cru ». « sel » et « sucre » non
+#  plus : « sans sel ajoute » traine dans la moitie des libelles Ciqual.
+MOTS_DECISIFS = ("naturel", "huile", "complet", "ecreme", "allege", "fume")
+
+
+# ---------------------------------------------------------------------
+#  CE QUE TU AS SAISI A LA MAIN NE S'ECRASE PAS.
+#
+#  Aucune table ne couvre tout. Ciqual n'a pas de sardine « au naturel » —
+#  que du cru, du grille et cinq versions a l'huile, de 194 a 224 kcal. Pour
+#  ces produits-la, l'etiquette de la boite bat n'importe quelle moyenne, et
+#  c'est a son proprietaire de la saisir.
+#
+#  Encore faut-il que sa saisie survive. Tant que l'import ecrasait toutes
+#  les valeurs a chaque passage, prendre le temps de recopier une etiquette
+#  ne servait a rien : le lendemain, Ciqual reprenait la main.
+#
+#  Le produit porte donc un champ « source_valeurs ». L'application l'ecrit a
+#  « moi » des qu'on modifie les macros a la main ; ce script ne touche alors
+#  plus a cet aliment. Meme regle que pour les pesees : ce qui vient de
+#  l'utilisateur passe devant.
+SAISIE_MANUELLE = "moi"
+
+# Les champs personnalises Grocy dont CE script a besoin. Il les cree lui-meme
+# plutot que de dependre d'un autre outil : grocy_macros.py sait aussi les
+# creer, mais son --appliquer reecrit AU PASSAGE les macros de tous les
+# produits depuis sa propre table, ecrasant le travail fait ici. Demander a
+# quelqu'un de lancer l'un pour reparer l'autre etait un piege.
+CHAMPS_REQUIS = [
+    ("cat", "Catégorie", "text-single-line"),
+    ("kcal100", "kcal / 100 g", "number-decimal"),
+    ("prot100", "Protéines / 100 g", "number-decimal"),
+    ("gluc100", "Glucides / 100 g", "number-decimal"),
+    ("lip100", "Lipides / 100 g", "number-decimal"),
+    ("fibres100", "Fibres / 100 g", "number-decimal"),
+    ("ratio", "Ratio cuit / cru", "number-decimal"),
+    ("pesee_avant", "Poids avant cuisson (g)", "number-decimal"),
+    ("pesee_apres", "Poids apres cuisson (g)", "number-decimal"),
+    ("source_valeurs", "Source des valeurs", "text-single-line"),
+]
+
+
+def creer_champs_manquants(appliquer: bool) -> list[str]:
+    """Cree les champs personnalises absents. Rend ceux qui manquaient."""
+    existants = {c["name"] for c in api("GET", "/objects/userfields")
+                 if c.get("entity") == "products"}
+    manquants = [c for c in CHAMPS_REQUIS if c[0] not in existants]
+
+    for nom, libelle, type_ in manquants:
+        if appliquer:
+            api("POST", "/objects/userfields", {
+                "entity": "products", "name": nom, "caption": libelle,
+                "type": type_, "show_as_column_in_tables": 0})
+
+    return [c[1] for c in manquants]
+
+
+def valeurs_saisies_a_la_main(produit) -> bool:
+    """L'utilisateur a-t-il renseigne les macros de ce produit lui-meme ?"""
+    champs = produit.get("userfields") or {}
+
+    return str(champs.get("source_valeurs") or "").strip() == SAISIE_MANUELLE
+
+
+def desaccords(nom_produit: str, nom_ciqual: str) -> list[str]:
+    """Les mots decisifs presents d'un cote et absents de l'autre."""
+    produit, ciqual = normaliser(nom_produit), normaliser(nom_ciqual)
+
+    return [
+        mot for mot in MOTS_DECISIFS
+        if (mot in produit) != (mot in ciqual)
+    ]
 
 
 def coherent(a) -> tuple[bool, float]:
@@ -404,17 +595,31 @@ def main() -> int:
         print("\nRecopie le bon libellé dans EXACTS, en tête du script.")
 
         return 0
+    # Sans le champ, Grocy refuse l'ecriture entiere avec un 400 laconique :
+    # « Field source_valeurs is not a valid userfield of the given entity ».
+    manquants = creer_champs_manquants(APPLIQUER)
+    if manquants:
+        etat = "créé(s)" if APPLIQUER else "à créer (--appliquer les posera)"
+        print(f"{len(manquants)} champ(s) personnalisé(s) {etat} : "
+              f"{', '.join(manquants)}\n")
+
     produits = api("GET", "/objects/products")
 
     trouves, sans_correspondance, introuvables, suspects = [], [], [], []
     ratios_corriges, depuis_etiquette, ratios_mesures = [], [], []
-    pesees_ecartees = []
+    pesees_ecartees, macros_refaites, appariements_douteux = [], [], []
+    valeurs_a_toi = []
 
     for produit in produits:
         cle = normaliser(produit["name"])
 
         if any(mot in cle.split() for mot in EXCLUSIONS):
             sans_correspondance.append((produit["name"], "hors diète"))
+            continue
+
+        # Ce que l'utilisateur a saisi lui-meme ne se touche pas.
+        if valeurs_saisies_a_la_main(produit):
+            valeurs_a_toi.append(produit["name"])
             continue
 
         # une valeur relevée sur l'emballage prime sur tout
@@ -451,7 +656,16 @@ def main() -> int:
             introuvables.append((produit["name"], motifs_ciqual))
             continue
 
-        # ratio dérivé de Ciqual quand les deux états sont connus
+        # ratio dérivé de Ciqual quand les deux états sont connus — et
+        # seulement pour un GRAIN SEC, seul cas où l'énergie se conserve.
+        sec = None
+        if categorie != "fec" and motif_produit in AUTRE_ETAT:
+            sys.exit(
+                f"« {motif_produit} » figure dans AUTRE_ETAT mais n'est pas un\n"
+                "féculent. La dérivation du rendement par l'énergie ne vaut que\n"
+                "pour un grain sec : un légume perd ses sucres dans l'eau de\n"
+                "cuisson, et le calcul rend une portion cinq fois trop petite.")
+
         if motif_produit in AUTRE_ETAT and aliment and aliment["kcal"]:
             sec = chercher(aliments, AUTRE_ETAT[motif_produit])
             if sec and sec["kcal"]:
@@ -461,32 +675,49 @@ def main() -> int:
                         ratios_corriges.append(
                             (produit["name"], ratio, calcule, sec["nom"]))
                     ratio = calcule
+            else:
+                sec = None
 
-        # TA balance passe avant Ciqual : un ratio derive d'une moyenne
-        # nationale ne vaut pas deux pesees faites sur TON riz, avec TON eau
-        # et TON temps de cuisson. On ne les ecrase donc jamais, on les
-        # utilise.
+        # TA balance passe avant Ciqual — et cette fois le code le fait.
         #
-        # Sauf quand la mesure contredit la physique. La cuisson n'ajoute que
-        # de l'eau : l'energie se conserve. Une pesee qui doublerait le ratio
-        # attendu impliquerait un aliment deux fois moins calorique une fois
-        # cuit, ce qui n'arrive pas — c'est une erreur de saisie, une pesee
-        # faite apres rincage, ou l'eau restee dans la casserole.
+        # Une mesure et une table ne se contredisent pas : elles decrivent
+        # deux produits differents. Ton riz rend 4,68 fois son poids, celui de
+        # la table 2,26 ; les deux existent, ils n'ont simplement pas la meme
+        # teneur en eau. Le seul tort serait de garder le rendement de l'un
+        # avec les macros de l'autre — c'est ce que faisait ce bloc.
         #
-        # Ecrire ce ratio-la fausserait toutes les quantites de cet aliment,
-        # en silence. On garde donc l'ancien et on le dit.
+        # On garde donc la mesure, et on recalcule les macros CUITES depuis
+        # l'etat SEC divise par elle : deux valeurs qui viennent l'une de ta
+        # balance, l'autre d'une etiquette, et qui ne peuvent plus se
+        # contredire. Sans etat sec connu, on garde les macros de la table et
+        # on dit franchement ce qui restera faux.
         pesees = pesees_de(produit)
         if pesees is not None:
             mesure = round(pesees[1] / pesees[0], 2)
-            if not (0.4 <= mesure <= 5):
+            contresens = sens_du_rendement(categorie, mesure)
+
+            if contresens is not None:
+                # Le sens, lui, ne se discute pas : a contresens, les deux
+                # colonnes de l'ecran s'inversent.
                 pesees_ecartees.append(
-                    (produit["name"], mesure, ratio, pesees, "hors de tout ordre de grandeur"))
-            elif abs(mesure - ratio) / ratio > ECART_PESEE_MAX:
-                pesees_ecartees.append(
-                    (produit["name"], mesure, ratio, pesees,
-                     f"{abs(mesure - ratio) / ratio:.0%} d'ecart avec Ciqual"))
+                    (produit["name"], mesure, ratio, pesees, contresens))
             else:
-                if abs(mesure - ratio) / ratio > 0.02:
+                ecart = abs(mesure - ratio) / ratio
+                if ecart > ECART_PESEE_MAX:
+                    refait = macros_depuis_le_sec(sec, mesure)
+                    if refait is not None:
+                        macros_refaites.append(
+                            (produit["name"], aliment["nom"], aliment["kcal"],
+                             refait["kcal"], mesure, ratio))
+                        aliment = refait
+                    else:
+                        # Pas d'etat sec connu : on ne peut pas rendre le
+                        # couple coherent, alors on le dit au lieu de le taire.
+                        pesees_ecartees.append(
+                            (produit["name"], mesure, ratio, pesees,
+                             f"{ecart:.0%} d'ecart avec Ciqual, et aucun etat sec "
+                             "connu pour recalculer les macros"))
+                if ecart > 0.02:
                     ratios_mesures.append((produit["name"], ratio, mesure, pesees))
                 ratio = mesure
 
@@ -500,6 +731,18 @@ def main() -> int:
         ok, calcul = coherent(aliment)
         if not ok:
             suspects.append((produit["name"], aliment["nom"], aliment["kcal"], calcul))
+
+        # « au naturel » contre « a l'huile » : meme poisson, 4 g de lipides
+        # d'ecart pour 100 g. La recherche par mots-cles ne peut pas le voir.
+        # Un libelle EXACT est un choix delibere : quelqu'un a cherche, lu la
+        # liste et recopie le bon. Le controle des mots decisifs n'est la que
+        # pour les accidents de la recherche par mots-cles ; l'appliquer a une
+        # correspondance exacte reviendrait a se mefier de sa propre decision.
+        ecarts_de_mots = ([] if motif_produit in EXACTS
+                          else desaccords(produit["name"], aliment["nom"]))
+        if ecarts_de_mots:
+            appariements_douteux.append(
+                (produit["name"], aliment["nom"], ecarts_de_mots))
 
         trouves.append((produit, aliment, categorie, ratio, ok))
 
@@ -524,6 +767,29 @@ def main() -> int:
         for nom, avant, apres, (pa, pb) in ratios_mesures:
             print(f"  {nom[:26]:28} {avant} -> {apres}   ({pa:g} g avant → {pb:g} g après)")
         print("  Ces pesées ne sont pas réécrites : le script ne mesure rien.")
+
+    if valeurs_a_toi:
+        print(f"\n{len(valeurs_a_toi)} produit(s) laisse(s) intact(s) — tu les as saisis :")
+        for nom in valeurs_a_toi:
+            print(f"  - {nom}")
+        print("  Aucune table ne bat une etiquette lue sur la boite.")
+
+    if appariements_douteux:
+        print(f"\n{len(appariements_douteux)} appariement(s) a verifier :")
+        for nom, libelle, mots in appariements_douteux:
+            print(f"  {nom[:30]:32} -> « {libelle[:44]} »")
+            print(f"  {'':32}    « {', '.join(mots)} » n'est que d'un cote")
+        print("  Ces mots-la changent les valeurs, pas seulement le libelle.")
+        print("  Utilise --chercher pour trouver le bon, puis ajoute-le a EXACTS.")
+
+    if macros_refaites:
+        print(f"\n{len(macros_refaites)} macro(s) recalculée(s) depuis TA pesée :")
+        for nom, libelle, avant, apres, mesure, table in macros_refaites:
+            print(f"  {nom:28} {avant:6.1f} → {apres:6.1f} kcal/100 g cuits")
+            print(f"  {'':28} ton rendement {mesure} contre {table} pour « {libelle} ».")
+        print("  Ta balance décrit TON produit ; la table décrit une moyenne.")
+        print("  On garde ta mesure et on en déduit les macros, pour que les")
+        print("  deux colonnes « à cuire » et « cuit » disent la même chose.")
 
     if pesees_ecartees:
         print(f"\n{len(pesees_ecartees)} pesee(s) ECARTEE(S) — le ratio de Ciqual est conserve :")
@@ -569,6 +835,9 @@ def main() -> int:
             "gluc100": round(aliment["gluc"] or 0, 2),
             "lip100": round(aliment["lip"] or 0, 2),
             "ratio": ratio,
+            # D'ou viennent ces valeurs. L'application ecrira « moi » si tu les
+            # corriges a la main, et ce script ne reviendra plus dessus.
+            "source_valeurs": "ciqual",
         }
 
         # Les fibres sont une VALEUR CIQUAL, au meme titre que les glucides :

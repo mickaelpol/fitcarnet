@@ -60,7 +60,11 @@ final readonly class FrigoBase
             lip100: (float) $l['lip_100'],
             fibres100: null !== $l['fibres_100'] ? (float) $l['fibres_100'] : null,
             ratio: (float) $l['ratio'] ?: 1.0,
-            etatReference: (string) $l['etat_reference'],
+            /* `etat_reference` n'est plus lu. La regle est unique et vit dans
+               EtatReference ; la lire ici, c'etait laisser une colonne dire le
+               contraire de ce que Grocy deduisait, pour le meme aliment. La
+               colonne survit pour l'historique et ne decide plus rien —
+               voir db/manuel/14-etat-reference-coherent.sql. */
             stock: (float) $l['quantite'],
             emplacement: null !== $l['emplacement'] ? (string) $l['emplacement'] : null,
             peseeAvant: null !== $l['pesee_avant'] ? (float) $l['pesee_avant'] : null,

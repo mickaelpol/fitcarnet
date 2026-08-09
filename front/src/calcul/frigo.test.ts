@@ -13,7 +13,7 @@ const aliment = (
   kcal100: 0, prot100: 0, gluc100: 0, lip100: 0, fibres100: null,
   ratio: 1, etatReference: 'cru',
   stock, unite: 'g', grammesParUnite: 1,
-  emplacement, peseeAvant: null, peseeApres: null,
+  emplacement, peseeAvant: null, peseeApres: null, provenanceRatio: 'table',
 });
 
 describe('écarts d\'inventaire', () => {

@@ -16,6 +16,8 @@ export const A = {
   oeufs:       a('Oeufs entiers', 'prot', 146, 12, 2, 10, 1, 'cru'),
   blancs:      a("Blancs d'oeufs", 'prot', 52, 10.9, 0.7, 0.2, 1, 'cru'),
   skyr:        a('Skyr 0%', 'lait', 57, 10, 4, 0.2),
+  lait:        a('Lait demi-écrémé', 'lait', 47.7, 3.5, 5, 1.6),
+  boulgour:    a('Boulgour', 'fec', 131, 4.3, 24.1, 1, 2.5),
   patateDouce: a('Patate douce', 'fec', 92, 2, 20.7, 0.16, 1),
   riz:         a('Riz basmati', 'fec', 130, 2.7, 28.2, 0.3, 3),
   quinoa:      a('Quinoa', 'fec', 120, 4.4, 21.3, 1.9, 2.75),

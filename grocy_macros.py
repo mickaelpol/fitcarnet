@@ -77,6 +77,11 @@ CHAMPS = [
     ("gluc100", "Glucides / 100 g",      "number-decimal"),
     ("lip100",  "Lipides / 100 g",       "number-decimal"),
     ("ratio",   "Ratio cuit / cru",      "number-decimal"),
+    # D'ou viennent les macros : « ciqual » quand le script les a ecrites,
+    # « moi » quand l'utilisateur les a saisies lui-meme. Dans ce second cas
+    # l'import n'y touche plus — aucune table ne bat une etiquette lue sur la
+    # boite, et Ciqual ne couvre pas tout (il n'y a pas de sardine au naturel).
+    ("source_valeurs", "Source des valeurs", "text-single-line"),
 ]
 
 # --------------------------------------------------- valeurs de reference
@@ -176,6 +181,8 @@ def apparier(nom: str):
 
 def main() -> int:
     print(f"Grocy : {GROCY_URL}")
+    print("Amorçage seulement : les produits déjà renseignés ne sont pas touchés.")
+    print("Pour des valeurs justes, c'est ciqual_vers_grocy.py qui fait autorité.\n")
     if not APPLIQUER:
         print("Mode simulation — rien ne sera écrit. Ajoute --appliquer pour agir.\n")
 
@@ -210,14 +217,40 @@ def main() -> int:
     print(f"\n{len(apparies)} produit(s) sur {len(produits)} reconnus.\n")
 
     if APPLIQUER:
+        # CE SCRIPT NE FAIT QUE L'AMORCAGE.
+        #
+        # Sa table REFERENCE est un depannage : des valeurs approchees, tapees
+        # a la main, en partie d'origine americaine — l'amande y est a 21,5 g
+        # de glucides, fibres comprises, contre 8,8 en Ciqual. C'est
+        # ciqual_vers_grocy.py qui fait autorite.
+        #
+        # Ecraser un produit deja renseigne reviendrait donc a remplacer des
+        # valeurs verifiees par des valeurs approximatives. On saute tout ce
+        # qui porte deja une provenance — « ciqual » comme « moi ».
+        ecrits, epargnes = 0, []
         for index, (produit, reference) in enumerate(apparies, 1):
+            deja = (produit.get("userfields") or {}).get("source_valeurs")
+            if deja:
+                epargnes.append((produit["name"], deja))
+                continue
+
             categorie, kcal, prot, gluc, lip, ratio = REFERENCE[reference]
             api("PUT", f"/userfields/products/{produit['id']}", {
                 "cat": categorie, "kcal100": kcal, "prot100": prot,
-                "gluc100": gluc, "lip100": lip, "ratio": ratio})
+                "gluc100": gluc, "lip100": lip, "ratio": ratio,
+                "source_valeurs": "amorcage"})
+            ecrits += 1
             if index % 10 == 0:
                 print(f"  [{index}/{len(apparies)}]", flush=True)
-        print(f"\n=== {len(apparies)} produits renseignés ===")
+
+        print(f"\n=== {ecrits} produit(s) amorcé(s) ===")
+        if epargnes:
+            print(f"{len(epargnes)} produit(s) laissé(s) intact(s), déjà renseignés :")
+            for nom, source in epargnes[:8]:
+                print(f"  - {nom[:44]:46} ({source})")
+            if len(epargnes) > 8:
+                print(f"  … et {len(epargnes) - 8} autres")
+            print("  Pour les mettre à jour : ciqual_vers_grocy.py, qui fait autorité.")
     else:
         for produit, reference in apparies[:8]:
             c, k, p, g, l, r = REFERENCE[reference]

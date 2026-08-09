@@ -175,6 +175,15 @@ export interface AlimentDisponible {
   emplacement: string | null;
   peseeAvant: number | null;
   peseeApres: number | null;
+  /**
+   * D'où vient le rendement retenu.
+   *
+   * `mesure` : l'utilisateur a pesé son aliment cru puis cuit, et c'est SON
+   * chiffre qui est utilisé — aucun import ne peut plus l'écraser, la règle
+   * s'applique à la lecture. `table` : faute de pesée, on prend la valeur de
+   * référence.
+   */
+  provenanceRatio: 'mesure' | 'table';
 }
 
 export interface MonFrigo {

@@ -13,6 +13,43 @@ namespace App\Service;
  */
 final readonly class AlimentDisponible
 {
+    /**
+     * A quel etat se rapportent les valeurs ci-dessus — DEDUIT, jamais recu.
+     *
+     * Ce n'est plus un parametre. Tant qu'il en etait un, chaque source
+     * pouvait le remplir a sa facon : Grocy le deduisait de la categorie, la
+     * base le lisait dans une colonne. Deux sources, deux verites, le meme
+     * type en sortie — et un compte ordinaire mangeait trois fois trop de
+     * glucides sans que rien ne le signale.
+     *
+     * En le derivant ici, la divergence devient impossible a ecrire.
+     */
+    public string $etatReference;
+
+    /**
+     * LE RENDEMENT RETENU — la pesee de l'utilisateur d'abord, toujours.
+     *
+     * Quand quelqu'un s'est donne la peine de peser son aliment cru, de le
+     * cuire, de l'egoutter et de le repeser, ce chiffre-la vaut mieux que
+     * n'importe quelle moyenne nationale : il porte SA cuisson, SON eau, SON
+     * temps de feu. Le laisser ecraser par un import serait lui dire que sa
+     * balance ne compte pas.
+     *
+     * C'etait pourtant le cas : le rendement etait une simple colonne, et le
+     * script Ciqual la reecrivait a chaque passage. Le derivant ici, aucune
+     * source ne peut plus le faire — la mesure gagne a la lecture, quoi qu'il
+     * y ait eu d'ecrit.
+     *
+     * Seule exception, et elle ne se discute pas : une mesure a CONTRESENS.
+     * Une viande qui grossit en cuisant, un feculent qui retrecit — la, les
+     * deux colonnes de l'ecran s'inverseraient. On garde alors la valeur de
+     * la table, et `incoherences()` le dit en clair.
+     */
+    public float $ratio;
+
+    /** D'ou vient le rendement retenu : 'mesure' ou 'table'. */
+    public string $provenanceRatio;
+
     public function __construct(
         public string $reference,
         public string $nom,
@@ -22,8 +59,7 @@ final readonly class AlimentDisponible
         public float $gluc100,
         public float $lip100,
         public ?float $fibres100,
-        public float $ratio,
-        public string $etatReference,
+        float $ratio,
         /** quantite en stock, exprimee dans l'unite ci-dessous */
         public float $stock,
         public ?string $emplacement = null,
@@ -52,6 +88,73 @@ final readonly class AlimentDisponible
          */
         public ?float $grammesParUnite = 1.0,
     ) {
+        $this->etatReference = EtatReference::pour($categorie);
+
+        $mesure = self::rendementMesure($peseeAvant, $peseeApres);
+        $retenu = null !== $mesure
+            && null === EtatReference::sensDuRendement($categorie, $mesure);
+
+        $this->ratio = $retenu ? $mesure : ($ratio > 0 ? $ratio : 1.0);
+        $this->provenanceRatio = $retenu ? 'mesure' : 'table';
+    }
+
+    /** Le rendement que disent deux pesees, ou NULL s'il n'y en a pas. */
+    private static function rendementMesure(?float $avant, ?float $apres): ?float
+    {
+        if (null === $avant || null === $apres || $avant <= 0 || $apres <= 0) {
+            return null;
+        }
+
+        return \round($apres / $avant, 3);
+    }
+
+    /** L'utilisateur a-t-il pese cet aliment lui-meme ? */
+    public function mesureParLUtilisateur(): bool
+    {
+        return 'mesure' === $this->provenanceRatio;
+    }
+
+    /**
+     * Ce qui, dans cet aliment, rendrait un repas faux — a dire, jamais a taire.
+     *
+     * Une valeur nutritionnelle n'est pas invalide au sens d'un formulaire :
+     * elle est physiquement impossible, ou elle ne l'est pas. On ne refuse
+     * donc pas l'aliment — il est peut-etre le seul du frigo — mais on ne
+     * laisse pas non plus le calculateur batir dessus sans un mot.
+     *
+     * @return string[]
+     */
+    public function incoherences(): array
+    {
+        $dits = [];
+
+        $sens = EtatReference::sensDuRendement($this->categorie, $this->ratio);
+        if (null !== $sens) {
+            $dits[] = $sens;
+        }
+
+        /* Une pesee ecartee doit se dire. Quelqu'un a pris sa balance, note
+           deux chiffres, et l'application ne s'en sert pas : le taire serait
+           lui laisser croire que sa mesure a ete prise en compte. */
+        $mesure = self::rendementMesure($this->peseeAvant, $this->peseeApres);
+        if (null !== $mesure && !$this->mesureParLUtilisateur()) {
+            $dits[] = \sprintf(
+                'ta pesee (%.0f g -> %.0f g, soit %.2f) n\'a pas ete retenue : %s '
+                . 'Le rendement %.2f de la table est utilise a la place.',
+                $this->peseeAvant, $this->peseeApres, $mesure,
+                EtatReference::sensDuRendement($this->categorie, $mesure) ?? '',
+                $this->ratio);
+        }
+
+        $matiere = $this->prot100 + $this->gluc100 + $this->lip100 + ($this->fibres100 ?? 0);
+        if ($matiere > 100.5) {
+            $dits[] = \sprintf(
+                '%.1f g de nutriments dans 100 g de produit : les glucides '
+                . 'viennent probablement d\'une table americaine, ou les fibres '
+                . 'sont comptees deux fois.', $matiere);
+        }
+
+        return $dits;
     }
 
     /** Le stock est-il convertible en grammes, donc utilisable par le solveur ? */
@@ -78,6 +181,7 @@ final readonly class AlimentDisponible
             'lip100' => $this->lip100,
             'fibres100' => $this->fibres100,
             'ratio' => $this->ratio,
+            'provenanceRatio' => $this->provenanceRatio,
             'etatReference' => $this->etatReference,
             'stock' => $this->stock,
             'unite' => $this->unite,

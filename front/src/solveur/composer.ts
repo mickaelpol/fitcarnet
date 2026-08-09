@@ -1,4 +1,4 @@
-import { calculer } from './solveur';
+import { calculer, convertir, versReference } from './solveur';
 import type { Aliment, Cibles, Fixe, Resultat, Variables } from './types';
 
 /**
@@ -31,13 +31,17 @@ export const NOM_REPAS: Record<Repas, string> = {
  * seule l'intention diffère, et l'application ne la connaît pas. Remplacer
  * n'engage donc que le repas qu'on regarde.
  */
-export type Role = 'proteine' | 'glucide' | 'fruit' | 'lipide' | 'huile' | 'legume';
+export type Role =
+  | 'proteine' | 'laitage' | 'glucide' | 'fruit' | 'lipide' | 'huile' | 'legume';
 
 /* Le fruit a son propre rôle depuis qu'un petit-déjeuner doit pouvoir porter
    un féculent ET un fruit. Confondus sous « glucide », l'un chassait l'autre. */
 const ROLE_DE: Record<Aliment['categorie'], Role | null> = {
   prot: 'proteine',
-  lait: 'proteine',
+  /* Le laitage a son propre rôle depuis que la collation porte DEUX sources
+     de protéines : le skyr et les blancs d'œufs. Confondus, l'un chassait
+     l'autre, exactement comme le fruit chassait le féculent. */
+  lait: 'laitage',
   fec: 'glucide',
   fruit: 'fruit',
   ole: 'lipide',
@@ -48,11 +52,18 @@ const ROLE_DE: Record<Aliment['categorie'], Role | null> = {
 
 export const roleDe = (a: Aliment): Role | null => ROLE_DE[a.categorie];
 
-/** Grammes de légume servis à chaque personne, avant tout calcul de macros. */
-export const LEGUME_PAR_PORTION = 150;
+/**
+ * Grammes de légume par personne — chiffre du plan, pas une invention.
+ *
+ * Le plan de reference sert 200 g de legumes verts a midi et 200 g de
+ * haricots verts le soir. Le 150 g d'origine venait de moi et obligeait le
+ * reste du repas a compenser.
+ */
+export const LEGUME_PAR_PORTION = 200;
 
 /**
- * Grammes d'huile par personne — une cuillère à soupe.
+ * Grammes d'huile par personne — 5 g, le chiffre du plan de reference, qui
+ * en sert exactement cette quantite a midi, a la collation et le soir.
  *
  * L'huile et l'oléagineux figurent TOUS DEUX au repas, mais un seul des deux
  * peut s'ajuster : trois macros ne déterminent que trois inconnues, et laisser
@@ -60,7 +71,7 @@ export const LEGUME_PAR_PORTION = 150;
  * donc celle qui se dose à la cuillère et non à la balance ; l'oléagineux
  * absorbe le reste. La quantité reste modifiable repas par repas.
  */
-export const HUILE_PAR_PORTION = 10;
+export const HUILE_PAR_PORTION = 5;
 
 /**
  * Grammes de fruit par personne, PAR REPAS.
@@ -89,40 +100,87 @@ export const FRUIT_PAR_PORTION: Record<Repas, number> = {
  * **C'est ici qu'on modifie la forme d'un repas**, et nulle part ailleurs.
  */
 export interface ModeleRepas {
-  /** ce qui s'ajuste pour atteindre les cibles — trois au maximum */
-  variables: Role[];
+  /** quel role alimente chacune des trois variables du solveur */
+  proteine: Role;
+  glucide: Role;
+  lipide: Role;
   /** ce qui est servi en quantite fixe, en grammes par personne */
   imposes: { role: Role; grammes: number }[];
+  /**
+   * L'aliment PREFERE pour un role, reconnu a un fragment de son nom.
+   *
+   * C'est une preference, pas une contrainte : absent du frigo, on prend
+   * n'importe quel aliment du role. Elle existe parce qu'un plan nomme ses
+   * aliments — la collation porte des flocons d'avoine, pas du boulgour — et
+   * qu'aucune propriete nutritionnelle ne permet de le deviner.
+   */
+  preferes?: Partial<Record<Role, string>>;
 }
+
+/** Blancs d'oeufs de la collation, en grammes par personne — chiffre du plan. */
+export const BLANCS_PAR_PORTION = 175;
 
 export const MODELE: Record<Repas, ModeleRepas> = {
   // Matin : oeufs, flocons d'avoine, un fruit, des amandes.
   R1: {
-    variables: ['proteine', 'glucide', 'lipide'],
+    proteine: 'proteine', glucide: 'glucide', lipide: 'lipide',
     imposes: [{ role: 'fruit', grammes: FRUIT_PAR_PORTION.R1 }],
+    preferes: { proteine: 'oeufs entiers', glucide: 'avoine' },
   },
   // Midi : proteine, feculent, oleagineux, huile, legume.
   R2: {
-    variables: ['proteine', 'glucide', 'lipide'],
+    proteine: 'proteine', glucide: 'glucide', lipide: 'lipide',
     imposes: [
       { role: 'huile', grammes: HUILE_PAR_PORTION },
       { role: 'legume', grammes: LEGUME_PAR_PORTION },
     ],
   },
-  // Collation : comme le matin. La seconde proteine — le skyr a cote des
-  // blancs d'oeufs — s'ajoute a la main : sa quantite n'appartient qu'a toi.
+  /* Collation : DEUX sources de proteines. Le laitage s'ajuste — c'est lui
+     qui porte la cible — et les blancs d'oeufs sont une quantite fixe, celle
+     du plan. Trois macros ne determinent que trois inconnues : l'un des deux
+     devait etre fige, et c'est celui qui se dose au verre doseur. */
   R3: {
-    variables: ['proteine', 'glucide', 'lipide'],
-    imposes: [{ role: 'fruit', grammes: FRUIT_PAR_PORTION.R3 }],
+    proteine: 'laitage', glucide: 'glucide', lipide: 'lipide',
+    imposes: [
+      { role: 'proteine', grammes: BLANCS_PAR_PORTION },
+      { role: 'fruit', grammes: FRUIT_PAR_PORTION.R3 },
+    ],
+    preferes: { proteine: 'blancs', laitage: 'skyr', glucide: 'avoine', fruit: 'banane' },
   },
   R4: {
-    variables: ['proteine', 'glucide', 'lipide'],
+    proteine: 'proteine', glucide: 'glucide', lipide: 'lipide',
     imposes: [
       { role: 'huile', grammes: HUILE_PAR_PORTION },
       { role: 'legume', grammes: LEGUME_PAR_PORTION },
     ],
   },
 };
+
+/**
+ * Les roles que ce repas utilise VRAIMENT.
+ *
+ * Sert a ne signaler l'absence que de ce qui manque pour de bon. Le dejeuner
+ * annoncait « Aucun laitage utilisable dans ton frigo » et « Aucun fruit
+ * utilisable » — deux roles que son modele ne demande pas. Signaler l'absence
+ * de ce qu'on n'a jamais reclame n'informe de rien et fait douter du reste.
+ *
+ * L'huile a longtemps ete ajoutee ici sans condition, et reproduisait
+ * exactement le meme travers : le petit-dejeuner affichait « Aucune huile
+ * utilisable dans ton frigo » alors qu'il y en avait, simplement parce que ce
+ * repas n'en sert pas. Elle suit donc la regle commune : elle ne figure que si
+ * le modele la demande.
+ */
+export const rolesDuRepas = (repas: Repas): Set<Role> => {
+  const m = MODELE[repas];
+
+  return new Set<Role>([
+    m.proteine, m.glucide, m.lipide,
+    ...m.imposes.map((i) => i.role),
+  ]);
+};
+
+const sansAccent = (v: string): string =>
+  v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 
 export interface Composition {
@@ -150,9 +208,18 @@ export function composer(
 ): Composition {
   const utilisables = disponibles.filter((a) => roleDe(a) !== null);
 
+  const modele = MODELE[repas];
+
   const choisir = (role: Role): Aliment | undefined => {
     const candidats = utilisables.filter((a) => roleDe(a) === role);
     if (candidats.length === 0) return undefined;
+
+    /* L'aliment nommé par le plan passe devant, s'il est là. */
+    const voulu = modele.preferes?.[role];
+    if (voulu !== undefined) {
+      const nomme = candidats.find((a) => sansAccent(a.nom).includes(sansAccent(voulu)));
+      if (nomme !== undefined) return nomme;
+    }
 
     /* Départage stable : d'abord ce qui n'a pas encore servi aujourd'hui,
        puis l'ordre du stock. Un tri instable rendrait deux générations
@@ -162,16 +229,14 @@ export function composer(
     return (neufs.length > 0 ? neufs : candidats)[0];
   };
 
-  const modele = MODELE[repas];
-
-  const proteine = choisir('proteine');
-  const glucide = choisir('glucide');
+  const proteine = choisir(modele.proteine);
+  const glucide = choisir(modele.glucide);
   const huile = choisir('huile');
 
   /* L'oléagineux pilote les lipides. À défaut — aucun en stock — c'est
      l'huile qui prend ce rôle, et elle cesse alors d'être une quantité fixe :
      sans elle, plus rien ne porterait les lipides. */
-  const oleagineux = choisir('lipide');
+  const oleagineux = choisir(modele.lipide);
   const lipide = oleagineux ?? huile;
 
   const variables: Variables = {};
@@ -211,7 +276,7 @@ export function composer(
 
 export interface Plafonne {
   /** le rôle dont l'aliment a débordé, pour l'afficher au bon endroit */
-  role: 'proteine' | 'glucide' | 'lipide';
+  role: Role;
   aliment: Aliment;
   /** ce qu'il en restait réellement, en grammes à cuire */
   grammes: number;
@@ -226,11 +291,19 @@ export interface Ajuste {
   resultat: Resultat;
 }
 
-/** Ce qui peut prendre le relais d'un rôle : l'huile supplée l'oléagineux. */
-const RELEVE: Record<'proteine' | 'glucide' | 'lipide', Role[]> = {
-  proteine: ['proteine'],
-  glucide: ['glucide'],
-  lipide: ['lipide', 'huile'],
+/**
+ * Ce qui peut prendre le relais d'un aliment épuisé : un aliment du MÊME
+ * rôle. L'huile supplée l'oléagineux, et rien d'autre ne se supplée.
+ *
+ * On regarde le rôle de l'aliment qui déborde, pas le nom de la variable :
+ * quand le skyr manquait, la variable « proteine » de la collation cherchait
+ * une protéine et proposait du blanc de poulet à 16 h.
+ */
+const releveDe = (a: Aliment): Role[] => {
+  const role = roleDe(a);
+  if (role === 'lipide' || role === 'huile') return ['lipide', 'huile'];
+
+  return role === null ? [] : [role];
 };
 
 /**
@@ -269,7 +342,57 @@ export function ajusterAuStock(
   /* Une boucle bornée : chaque tour consomme un aliment du stock, et le
      stock est fini. La borne n'est là que pour qu'un cas non prévu s'arrête
      au lieu de figer l'écran. */
+  /** Ce qu'il faudrait peser pour servir cette quantité imposée. */
+  const aCuireDe = (f: Fixe): number =>
+    convertir(f.aliment, versReference(f.aliment, f.grammes, f.unite)).aCuire;
+
   for (let tour = 0; tour < 12; tour += 1) {
+    /* Les quantités IMPOSÉES passent devant, parce qu'elles ne se discutent
+       pas : 200 g de brocoli quand il en reste 60, c'est une consigne qu'on
+       ne peut pas suivre, et tout ce que le solveur calcule autour repose
+       dessus. Longtemps seules les variables étaient confrontées au stock ;
+       le légume, l'huile, les blancs d'œufs et le fruit du plan passaient au
+       travers, et l'application affichait sereinement une quantité que le
+       frigo ne contenait pas. */
+    const iDeborde = fixes.findIndex(
+      (f) => aCuireDe(f) > stockDe(f.aliment) + 0.5);
+
+    if (iDeborde >= 0) {
+      const f = fixes[iDeborde]!;
+      const dispo = stockDe(f.aliment);
+      const r = f.aliment.ratio > 0 ? f.aliment.ratio : 1;
+      /* Le manque se compte DANS L'ASSIETTE : c'est la portion servie que le
+         plan fixe, pas le poids à la balance, et le relais n'a ni le même
+         rendement de cuisson ni la même densité. */
+      const manque = convertir(f.aliment, versReference(f.aliment, f.grammes, f.unite))
+        .assiette - dispo * r;
+
+      const permis = releveDe(f.aliment);
+      const releve = candidats.find(
+        (c) => permis.includes(roleDe(c) as Role)
+          && !utilises.has(c.id)
+          && stockDe(c) > 0);
+
+      // `unite: 'cru'` : le stock se compte avant cuisson, comme la colonne « à cuire »
+      fixes = fixes.map((x, i) => (i === iDeborde
+        ? { aliment: x.aliment, grammes: dispo, unite: 'cru' as const }
+        : x));
+
+      if (releve !== undefined && manque > 0.5) {
+        fixes = [...fixes, { aliment: releve, grammes: manque, unite: 'cuit' as const }];
+        utilises.add(releve.id);
+      }
+
+      plafonnes.push({
+        role: roleDe(f.aliment) ?? 'glucide',
+        aliment: f.aliment,
+        grammes: dispo,
+        releve: manque > 0.5 ? releve : undefined,
+      });
+
+      continue;
+    }
+
     const resultat = calculer(cibles, variables, fixes, { glucidesTotaux });
 
     const cles = ['proteine', 'glucide', 'lipide'] as const;
@@ -297,8 +420,9 @@ export function ajusterAuStock(
     fixes = [...fixes, { aliment: deborde.aliment, grammes: deborde.dispo, unite: 'cru' }];
     delete variables[deborde.cle];
 
+    const permis = releveDe(deborde.aliment);
     const releve = candidats.find(
-      (c) => RELEVE[deborde.cle].includes(roleDe(c) as Role)
+      (c) => permis.includes(roleDe(c) as Role)
         && !utilises.has(c.id)
         && stockDe(c) > 0);
 
@@ -379,9 +503,24 @@ export function resoudreAuMieux(
   ) => {
     const tente = ajusterAuStock(
       { variables, fixes }, cibles, stockDe, candidats, glucidesTotaux);
-    if (penalite(tente.resultat) < penalite(meilleur.resultat)) {
-      meilleur = { ...tente, echanges: [echange] };
-    }
+    if (penalite(tente.resultat) >= penalite(meilleur.resultat)) return;
+
+    /* Le plafonnement du stock peut faire revenir l'aliment qu'on venait de
+       sortir : il redevient le relais d'un autre. Annoncer « X ne permettait
+       pas de tenir les objectifs » alors que X est toujours au menu, sur sa
+       propre ligne, est un mensonge d'affichage. Dans ce cas on garde le
+       résultat, mais sans prétendre à un échange. */
+    const revenu = Object.values(tente.variables).some((a) => a.id === echange.retire.id)
+      || tente.fixes.some((f) => f.aliment.id === echange.retire.id);
+
+    /* Et le remplaçant doit peser quelque chose. Quand le repas est déjà trop
+       gras, l'huile promue variable retombe à zéro : annoncer « c'est l'huile
+       qui s'en charge » sous une ligne vide n'aide personne. Les diagnostics
+       disent alors la vérité — trop gras — et c'est suffisant. */
+    const sert = tente.resultat.quantites.some(
+      (q) => q.aliment.id === echange.mis.id && q.aCuire > 0);
+
+    meilleur = { ...tente, echanges: revenu || !sert ? [] : [echange] };
   };
 
   /* 1. Les lipides : l'huile prend le relais de l'oléagineux. Elle est
@@ -402,8 +541,22 @@ export function resoudreAuMieux(
         au-delà, on ne fait plus que raboter des dixièmes de gramme. */
   const proteine = depart.variables.proteine;
   if (proteine !== undefined && !verrous.has('proteine')) {
+    /* Le rôle de CELUI QU'ON REMPLACE, pas le nom de la case. À 16 h la
+       variable « proteine » porte un laitage : y glisser un blanc de poulet
+       parce que la case s'appelle « proteine » donnait une collation au
+       poulet — et, quand les blancs d'œufs étaient déjà servis en quantité
+       imposée, le même aliment deux fois sur deux lignes. */
+    const role = roleDe(proteine);
+
+    /* Un aliment déjà au menu ne peut pas « remplacer » : il s'ajouterait à
+       lui-même. */
+    const dejaLa = new Set<Aliment['id']>([
+      ...depart.fixes.map((f) => f.aliment.id),
+      ...Object.values(depart.variables).map((a) => a.id),
+    ]);
+
     const maigres = candidats
-      .filter((c) => roleDe(c) === 'proteine' && c.id !== proteine.id && stockDe(c) > 0)
+      .filter((c) => roleDe(c) === role && !dejaLa.has(c.id) && stockDe(c) > 0)
       .sort((a, b) => grasParProteine(a) - grasParProteine(b))
       .slice(0, 3);
 
