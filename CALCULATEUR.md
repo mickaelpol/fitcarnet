@@ -5,6 +5,10 @@ l'écran, dans quel ordre, et pourquoi chaque choix a été fait plutôt qu'un
 autre. Tout ce qui y figure a été arrêté avec Mickaël ; ce qui reste à
 trancher est marqué **À TRANCHER**.
 
+**L'étape 1 est livrée et sert tous les jours.** Les étapes 2 et 3 restent à
+faire. Ce qui suit décrit le parcours complet ; les écarts entre le texte et
+le code sont signalés au fil.
+
 ---
 
 ## Ce que le calculateur n'est pas
@@ -95,20 +99,35 @@ illisibles.
 partage un mode de cuisson et une température, et on termine par le tableau
 de répartition.
 
-### 5. Le tableau de répartition (batch cooking)
+### 5. Le tableau — quatre colonnes
 
-Quatre colonnes :
+C'est la forme de l'écran d'aujourd'hui, et elle vaudra telle quelle pour le
+batch cooking.
 
-| repas | cru | cuit | dans l'assiette pour 1 personne |
+| aliment | à cuire | cuit | 1 pers. |
 |---|---|---|---|
 
-- **cru** : ce qu'il faut peser avant cuisson, pour toutes les portions.
-- **cuit** : ce que ça pèsera après, calculé avec le ratio de l'aliment.
-- **dans l'assiette** : la part d'une seule personne, celle qui respecte tes
-  macros au gramme près.
+- **à cuire** : ce qu'on pose sur la balance, avant cuisson, pour toutes les
+  portions. Riz **sec**, viande **crue**, légume **cru** — sans exception.
+- **cuit** : ce que ça pèsera après, d'après le rendement de l'aliment.
+- **1 pers.** : la part d'une seule personne, et **c'est elle qui porte les
+  macros du repas au gramme près**.
 
-C'est la colonne de droite qui fait tout l'intérêt du batch : sans elle, on
-sait quoi cuire mais plus comment se servir.
+Le nom de la colonne compte : « à cuire » et non « cru », parce qu'un riz se
+pèse SEC et non cru. Le mot juste évite la faute.
+
+**Pourquoi peser cru et manger cuit revient au même.** La cuisson ne détruit
+ni protéine, ni glucide, ni lipide : elle ne déplace que de l'eau. Les
+nutriments de 200 g de brocoli cru sont encore dans les 150 g cuits. Compter
+sur le poids pesé est donc exact — à condition que l'état de référence de
+chaque aliment soit le bon, ce que le type partagé garantit désormais par
+construction (voir `ETAT.md`).
+
+**Un piège qui a coûté cher.** Pour un féculent, le rendement se simplifie
+entre les deux colonnes : le poids à peser est le même à 2,26 comme à 4,68,
+seule la colonne « cuit » en dépend. Il faut donc **peser le sec** ; peser le
+poids cuit affiché quand le rendement est faux fait manger jusqu'à deux fois
+moins de glucides. Trois tests verrouillent la propriété.
 
 ---
 
@@ -131,10 +150,22 @@ que tu n'as pas, et ne décide pas à ta place de ce que tu gardes.
 
 ## Le stock
 
-Le calculateur ne propose que ce qui est dans ton frigo, et **vérifie le
-total sur tous les repas sélectionnés**. Sans ce cumul, deux repas peuvent
-réclamer les mêmes 200 g de riz et le plan devient physiquement impossible —
-un piège qui n'apparaît qu'à partir de deux jours.
+Le calculateur ne propose que ce qui est dans ton frigo, et **aucune quantité
+ne dépasse ce qu'il en reste** — ni les quantités ajustables, ni les
+quantités imposées. Longtemps seules les premières étaient confrontées au
+stock : le légume, l'huile et les blancs d'œufs passaient au travers, et
+l'application affichait sereinement 200 g de brocoli quand il en restait 60.
+
+Un aliment plafonné devient une quantité imposée, et le manque est confié à un
+AUTRE aliment du même rôle : 200 g de saumon plus du poulet pour le reste des
+protéines. S'il n'y a plus personne pour prendre le relais, la macro n'est
+plus atteignable et c'est dit en clair, plutôt que de promettre un repas
+impossible.
+
+**Le cumul sur plusieurs repas reste à faire** (étape 2). Aujourd'hui chaque
+repas voit le stock entier ; deux repas peuvent donc réclamer les mêmes 200 g
+de riz. Le piège n'existe pas sur un seul repas à la fois, mais il apparaîtra
+dès le calendrier.
 
 Un aliment sans poids connu — litre, pack — reste écarté du calcul, comme
 partout ailleurs dans l'app. On ne devine pas une densité.
@@ -166,29 +197,117 @@ pas.
 
 ### De quoi se compose un repas généré
 
-Un aliment par rôle, pris dans le stock :
+**Sept rôles, un par catégorie.** Le rôle dit quelle macro l'aliment pilote,
+et rien du moment de la journée :
 
-| rôle | catégories | quantité |
+| rôle | catégorie |
+|---|---|
+| protéine | `prot` |
+| laitage | `lait` |
+| glucide | `fec` |
+| fruit | `fruit` |
+| oléagineux | `ole` |
+| huile | `huile` |
+| légume | `leg` |
+
+Le **fruit** et le **laitage** ont leur propre rôle depuis qu'un
+petit-déjeuner doit porter un féculent ET un fruit, et la collation DEUX
+sources de protéines — le skyr et les blancs d'œufs. Confondus sous un rôle
+commun, l'un chassait l'autre.
+
+**Chaque repas a sa forme**, décrite une seule fois dans `MODELE`
+(`src/solveur/composer.ts`). Ce n'est pas une règle devinée : c'est la façon
+dont Mickaël mange, dictée par lui. Une table qui prétendrait déduire ça des
+catégories se tromperait — c'est une habitude, pas une propriété des aliments.
+
+| repas | les trois variables | ce qui est imposé |
 |---|---|---|
-| protéine | `prot`, `lait` | calculée par le solveur |
-| glucide | `fec`, `fruit` | calculée par le solveur |
-| oléagineux | `ole` | calculée par le solveur |
-| huile | `huile` | fixe, 10 g par portion |
-| légume | `leg` | fixe, 150 g par portion |
+| Matin | protéine · glucide · oléagineux | 55 g de fruit |
+| Midi | protéine · glucide · oléagineux | 5 g d'huile · 200 g de légume |
+| 16 h | **laitage** · glucide · oléagineux | 175 g de blancs d'œufs · 83 g de fruit |
+| Soir | protéine · glucide · oléagineux | 5 g d'huile · 200 g de légume |
+
+Les quantités imposées sont **celles du plan**, pas des moyennes inventées.
+Elles restent modifiables repas par repas.
+
+À 16 h, c'est le **laitage** qui porte la cible protéique et les blancs d'œufs
+qui sont figés : trois macros ne déterminent que trois inconnues, l'un des
+deux devait être fixe, et c'est celui qui se dose au verre doseur.
+
+Le modèle peut aussi **nommer** un aliment — l'avoine le matin, la banane à
+16 h. C'est une préférence, pas une contrainte : absent du frigo, on prend
+n'importe quel aliment du rôle. Elle existe parce qu'un plan nomme ses
+aliments et qu'aucune propriété nutritionnelle ne permet de le deviner.
 
 **Trois variables, pas quatre.** L'huile et l'oléagineux figurent tous deux au
 repas, mais un seul des deux peut s'ajuster : trois macros ne déterminent que
 trois inconnues, et laisser les quatre libres donnerait une infinité de
 solutions toutes également valables. On fige donc celle qui se dose à la
-cuillère et non à la balance ; l'oléagineux absorbe le reste. Les deux
-quantités restent modifiables repas par repas.
+cuillère et non à la balance ; l'oléagineux absorbe le reste.
 
 S'il n'y a aucun oléagineux en stock, c'est l'huile qui porte les lipides et
-cesse d'être fixe — sans elle, plus rien ne les porterait. Un légume ou une
-huile absents ne sont pas des manques : le repas s'en passe.
+cesse d'être fixe — sans elle, plus rien ne les porterait.
 
-C'est le découpage déjà utilisé par l'écran actuel, à ceci près que l'app
-choisit au lieu d'attendre que tu ajoutes les lignes.
+**On ne signale que ce qui manque VRAIMENT.** Un repas ne réclame que les
+rôles de son modèle. Le déjeuner a longtemps annoncé « Aucun laitage
+utilisable dans ton frigo » et « Aucun fruit utilisable » — deux rôles qu'il
+ne demande pas ; puis le petit-déjeuner s'est mis à réclamer de l'huile alors
+qu'il n'en sert pas. Un message faux coûte plus cher qu'un message absent :
+il fait douter de tous les autres.
+
+### Quand la combinaison ne tombe pas juste
+
+Le calculateur essaie d'autres aliments **avant** de renvoyer l'utilisateur
+corriger à la main. Deux échanges, ceux qui correspondent aux impasses
+réelles :
+
+- **les lipides ne tiennent pas** — l'oléagineux tombe à zéro et le gras reste
+  hors cible : on confie les lipides à l'huile, qui cesse d'être figée ;
+- **la protéine est trop grasse** — aucun oléagineux ne peut compenser : on
+  essaie les protéines les plus maigres du stock.
+
+Un rôle que l'utilisateur a choisi lui-même n'est **jamais** remplacé dans son
+dos. Et un échange n'est annoncé que s'il a vraiment eu lieu : si le
+remplaçant pèse zéro, ou si l'aliment sorti revient par ailleurs, on se tait
+plutôt que de mentir sur sa propre ligne.
+
+### Ajouter un aliment hors des rôles
+
+Un vrai petit-déjeuner porte deux protéines et deux glucides. Un aliment par
+rôle ne sait pas écrire ça. Le bouton **« + Ajouter un aliment »** pose donc
+une quantité IMPOSÉE, saisie par l'utilisateur, et le repas se recalcule
+autour — quatre aliments ajustables pour trois macros n'auraient pas de
+solution unique.
+
+---
+
+## Ce que le calculateur ne peut pas rattraper
+
+Le solveur est juste : il résout exactement le système qu'on lui donne. Sa
+faiblesse n'est pas l'algèbre, c'est ce qu'on lui raconte sur les aliments. Un
+riz dont les valeurs sont celles du sec mais qu'on déclare cuit se calcule
+parfaitement — il fait simplement manger deux fois trop de glucides, et aucun
+test du solveur ne peut le voir.
+
+`src/calcul/plausibilite.ts` regarde donc chaque aliment du frigo AVANT de
+composer, et se demande si ce qu'il raconte est physiquement possible :
+
+- des valeurs finies, positives, qui tiennent dans 100 g ;
+- des calories qui correspondent aux macros, à la règle d'Atwater près ;
+- un rendement qui va dans le bon SENS — une viande perd de l'eau, un féculent
+  en absorbe ;
+- un couple rendement/macros compatible : avec un rendement de 4,68 et
+  155 kcal/100 g cuits, 100 g de riz SEC porteraient 616 kcal, plus dense que
+  du beurre.
+
+Ce dernier contrôle ne dépend d'aucune table : c'est la conservation de
+l'énergie, qu'aucune casserole ne viole. Il ne dit pas que la pesée est
+fausse — il dit que les deux nombres décrivent deux produits différents, et
+propose les deux corrections possibles.
+
+Ce que le module trouve s'affiche en tête du calculateur. Il ne bloque rien :
+l'aliment est peut-être le seul du frigo. Mais il ne laisse pas non plus
+bâtir dessus sans un mot.
 
 ---
 
@@ -218,11 +337,17 @@ Trois étapes, chacune utilisable seule. Livrer les trois d'un coup, c'est
 trois semaines avant de pouvoir juger, et la certitude de se tromper sur des
 détails qui ne se voient qu'à l'usage.
 
-**Étape 1 — aujourd'hui.**
+**Étape 1 — aujourd'hui. LIVRÉE.**
 Le sélecteur, les quatre cases avec le nombre de personnes, la génération
-depuis le frigo, **l'étape de correction et de validation**, le plié/déplié,
-les macros, la substitution et les restes.
-*À la fin de cette étape, le calculateur sert tous les jours.*
+depuis le frigo réel, la correction, le plié/déplié, les macros par personne,
+la substitution, les restes, l'ajout d'un aliment, le plafonnement par le
+stock et le garde-fou sur les données.
+*Le calculateur sert tous les jours.*
+
+Deux choses ont été ajoutées en route, absentes du plan d'origine : la
+**convention glucidique** — une cible peut être exprimée en glucides TOTAUX,
+fibres comprises, comme le font les plans nord-américains — et le **garde-fou
+sur les données**, né des pannes rencontrées.
 
 **Étape 2 — plusieurs jours.**
 Le calendrier, les en-têtes par date, la correction et la validation étendues

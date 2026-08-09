@@ -43,21 +43,60 @@ Six tests, dont le réordonnancement pendant la mesure.
 **Modèles.** Glisser-déposer, propagation de l'ordre aux séances existantes,
 suppression.
 
-**Repas.** Solveur linéaire exact à 47 tests : substitution sans toucher aux
-macros, restes à écouler saisissables en cru ou en cuit, calcul souple quand
-il manque des variables. Valeurs nutritionnelles issues de Ciqual (Anses),
-ratios cru/cuit dérivés de la conservation de l'énergie.
+**Repas.** Solveur linéaire exact : substitution sans toucher aux macros,
+restes à écouler saisissables en cru ou en cuit, calcul souple quand il manque
+des variables. Valeurs nutritionnelles issues de Ciqual (Anses).
 
-**Tests.** 84 au total, tous dans `npm test` : 47 pour le solveur, 26 pour
-`nutrition.ts` et `frigo.ts`, 6 pour la mesure d'effort, 5 pour le
-regroupement des renouvellements de jeton.
+**Calculateur de repas.** Branché sur `/api/mon-frigo`. On coche les repas du
+jour et le nombre de convives, l'application compose depuis le stock réel, on
+corrige, elle recalcule. Quatre colonnes :
+
+| aliment | à cuire | cuit | 1 pers. |
+
+**« À cuire » est ce qu'on pose sur la balance, sur TOUTES les lignes** — riz
+sec, viande crue, légume cru. « Cuit » dit ce qui sortira de la casserole,
+« 1 pers. » ce qu'on met dans une assiette. Et le contenu de cette assiette
+porte exactement les macros du repas réglées dans le compte : c'est le contrat
+de l'écran, et deux tests le vérifient sur mille scénarios.
+
+Le stock a le dernier mot — quantités ajustables ET imposées. Une quantité
+plafonnée est annoncée, et le manque confié à un autre aliment du même rôle.
+
+**Garde-fou sur les données.** `src/calcul/plausibilite.ts` regarde chaque
+aliment du frigo et se demande si ce qu'il raconte est physiquement possible :
+rendement à contresens, plus de 100 g de nutriments dans 100 g de produit,
+calories qui ne collent pas aux macros, couple rendement/macros impossible. Ce
+qu'il trouve s'affiche en tête du calculateur, avant de composer.
+
+**Tests.** 211 côté front (`npm test`), 93 + 17 côté Python, 45 côté PHP.
+
+Le gros morceau est `src/solveur/garanties.test.ts` : 250 frigos tirés au sort
+— avec une graine fixe, donc rejouables à l'identique — × 4 repas, soit mille
+scénarios, sur lesquels une trentaine de PROPRIÉTÉS doivent tenir. Pas des cas :
+des phrases qui doivent rester vraies quoi qu'il arrive. « Les macros annoncées
+sont celles des grammes du tableau », « aucune quantité ne dépasse ce qu'il
+reste », « ce qui est dans une assiette porte les macros du compte ».
+
+`test_ecriture_grocy.py` lance le VRAI script d'import contre un Grocy factice
+qui refuse comme le vrai. C'est le seul moyen d'attraper une panne d'écriture ;
+sans lui, un champ manquant n'a été découvert qu'en production.
+
+**Chaque garde-fou est vérifié par mutation** : on casse le code sur un point
+précis, on regarde le test tomber. Un test qui passe quoi qu'il arrive ne
+protège rien.
+
 `tsconfig.tests.json` liste les fichiers testés — **toute nouvelle cible doit
 y être ajoutée**, sinon le test compile mais ne s'exécute jamais.
 
-**Import Ciqual.** `ciqual_vers_grocy.py` écrit `fibres100` avec les autres
-macros. Absente de la table, la valeur part vide et non à zéro : « inconnu »
-et « aucune fibre » ne se valent pas. Les deux pesées ne sont jamais écrites
-par le script — voir les décisions.
+**Import Ciqual.** `ciqual_vers_grocy.py` écrit les macros et `fibres100`.
+Absente de la table, la valeur part vide et non à zéro : « inconnu » et
+« aucune fibre » ne se valent pas. Le script crée lui-même les champs
+personnalisés Grocy dont il a besoin, et n'écrit jamais les pesées.
+
+Il signale ce qu'il ne peut pas trancher seul : un appariement dont un mot
+décisif — `naturel`, `huile`, `complet`, `écrémé` — ne figure que d'un côté,
+un couple rendement/macros impossible, une énergie qui ne colle pas. Et il
+laisse intact tout produit marqué `source_valeurs = moi`.
 
 **Frigo.** `/api/mon-frigo` renvoie une forme unique quelle que soit la
 source : Grocy pour le compte administrateur, table `aliment` pour les
@@ -134,9 +173,14 @@ allumé indéfiniment.
 
 ## Ce qui reste
 
-**Calculateur de repas.** Toujours branché sur des données de démonstration ;
-il doit lire `/api/mon-frigo`. Et l'écran s'ouvre vide — il faudrait
-reprendre la composition du dernier repas du même type.
+**Calculateur, étapes 2 et 3.** L'étape 1 — aujourd'hui — sert tous les
+jours. Restent le calendrier sur plusieurs jours avec le contrôle du stock
+CUMULÉ, puis le batch cooking. Voir `CALCULATEUR.md`.
+
+**Les rendements non mesurés.** Ceux des légumes et de quelques féculents
+valent 1 faute de mesure. Sans conséquence sur les macros — elles se comptent
+sur le poids pesé — mais la colonne « cuit » reste approximative tant qu'une
+pesée n'a pas été faite.
 
 **Déploiement NAS.** Image Docker, webhook Gitea vers n8n, sauvegarde
 automatisée de la base. Un dev build EAS fait partie du lot.
@@ -212,18 +256,75 @@ corps et jamais dans l'URL, qui finirait dans les journaux du serveur.
 L'application les présente comme « mesuré : 100 g avant cuisson → 187 g
 après ». Or le script ne pèse rien : il divise deux énergies Ciqual. Y poser
 100 et 187 ferait passer une dérivation pour une mesure, et effacerait les
-pesées réelles à chaque réimport. Le ratio, lui, est bien écrit — c'est la
-valeur utile. **L'inverse est vrai aussi** : quand les deux pesées existent
-dans Grocy, le script en tire le ratio et ignore celui de Ciqual. Une mesure
-faite sur ton riz vaut mieux qu'une moyenne nationale.
+pesées réelles à chaque réimport.
 
-**Ratio cru/cuit dérivé de l'énergie.** La cuisson n'ajoute que de l'eau :
-riz complet à 350 kcal secs et 187 cuits donne un ratio de 1,87, et non 3
-comme supposé initialement.
+**Une pesée de l'utilisateur gagne À LA LECTURE, pas à l'écriture.** Le
+rendement n'est plus une colonne qu'on espère à jour : `AlimentDisponible` le
+DÉRIVE des deux pesées quand elles existent. Aucun import ne peut donc plus
+l'écraser, ni côté Grocy ni côté base — la règle s'applique au moment où on
+lit, quoi qu'il ait été écrit avant. Elle vaut pour l'administrateur comme
+pour un compte ordinaire : les deux ont le même bouton « je préfère mesurer ».
+
+Le rendement était auparavant réécrit par le script à chaque passage, et une
+pesée de riz — 84 g secs pour 393 g cuits — avait été jetée en silence pour
+« écart avec Ciqual ». Une mesure et une table ne se contredisent pas : elles
+décrivent deux produits différents.
+
+Seule exception, et elle ne se discute pas : une mesure à CONTRESENS — une
+viande qui grossirait en cuisant, un féculent qui rétrécirait. Là, les deux
+colonnes de l'écran s'inverseraient. La table reprend la main, et l'écart est
+annoncé au lieu d'être tu.
+
+**Ce qui est saisi à la main n'est jamais réécrit.** Aucune table ne couvre
+tout : Ciqual n'a pas de sardine « au naturel », seulement du cru, du grillé
+et cinq versions à l'huile de 194 à 224 kcal. Pour ces produits, l'étiquette
+de la boîte bat n'importe quelle moyenne. Le produit porte donc
+`source_valeurs = moi` dès que l'application écrit ses macros, et le script
+d'import le saute. Sans cette marque, recopier une étiquette ne servait à
+rien : le prochain import reprenait la main.
+
+**Le rendement cru/cuit ne se dérive de l'énergie QUE pour un grain sec.**
+L'hypothèse — la cuisson n'ajoute que de l'eau, donc l'énergie se conserve —
+est vraie d'un grain, qui absorbe sans rien perdre. Elle est FAUSSE d'un
+légume à l'eau bouillante, dont les sucres partent dans la casserole. Étendue
+aux légumes, elle donnait un épinard à 1,70 : il aurait fallu en peser 119 g
+crus pour en servir 200 g cuits, quand il en faut 500 à 700. Facteur cinq,
+dans le mauvais sens, sur toutes les portions de légumes. Le script refuse
+maintenant de démarrer si un légume figure dans cette table.
+
+**Un légume se pèse CRU, comme une viande.** 200 g de brocoli sur la balance,
+150 g dans l'assiette après la vapeur : personne ne pèse un légume après
+cuisson. Tant qu'ils portaient leurs valeurs cuites, la colonne « à cuire » ne
+pouvait être juste qu'en connaissant leur rendement — et il n'est pas
+dérivable. Référencés au cru, tout rentre dans l'ordre : à la vapeur seule
+l'eau part, les nutriments de 200 g de brocoli cru sont encore dans les 150 g
+cuits. Le rendement ne sert alors plus qu'à AFFICHER le poids servi, et peut
+être approximatif sans qu'une macro bouge.
+
+**L'état de référence se DÉDUIT de la catégorie, il ne se stocke pas.** Il y
+a eu deux règles pour la même chose : Grocy la déduisait, la base la lisait
+dans une colonne qui pouvait dire le contraire. Les deux rendaient pourtant le
+même `AlimentDisponible`, et rien ne pouvait signaler qu'elles divergeaient —
+un compte ordinaire dont la colonne portait « cru » sur un féculent mangeait
+jusqu'à trois fois trop de glucides. La règle vit dans
+`App\Service\EtatReference` et `AlimentDisponible` la dérive : la divergence
+est devenue impossible à écrire. La colonne survit pour l'historique et ne
+décide plus rien.
+
+**La colonne « à cuire » d'un féculent est exacte même si son rendement est
+faux.** Les macros cuites sont les macros sèches divisées par le rendement, et
+le poids à peser est le poids cuit divisé par ce même rendement : il se
+simplifie. Seule la colonne « cuit » en dépend. Conséquence contre-intuitive
+et importante : **il faut peser le féculent SEC.** Peser le poids cuit affiché
+quand le rendement est faux fait manger jusqu'à deux fois moins de glucides
+que prévu. Trois tests verrouillent cette propriété.
 
 **Deux dossiers SQL.** `db/` ne contient que ce qui s'applique à une base
 vierge — PostgreSQL ne le joue qu'à la création. `db/manuel/` contient les
 évolutions ultérieures, jouées par `installer.sh`, et doit rester idempotent.
+Elles sont exécutées dans l'ordre alphabétique, ce qui vaut ordre numérique
+tant qu'on préfixe : `15-legumes-peses-crus.sql` remplace les contraintes
+posées par `14-etat-reference-coherent.sql` et n'a de sens qu'après lui.
 
 **L'unicité du nom d'un aliment est PAR PROPRIÉTAIRE.** Deux index partiels,
 pas une contrainte globale : un nom commun est unique parmi les communs, un
