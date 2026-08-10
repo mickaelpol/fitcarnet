@@ -173,7 +173,14 @@ export function useEnregistrerAliment() {
 
   return useMutation({
     mutationFn: (v: {
+      /**
+       * Vide pour une CRÉATION : le produit n'existe pas encore dans Grocy et
+       * l'API l'y pose avant d'écrire ses valeurs. Renseignée, elle désigne
+       * un produit existant dont on corrige les valeurs.
+       */
       reference: string;
+      /** obligatoire à la création, ignoré ensuite — Grocy est maître du nom */
+      nom?: string;
       categorie: string;
       kcal100: number;
       prot100: number;
@@ -183,7 +190,8 @@ export function useEnregistrerAliment() {
       ratio: number;
       peseeAvant: number | null;
       peseeApres: number | null;
-    }) => api<{ ok: boolean }>('/mon-frigo/aliment', { methode: 'POST', corps: v }),
+    }) => api<{ ok: boolean; reference: string }>(
+      '/mon-frigo/aliment', { methode: 'POST', corps: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
   });
 }

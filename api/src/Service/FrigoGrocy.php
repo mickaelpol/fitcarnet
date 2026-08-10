@@ -190,6 +190,104 @@ final readonly class FrigoGrocy
     }
 
     /** Ecrit les valeurs nutritionnelles d'un produit. */
+    /**
+     * CREE un produit dans Grocy et rend son identifiant.
+     *
+     * Jusqu'ici l'application savait remplir les valeurs d'un produit, jamais
+     * en creer un : il fallait ouvrir Grocy, ajouter le produit, revenir dans
+     * l'app, saisir les macros. Deux outils pour un geste. Grocy reste le
+     * maitre de l'inventaire — c'est lui qui sort la liste de courses — mais
+     * rien n'oblige a passer par son interface pour y poser une ligne.
+     *
+     * TROIS CHOSES QUE GROCY EXIGE, ET QU'IL FAUT DEVINER PROPREMENT.
+     *
+     * Un produit ne peut exister sans emplacement ni unite. On ne les invente
+     * pas : on lit ce qui est deja configure, et on refuse clairement si la
+     * base Grocy n'a pas de quoi repondre. Un produit cree avec une unite au
+     * hasard serait pire qu'un refus — les valeurs nutritionnelles sont pour
+     * 100 g, et le calculateur ecarte silencieusement tout ce qui n'est pas
+     * convertible en grammes.
+     *
+     * Le nom en double est refuse ici plutot que laisse a Grocy : lui accepte
+     * deux produits homonymes sans broncher, et le frigo afficherait alors
+     * deux lignes identiques dont une seule porte les macros.
+     */
+    public function creerProduit(string $nom): int
+    {
+        if (!$this->estConfigure()) {
+            throw new \RuntimeException(
+                "Grocy n'est pas configuré : renseigne GROCY_URL et GROCY_API_KEY.");
+        }
+
+        $nom = \trim($nom);
+        if ('' === $nom) {
+            throw new \RuntimeException('Le nom est obligatoire.');
+        }
+
+        $repere = self::repere($nom);
+        foreach ($this->appeler('/objects/products') as $produit) {
+            if (self::repere((string) ($produit['name'] ?? '')) === $repere) {
+                throw new \RuntimeException(\sprintf(
+                    '« %s » existe déjà dans Grocy. Ouvre-le pour corriger ses valeurs.',
+                    (string) $produit['name']));
+            }
+        }
+
+        $idGramme = null;
+        foreach ($this->appeler('/objects/quantity_units') as $unite) {
+            if ('g' === self::normaliserUnite((string) ($unite['name'] ?? ''))) {
+                $idGramme = (int) $unite['id'];
+                break;
+            }
+        }
+        if (null === $idGramme) {
+            throw new \RuntimeException(
+                "Grocy n'a pas d'unité « gramme ». Crée-la dans Grocy avant "
+                . 'd\'ajouter un aliment : les valeurs nutritionnelles sont '
+                . 'pour 100 g, et le calculateur écarte tout ce qui ne se '
+                . 'convertit pas en grammes.');
+        }
+
+        $emplacements = $this->appeler('/objects/locations');
+        if ([] === $emplacements) {
+            throw new \RuntimeException(
+                "Grocy n'a aucun emplacement. Crée-en un (« Frigo », "
+                . '« Placard »…) avant d\'ajouter un aliment.');
+        }
+        /* Le premier emplacement fait un defaut acceptable : le produit est
+           visible tout de suite, et l'utilisateur le deplace dans Grocy si ce
+           n'est pas le bon. Mieux vaut un rangement approximatif qu'un
+           formulaire de plus a remplir pour ajouter du poulet. */
+        $idEmplacement = (int) $emplacements[0]['id'];
+
+        $cree = $this->appeler('/objects/products', 'POST', [
+            'name' => $nom,
+            'location_id' => $idEmplacement,
+            'qu_id_purchase' => $idGramme,
+            'qu_id_stock' => $idGramme,
+        ]);
+
+        $id = (int) ($cree['created_object_id'] ?? 0);
+        if ($id <= 0) {
+            throw new \RuntimeException(
+                'Grocy a accepté la création sans rendre d\'identifiant. '
+                . 'Vérifie dans Grocy si le produit existe avant de recommencer.');
+        }
+
+        return $id;
+    }
+
+    /** Un nom réduit à ce qui permet de reconnaître un doublon. */
+    private static function repere(string $nom): string
+    {
+        $sansAccent = \strtr(\mb_strtolower(\trim($nom)),
+            ['à' => 'a', 'â' => 'a', 'ä' => 'a', 'é' => 'e', 'è' => 'e', 'ê' => 'e',
+             'ë' => 'e', 'î' => 'i', 'ï' => 'i', 'ô' => 'o', 'ö' => 'o', 'ù' => 'u',
+             'û' => 'u', 'ü' => 'u', 'ç' => 'c']);
+
+        return (string) \preg_replace('/[^a-z0-9]+/', ' ', $sansAccent);
+    }
+
     public function enregistrer(int $idProduit, array $valeurs): void
     {
         $this->appeler('/userfields/products/' . $idProduit, 'PUT', $valeurs);

@@ -81,7 +81,16 @@ export default function MonFrigo() {
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
 
   /** Les comptes lisant Grocy gèrent leurs fiches et leurs quantités là-bas. */
+  /* Qui tient la fiche d'un aliment : la base pour un compte ordinaire,
+     Grocy pour l'administrateur. Le geste, lui, est le meme des deux cotes —
+     l'ecran ne distingue les deux que pour choisir l'API. */
+  const surGrocy = frigo.data?.source === 'grocy';
   const modifiable = frigo.data?.source === 'base';
+  /* La CREATION, elle, est ouverte aux deux. Grocy reste maitre de
+     l'inventaire — c'est lui qui sort la liste de courses — mais rien
+     n'oblige a ouvrir son interface pour y poser une ligne : l'API cree le
+     produit puis ecrit ses valeurs dans le meme appel. */
+  const peutCreer = modifiable || surGrocy;
   const incomplets = useFrigoIncomplets(frigo.data?.source === 'grocy');
 
   /* Sans macros, l'aliment est écarté du frigo ; sans fibres, il y reste. Les
@@ -181,11 +190,16 @@ export default function MonFrigo() {
           </View>
         )}
 
-        {definir.isError && (
+        {/* La création se fait en deux temps : l'aliment, puis sa quantité.
+            Si le second échoue, le premier est déjà passé — le taire laisserait
+            croire que rien n'a été fait, et l'utilisateur recréerait un
+            doublon. On nomme donc précisément ce qui a marché. */}
+        {(definir.isError || envoyer.isError) && (
           <View style={s.alerte}>
             <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 17 }}>
               L'aliment a bien été créé, mais sa quantité n'a pas pu être posée :
-              {' '}{definir.error.message}. Renseigne-la depuis l'inventaire.
+              {' '}{(definir.error ?? envoyer.error)?.message}.
+              {' '}Renseigne-la depuis l'inventaire.
             </Discret>
           </View>
         )}
@@ -287,7 +301,7 @@ export default function MonFrigo() {
       {/* Barre du bas, présente dans les deux modes : c'est elle qui porte
           l'action principale, à portée du pouce. Sa présence constante évite
           que la liste ne se redimensionne au changement de mode. */}
-      {mode === 'stock' && modifiable && (
+      {mode === 'stock' && peutCreer && (
         <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
           <Bouton onPress={() => { creer.reset(); definir.reset(); setChoixModele(true); }}>
             Ajouter un aliment
@@ -333,20 +347,27 @@ export default function MonFrigo() {
         </View>
       )}
 
-      {/* ---- compte Grocy : correction des macros, nom et état verrouillés ---- */}
+      {/* ---- compte Grocy : création, et correction des macros ---- */}
       <EditeurAliment
-        visible={edite !== null && !modifiable}
-        titre={edite?.nom ?? 'Aliment'}
-        aliment={edite !== null ? versSaisie(edite) : undefined}
-        enCours={enregistrer.isPending}
+        visible={surGrocy && (nouveau !== null || edite !== null)}
+        titre={nouveau !== null ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment')}
+        aliment={nouveau ?? (edite !== null ? versSaisie(edite) : undefined)}
+        enCours={enregistrer.isPending || envoyer.isPending}
         erreur={enregistrer.error?.message ?? null}
-        nomModifiable={false}
-        onFermer={() => setEdite(null)}
+        /* Le nom ne se saisit qu'à la création : ensuite Grocy en est maître,
+           et le changer ici ferait diverger les deux outils. */
+        nomModifiable={nouveau !== null}
+        quantite={nouveau !== null ? quantiteNouvelle : undefined}
+        onQuantiteChange={nouveau !== null ? setQuantiteNouvelle : undefined}
+        onFermer={() => { setNouveau(null); setEdite(null); setQuantiteNouvelle(''); }}
         onEnregistrer={(v) => {
-          if (edite === null) return;
+          if (nouveau === null && edite === null) return;
 
           enregistrer.mutate({
-            reference: edite.reference,
+            /* Vide = création : l'API pose le produit dans Grocy avant
+               d'écrire ses valeurs. */
+            reference: edite?.reference ?? '',
+            nom: v.nom.trim(),
             categorie: v.categorie,
             kcal100: v.kcal100,
             prot100: v.prot100,
@@ -356,7 +377,32 @@ export default function MonFrigo() {
             ratio: v.ratio,
             peseeAvant: v.peseeAvant ?? null,
             peseeApres: v.peseeApres ?? null,
-          }, { onSuccess: () => setEdite(null) });
+          }, {
+            onSuccess: (rendu) => {
+              if (nouveau === null) { setEdite(null); return; }
+
+              const q = parseFloat(quantiteNouvelle.replace(',', '.'));
+              setNouveau(null);
+              setQuantiteNouvelle('');
+
+              /* La quantité passe par l'INVENTAIRE, pas par `/mon-frigo/stock`
+                 qui est réservé aux comptes tenus en base et répond 409 ici.
+
+                 Ce n'est pas qu'une question de route : côté Grocy, poser une
+                 quantité EST un inventaire — on déclare le poids réellement
+                 présent, Grocy en déduit l'écart. C'est exactement ce qu'on
+                 veut à la création : le produit passe de « inconnu » à « j'en
+                 ai tant ».
+
+                 On l'envoie même à zéro. C'est cet appel qui crée la ligne de
+                 stock, donc qui rattache le produit à un emplacement — sans
+                 lui il resterait sous « Sans emplacement », tout en bas. */
+              envoyer.mutate([{
+                reference: rendu.reference,
+                quantite: Number.isNaN(q) ? 0 : q,
+              }]);
+            },
+          });
         }}
       />
 

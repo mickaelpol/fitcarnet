@@ -139,13 +139,32 @@ final class FrigoController extends AbstractController
         $donnees = (array) \json_decode($requete->getContent(), true);
         $reference = (string) ($donnees['reference'] ?? '');
 
-        if (!\str_starts_with($reference, 'grocy:')) {
-            return $this->json(['erreur' => 'Référence inattendue : ' . $reference], 422);
-        }
+        /* Sans reference, c'est une CREATION : le produit n'existe pas encore
+           dans Grocy et on l'y pose avant d'ecrire ses valeurs.
 
-        $idProduit = (int) \substr($reference, \strlen('grocy:'));
-        if ($idProduit <= 0) {
-            return $this->json(['erreur' => 'Produit non précisé.'], 422);
+           Les deux gestes tiennent dans le meme appel a dessein. Les separer
+           laisserait, au moindre echec entre les deux, un produit nu dans
+           Grocy — sans categorie ni calories, donc invisible au calculateur
+           et impossible a distinguer d'un oubli. Ici l'echec de l'ecriture
+           remonte tel quel : le produit reste, mais l'utilisateur voit le
+           message et le rouvre pour le completer. */
+        $creation = '' === $reference;
+
+        if ($creation) {
+            try {
+                $idProduit = $this->grocy->creerProduit((string) ($donnees['nom'] ?? ''));
+            } catch (\RuntimeException $e) {
+                return $this->json(['erreur' => $e->getMessage()], 422);
+            }
+        } else {
+            if (!\str_starts_with($reference, 'grocy:')) {
+                return $this->json(['erreur' => 'Référence inattendue : ' . $reference], 422);
+            }
+
+            $idProduit = (int) \substr($reference, \strlen('grocy:'));
+            if ($idProduit <= 0) {
+                return $this->json(['erreur' => 'Produit non précisé.'], 422);
+            }
         }
 
         $categorie = (string) ($donnees['categorie'] ?? '');
@@ -182,7 +201,10 @@ final class FrigoController extends AbstractController
             return $this->json(['erreur' => $e->getMessage()], 502);
         }
 
-        return $this->json(['ok' => true]);
+        /* La reference est rendue pour que l'ecran puisse enchainer sur la
+           quantite : c'est cet appel-la qui rattache le produit a un
+           emplacement, sans quoi il resterait sous « Sans emplacement ». */
+        return $this->json(['ok' => true, 'reference' => 'grocy:' . $idProduit]);
     }
 
     /**
