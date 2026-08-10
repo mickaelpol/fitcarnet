@@ -1,13 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCibles, useMonFrigo } from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
+import { Calendrier, libelleDuJour } from '@/composants/calendrier';
+import { Pliant } from '@/composants/pliant';
 import {
   MODELE, NOM_REPAS, REPAS,
-  type AuMieux, type DemandeRepas, type Repas, type Role,
-  composer, resoudreLaJournee, roleDe, rolesDuRepas,
+  type AuMieux, type DemandeDatee, type DemandeRepas, type Repas, type Role,
+  cleDuRepas, composer, listeDeCourses, resoudreLaPeriode, roleDe, rolesDuRepas,
 } from '@/solveur/composer';
 import { verifierCatalogue } from '@/calcul/plausibilite';
 import { versReference } from '@/solveur/solveur';
@@ -17,10 +20,19 @@ import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 /**
  * Le calculateur : l'application compose, tu corriges, elle recalcule.
  *
- * Étape 1 du parcours décrit dans CALCULATEUR.md — aujourd'hui seulement. Le
- * calendrier et le batch cooking viennent après ; il n'y a donc volontairement
- * aucun sélecteur « plusieurs jours » ici plutôt qu'un bouton mort.
+ * Étapes 1 et 2 du parcours décrit dans CALCULATEUR.md. Un plan tient sur un
+ * ou plusieurs jours, et UN SEUL JOUR N'EST PAS UN CAS PARTICULIER : c'est une
+ * période de longueur 1. Tout l'écran est indexé par `jour|repas`, et le
+ * solveur ne fait aucune différence entre les deux — ce qui évite deux chemins
+ * de code dont un seul serait testé.
+ *
+ * Le batch cooking (étape 3) reste à faire.
  */
+
+/* Les dates vivent dans `composants/calendrier` : rang, libellé et grille du
+   mois y sont écrits une fois. Cet écran ne manipule que des RANGS — 0 pour
+   aujourd'hui, 3 pour dans trois jours — et n'a donc besoin d'aucun calcul de
+   calendrier. */
 
 /* L'ordre d'affichage. `fixe` dit la quantité par personne quand le rôle
    n'est pas une variable du solveur — l'huile et le légume. */
@@ -150,15 +162,44 @@ const vers = (a: AlimentDisponible): Aliment => ({
 export default function Calculateur() {
   const frigo = useMonFrigo();
   const cibles = useCibles();
+  const insets = useSafeAreaInsets();
 
-  const [choisis, setChoisis] = useState<Record<Repas, boolean>>(
-    { R1: false, R2: false, R3: false, R4: false });
-  const [portions, setPortions] = useState<Record<Repas, number>>(
-    { R1: 1, R2: 1, R3: 1, R4: 1 });
-  const [plan, setPlan] = useState<Partial<Record<Repas, Compose>> | null>(null);
-  const [ouvert, setOuvert] = useState<Repas | null>(null);
-  const [remplacer, setRemplacer] = useState<{ repas: Repas; role: Role } | null>(null);
-  const [ajouter, setAjouter] = useState<Repas | null>(null);
+  /* --------------------------------------------------------- la période
+     Un plan tient sur un ou plusieurs jours. Un seul jour n'est pas un cas
+     particulier : c'est une période de longueur 1, et le solveur ne fait
+     aucune différence. Tout ce qui suit est donc indexé par `jour|repas` —
+     « 0|R2 » pour le déjeuner du premier jour. */
+
+  const [plusieurs, setPlusieurs] = useState(false);
+  /* Les jours retenus, en rang : [0] pour aujourd'hui seul, [0, 2, 3] pour
+     aujourd'hui, après-demain et le jour suivant. Toujours triés. */
+  const [rangs, setRangs] = useState<number[]>([0]);
+
+  const [choisis, setChoisis] = useState<Record<string, boolean>>({});
+  const [portions, setPortions] = useState<Record<string, number>>({});
+  const [plan, setPlan] = useState<Record<string, Compose> | null>(null);
+  const [ouvert, setOuvert] = useState<string | null>(null);
+  const [remplacer, setRemplacer] = useState<{ cle: string; role: Role } | null>(null);
+  const [ajouter, setAjouter] = useState<string | null>(null);
+  const [courses, setCourses] = useState(false);
+  /* Le pliage. Un seul jour ouvert à la fois — un accordéon, pas sept encarts
+     dépliés qui reproduiraient exactement le mur qu'on veut éviter. Le repas
+     détaillé, lui, est libre : on n'en ouvre qu'un parce qu'on n'en règle
+     qu'un. */
+  const [jourOuvert, setJourOuvert] = useState<number | null>(0);
+  const [detaille, setDetaille] = useState<string | null>(null);
+
+  /* Les jours réellement planifiés : un seul si le mode ne l'est pas. Rendus
+     dans l'ordre du temps, quel que soit l'ordre où on les a cochés. */
+  const joursRetenus = useMemo(
+    () => (plusieurs ? [...rangs].sort((x, y) => x - y) : [0]),
+    [plusieurs, rangs],
+  );
+
+  const coche = (rang: number, repas: Repas): boolean =>
+    choisis[cleDuRepas(rang, repas)] === true;
+  const convives = (rang: number, repas: Repas): number =>
+    portions[cleDuRepas(rang, repas)] ?? 1;
 
   /* Le calculateur ne travaille qu'avec ce qui a un poids connu : un litre ou
      un pack n'entrent pas dans un calcul de macros pour 100 g. Un aliment sans
@@ -199,57 +240,92 @@ export default function Calculateur() {
 
   /* Ce que les données racontent et qui ne peut pas être vrai.
      Le solveur est juste ; il ne peut rien contre un aliment dont les valeurs
-     mentent. Un riz dont les macros sont celles du sec mais qu'on déclare
-     cuit se calcule parfaitement — et fait manger deux fois trop. On le dit
-     AVANT de composer, pas après avoir mangé. */
+     mentent. Des valeurs de riz CUIT posées sur un riz qu'on pèse sec se
+     calculent parfaitement — et font peser trois fois trop. On le dit AVANT
+     de composer, pas après avoir mangé. */
   const anomalies = useMemo(() => verifierCatalogue(stock), [stock]);
 
   const cibleDe = (repas: Repas) => (cibles.data ?? []).find((c) => c.repas === repas);
 
-  /* TOUS les repas du plan, résolus EN UNE PASSE et dans l'ordre, parce
-     qu'ils puisent dans le même frigo. Chacun se plafonnait déjà à ce qu'il
-     restait ; aucun ne savait que les autres avaient servi avant lui. */
-  const resultats = useMemo(() => {
-    if (plan === null) return new Map<Repas, AuMieux>();
+  /* Les demandes du plan, dans l'ordre du temps. Sert deux fois : au calcul
+     réel, bridé par le frigo, et à la liste de courses, frigo plein. */
+  const demandes = useMemo((): DemandeDatee[] => {
+    if (plan === null) return [];
+    const out: DemandeDatee[] = [];
 
-    const demandes: DemandeRepas[] = [];
-    for (const repas of REPAS) {
-      const compose = plan[repas];
-      const cible = (cibles.data ?? []).find((c) => c.repas === repas);
-      if (compose === undefined || cible === undefined) continue;
-      demandes.push(demandePour(repas, compose, portions[repas], cible));
+    for (const rang of joursRetenus) {
+      for (const repas of REPAS) {
+        const cle = cleDuRepas(rang, repas);
+        const compose = plan[cle];
+        const cible = (cibles.data ?? []).find((c) => c.repas === repas);
+        if (compose === undefined || cible === undefined) continue;
+        /* Le RANG du calendrier sert directement de rang de période : le
+           solveur ne s'en sert que pour ordonner et pour nommer sa sortie.
+           Lui passer un index à part obligerait à retraduire ses clés, et une
+           erreur de traduction attribuerait les repas d'un jour à un autre —
+           sans que rien ne le signale. Un seul système de numérotation. */
+        out.push({ ...demandePour(repas, compose, portions[cle] ?? 1, cible), jour: rang });
+      }
     }
 
-    return resoudreLaJournee(demandes, stockDe, stock);
-  }, [plan, cibles.data, portions, stockDe, stock]);
+    return out;
+  }, [plan, cibles.data, portions, joursRetenus]);
+
+  /* TOUTE la période résolue EN UNE PASSE, sur un frigo qui se vide. Chaque
+     repas se plafonnait déjà à ce qu'il restait ; aucun ne savait que les
+     autres avaient servi avant lui — ni hier. */
+  const resultats = useMemo(
+    () => (demandes.length === 0
+      ? new Map<string, AuMieux>()
+      : resoudreLaPeriode(demandes, stockDe, stock)),
+    [demandes, stockDe, stock],
+  );
+
+  /* Ce qu'il faut acheter pour tenir le plan. Calculé frigo plein puis
+     diminué du stock réel : le solveur CONTOURNE une pénurie au lieu de la
+     subir, donc compter les manques du plan répondrait « rien ». */
+  const aAcheter = useMemo(
+    () => (demandes.length === 0 ? [] : listeDeCourses(demandes, stockDe, stock)),
+    [demandes, stockDe, stock],
+  );
 
   /** Compose tous les repas cochés, en évitant de resservir le même aliment. */
   const composerTout = () => {
-    const servis = new Set<number | string>();
-    const suite: Partial<Record<Repas, Compose>> = {};
+    const suite: Record<string, Compose> = {};
 
-    for (const repas of REPAS) {
-      if (!choisis[repas]) continue;
-      const c = composer(stock, portions[repas], servis, repas);
+    for (const rang of joursRetenus) {
+      /* « Déjà servi » se remet à zéro CHAQUE JOUR. Éviter le poulet deux
+         fois le même jour est un service ; l'éviter toute la semaine serait
+         une contrainte que personne n'a demandée. */
+      const servis = new Set<number | string>();
 
-      const roles: Partial<Record<Role, Aliment>> = {};
-      /* Une variable du solveur peut venir d'un rôle différent : à la
-         collation, c'est le laitage qui porte les protéines. */
-      for (const slot of ['proteine', 'glucide', 'lipide'] as const) {
-        const a = c.variables[slot];
-        if (a) { roles[MODELE[repas][slot]] = a; servis.add(a.id); }
+      for (const repas of REPAS) {
+        const cle = cleDuRepas(rang, repas);
+        if (!coche(rang, repas)) continue;
+        const c = composer(stock, convives(rang, repas), servis, repas);
+
+        const roles: Partial<Record<Role, Aliment>> = {};
+        /* Une variable du solveur peut venir d'un rôle différent : à la
+           collation, c'est le laitage qui porte les protéines. */
+        for (const slot of ['proteine', 'glucide', 'lipide'] as const) {
+          const a = c.variables[slot];
+          if (a) { roles[MODELE[repas][slot]] = a; servis.add(a.id); }
+        }
+        /* Les quantités imposées ne comptent pas dans « déjà servi » :
+           resservir la même huile à tous les repas est normal. */
+        for (const [role, aliment] of Object.entries(c.imposes)) {
+          roles[role as Role] = aliment;
+        }
+
+        suite[cle] = { roles, restes: {}, verrous: [], ajouts: [] };
       }
-      /* Les quantités imposées ne comptent pas dans « déjà servi » : resservir
-         la même huile à tous les repas est normal. */
-      for (const [role, aliment] of Object.entries(c.imposes)) {
-        roles[role as Role] = aliment;
-      }
-
-      suite[repas] = { roles, restes: {}, verrous: [], ajouts: [] };
     }
 
     setPlan(suite);
-    setOuvert(REPAS.find((r) => choisis[r]) ?? null);
+    setCourses(false);
+    const premier = Object.keys(suite)[0];
+    setOuvert(premier ?? null);
+    setJourOuvert(joursRetenus[0] ?? null);
   };
 
   if (frigo.isLoading || cibles.isLoading) return <Chargement />;
@@ -257,62 +333,206 @@ export default function Calculateur() {
     return <Erreur message={frigo.error.message} onReessayer={() => void frigo.refetch()} />;
   }
 
-  const aucunCoche = REPAS.every((r) => !choisis[r]);
+  const aucunCoche = joursRetenus.every((r) => REPAS.every((x) => !coche(r, x)));
 
   /* ------------------------------------------------ paramétrage */
 
   if (plan === null) {
     return (
-      <ScrollView contentContainerStyle={s.page}>
+      /* L'action principale est COLLÉE EN BAS, hors du défilement. Sept jours
+         de repas font une page longue ; laisser le bouton à la fin obligeait
+         à dérouler jusqu'en bas pour lancer le calcul, puis à remonter pour
+         corriger. Il reste sous le pouce, là où on l'attend. */
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={s.page}>
         <Carte style={{ gap: E.s }}>
-          <Texte style={{ fontFamily: P.fort }}>Aujourd'hui</Texte>
-          <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
-            Coche les repas à cuisiner et dis pour combien de personnes.
-            L'application composera à partir de ton frigo.
+          {/* Un interrupteur, pas deux boutons. Deux boutons demandent de lire
+              lequel est enfoncé ; un interrupteur se lit d'un coup d'œil et
+              dit tout seul dans quel état il est. */}
+          <View style={s.interrupteur}>
+            <View style={{ flex: 1 }}>
+              <Texte style={{ fontFamily: P.fort }}>Plusieurs jours</Texte>
+              <Discret style={s.aide}>
+                {plusieurs ? 'Choisis tes jours au calendrier' : "Aujourd'hui seulement"}
+              </Discret>
+            </View>
+            <Switch
+              value={plusieurs}
+              onValueChange={(v) => { setPlusieurs(v); if (!v) setRangs([0]); }}
+              trackColor={{ false: C.ligne, true: C.vifFond }}
+              thumbColor={plusieurs ? C.vif : C.attenue}
+              accessibilityLabel="Planifier plusieurs jours"
+            />
+          </View>
+          <Discret style={s.aide}>
+            {plusieurs
+              ? 'Les jours choisis partagent le MÊME frigo : le premier est servi '
+                + 'en entier, le dernier hérite de ce qui reste. La liste de courses '
+                + 'dira ce qui manque.'
+              : 'Coche les repas à cuisiner et dis pour combien de personnes. '
+                + "L'application composera à partir de ton frigo."}
           </Discret>
         </Carte>
 
-        {REPAS.map((repas) => {
-          const cible = cibleDe(repas);
+        {plusieurs && (
+          <Carte style={{ gap: E.s }}>
+            <Calendrier
+              rangs={rangs}
+              onBasculer={(rang) => setRangs((liste) => (liste.includes(rang)
+                /* On ne descend jamais sous un jour : un plan vide n'a pas de
+                   sens, et le bouton « composer » serait mort. */
+                ? (liste.length > 1 ? liste.filter((r) => r !== rang) : liste)
+                : [...liste, rang]))}
+            />
+          </Carte>
+        )}
+
+        {joursRetenus.map((rang) => {
+          /* Le contenu d'un jour, identique qu'il soit plié ou non. Le sortir
+             ici évite de l'écrire deux fois — et donc de le laisser diverger
+             entre le mode « aujourd'hui » et le mode « plusieurs jours ». */
+          const contenu = (
+            <>
+              {REPAS.map((repas) => {
+                const cle = cleDuRepas(rang, repas);
+                const cible = cibleDe(repas);
+                const pris = coche(rang, repas);
+
+                return (
+                  <Pliant
+                    key={cle}
+                    titre={NOM_REPAS[repas]}
+                    /* Replié, la ligne dit déjà l'essentiel : est-ce cuisiné,
+                       pour combien, et vers quelles macros. On n'ouvre que
+                       pour changer le nombre de convives. */
+                    resume={cible
+                      ? `${pris ? `${convives(rang, repas)} pers.  ·  ` : ''}`
+                        + `${nb(cible.kcal)} kcal · ${nb(cible.prot)} P`
+                        + ` · ${nb(cible.gluc)} G · ${nb(cible.lip)} L`
+                      : 'aucun objectif défini'}
+                    ouvert={detaille === cle}
+                    onBascule={() => setDetaille(detaille === cle ? null : cle)}
+                    teinte="repas"
+                    aDroite={(
+                      <Pressable
+                        /* Cocher OUVRE le repas : régler le nombre de
+                           convives est le geste qui suit immédiatement, et le
+                           faire attendre un second appui n'apporte rien.
+                           Décocher referme, pour la même raison. */
+                        onPress={() => {
+                          setChoisis((c) => ({ ...c, [cle]: !c[cle] }));
+                          setDetaille(pris ? null : cle);
+                        }}
+                        style={s.coche}
+                        accessibilityLabel={`Cuisiner le repas ${NOM_REPAS[repas]} du ${libelleDuJour(rang)}`}
+                        accessibilityState={{ checked: pris }}
+                      >
+                        <View style={[
+                          s.carre,
+                          pris && { backgroundColor: C.ok, borderColor: C.ok },
+                        ]}
+                        >
+                          {pris && <Texte style={s.coched}>✓</Texte>}
+                        </View>
+                      </Pressable>
+                    )}
+                  >
+                    {pris ? (
+                      <View style={s.persLigne}>
+                        <Discret style={s.aide}>Pour combien de personnes ?</Discret>
+                        <View style={s.pers}>
+                          <Pressable
+                            onPress={() => setPortions((p) => ({
+                              ...p, [cle]: Math.max(1, (p[cle] ?? 1) - 1),
+                            }))}
+                            style={s.persBouton}
+                          >
+                            <Texte style={s.signe}>−</Texte>
+                          </Pressable>
+                          <Chiffre taille={N.petit}>{convives(rang, repas)}</Chiffre>
+                          <Pressable
+                            onPress={() => setPortions((p) => ({
+                              ...p, [cle]: Math.min(12, (p[cle] ?? 1) + 1),
+                            }))}
+                            style={s.persBouton}
+                          >
+                            <Texte style={s.signe}>+</Texte>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      <Discret style={s.aide}>
+                        Coche à droite pour cuisiner ce repas.
+                      </Discret>
+                    )}
+                  </Pliant>
+                );
+              })}
+
+              {/* Recopier un jour évite de re-cocher quatre cases et de
+                  re-régler quatre fois le nombre de personnes. C'est le geste
+                  qui rend une semaine saisissable en moins d'une minute. */}
+              {plusieurs && rang === joursRetenus[0] && joursRetenus.length > 1 && (
+                <Bouton
+                  variante="contour"
+                  /* Les deux états se mettent à jour SÉPARÉMENT. Appeler
+                     setPortions depuis l'intérieur de setChoisis marcherait à
+                     l'oeil, mais React réexécute les fonctions de mise à jour —
+                     deux fois en développement — et un effet de bord glissé
+                     dedans se rejouerait avec lui. */
+                  onPress={() => {
+                    const modele = REPAS.map((repas) => ({
+                      repas,
+                      coche: coche(rang, repas),
+                      convives: convives(rang, repas),
+                    }));
+                    const autres = joursRetenus.slice(1);
+
+                    setChoisis((c) => {
+                      const suite = { ...c };
+                      for (const autre of autres) {
+                        for (const m of modele) suite[cleDuRepas(autre, m.repas)] = m.coche;
+                      }
+
+                      return suite;
+                    });
+                    setPortions((p) => {
+                      const suite = { ...p };
+                      for (const autre of autres) {
+                        for (const m of modele) suite[cleDuRepas(autre, m.repas)] = m.convives;
+                      }
+
+                      return suite;
+                    });
+                  }}
+                >
+                  Recopier ce jour sur les {joursRetenus.length - 1} autres
+                </Bouton>
+              )}
+            </>
+          );
+
+          /* Un seul jour ne se plie pas : il n'y a rien à replier POUR. Le
+             pliage sert à tenir sept jours sur un écran, pas à cacher le
+             seul contenu de la page. */
+          if (!plusieurs) return <View key={rang} style={s.jourSeul}>{contenu}</View>;
+
+          const cuisines = REPAS.filter((r) => coche(rang, r)).length;
 
           return (
-            <Carte key={repas} style={s.ligneRepas}>
-              <Pressable
-                onPress={() => setChoisis((c) => ({ ...c, [repas]: !c[repas] }))}
-                style={s.coche}
-                accessibilityLabel={`Cuisiner le repas ${NOM_REPAS[repas]}`}
-              >
-                <View style={[s.carre, choisis[repas] && { backgroundColor: C.ok, borderColor: C.ok }]}>
-                  {choisis[repas] && <Texte style={{ color: C.fond, fontSize: T.petit }}>✓</Texte>}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Texte style={{ fontFamily: P.fort }}>{NOM_REPAS[repas]}</Texte>
-                  <Discret style={{ fontSize: T.petit }}>
-                    {cible
-                      ? `${nb(cible.kcal)} kcal · ${nb(cible.prot)} P · ${nb(cible.gluc)} G · ${nb(cible.lip)} L`
-                      : 'aucun objectif défini'}
-                  </Discret>
-                </View>
-              </Pressable>
-
-              {choisis[repas] && (
-                <View style={s.pers}>
-                  <Pressable
-                    onPress={() => setPortions((p) => ({ ...p, [repas]: Math.max(1, p[repas] - 1) }))}
-                    style={s.persBouton}
-                  >
-                    <Texte style={{ fontSize: T.grand, color: C.attenue }}>−</Texte>
-                  </Pressable>
-                  <Chiffre taille={N.petit}>{portions[repas]}</Chiffre>
-                  <Pressable
-                    onPress={() => setPortions((p) => ({ ...p, [repas]: Math.min(12, p[repas] + 1) }))}
-                    style={s.persBouton}
-                  >
-                    <Texte style={{ fontSize: T.grand, color: C.attenue }}>+</Texte>
-                  </Pressable>
-                </View>
-              )}
-            </Carte>
+            <Pliant
+              key={rang}
+              titre={libelleDuJour(rang)}
+              resume={cuisines === 0
+                ? 'aucun repas'
+                : `${cuisines} repas  ·  `
+                  + `${REPAS.reduce((n, r) => n + (coche(rang, r) ? convives(rang, r) : 0), 0)} portions`}
+              ouvert={jourOuvert === rang}
+              onBascule={() => setJourOuvert(jourOuvert === rang ? null : rang)}
+              teinte="jour"
+            >
+              {contenu}
+            </Pliant>
           );
         })}
 
@@ -333,7 +553,7 @@ export default function Calculateur() {
             </Texte>
             <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
               Le calcul sera exact, mais il partira de valeurs qui ne peuvent pas
-              être vraies. Corrige-les dans Grocy avant de cuisiner.
+              être vraies. Corrige-les avant de cuisiner.
             </Discret>
             {anomalies.slice(0, 6).map((d) => (
               <Texte
@@ -355,10 +575,16 @@ export default function Calculateur() {
           </Carte>
         )}
 
-        <Bouton onPress={composerTout} desactive={aucunCoche || stock.length === 0}>
-          Composer les repas
-        </Bouton>
-      </ScrollView>
+        </ScrollView>
+
+        <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
+          <Bouton onPress={composerTout} desactive={aucunCoche || stock.length === 0}>
+            {joursRetenus.length > 1
+              ? `Composer les ${joursRetenus.length} jours`
+              : 'Composer les repas'}
+          </Bouton>
+        </View>
+      </View>
     );
   }
 
@@ -369,7 +595,7 @@ export default function Calculateur() {
      jamais un aliment d'un repas, ni maintenant ni plus tard. */
   const remplacants = remplacer === null ? [] : stock.filter(
     (a) => roleDe(a) === remplacer.role
-      && a.id !== plan[remplacer.repas]?.roles[remplacer.role]?.id);
+      && a.id !== plan[remplacer.cle]?.roles[remplacer.role]?.id);
 
   return (
     <View style={{ flex: 1 }}>
@@ -380,37 +606,102 @@ export default function Calculateur() {
           mets 0 pour écarter un aliment de ce repas.
         </Discret>
 
-        {REPAS.filter((r) => plan[r] !== undefined).map((repas) => (
-          <CarteRepas
-            key={repas}
-            repas={repas}
-            compose={plan[repas]!}
-            cible={cibleDe(repas)}
-            portions={portions[repas]}
-            resultat={resultats.get(repas) ?? null}
-            fibresDe={fibresDe}
-            ouvert={ouvert === repas}
-            onOuvrir={() => setOuvert(ouvert === repas ? null : repas)}
-            onRemplacer={(role) => setRemplacer({ repas, role })}
-            onAjouter={() => setAjouter(repas)}
-            onRetirerAjout={(id) => setPlan((p) => ({
-              ...p!,
-              [repas]: {
-                ...p![repas]!,
-                ajouts: p![repas]!.ajouts.filter((a) => a.id !== id),
-              },
-            }))}
-            onReste={(cle, valeurs) => setPlan((p) => ({
-              ...p!,
-              [repas]: { ...p![repas]!, restes: { ...p![repas]!.restes, [cle]: valeurs } },
-            }))}
-          />
-        ))}
+        {/* ---- la liste de courses ---- */}
+        {aAcheter.length > 0 && (
+          <Carte style={{ gap: E.xs }}>
+            <Pressable onPress={() => setCourses(!courses)}>
+              <Texte style={{ fontFamily: P.fort }}>
+                Liste de courses · {aAcheter.length} aliment
+                {aAcheter.length > 1 ? 's' : ''}
+              </Texte>
+              <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
+                Ce qu'il manque pour cuisiner ce plan tel qu'il est prévu, ton
+                frigo déjà déduit. {courses ? '' : 'Touche pour voir.'}
+              </Discret>
+            </Pressable>
 
+            {courses && aAcheter.map(({ aliment, grammes }) => (
+              <View key={String(aliment.id)} style={s.ligneCourse}>
+                <View style={[s.pastille, { backgroundColor: couleurRole(aliment.categorie) }]} />
+                <Texte style={{ flex: 1 }}>{aliment.nom}</Texte>
+                <Texte style={{ fontFamily: P.fort }}>{nb(grammes)} g</Texte>
+              </View>
+            ))}
+          </Carte>
+        )}
+
+        {joursRetenus.map((rang) => {
+          const duJour = REPAS.filter((r) => plan[cleDuRepas(rang, r)] !== undefined);
+          if (duJour.length === 0) return null;
+
+          const cartes = (
+            <>
+              {duJour.map((repas) => {
+                const cle = cleDuRepas(rang, repas);
+
+                return (
+                  <CarteRepas
+                    key={cle}
+                    repas={repas}
+                    compose={plan[cle]!}
+                    cible={cibleDe(repas)}
+                    portions={portions[cle] ?? 1}
+                    resultat={resultats.get(cle) ?? null}
+                    fibresDe={fibresDe}
+                    ouvert={ouvert === cle}
+                    onOuvrir={() => setOuvert(ouvert === cle ? null : cle)}
+                    onRemplacer={(role) => setRemplacer({ cle, role })}
+                    onAjouter={() => setAjouter(cle)}
+                    onRetirerAjout={(id) => setPlan((p) => ({
+                      ...p!,
+                      [cle]: {
+                        ...p![cle]!,
+                        ajouts: p![cle]!.ajouts.filter((a) => a.id !== id),
+                      },
+                    }))}
+                    onReste={(k, valeurs) => setPlan((p) => ({
+                      ...p!,
+                      [cle]: { ...p![cle]!, restes: { ...p![cle]!.restes, [k]: valeurs } },
+                    }))}
+                  />
+                );
+              })}
+            </>
+          );
+
+          if (joursRetenus.length === 1) {
+            return <View key={rang} style={s.jourSeul}>{cartes}</View>;
+          }
+
+          /* Combien de repas de ce jour n'ont PAS atteint leurs cibles. C'est
+             la seule chose qu'on ait besoin de savoir sans déplier — un jour
+             replié doit pouvoir dire « celui-là coince ». */
+          const rates = duJour.filter(
+            (r) => resultats.get(cleDuRepas(rang, r))?.resultat.ok === false).length;
+
+          return (
+            <Pliant
+              key={rang}
+              titre={libelleDuJour(rang)}
+              resume={rates === 0
+                ? `${duJour.length} repas  ·  objectifs atteints`
+                : `${duJour.length} repas  ·  ${rates} hors cible`}
+              ouvert={jourOuvert === rang}
+              onBascule={() => setJourOuvert(jourOuvert === rang ? null : rang)}
+              teinte="jour"
+            >
+              {cartes}
+            </Pliant>
+          );
+        })}
+
+      </ScrollView>
+
+      <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
         <Bouton variante="contour" onPress={() => setPlan(null)}>
           ← Modifier la sélection
         </Bouton>
-      </ScrollView>
+      </View>
 
       <ChoixDansListe
         visible={remplacer !== null}
@@ -427,11 +718,11 @@ export default function Calculateur() {
           if (!choisi) return;
 
           setPlan((p) => {
-            const courant = p![remplacer.repas]!;
+            const courant = p![remplacer.cle]!;
 
             return {
               ...p!,
-              [remplacer.repas]: {
+              [remplacer.cle]: {
                 ...courant,
                 roles: { ...courant.roles, [remplacer.role]: choisi },
                 /* Ce que tu viens de choisir est verrouillé : le calculateur
@@ -473,6 +764,7 @@ export default function Calculateur() {
     </View>
   );
 }
+
 
 /* ------------------------------------------------------ une carte de repas */
 
@@ -769,6 +1061,27 @@ function CarteRepas({
 
 const s = StyleSheet.create({
   page: { padding: E.m, gap: E.s, paddingBottom: E.l },
+
+  /* Barre d'action collée en bas, hors du défilement. Le retrait vient de
+     useSafeAreaInsets : sans lui, le bouton passe sous la barre de gestes
+     d'un téléphone sans bouton physique, et devient intouchable. */
+  pied: {
+    padding: E.m,
+    borderTopWidth: 1, borderTopColor: C.ligne, backgroundColor: C.fond,
+  },
+  interrupteur: { flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: TOUCHE },
+  aide: { fontSize: T.petit, lineHeight: T.moyen },
+  /* Un seul jour : pas d'encart pliant, juste la pile de repas. */
+  jourSeul: { gap: E.xs },
+  persLigne: { flexDirection: 'row', alignItems: 'center', gap: E.s },
+  coched: { color: C.fond, fontSize: T.petit },
+  signe: { fontSize: T.grand, color: C.attenue },
+
+  ligneCourse: {
+    flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: TOUCHE - 12,
+  },
+  pastille: { width: 8, height: 8, borderRadius: 4 },
+
   ligneRepas: { flexDirection: 'row', alignItems: 'center', gap: E.s },
   coche: { flexDirection: 'row', alignItems: 'center', gap: E.s, flex: 1, minHeight: TOUCHE },
   carre: {

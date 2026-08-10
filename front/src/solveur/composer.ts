@@ -611,16 +611,72 @@ export function resoudreLaJournee(
   stockDe: (a: Aliment) => number,
   candidats: Aliment[],
 ): Map<Repas, AuMieux> {
-  const consomme = new Map<Aliment['id'], number>();
   const sorties = new Map<Repas, AuMieux>();
+  for (const [cle, sortie] of resoudreLaPeriode(
+    demandes.map((d) => ({ ...d, jour: 0 })), stockDe, candidats)) {
+    sorties.set(cle.split('|')[1] as Repas, sortie);
+  }
 
-  /* Ce qu'il reste VRAIMENT à cet instant de la journée. Jamais négatif : un
+  return sorties;
+}
+
+/** Un repas situé dans le temps : le même besoin, plus le jour où il tombe. */
+export interface DemandeDatee extends DemandeRepas {
+  /**
+   * Le jour, en RANG. Aucune date ici : le solveur n'a besoin que de l'ORDRE,
+   * et une date l'obligerait à connaître un fuseau, un calendrier et un
+   * changement d'heure pour répondre « lequel vient d'abord ».
+   *
+   * N'importe quelle numérotation croissante convient — 0,1,2 ou 0,3,7 — du
+   * moment qu'elle est la même que celle de l'écran : les clés de sortie la
+   * reprennent telle quelle, donc l'appelant retrouve ses repas sans avoir à
+   * retraduire. Une traduction de plus, c'est une occasion de plus
+   * d'attribuer les repas d'un jour à un autre.
+   */
+  jour: number;
+}
+
+/** La clé d'un repas dans une période : « 2|R3 » pour le 16 h du 3e jour. */
+export const cleDuRepas = (jour: number, repas: Repas): string => `${jour}|${repas}`;
+
+/**
+ * TOUTE LA PÉRIODE PARTAGE UN SEUL FRIGO.
+ *
+ * C'est l'extension littérale de la journée, et le mécanisme ne change pas
+ * d'un iota : les repas sont résolus dans l'ordre du temps — jour 0 matin,
+ * jour 0 midi, … jour 3 soir — sur un stock qui décroît. Le premier repas
+ * planifié est servi en entier, le dernier hérite du manque.
+ *
+ * C'EST UN CHOIX, ET IL A UN PRIX. Un frigo qui doit tenir cinq jours
+ * s'épuisera, et les derniers repas seront recomposés autour de ce qui reste
+ * — parfois jusqu'à ne plus tomber sur leurs cibles. C'est la réalité qu'on
+ * veut voir : mieux vaut savoir dès le lundi que le jeudi ne passera pas que
+ * de le découvrir jeudi soir devant un frigo vide. Rien n'est tu, chaque
+ * plafonnement est annoncé.
+ *
+ * L'alternative — chaque jour repart d'un frigo plein — dirait ce qu'il FAUT
+ * sans jamais dire ce qui MANQUE. Elle sert un autre besoin, celui de la
+ * liste de courses, et se calcule en passant un stock infini.
+ */
+export function resoudreLaPeriode(
+  demandes: readonly DemandeDatee[],
+  stockDe: (a: Aliment) => number,
+  candidats: Aliment[],
+): Map<string, AuMieux> {
+  const consomme = new Map<Aliment['id'], number>();
+  const sorties = new Map<string, AuMieux>();
+
+  /* Ce qu'il reste VRAIMENT à cet instant de la période. Jamais négatif : un
      dépassement d'arrondi ne doit pas rendre un aliment « dû ». */
   const restant = (a: Aliment): number =>
     Math.max(0, stockDe(a) - (consomme.get(a.id) ?? 0));
 
+  /* L'ordre du TEMPS, pas celui de la saisie. Deux plans qui portent les
+     mêmes repas doivent donner le même résultat, quel que soit l'ordre dans
+     lequel l'écran les a empilés — sinon cocher ses jours à rebours changerait
+     les quantités. */
   const enOrdre = [...demandes].sort(
-    (x, y) => REPAS.indexOf(x.repas) - REPAS.indexOf(y.repas));
+    (x, y) => x.jour - y.jour || REPAS.indexOf(x.repas) - REPAS.indexOf(y.repas));
 
   for (const d of enOrdre) {
     const sortie = resoudreAuMieux(
@@ -633,8 +689,54 @@ export function resoudreLaJournee(
       consomme.set(q.aliment.id, (consomme.get(q.aliment.id) ?? 0) + q.aCuire);
     }
 
-    sorties.set(d.repas, sortie);
+    sorties.set(cleDuRepas(d.jour, d.repas), sortie);
   }
 
   return sorties;
+}
+
+/**
+ * CE QU'IL FAUT ACHETER POUR TENIR LE PLAN.
+ *
+ * On résout la même période DEUX fois : une fois bridée par le frigo — c'est
+ * ce qu'on peut cuisiner ce soir — et une fois frigo plein, qui dit ce que le
+ * plan réclame idéalement. La liste de courses est la seconde moins le stock.
+ *
+ * Pourquoi ce détour plutôt que de compter les manques du premier calcul : le
+ * solveur ne subit pas une pénurie, il la CONTOURNE. À court de brocoli il
+ * sert des haricots, et le plan qui en sort tient dans le frigo — il n'y a
+ * donc, par construction, plus rien à acheter. Compter les manques de ce
+ * plan-là répondrait « rien », ce qui est exact et inutile.
+ *
+ * Le second calcul répond à la vraie question : de quoi ai-je besoin pour
+ * manger ce que je voulais manger, et non ce que mon frigo m'impose.
+ */
+export function listeDeCourses(
+  demandes: readonly DemandeDatee[],
+  stockDe: (a: Aliment) => number,
+  candidats: Aliment[],
+): { aliment: Aliment; grammes: number }[] {
+  const ALaCarte = (): number => Number.POSITIVE_INFINITY;
+  const voulu = new Map<Aliment['id'], { aliment: Aliment; grammes: number }>();
+
+  for (const sortie of resoudreLaPeriode(demandes, ALaCarte, candidats).values()) {
+    for (const q of sortie.resultat.quantites) {
+      const deja = voulu.get(q.aliment.id);
+      if (deja === undefined) {
+        voulu.set(q.aliment.id, { aliment: q.aliment, grammes: q.aCuire });
+      } else {
+        deja.grammes += q.aCuire;
+      }
+    }
+  }
+
+  return [...voulu.values()]
+    /* Le stock est en grammes « à cuire », comme les quantités : c'est ce
+       qu'on pèse, donc ce qu'on achète. */
+    .map((v) => ({ aliment: v.aliment, grammes: v.grammes - stockDe(v.aliment) }))
+    /* Un gramme manquant n'est pas une course. Le seuil évite une liste
+       encombrée de « 2 g d'huile » nés d'un arrondi. */
+    .filter((v) => v.grammes >= 5)
+    .map((v) => ({ aliment: v.aliment, grammes: Math.ceil(v.grammes) }))
+    .sort((x, y) => x.aliment.nom.localeCompare(y.aliment.nom, 'fr'));
 }

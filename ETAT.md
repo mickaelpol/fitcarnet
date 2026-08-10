@@ -78,7 +78,20 @@ portent tous sur UNE seule valeur, et se réparent donc d'une seule façon :
 l'application donne la correction au lieu de demander à l'utilisateur laquelle
 de ses deux valeurs était la bonne.
 
-**Tests.** 217 côté front (`npm test`), 172 + 47 côté Python, 20 côté PHP.
+**Tests.** 229 côté front (`npm test`), 172 + 47 côté Python, 29 côté PHP.
+
+**Le calculateur tient sur plusieurs jours.** Une période partage un seul
+frigo : les repas sont résolus dans l'ordre du temps sur un stock qui décroît,
+le premier jour est servi en entier, le dernier hérite du manque. Chaque jour
+a ses propres cases et son propre nombre de personnes, et un bouton recopie le
+premier sur les autres. Une **liste de courses** dit ce qu'il faut acheter
+pour tenir le plan — calculée frigo plein puis diminuée du stock réel, parce
+que le solveur contourne une pénurie au lieu de la subir.
+
+**L'administrateur ajoute un aliment depuis l'app.** L'API crée le produit
+dans Grocy puis écrit ses macros dans le même appel — les séparer laisserait,
+au moindre échec entre les deux, un produit nu et invisible au calculateur.
+Grocy reste maître de l'inventaire et de la liste de courses.
 
 **Audit du catalogue commun.** `db/manuel/audit-catalogue.sql`, en lecture
 seule, relit les aliments de référence — ceux dont part tout nouveau compte,

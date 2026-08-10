@@ -5,9 +5,22 @@ l'écran, dans quel ordre, et pourquoi chaque choix a été fait plutôt qu'un
 autre. Tout ce qui y figure a été arrêté avec Mickaël ; ce qui reste à
 trancher est marqué **À TRANCHER**.
 
-**L'étape 1 est livrée et sert tous les jours.** Les étapes 2 et 3 restent à
+**Les étapes 1 et 2 sont livrées.** L'étape 3 — le batch cooking — reste à
 faire. Ce qui suit décrit le parcours complet ; les écarts entre le texte et
 le code sont signalés au fil.
+
+**Un seul jour n'est pas un cas particulier.** C'est une période de longueur
+1, et `resoudreLaJournee` n'est plus qu'un appel à `resoudreLaPeriode`. Il n'y
+a donc pas deux chemins de code dont un seul serait éprouvé : un défaut de
+partage du stock se verrait des deux côtés à la fois.
+
+**Les jours sont manipulés en RANG, jamais en date.** Le solveur n'a besoin
+que de l'ordre ; lui donner une date l'obligerait à connaître un fuseau, un
+calendrier et un changement d'heure pour répondre « lequel vient d'abord ».
+L'écran numérote ses jours — 0 pour aujourd'hui, 3 pour dans trois jours — et
+le solveur reprend ces rangs tels quels dans ses clés de sortie. Une
+traduction de moins, c'est une occasion de moins d'attribuer les repas d'un
+jour à un autre.
 
 ---
 
@@ -36,7 +49,33 @@ sans balance.
 
 ### 1. Pour quand ?
 
-Un sélecteur à deux positions : **aujourd'hui** ou **plusieurs jours**.
+Un **interrupteur** « plusieurs jours ». Un interrupteur et non deux boutons :
+deux boutons obligent à lire lequel est enfoncé, un interrupteur dit tout seul
+dans quel état il est.
+
+Activé, il ouvre un **calendrier mensuel** — grille lundi → dimanche, flèches
+de mois, aujourd'hui cerclé, passé non cliquable. Une bande de dates à faire
+défiler cachait ce qu'on cherche : on planifie sa semaine en la voyant, pas en
+la parcourant.
+
+Chaque jour porte ses quatre repas, avec sa propre case et son propre nombre
+de personnes — on ne mange pas à trois tous les soirs. Un bouton **« recopier
+ce jour sur les autres »** évite de re-régler vingt-huit champs pour une
+semaine.
+
+**Tout se plie, à deux niveaux** : le jour, et le repas à l'intérieur. Sept
+jours de quatre lignes font vingt-huit blocs, et plus rien de lisible. Deux
+règles tenues par le composant `Pliant` plutôt que par chaque écran :
+
+- **replié, un encart dit toujours l'essentiel** — « 3 repas · 5 portions »
+  au réglage, « 4 repas · 1 hors cible » une fois composé. On ouvre pour
+  AGIR, jamais pour savoir ;
+- **un seul jour ouvert à la fois** — sept encarts dépliés reproduiraient
+  exactement le mur qu'on veut éviter.
+
+L'action principale est **collée en bas**, hors du défilement : avec sept
+jours, la laisser en fin de page obligeait à dérouler pour lancer le calcul
+puis à remonter pour corriger.
 
 - *Aujourd'hui* : pas de calendrier. On affiche directement l'en-tête du jour
   et ses quatre repas.
@@ -132,6 +171,28 @@ moins de glucides. Trois tests verrouillent la propriété.
 
 ---
 
+## La liste de courses
+
+Le plan dit ce qu'il faut cuisiner ; la liste dit ce qu'il faut acheter pour
+y arriver.
+
+**Elle ne se déduit PAS des manques du plan**, et c'est le piège de ce
+calcul. Le solveur ne subit pas une pénurie, il la CONTOURNE : à court de
+brocoli il sert des haricots, et le plan qui en sort tient donc, par
+construction, dans le frigo. Compter ses manques répondrait « rien à
+acheter » — exact, et inutile.
+
+On résout donc la période **deux fois** : une fois bridée par le frigo, qui
+dit ce qu'on peut cuisiner ce soir, et une fois frigo plein, qui dit ce que le
+plan réclame idéalement. La liste est la seconde moins le stock réel.
+
+Les grammes sont arrondis **au-dessus** : acheter 94 g quand il en faut 94,3
+fait rater le dernier repas d'un cheveu. En dessous de 5 g manquants, rien
+n'est proposé — une liste encombrée de « 2 g d'huile » nés d'un arrondi ne se
+lit pas.
+
+---
+
 ## Ce qui reste modifiable dans un repas
 
 Les deux fonctions les mieux testées de l'app ne disparaissent pas — elles se
@@ -178,7 +239,8 @@ plafonné, annoncé, et confié à un autre aliment du même rôle.
 L'ordre ne dépend pas de celui dans lequel l'écran passe les repas : sinon la
 présentation déciderait du partage.
 
-Reste à étendre le cumul à **plusieurs jours** (étape 2). Le mécanisme est le
+Le cumul vaut désormais sur **toute la période**, pas seulement sur la
+journée. Le mécanisme est le
 même, il ne lui manque que des repas supplémentaires à enchaîner.
 
 Un aliment sans poids connu — litre, pack — reste écarté du calcul, comme
