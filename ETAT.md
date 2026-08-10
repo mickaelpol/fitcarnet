@@ -59,8 +59,11 @@ sec, viande crue, légume cru. « Cuit » dit ce qui sortira de la casserole,
 porte exactement les macros du repas réglées dans le compte : c'est le contrat
 de l'écran, et deux tests le vérifient sur mille scénarios.
 
-Le stock a le dernier mot — quantités ajustables ET imposées. Une quantité
-plafonnée est annoncée, et le manque confié à un autre aliment du même rôle.
+Le stock a le dernier mot — quantités ajustables ET imposées, **et sur toute
+la journée** : les repas cochés ensemble partagent un seul frigo. Ils sont
+résolus en une passe, dans l'ordre matin → soir, sur un stock qui décroît.
+Une quantité plafonnée est annoncée, et le manque confié à un autre aliment du
+même rôle.
 
 **Garde-fou sur les données.** `src/calcul/plausibilite.ts` regarde chaque
 aliment du frigo et se demande si ce qu'il raconte est physiquement possible :
@@ -68,7 +71,7 @@ rendement à contresens, plus de 100 g de nutriments dans 100 g de produit,
 calories qui ne collent pas aux macros, couple rendement/macros impossible. Ce
 qu'il trouve s'affiche en tête du calculateur, avant de composer.
 
-**Tests.** 211 côté front (`npm test`), 93 + 17 côté Python, 45 côté PHP.
+**Tests.** 216 côté front (`npm test`), 93 + 29 côté Python, 45 côté PHP.
 
 Le gros morceau est `src/solveur/garanties.test.ts` : 250 frigos tirés au sort
 — avec une graine fixe, donc rejouables à l'identique — × 4 repas, soit mille
@@ -92,6 +95,13 @@ y être ajoutée**, sinon le test compile mais ne s'exécute jamais.
 Absente de la table, la valeur part vide et non à zéro : « inconnu » et
 « aucune fibre » ne se valent pas. Le script crée lui-même les champs
 personnalisés Grocy dont il a besoin, et n'écrit jamais les pesées.
+
+`--exporter-catalogue` régénère `db/manuel/16-catalogue-ciqual.sql` depuis la
+même table : les 50 aliments de référence, point de départ de tout nouveau
+compte, portaient encore des valeurs tapées à la main — l'amande à 21,5 g de
+glucides, fibres comprises, contre 8,8 en Ciqual — sans aucune fibre
+renseignée, et des légumes référencés cuits. Rien n'est retapé : la migration
+est **générée**, et elle ne touche que le commun.
 
 Il signale ce qu'il ne peut pas trancher seul : un appariement dont un mot
 décisif — `naturel`, `huile`, `complet`, `écrémé` — ne figure que d'un côté,
@@ -174,8 +184,8 @@ allumé indéfiniment.
 ## Ce qui reste
 
 **Calculateur, étapes 2 et 3.** L'étape 1 — aujourd'hui — sert tous les
-jours. Restent le calendrier sur plusieurs jours avec le contrôle du stock
-CUMULÉ, puis le batch cooking. Voir `CALCULATEUR.md`.
+jours, et le stock cumulé fonctionne déjà sur la journée. Restent le
+calendrier sur plusieurs jours, puis le batch cooking. Voir `CALCULATEUR.md`.
 
 **Les rendements non mesurés.** Ceux des légumes et de quelques féculents
 valent 1 faute de mesure. Sans conséquence sur les macros — elles se comptent

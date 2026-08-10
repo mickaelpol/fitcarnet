@@ -580,10 +580,157 @@ def coherent(a) -> tuple[bool, float]:
     return abs(calcul - a["kcal"]) / a["kcal"] <= 0.12, calcul
 
 
+# ------------------------------------------------- le catalogue commun
+
+#  Les 50 aliments de reference sont le point de depart de TOUT nouveau
+#  compte. Ils portaient encore des valeurs tapees a la main, en partie
+#  d'origine americaine — l'amande y etait a 21,5 g de glucides, fibres
+#  comprises, contre 8,8 en Ciqual — sans aucune fibre renseignee, et avec
+#  des legumes references cuits.
+#
+#  Plutot que de retaper cinquante lignes, on les GENERE depuis la table
+#  Ciqual, avec exactement les memes regles que pour Grocy. Aucun chiffre
+#  n'est invente : ils viennent tous du fichier de l'Anses.
+#
+#  La migration ne touche QUE le commun (`cree_par IS NULL`). Un aliment cree
+#  par un utilisateur lui appartient, meme s'il porte le meme nom.
+
+# Relatif au SCRIPT et non au dossier courant : on le lance souvent depuis
+# ailleurs, et un fichier ecrit au hasard du `cd` est un fichier perdu.
+CHEMIN_CATALOGUE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "db", "manuel",
+    "16-catalogue-ciqual.sql")
+
+# Les accents, sans extension PostgreSQL a installer.
+ACCENTS = "àâäéèêëïîôöùûüçÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ"
+SANS_ACCENT = "aaaeeeeiioouuucAAAEEEEIIOOUUUC"
+
+
+def _sql(v) -> str:
+    """Un nombre pour SQL, ou NULL quand la valeur est inconnue."""
+    return "NULL" if v is None else f"{v:g}"
+
+
+def exporter_catalogue(aliments) -> int:
+    lignes, introuvables = [], []
+
+    for motif, (motifs_ciqual, categorie, ratio) in sorted(CORRESPONDANCE.items()):
+        aliment = None
+        if motif in EXACTS:
+            vise = normaliser(EXACTS[motif])
+            aliment = next((a for a in aliments if a["cle"] == vise), None)
+        if aliment is None:
+            aliment = chercher(aliments, motifs_ciqual)
+        if aliment is None or not aliment["kcal"]:
+            introuvables.append((motif, motifs_ciqual))
+            continue
+
+        # meme regle que pour Grocy : l'energie ne derive le rendement que
+        # pour un grain sec
+        if motif in AUTRE_ETAT:
+            sec = chercher(aliments, AUTRE_ETAT[motif])
+            if sec and sec["kcal"]:
+                calcule = round(sec["kcal"] / aliment["kcal"], 2)
+                if 0.4 <= calcule <= 5:
+                    ratio = calcule
+
+        contresens = sens_du_rendement(categorie, ratio)
+        if contresens is not None:
+            ratio = 1
+
+        etat = "cru" if categorie in ("prot", "leg") else "cuit"
+        ou = " AND ".join(
+            f"fitcarnet_normaliser(nom) LIKE '%{mot}%'" for mot in motif.split())
+
+        lignes.append(f"""
+-- {aliment['nom']}
+UPDATE aliment SET
+    categorie      = '{categorie}',
+    kcal_100       = {_sql(aliment['kcal'])},
+    prot_100       = {_sql(aliment['prot'] or 0)},
+    gluc_100       = {_sql(aliment['gluc'] or 0)},
+    lip_100        = {_sql(aliment['lip'] or 0)},
+    fibres_100     = {_sql(aliment['fibres'])},
+    ratio          = {ratio:g},
+    etat_reference = '{etat}'
+WHERE cree_par IS NULL AND {ou};""")
+
+    entete = f"""-- =====================================================================
+--  Le catalogue COMMUN, aligne sur Ciqual.
+--
+--  GENERE par `ciqual_vers_grocy.py --exporter-catalogue`. Ne pas modifier
+--  a la main : relance la commande.
+--
+--  Les 50 aliments de reference sont le point de depart de tout nouveau
+--  compte. Ils portaient des valeurs tapees a la main, en partie d'origine
+--  americaine — l'amande a 21,5 g de glucides fibres comprises contre 8,8 en
+--  Ciqual — sans fibres renseignees, ce qui rend une cible exprimee en
+--  glucides TOTAUX silencieusement fausse. Et des legumes references cuits,
+--  alors qu'on les pese crus.
+--
+--  Aucun chiffre n'est invente ici : tous viennent de la table de l'Anses.
+--  Le rendement d'un grain sec est derive de la conservation de l'energie ;
+--  celui d'un legume ou d'une viande reste a 1 faute de mesure — il n'affiche
+--  que le poids servi et ne touche aucune macro.
+--
+--  NE TOUCHE QUE LE COMMUN (`cree_par IS NULL`). Un aliment cree par un
+--  utilisateur lui appartient, meme s'il porte le meme nom.
+--
+--  A jouer APRES 15-legumes-peses-crus.sql. Idempotent.
+--
+--  Source : Anses, Table Ciqual de composition nutritionnelle des aliments.
+-- =====================================================================
+
+BEGIN;
+
+-- Comparer des noms accentues sans installer d'extension.
+CREATE OR REPLACE FUNCTION fitcarnet_normaliser(t text) RETURNS text AS $$
+    SELECT lower(translate(t, '{ACCENTS}', '{SANS_ACCENT}'));
+$$ LANGUAGE sql IMMUTABLE;
+
+SELECT 'avant' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
+       count(*) FILTER (WHERE categorie = 'leg' AND etat_reference <> 'cru') AS legumes_cuits
+FROM   aliment WHERE cree_par IS NULL;
+"""
+
+    pied = """
+SELECT 'apres' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
+       count(*) FILTER (WHERE categorie = 'leg' AND etat_reference <> 'cru') AS legumes_cuits
+FROM   aliment WHERE cree_par IS NULL;
+
+COMMIT;
+
+-- Ce qui reste sans fibres apres coup : ces aliments faussent une cible
+-- exprimee en glucides totaux, et rien ne le signale a l'ecran.
+SELECT nom, categorie FROM aliment
+WHERE  cree_par IS NULL AND fibres_100 IS NULL
+ORDER  BY categorie, nom;
+"""
+
+    os.makedirs(os.path.dirname(CHEMIN_CATALOGUE), exist_ok=True)
+    with open(CHEMIN_CATALOGUE, "w", encoding="utf-8") as f:
+        f.write(entete + "".join(lignes) + "\n" + pied)
+
+    print(f"{len(lignes)} aliment(s) ecrits dans {CHEMIN_CATALOGUE}")
+    if introuvables:
+        print(f"\n{len(introuvables)} sans equivalent Ciqual, laisses tels quels :")
+        for motif, motifs in introuvables:
+            print(f"  - {motif:24} (cherche : « {motifs} »)")
+    print("\nRelis le fichier, puis joue-le :")
+    print("  docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet"
+          f" -f - < {CHEMIN_CATALOGUE}")
+
+    return 0
+
+
 # -------------------------------------------------------------------- main
 
 def main() -> int:
     aliments = lire_ciqual(CIQUAL)
+
+    # --exporter-catalogue : écrit la migration du catalogue COMMUN
+    if "--exporter-catalogue" in sys.argv:
+        return exporter_catalogue(aliments)
 
     # --chercher « amande » : liste les libellés Ciqual disponibles
     if "--chercher" in sys.argv:

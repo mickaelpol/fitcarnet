@@ -474,11 +474,16 @@ describe('LE CŒUR : calculer même sans marge complète', () => {
 
 describe('un aliment ajustable devenu inutile', () => {
   it('signale quand sa quantité tombe à presque rien', () => {
-    // 100 g de bœuf cuits couvrent déjà les protéines du soir : le thon ne sert plus
+    /* Le bœuf couvre presque toutes les protéines du soir : il ne reste au
+       thon que quelques grammes, qui ne veulent plus rien dire dans une
+       assiette. Le chiffre a bougé le jour où les haricots verts sont passés
+       aux glucides EUROPÉENS — 4,1 g au lieu de 7, les fibres à part — ce qui
+       laissait plus de place au féculent et poussait le thon dans le négatif
+       au lieu du négligeable. Le cas testé n'a pas changé, son réglage si. */
     const r = calculer({ kcal: 551.8, prot: 30.1, gluc: 80.3, lip: 15.4 },
       { proteine: A.thon, glucide: A.patateDouce, lipide: A.amandes },
       [
-        { aliment: A.boeuf5, grammes: 50, unite: 'cuit' },
+        { aliment: A.boeuf5, grammes: 46, unite: 'cuit' },
         { aliment: A.haricots, grammes: 200 },
         { aliment: A.huile, grammes: 2 },
       ]);

@@ -571,3 +571,70 @@ export function resoudreAuMieux(
 
   return meilleur;
 }
+
+/* ------------------------------------------- une journée, un seul frigo */
+
+/** Un repas prêt à résoudre, tel que l'écran l'a corrigé. */
+export interface DemandeRepas {
+  repas: Repas;
+  variables: Variables;
+  fixes: Fixe[];
+  /** cibles DÉJÀ multipliées par le nombre de convives */
+  cibles: Cibles;
+  /** les rôles que l'utilisateur a choisis lui-même */
+  verrous: ReadonlySet<Role>;
+  glucidesTotaux: boolean;
+}
+
+/**
+ * Résout plusieurs repas qui PARTAGENT le même frigo.
+ *
+ * Chaque repas savait déjà se plafonner à ce qu'il restait. Ce qu'aucun ne
+ * savait, c'est que les autres puisent dans le même stock : composés
+ * séparément, le déjeuner et le dîner réclamaient chacun 400 g de brocoli
+ * quand il n'en restait que 500. Deux repas annoncés justes, dont un
+ * impossible, et rien ne le disait.
+ *
+ * Le partage se fait DANS L'ORDRE DES REPAS — matin, midi, 16 h, soir.
+ * Chacun prend ce dont il a besoin, le suivant compose sur ce qui reste. Le
+ * dernier hérite donc du manque, et c'est voulu : mieux vaut trois repas
+ * justes et un recomposé autour de ce qui reste que quatre repas légèrement
+ * faux. Un manque n'est jamais tu — il est plafonné, annoncé, et confié à un
+ * autre aliment du même rôle quand il y en a un.
+ *
+ * Rien de neuf dans le mécanisme : c'est `ajusterAuStock` qui travaille, avec
+ * un stock qui décroît au fil de la journée au lieu de repartir intact à
+ * chaque repas.
+ */
+export function resoudreLaJournee(
+  demandes: readonly DemandeRepas[],
+  stockDe: (a: Aliment) => number,
+  candidats: Aliment[],
+): Map<Repas, AuMieux> {
+  const consomme = new Map<Aliment['id'], number>();
+  const sorties = new Map<Repas, AuMieux>();
+
+  /* Ce qu'il reste VRAIMENT à cet instant de la journée. Jamais négatif : un
+     dépassement d'arrondi ne doit pas rendre un aliment « dû ». */
+  const restant = (a: Aliment): number =>
+    Math.max(0, stockDe(a) - (consomme.get(a.id) ?? 0));
+
+  const enOrdre = [...demandes].sort(
+    (x, y) => REPAS.indexOf(x.repas) - REPAS.indexOf(y.repas));
+
+  for (const d of enOrdre) {
+    const sortie = resoudreAuMieux(
+      { variables: d.variables, fixes: d.fixes },
+      d.cibles, restant, candidats, d.verrous, d.glucidesTotaux);
+
+    /* On retire ce que ce repas vient de prendre, dans l'unité du stock —
+       celle de la colonne « à cuire ». */
+    for (const q of sortie.resultat.quantites) {
+      consomme.set(q.aliment.id, (consomme.get(q.aliment.id) ?? 0) + q.aCuire);
+    }
+
+    sorties.set(d.repas, sortie);
+  }
+
+  return sorties;
+}

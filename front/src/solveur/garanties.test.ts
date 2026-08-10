@@ -3,9 +3,11 @@ import { describe, it } from 'node:test';
 
 import {
   type AuMieux, type Repas, type Role,
-  MODELE, REPAS, ajusterAuStock, composer, resoudreAuMieux, roleDe, rolesDuRepas,
+  type DemandeRepas,
+  MODELE, REPAS, ajusterAuStock, composer, resoudreAuMieux, resoudreLaJournee,
+  roleDe, rolesDuRepas,
 } from './composer';
-import { CIBLES_PLAN, type Frigo, frigoAleatoire } from './frigos.test-data';
+import { CATALOGUE, CIBLES_PLAN, type Frigo, frigoAleatoire } from './frigos.test-data';
 import { calculer as calculerBrut } from './solveur';
 import type { Aliment, Cibles, Macros, Quantite } from './types';
 
@@ -885,6 +887,158 @@ describe('On ne signale que ce qui manque vraiment', () => {
 
       return null;
     });
+  });
+});
+
+describe('Une journée, un seul frigo', () => {
+  /**
+   * Quatre repas cochés d'un coup puisent dans le MÊME stock.
+   *
+   * Chacun savait déjà se plafonner à ce qu'il restait. Ce qu'aucun ne savait,
+   * c'est que les autres avaient servi avant lui : composés séparément, le
+   * déjeuner et le dîner réclamaient chacun 400 g de brocoli quand il n'en
+   * restait que 500. Deux repas annoncés justes, dont un impossible.
+   */
+  const journee = (frigo: Frigo, portions = 2): DemandeRepas[] =>
+    REPAS.map((repas) => {
+      const par = CIBLES_PLAN[repas];
+      const depart = composer(frigo.aliments, portions, new Set(), repas);
+
+      return {
+        repas,
+        variables: depart.variables,
+        fixes: depart.fixes,
+        cibles: {
+          kcal: par.kcal * portions, prot: par.prot * portions,
+          gluc: par.gluc * portions, lip: par.lip * portions,
+        },
+        verrous: new Set<Role>(),
+        glucidesTotaux: false,
+      };
+    });
+
+  it('la journée entière ne réclame jamais plus que le frigo', () => {
+    const fautes: string[] = [];
+
+    for (let graine = 1; graine <= 120; graine += 1) {
+      const frigo = frigoAleatoire(graine);
+      if (frigo.aliments.length === 0) continue;
+
+      const sorties = resoudreLaJournee(
+        journee(frigo), frigo.stockDe, frigo.aliments);
+
+      const total = new Map<Aliment['id'], number>();
+      for (const sortie of sorties.values()) {
+        for (const q of sortie.resultat.quantites) {
+          total.set(q.aliment.id, (total.get(q.aliment.id) ?? 0) + q.aCuire);
+        }
+      }
+
+      for (const [id, demande] of total) {
+        const aliment = frigo.aliments.find((a) => a.id === id);
+        if (aliment === undefined) continue;
+        const dispo = frigo.stockDe(aliment);
+        /* Un demi-gramme par repas : au-delà, c'est la balance qui parle. */
+        if (demande > dispo + 2) {
+          fautes.push(`  graine ${graine} — ${aliment.nom} : `
+            + `${demande.toFixed(0)} g réclamés sur la journée, `
+            + `${dispo.toFixed(0)} g en stock`);
+        }
+      }
+    }
+
+    assert.equal(fautes.length, 0,
+      'La journée réclame plus que ce que contient le frigo.\n'
+        + fautes.slice(0, 10).join('\n'));
+  });
+
+  it('le cas vécu : deux repas, 500 g de brocoli, 400 g demandés chacun', () => {
+    const brocoli = CATALOGUE.find((a) => a.nom === 'Brocoli')!;
+    const frigo: Frigo = {
+      graine: 0,
+      aliments: CATALOGUE.filter((a) => ['prot', 'fec', 'ole', 'huile', 'leg']
+        .includes(a.categorie)),
+      stocks: new Map(),
+      stockDe: (a) => (a.id === brocoli.id ? 500 : 5000),
+    };
+
+    const midiEtSoir = journee(frigo).filter((d) => d.repas === 'R2' || d.repas === 'R4');
+    const sorties = resoudreLaJournee(midiEtSoir, frigo.stockDe, frigo.aliments);
+
+    const pris = [...sorties.values()]
+      .flatMap((s) => s.resultat.quantites)
+      .filter((q) => q.aliment.id === brocoli.id)
+      .reduce((somme, q) => somme + q.aCuire, 0);
+
+    assert.ok(pris <= 500 + 1,
+      `${pris.toFixed(0)} g de brocoli réclamés pour 500 g en stock`);
+  });
+
+  it('le premier repas est servi en entier, le dernier hérite du manque', () => {
+    /* Choix assumé : mieux vaut trois repas justes et un recomposé autour de
+       ce qui reste que quatre repas légèrement faux. */
+    const brocoli = CATALOGUE.find((a) => a.nom === 'Brocoli')!;
+    const frigo: Frigo = {
+      graine: 0,
+      aliments: CATALOGUE.filter((a) => ['prot', 'fec', 'ole', 'huile', 'leg']
+        .includes(a.categorie) && (a.categorie !== 'leg' || a.id === brocoli.id)),
+      stocks: new Map(),
+      stockDe: (a) => (a.id === brocoli.id ? 500 : 5000),
+    };
+
+    const sorties = resoudreLaJournee(
+      journee(frigo).filter((d) => d.repas === 'R2' || d.repas === 'R4'),
+      frigo.stockDe, frigo.aliments);
+
+    const pris = (repas: Repas): number =>
+      (sorties.get(repas)?.resultat.quantites ?? [])
+        .filter((q) => q.aliment.id === brocoli.id)
+        .reduce((somme, q) => somme + q.aCuire, 0);
+
+    assert.equal(Math.round(pris('R2')), 400, 'le midi est servi en entier');
+    assert.ok(pris('R4') < 400, 'le soir compose sur ce qui reste');
+  });
+
+  it('l\'ordre ne dépend pas de celui des demandes', () => {
+    /* On passe le dîner d'abord : il doit quand même être servi APRÈS le
+       déjeuner. Sinon l'écran déciderait du partage par son ordre de rendu. */
+    const brocoli = CATALOGUE.find((a) => a.nom === 'Brocoli')!;
+    const frigo: Frigo = {
+      graine: 0,
+      aliments: CATALOGUE.filter((a) => ['prot', 'fec', 'ole', 'huile', 'leg']
+        .includes(a.categorie) && (a.categorie !== 'leg' || a.id === brocoli.id)),
+      stocks: new Map(),
+      stockDe: (a) => (a.id === brocoli.id ? 500 : 5000),
+    };
+
+    const deux = journee(frigo).filter((d) => d.repas === 'R2' || d.repas === 'R4');
+    const alEndroit = resoudreLaJournee(deux, frigo.stockDe, frigo.aliments);
+    const alEnvers = resoudreLaJournee([...deux].reverse(), frigo.stockDe, frigo.aliments);
+
+    const ligne = (m: Map<Repas, typeof alEndroit extends Map<Repas, infer V> ? V : never>) =>
+      REPAS.map((r) => (m.get(r)?.resultat.quantites ?? [])
+        .map((q) => `${q.aliment.id}:${q.aCuire.toFixed(2)}`).join('|')).join(' // ');
+
+    assert.equal(ligne(alEnvers), ligne(alEndroit));
+  });
+
+  it('un seul repas donne le même résultat qu\'avant', () => {
+    /* Le partage ne doit rien changer quand il n'y a rien à partager. */
+    for (let graine = 1; graine <= 40; graine += 1) {
+      const frigo = frigoAleatoire(graine);
+      if (frigo.aliments.length === 0) continue;
+
+      const seul = journee(frigo).filter((d) => d.repas === 'R2');
+      const parLaJournee = resoudreLaJournee(seul, frigo.stockDe, frigo.aliments).get('R2');
+      const directement = resoudreAuMieux(
+        { variables: seul[0]!.variables, fixes: seul[0]!.fixes },
+        seul[0]!.cibles, frigo.stockDe, frigo.aliments, new Set(), false);
+
+      assert.deepEqual(
+        parLaJournee?.resultat.quantites.map((q) => [q.aliment.id, q.aCuire]),
+        directement.resultat.quantites.map((q) => [q.aliment.id, q.aCuire]),
+        `graine ${graine}`);
+    }
   });
 });
 

@@ -259,6 +259,60 @@ def main():
              all("pesee_avant" not in c and "pesee_apres" not in c
                  for c in ecrites.values()))
 
+    # ------------------------------------ l'export du catalogue commun
+
+    # Les 50 aliments de reference sont le point de depart de tout nouveau
+    # compte. Ils sont GENERES depuis Ciqual, avec les memes regles que pour
+    # Grocy — aucun chiffre tape a la main, donc aucun a corriger deux fois.
+    with tempfile.TemporaryDirectory() as dossier:
+        table = os.path.join(dossier, "ciqual-factice.xlsx")
+        ecrire_table(table)
+
+        export = subprocess.run(
+            [sys.executable, SCRIPT, table, "--exporter-catalogue"],
+            env=dict(os.environ,
+                     GROCY_URL="http://127.0.0.1:1",
+                     GROCY_API_KEY="factice"),
+            capture_output=True, text=True)
+
+    verifier("l'export se termine sans erreur", export.returncode == 0)
+
+    chemin = os.path.join(os.path.dirname(SCRIPT), "db", "manuel",
+                          "16-catalogue-ciqual.sql")
+    sql = open(chemin, encoding="utf-8").read() if os.path.exists(chemin) else ""
+
+    verifier("la migration est écrite", len(sql) > 500)
+    verifier("elle est dans une transaction",
+             "BEGIN;" in sql and "COMMIT;" in sql)
+
+    # Chaque UPDATE est examiné SÉPARÉMENT. Compter les occurrences dans tout
+    # le fichier ne prouvait rien : les SELECT de contrôle contiennent déjà
+    # « cree_par IS NULL », et le test passait même en retirant la clause de
+    # tous les UPDATE.
+    mises_a_jour = [m.split(";")[0] for m in sql.split("UPDATE aliment SET")[1:]]
+
+    verifier("la migration met bien des aliments à jour", len(mises_a_jour) >= 3)
+    verifier("CHAQUE mise à jour ne touche que le catalogue commun",
+             all("cree_par IS NULL" in m for m in mises_a_jour))
+    verifier("CHAQUE mise à jour renseigne les fibres",
+             all("fibres_100" in m for m in mises_a_jour))
+    verifier("CHAQUE mise à jour fixe l'état de référence",
+             all("etat_reference" in m for m in mises_a_jour))
+
+    # Les valeurs viennent de Ciqual, pas d'une table americaine.
+    verifier("les amandes passent aux glucides européens (8,8 et non 21,5)",
+             "gluc_100       = 8.8" in sql)
+    verifier("... avec leurs fibres, jusqu'ici absentes",
+             "fibres_100     = 10.4" in sql)
+    verifier("le brocoli passe en valeurs CRUES",
+             "etat_reference = 'cru'" in sql and "kcal_100       = 31.9" in sql)
+    verifier("le rendement du riz est dérivé de l'énergie",
+             "ratio          = 2.26" in sql)
+
+    # Une catégorie sans mesure garde un rendement de 1 : on n'invente pas.
+    verifier("aucun rendement inventé pour un légume",
+             "etat_reference = 'cru'" in sql)
+
     total = PASSES + len(ECHECS)
     print(f"{PASSES}/{total} vérifications de l'écriture")
     for echec in ECHECS:

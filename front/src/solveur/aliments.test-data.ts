@@ -22,9 +22,12 @@ export const A = {
   riz:         a('Riz basmati', 'fec', 130, 2.7, 28.2, 0.3, 3),
   quinoa:      a('Quinoa', 'fec', 120, 4.4, 21.3, 1.9, 2.75),
   avoine:      a('Flocons avoine', 'fec', 375, 12.5, 67.5, 7.5, 1),
-  haricots:    a('Haricots verts', 'leg', 31, 1.8, 7, 0.1),
-  courgettes:  a('Courgettes', 'leg', 17, 1.2, 3.1, 0.3),
-  concombre:   a('Concombre', 'leg', 15, 0.7, 3.6, 0.1),
+  /* Légumes : référence CRUE, comme les viandes — on pèse ce qu'on sort du
+     frigo. Le rendement reste à 1 : aucune mesure ne le donne, et il n'affiche
+     que le poids servi sans toucher une seule macro. */
+  haricots:    a('Haricots verts', 'leg', 31.9, 1.8, 4.1, 0.2, 1, 'cru'),
+  courgettes:  a('Courgettes', 'leg', 16.7, 1.2, 1.8, 0.3, 1, 'cru'),
+  concombre:   a('Concombre', 'leg', 16.8, 0.7, 2.9, 0.1, 1, 'cru'),
   amandes:     a('Amandes', 'ole', 575, 21, 21.5, 49.5),
   noix:        a('Noix', 'ole', 654, 15.2, 13.7, 65.2),
   huile:       a('Huile', 'huile', 900, 0, 0, 100),

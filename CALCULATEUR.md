@@ -162,10 +162,23 @@ protéines. S'il n'y a plus personne pour prendre le relais, la macro n'est
 plus atteignable et c'est dit en clair, plutôt que de promettre un repas
 impossible.
 
-**Le cumul sur plusieurs repas reste à faire** (étape 2). Aujourd'hui chaque
-repas voit le stock entier ; deux repas peuvent donc réclamer les mêmes 200 g
-de riz. Le piège n'existe pas sur un seul repas à la fois, mais il apparaîtra
-dès le calendrier.
+**Le cumul est fait sur la journée.** Les repas cochés ensemble sont résolus
+en UNE passe, dans l'ordre matin → soir, sur un stock qui décroît
+(`resoudreLaJournee`). Sans cela, le déjeuner et le dîner réclamaient chacun
+400 g de brocoli quand il n'en restait que 500 : deux repas annoncés justes,
+dont un impossible, et rien ne le disait.
+
+**Le partage suit l'ordre des repas.** Chacun prend ce dont il a besoin, le
+suivant compose sur ce qui reste, et le dernier hérite du manque. C'est un
+choix : mieux vaut trois repas justes et un recomposé proprement autour de ce
+qui reste que quatre repas légèrement faux. Le manque n'est jamais tu — il est
+plafonné, annoncé, et confié à un autre aliment du même rôle.
+
+L'ordre ne dépend pas de celui dans lequel l'écran passe les repas : sinon la
+présentation déciderait du partage.
+
+Reste à étendre le cumul à **plusieurs jours** (étape 2). Le mécanisme est le
+même, il ne lui manque que des repas supplémentaires à enchaîner.
 
 Un aliment sans poids connu — litre, pack — reste écarté du calcul, comme
 partout ailleurs dans l'app. On ne devine pas une densité.

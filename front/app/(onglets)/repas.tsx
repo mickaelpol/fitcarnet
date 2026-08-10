@@ -6,7 +6,8 @@ import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide
 import { ChoixDansListe } from '@/composants/choixAliment';
 import {
   MODELE, NOM_REPAS, REPAS,
-  type Repas, type Role, composer, resoudreAuMieux, roleDe, rolesDuRepas,
+  type AuMieux, type DemandeRepas, type Repas, type Role,
+  composer, resoudreLaJournee, roleDe, rolesDuRepas,
 } from '@/solveur/composer';
 import { verifierCatalogue } from '@/calcul/plausibilite';
 import { versReference } from '@/solveur/solveur';
@@ -41,6 +42,81 @@ const ROLES: { cle: Role; titre: string; cat: string }[] = [
 /** Grammes par personne d'un rôle imposé à ce repas, ou undefined s'il varie. */
 const imposePour = (repas: Repas, cle: Role): number | undefined =>
   MODELE[repas].imposes.find((i) => i.role === cle)?.grammes;
+
+/**
+ * Ce qu'un repas corrigé demande au solveur : ses variables, ses quantités
+ * imposées, ses cibles pour toute la tablée.
+ *
+ * Cette construction vivait DANS la carte du repas, ce qui la rendait aveugle
+ * aux autres : chaque carte résolvait son repas contre le frigo entier, et le
+ * déjeuner comme le dîner réclamaient chacun 400 g de brocoli quand il n'en
+ * restait que 500. Sortie du composant, elle se résout maintenant en une
+ * seule passe pour la journée — voir `resoudreLaJournee`.
+ */
+const demandePour = (
+  repas: Repas,
+  compose: Compose,
+  portions: number,
+  cible: { kcal: number; prot: number; gluc: number; lip: number; glucidesTotaux?: boolean },
+): DemandeRepas => {
+  const fixes: Fixe[] = [];
+  const variables: { proteine?: Aliment; glucide?: Aliment; lipide?: Aliment } = {};
+
+  /* Un ajout n'a de sens qu'avec une quantité : sans elle, il ne pèse rien
+     et n'apparaît pas dans le résultat. On le pose donc à zéro tant que
+     l'utilisateur n'a pas tapé son chiffre. */
+  for (const aliment of compose.ajouts) {
+    const saisi = (compose.restes[String(aliment.id)]?.grammes ?? '').trim();
+    const g = Number(saisi.replace(',', '.'));
+    fixes.push({
+      aliment,
+      grammes: saisi !== '' && Number.isFinite(g) && g >= 0 ? g : 0,
+      unite: compose.restes[String(aliment.id)]?.unite ?? 'cru',
+    });
+  }
+
+  for (const { cle } of ROLES) {
+    const aliment = compose.roles[cle];
+    if (!aliment) continue;
+    const fixe = imposePour(repas, cle);
+
+    const reste = compose.restes[String(aliment.id)];
+    const saisi = (reste?.grammes ?? '').trim();
+    const grammes = Number(saisi.replace(',', '.'));
+
+    /* Un reste déclaré fige la quantité : l'aliment sort des variables et
+       le repas se recompose autour de lui.
+       Zéro est une valeur COMME UNE AUTRE — « je n'en mets pas » — et non
+       un champ vide. C'est ce qui permet d'écarter un aliment sans le
+       remplacer, et le repas se recalcule autour des autres. */
+    if (saisi !== '' && Number.isFinite(grammes) && grammes >= 0) {
+      fixes.push({ aliment, grammes, unite: reste!.unite });
+    } else if (fixe !== undefined) {
+      // même règle que `composer` : la quantité s'entend dans l'état de
+      // référence de l'aliment, donc ce qu'on sert.
+      fixes.push({ aliment, grammes: fixe * portions });
+    } else if (cle === MODELE[repas].proteine) {
+      variables.proteine = aliment;
+    } else if (cle === MODELE[repas].glucide) {
+      variables.glucide = aliment;
+    } else if (cle === MODELE[repas].lipide) {
+      variables.lipide = aliment;
+    }
+  }
+
+  return {
+    repas, variables, fixes,
+    /* Les cibles sont PAR PERSONNE : on les multiplie, et tout ce qui
+       s'affiche ensuite est le total à cuisiner. La part d'une personne se
+       relit sur la dernière colonne. */
+    cibles: {
+      kcal: cible.kcal * portions, prot: cible.prot * portions,
+      gluc: cible.gluc * portions, lip: cible.lip * portions,
+    },
+    verrous: new Set(compose.verrous),
+    glucidesTotaux: cible.glucidesTotaux === true,
+  };
+};
 
 /** Un repas composé, tel que l'utilisateur peut encore le corriger. */
 interface Compose {
@@ -129,6 +205,23 @@ export default function Calculateur() {
   const anomalies = useMemo(() => verifierCatalogue(stock), [stock]);
 
   const cibleDe = (repas: Repas) => (cibles.data ?? []).find((c) => c.repas === repas);
+
+  /* TOUS les repas du plan, résolus EN UNE PASSE et dans l'ordre, parce
+     qu'ils puisent dans le même frigo. Chacun se plafonnait déjà à ce qu'il
+     restait ; aucun ne savait que les autres avaient servi avant lui. */
+  const resultats = useMemo(() => {
+    if (plan === null) return new Map<Repas, AuMieux>();
+
+    const demandes: DemandeRepas[] = [];
+    for (const repas of REPAS) {
+      const compose = plan[repas];
+      const cible = (cibles.data ?? []).find((c) => c.repas === repas);
+      if (compose === undefined || cible === undefined) continue;
+      demandes.push(demandePour(repas, compose, portions[repas], cible));
+    }
+
+    return resoudreLaJournee(demandes, stockDe, stock);
+  }, [plan, cibles.data, portions, stockDe, stock]);
 
   /** Compose tous les repas cochés, en évitant de resservir le même aliment. */
   const composerTout = () => {
@@ -294,8 +387,7 @@ export default function Calculateur() {
             compose={plan[repas]!}
             cible={cibleDe(repas)}
             portions={portions[repas]}
-            stockDe={stockDe}
-            catalogue={stock}
+            resultat={resultats.get(repas) ?? null}
             fibresDe={fibresDe}
             ouvert={ouvert === repas}
             onOuvrir={() => setOuvert(ouvert === repas ? null : repas)}
@@ -385,7 +477,7 @@ export default function Calculateur() {
 /* ------------------------------------------------------ une carte de repas */
 
 function CarteRepas({
-  repas, compose, cible, portions, stockDe, catalogue, fibresDe,
+  repas, compose, cible, portions, resultat, fibresDe,
   ouvert, onOuvrir, onRemplacer, onAjouter, onRetirerAjout, onReste,
 }: {
   repas: Repas;
@@ -394,8 +486,8 @@ function CarteRepas({
     kcal: number; prot: number; gluc: number; lip: number; glucidesTotaux?: boolean;
   } | undefined;
   portions: number;
-  stockDe: (a: Aliment) => number;
-  catalogue: Aliment[];
+  /** résolu au niveau du plan : les repas partagent un seul frigo */
+  resultat: AuMieux | null;
   /** grammes de fibres pour 100 g, dans l'état de référence de l'aliment */
   fibresDe: (a: Aliment) => number;
   ouvert: boolean;
@@ -405,69 +497,10 @@ function CarteRepas({
   onRetirerAjout: (id: number | string) => void;
   onReste: (cle: string, valeurs: { grammes: string; unite: 'cru' | 'cuit' }) => void;
 }) {
-  /* Les cibles sont PAR PERSONNE : on les multiplie, et tout ce qui s'affiche
-     ensuite est le total à cuisiner. La part d'une personne se relit sur la
-     dernière colonne. */
-  const resultat = useMemo(() => {
-    if (!cible) return null;
-
-    const total = {
-      kcal: cible.kcal * portions, prot: cible.prot * portions,
-      gluc: cible.gluc * portions, lip: cible.lip * portions,
-    };
-
-    const fixes: Fixe[] = [];
-      const variables: { proteine?: Aliment; glucide?: Aliment; lipide?: Aliment } = {};
-
-    /* Un ajout n'a de sens qu'avec une quantité : sans elle, il ne pèse rien
-       et n'apparaît pas dans le résultat. On le pose donc à zéro tant que
-       l'utilisateur n'a pas tapé son chiffre. */
-    for (const aliment of compose.ajouts) {
-      const saisi = (compose.restes[String(aliment.id)]?.grammes ?? '').trim();
-      const g = Number(saisi.replace(',', '.'));
-      fixes.push({
-        aliment,
-        grammes: saisi !== '' && Number.isFinite(g) && g >= 0 ? g : 0,
-        unite: compose.restes[String(aliment.id)]?.unite ?? 'cru',
-      });
-    }
-
-    for (const { cle } of ROLES) {
-      const aliment = compose.roles[cle];
-      if (!aliment) continue;
-      const fixe = imposePour(repas, cle);
-
-      const reste = compose.restes[String(aliment.id)];
-      const saisi = (reste?.grammes ?? '').trim();
-      const grammes = Number(saisi.replace(',', '.'));
-
-      /* Un reste déclaré fige la quantité : l'aliment sort des variables et
-         le repas se recompose autour de lui. C'est le comportement d'origine
-         du solveur, il n'a pas bougé.
-         Zéro est une valeur COMME UNE AUTRE — « je n'en mets pas » — et non
-         un champ vide. C'est ce qui permet d'écarter un aliment sans le
-         remplacer, et le repas se recalcule autour des autres. */
-      if (saisi !== '' && Number.isFinite(grammes) && grammes >= 0) {
-        fixes.push({ aliment, grammes, unite: reste!.unite });
-      } else if (fixe !== undefined) {
-        // même règle que `composer` : la quantité s'entend dans l'état de
-        // référence de l'aliment, donc ce qu'on sert.
-        fixes.push({ aliment, grammes: fixe * portions });
-      } else if (cle === MODELE[repas].proteine) {
-        variables.proteine = aliment;
-      } else if (cle === MODELE[repas].glucide) {
-        variables.glucide = aliment;
-      } else if (cle === MODELE[repas].lipide) {
-        variables.lipide = aliment;
-      }
-    }
-
-    /* Le stock a le dernier mot, et le calculateur essaie d'autres aliments
-       plutôt que de renvoyer l'utilisateur corriger à la main. */
-    return resoudreAuMieux(
-      { variables, fixes }, total, stockDe, catalogue, new Set(compose.verrous),
-      cible.glucidesTotaux === true);
-  }, [cible, compose, portions, stockDe, catalogue]);
+  /* Le résultat n'est plus calculé ici : il vient du plan, où les quatre
+     repas ont été résolus dans l'ordre sur un frigo qui se vide. Une carte
+     qui résolvait son propre repas ne pouvait pas voir ce que les autres
+     avaient déjà pris. */
 
   if (!cible) {
     return (
