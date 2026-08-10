@@ -288,6 +288,51 @@ final readonly class FrigoGrocy
         return (string) \preg_replace('/[^a-z0-9]+/', ' ', $sansAccent);
     }
 
+    /**
+     * Les champs personnalises que cette classe ecrit, et leur libelle Grocy.
+     *
+     * Grocy REFUSE LE LOT ENTIER si une seule cle lui est inconnue, avec un
+     * 400 laconique — « Field source_valeurs is not a valid userfield of the
+     * given entity ». C'est deja arrive une fois en production, et ca a
+     * coute une soiree. On ne compte donc plus sur un script tiers pour les
+     * poser : la classe qui ecrit est celle qui s'assure qu'ils existent.
+     */
+    private const CHAMPS_ECRITS = [
+        'cat' => ['Catégorie', 'text-single-line'],
+        'kcal100' => ['kcal / 100 g', 'number-decimal'],
+        'prot100' => ['Protéines / 100 g', 'number-decimal'],
+        'gluc100' => ['Glucides / 100 g', 'number-decimal'],
+        'lip100' => ['Lipides / 100 g', 'number-decimal'],
+        'fibres100' => ['Fibres / 100 g', 'number-decimal'],
+        'ratio' => ['Ratio cuit / cru', 'number-decimal'],
+        'pesee_avant' => ['Poids avant cuisson (g)', 'number-decimal'],
+        'pesee_apres' => ['Poids apres cuisson (g)', 'number-decimal'],
+        'source_valeurs' => ['Source des valeurs', 'text-single-line'],
+    ];
+
+    /** Cree les champs personnalises absents. Rend ceux qui manquaient. */
+    public function assurerLesChamps(): array
+    {
+        $existants = [];
+        foreach ($this->appeler('/objects/userfields') as $champ) {
+            if ('products' === ($champ['entity'] ?? '')) {
+                $existants[] = (string) $champ['name'];
+            }
+        }
+
+        $poses = [];
+        foreach (self::CHAMPS_ECRITS as $nom => [$libelle, $type]) {
+            if (\in_array($nom, $existants, true)) continue;
+            $this->appeler('/objects/userfields', 'POST', [
+                'entity' => 'products', 'name' => $nom, 'caption' => $libelle,
+                'type' => $type, 'show_as_column_in_tables' => 0,
+            ]);
+            $poses[] = $nom;
+        }
+
+        return $poses;
+    }
+
     public function enregistrer(int $idProduit, array $valeurs): void
     {
         $this->appeler('/userfields/products/' . $idProduit, 'PUT', $valeurs);
@@ -320,6 +365,8 @@ final readonly class FrigoGrocy
             throw new \RuntimeException(
                 "Grocy n'est pas configuré : renseigne GROCY_URL et GROCY_API_KEY.");
         }
+
+        $this->assurerLesChamps();
 
         $this->enregistrer($idProduit, [
             'cat' => $categorie,

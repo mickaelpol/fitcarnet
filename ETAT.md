@@ -78,7 +78,29 @@ portent tous sur UNE seule valeur, et se réparent donc d'une seule façon :
 l'application donne la correction au lieu de demander à l'utilisateur laquelle
 de ses deux valeurs était la bonne.
 
-**Tests.** 229 côté front (`npm test`), 172 + 47 côté Python, 29 côté PHP.
+**Tests.** 238 côté front (`npm test`), 172 + 47 côté Python, 29 côté PHP.
+
+**Plans enregistrés.** Un plan de batch cooking se conserve, lié au compte, et
+se relit tel quel : des noms et des grammes figés, jamais recalculés à la
+lecture. Le jeudi midi on ne veut pas savoir ce qu'on cuisinerait aujourd'hui,
+on veut savoir ce qu'on a cuisiné dimanche. Chaque boîte y annonce deux
+quantités : ce qu'on y met pour tout le monde, et ce que celui qui suit la
+diète se sert. La liste de courses du jour est conservée avec.
+
+**Batch cooking.** Dernière étape du calculateur, atteignable une fois toutes
+les cuissons décidées. Dans l'ordre des gestes : la liste de courses pliée en
+haut s'il manque quelque chose, les fournées — ce qui part ensemble, en poids
+de balance, quantités additionnées sur toute la période — puis la répartition,
+une boîte par repas de chaque jour, en poids CUIT. Les deux poids diffèrent, et
+c'est le point : on pèse du riz sec, on répartit du riz cuit. Les façons de cuire vivent dans une table `mode_cuisson` partagée
+par tous les comptes, lisible par tous et alimentée par le seul
+administrateur. Rien n'est stocké sur la fiche de l'aliment : le frigo a deux
+sources, et un champ posé là aurait existé en double avec deux vocabulaires
+libres de diverger. Le mode se choisit au moment de composer, sur le couple
+repas + aliment — les mêmes pommes de terre au four ce soir et à la vapeur
+demain. « Sans cuisson » est un choix explicite, distinct de « pas encore
+décidé » : sans cette distinction, le skyr resterait éternellement à situer.
+Un bouton règle en bloc tout ce qui reste.
 
 **Le calculateur tient sur plusieurs jours.** Une période partage un seul
 frigo : les repas sont résolus dans l'ordre du temps sur un stock qui décroît,

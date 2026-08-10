@@ -65,6 +65,23 @@ export const libelleDuJour = (rang: number): string => {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: '2-digit' });
 };
 
+/**
+ * La forme courte, pour un résumé : « auj. », « dem. », « mar. 12/08 ».
+ *
+ * Sert quand plusieurs jours doivent tenir sur une ligne repliée. Écrire
+ * « Aujourd'hui, Demain, mardi 12/08, mercredi 13/08 » déborderait, et un
+ * résumé tronqué ne résume rien.
+ */
+export const libelleCourt = (rang: number): string => {
+  if (rang === 0) return 'auj.';
+  if (rang === 1) return 'dem.';
+
+  const d = dateDuRang(rang);
+
+  return `${d.toLocaleDateString('fr-FR', { weekday: 'short' })} `
+    + `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`;
+};
+
 /** Les cases d'un mois, alignées sur une grille lundi → dimanche. */
 function grilleDuMois(annee: number, mois: number): (Date | null)[] {
   const premier = new Date(annee, mois, 1);

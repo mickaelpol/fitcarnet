@@ -1,12 +1,19 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useCibles, useMonFrigo } from '@/api/hooks';
+import {
+  useCibles, useEnregistrerPlan, useModesCuisson, useMonFrigo, usePlans,
+  useSupprimerPlan,
+} from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
-import { Calendrier, libelleDuJour } from '@/composants/calendrier';
+import { Calendrier, libelleCourt, libelleDuJour } from '@/composants/calendrier';
 import { Pliant } from '@/composants/pliant';
+import {
+  type Cuissons, type ModeCuisson, type PlanEnregistre, cleDeCuisson,
+  enFournees, figerLePlan, repartition, resteSansCuisson, sansCuisson,
+} from '@/calcul/cuisson';
 import {
   MODELE, NOM_REPAS, REPAS,
   type AuMieux, type DemandeDatee, type DemandeRepas, type Repas, type Role,
@@ -162,6 +169,10 @@ const vers = (a: AlimentDisponible): Aliment => ({
 export default function Calculateur() {
   const frigo = useMonFrigo();
   const cibles = useCibles();
+  const modesCuisson = useModesCuisson();
+  const plansGardes = usePlans();
+  const enregistrerPlan = useEnregistrerPlan();
+  const supprimerPlan = useSupprimerPlan();
   const insets = useSafeAreaInsets();
 
   /* --------------------------------------------------------- la période
@@ -188,6 +199,25 @@ export default function Calculateur() {
      qu'un. */
   const [jourOuvert, setJourOuvert] = useState<number | null>(0);
   const [detaille, setDetaille] = useState<string | null>(null);
+  /* Le batch cooking est une ÉTAPE, pas un affichage. On y arrive une fois
+     les cuissons décidées, et on y trouve dans l'ordre : ce qu'il manque à
+     acheter, ce qu'on met à cuire, puis ce qu'on répartit dans les boîtes.
+     C'est l'ordre dans lequel on fait les gestes. */
+  const [batch, setBatch] = useState(false);
+  const [boiteOuverte, setBoiteOuverte] = useState<string | null>(null);
+  /* Le calendrier s'ouvre quand on bascule en « plusieurs jours » — il n'y a
+     rien d'autre à faire à cet instant — et se referme dès qu'on a choisi. */
+  const [calendrierOuvert, setCalendrierOuvert] = useState(false);
+  const [nomDuPlan, setNomDuPlan] = useState('');
+  /* Un plan relu. Il ne se recalcule pas : on affiche ce qui a été figé. */
+  const [relu, setRelu] = useState<{ libelle: string; contenu: PlanEnregistre } | null>(null);
+  const [plansOuverts, setPlansOuverts] = useState(false);
+  /* Les cuissons choisies POUR CE PLAN, par repas et par aliment. Rien n'est
+     stocké sur la fiche de l'aliment : les mêmes pommes de terre passent au
+     four ce soir et à la vapeur demain. Clé : « jour|repas|idAliment ». */
+  const [cuissons, setCuissons] = useState<Cuissons>({});
+  const [choisirCuisson, setChoisirCuisson] = useState<
+    { cle: string; aliment: Aliment } | null>(null);
 
   /* Les jours réellement planifiés : un seul si le mode ne l'est pas. Rendus
      dans l'ordre du temps, quel que soit l'ordre où on les a cochés. */
@@ -289,6 +319,40 @@ export default function Calculateur() {
     [demandes, stockDe, stock],
   );
 
+  /* Le plan mis à plat, tel que `enFournees` l'attend : un repas, ses
+     quantités. Ce module ne recalcule RIEN — il regroupe ce que le solveur a
+     déjà résolu, et c'est la garantie qu'un regroupement ne peut pas fausser
+     un gramme. */
+  const plat = useMemo(
+    () => joursRetenus.flatMap((rang) => REPAS
+      .map((repas) => cleDuRepas(rang, repas))
+      .filter((cle) => resultats.has(cle))
+      /* L'ordre du TEMPS, pas celui d'une Map : on remplit ses boîtes dans
+         l'ordre où on les mangera. */
+      .map((cle) => ({
+        cle,
+        convives: portions[cle] ?? 1,
+        quantites: resultats.get(cle)!.resultat.quantites,
+      }))),
+    [resultats, joursRetenus, portions],
+  );
+
+  const parFournee = useMemo(
+    () => enFournees(plat, cuissons, modesCuisson.data ?? []),
+    [plat, cuissons, modesCuisson.data],
+  );
+
+  const restentASituer = useMemo(() => sansCuisson(plat, cuissons), [plat, cuissons]);
+
+  const boites = useMemo(() => repartition(plat, cuissons), [plat, cuissons]);
+
+  /** « Aujourd'hui · Midi » — le nom d'une boîte. */
+  const nomDeLaBoite = (cle: string): string => {
+    const [rang, repas] = cle.split('|');
+
+    return `${libelleDuJour(Number(rang))} · ${NOM_REPAS[repas as Repas]}`;
+  };
+
   /** Compose tous les repas cochés, en évitant de resservir le même aliment. */
   const composerTout = () => {
     const suite: Record<string, Compose> = {};
@@ -358,7 +422,14 @@ export default function Calculateur() {
             </View>
             <Switch
               value={plusieurs}
-              onValueChange={(v) => { setPlusieurs(v); if (!v) setRangs([0]); }}
+              onValueChange={(v) => {
+                setPlusieurs(v);
+                if (!v) setRangs([0]);
+                /* En activant « plusieurs jours », la seule chose à faire est
+                   de choisir ses jours : on ouvre le calendrier plutôt que de
+                   demander un appui de plus. */
+                setCalendrierOuvert(v);
+              }}
               trackColor={{ false: C.ligne, true: C.vifFond }}
               thumbColor={plusieurs ? C.vif : C.attenue}
               accessibilityLabel="Planifier plusieurs jours"
@@ -374,8 +445,63 @@ export default function Calculateur() {
           </Discret>
         </Carte>
 
+        {(plansGardes.data ?? []).length > 0 && (
+          /* En tête, parce que c'est souvent ce qu'on vient chercher : le
+             jeudi midi on ne veut pas composer un plan, on veut relire celui
+             de dimanche. */
+          <Pliant
+            titre="Mes plans enregistrés"
+            resume={`${(plansGardes.data ?? []).length} plan`
+              + `${(plansGardes.data ?? []).length > 1 ? 's' : ''}`
+              + `  ·  le plus récent : ${plansGardes.data![0]!.libelle}`}
+            ouvert={plansOuverts}
+            onBascule={() => setPlansOuverts(!plansOuverts)}
+            teinte="jour"
+          >
+            {(plansGardes.data ?? []).map((pl) => (
+              <View key={pl.id} style={s.ligneCourse}>
+                <Pressable
+                  onPress={() => { setRelu(pl); setBoiteOuverte(null); setCourses(false); }}
+                  style={{ flex: 1, minHeight: TOUCHE }}
+                  accessibilityLabel={`Relire le plan ${pl.libelle}`}
+                >
+                  <Texte>{pl.libelle}</Texte>
+                  <Discret style={s.aide}>
+                    {pl.contenu.boites.length} boîte
+                    {pl.contenu.boites.length > 1 ? 's' : ''}
+                    {'  ·  '}
+                    {pl.contenu.fournees.length} fournée
+                    {pl.contenu.fournees.length > 1 ? 's' : ''}
+                  </Discret>
+                </Pressable>
+                <Pressable
+                  onPress={() => supprimerPlan.mutate(pl.id)}
+                  style={s.persBouton}
+                  accessibilityLabel={`Supprimer le plan ${pl.libelle}`}
+                >
+                  <Discret style={{ color: C.erreur }}>Supprimer</Discret>
+                </Pressable>
+              </View>
+            ))}
+          </Pliant>
+        )}
+
         {plusieurs && (
-          <Carte style={{ gap: E.s }}>
+          /* Une grille de mois occupe la moitié de l'écran, et on n'y revient
+             qu'une fois : le choix des jours se fait au début, le réglage des
+             repas dure. Elle se replie donc dès qu'un jour est coché, en
+             laissant lisible ce qui a été choisi — c'est la règle du Pliant :
+             replié, un encart dit toujours l'essentiel. */
+          <Pliant
+            titre="Quels jours"
+            resume={joursRetenus.length === 1
+              ? libelleDuJour(joursRetenus[0]!)
+              : `${joursRetenus.length} jours  ·  `
+                + joursRetenus.map((r) => libelleCourt(r)).join(', ')}
+            ouvert={calendrierOuvert}
+            onBascule={() => setCalendrierOuvert(!calendrierOuvert)}
+            teinte="jour"
+          >
             <Calendrier
               rangs={rangs}
               onBasculer={(rang) => setRangs((liste) => (liste.includes(rang)
@@ -384,7 +510,7 @@ export default function Calculateur() {
                 ? (liste.length > 1 ? liste.filter((r) => r !== rang) : liste)
                 : [...liste, rang]))}
             />
-          </Carte>
+          </Pliant>
         )}
 
         {joursRetenus.map((rang) => {
@@ -588,6 +714,264 @@ export default function Calculateur() {
     );
   }
 
+  /* ------------------------------------------- un plan qu'on relit */
+
+  if (relu !== null) {
+    const p = relu.contenu;
+
+    return (
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={s.page}>
+          <Carte style={{ gap: E.xs }}>
+            <Texte style={{ fontFamily: P.fort }}>{relu.libelle}</Texte>
+            <Discret style={s.aide}>
+              {/* Rien n'est recalculé ici, et c'est le point : le stock a
+                  bougé depuis, les cibles ont peut-être changé. On ne veut
+                  pas savoir ce qu'on cuisinerait aujourd'hui, on veut savoir
+                  ce qu'on a cuisiné ce jour-là. */}
+              Ce plan est figé tel qu'il a été enregistré. Les quantités ne se
+              recalculent pas : c'est ce que tu as cuisiné, pas ce que ton
+              frigo permettrait aujourd'hui.
+            </Discret>
+          </Carte>
+
+          {p.courses.length > 0 && (
+            <Pliant
+              titre="Liste de courses"
+              resume={`${p.courses.length} aliment${p.courses.length > 1 ? 's' : ''} manquant`
+                + `${p.courses.length > 1 ? 's' : ''} ce jour-là`}
+              ouvert={courses}
+              onBascule={() => setCourses(!courses)}
+              teinte="jour"
+            >
+              {p.courses.map((c) => (
+                <View key={c.nom} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(c.categorie) }]} />
+                  <Texte style={{ flex: 1 }}>{c.nom}</Texte>
+                  <Texte style={{ fontFamily: P.fort }}>{nb(c.grammes)} g</Texte>
+                </View>
+              ))}
+            </Pliant>
+          )}
+
+          <Texte style={s.titreEtape}>
+            À cuire · {p.fournees.length} fournée{p.fournees.length > 1 ? 's' : ''}
+          </Texte>
+          {p.fournees.map((f) => (
+            <Carte key={f.libelle} style={{ gap: E.xs }}>
+              <Texte style={{ fontFamily: P.fort }}>{f.libelle}</Texte>
+              {f.lignes.map((l) => (
+                <View key={l.nom} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(l.categorie) }]} />
+                  <Texte style={{ flex: 1 }}>{l.nom}</Texte>
+                  <Texte style={{ fontFamily: P.fort }}>{nb(l.aCuire)} g</Texte>
+                </View>
+              ))}
+            </Carte>
+          ))}
+
+          <Texte style={s.titreEtape}>
+            À servir · {p.boites.length} boîte{p.boites.length > 1 ? 's' : ''}
+          </Texte>
+          <Discret style={s.aide}>
+            La colonne dorée est ce que TU te sers pour tenir tes macros.
+          </Discret>
+
+          {p.boites.map((b) => (
+            <Pliant
+              key={b.titre}
+              titre={b.titre}
+              resume={`${nb(b.cuits.reduce((n, x) => n + x.assiette, 0))} g cuits`
+                + (b.convives > 1 ? `  ·  ${b.convives} personnes` : '')}
+              ouvert={boiteOuverte === b.titre}
+              onBascule={() => setBoiteOuverte(boiteOuverte === b.titre ? null : b.titre)}
+            >
+              <View style={s.entete}>
+                <Discret style={[s.col, { flex: 2 }]}>aliment</Discret>
+                <Discret style={s.col}>boîte</Discret>
+                <Discret style={s.col}>1 pers.</Discret>
+              </View>
+              {[...b.cuits, ...b.crus].map((x) => (
+                <View key={x.nom} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(x.categorie) }]} />
+                  <Texte style={{ flex: 2 }}>{x.nom}</Texte>
+                  <Texte style={[s.col, { textAlign: 'right' }]}>{nb(x.assiette)} g</Texte>
+                  <Texte style={[s.col, { textAlign: 'right', color: C.vif }]}>
+                    {nb(x.parPersonne)} g
+                  </Texte>
+                </View>
+              ))}
+            </Pliant>
+          ))}
+        </ScrollView>
+
+        <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
+          <Bouton variante="contour" onPress={() => setRelu(null)}>
+            ← Fermer
+          </Bouton>
+        </View>
+      </View>
+    );
+  }
+
+  /* --------------------------------------------- batch cooking */
+
+  if (batch) {
+    return (
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={s.page}>
+          {/* L'ordre de cet écran est celui des GESTES : ce qu'il faut aller
+              chercher, ce qu'on met à cuire, ce qu'on range dans les boîtes. */}
+
+          {aAcheter.length > 0 && (
+            <Pliant
+              titre="Liste de courses"
+              resume={`${aAcheter.length} aliment${aAcheter.length > 1 ? 's' : ''} manquant`
+                + `${aAcheter.length > 1 ? 's' : ''}`}
+              ouvert={courses}
+              onBascule={() => setCourses(!courses)}
+              teinte="jour"
+            >
+              <Discret style={s.aide}>
+                Ce qu'il manque pour cuisiner ce plan tel qu'il est prévu, ton
+                frigo déjà déduit.
+              </Discret>
+              {aAcheter.map(({ aliment, grammes }) => (
+                <View key={String(aliment.id)} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(aliment.categorie) }]} />
+                  <Texte style={{ flex: 1 }}>{aliment.nom}</Texte>
+                  <Texte style={{ fontFamily: P.fort }}>{nb(grammes)} g</Texte>
+                </View>
+              ))}
+            </Pliant>
+          )}
+
+          {/* ---- les fournées ---- */}
+          <Texte style={s.titreEtape}>
+            À cuire · {parFournee.length} fournée{parFournee.length > 1 ? 's' : ''}
+          </Texte>
+          <Discret style={s.aide}>
+            Les poids sont ceux de la BALANCE, avant cuisson : riz sec, viande
+            crue. Tout ce qui partage une fournée part ensemble.
+          </Discret>
+
+          {parFournee.length === 0 && (
+            <Vide message="Aucun aliment de ce plan ne se cuit. Il n'y a rien à mettre en fournée — passe directement aux boîtes." />
+          )}
+
+          {parFournee.map((f) => (
+            <Carte key={f.mode.id} style={{ gap: E.xs }}>
+              <Texte style={{ fontFamily: P.fort }}>{f.mode.libelle}</Texte>
+              <Discret style={s.aide}>
+                {nb(f.lignes.reduce((n, l) => n + l.aCuire, 0))} g à peser en tout
+              </Discret>
+              {f.lignes.map((l) => (
+                <View key={String(l.aliment.id)} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(l.aliment.categorie) }]} />
+                  <Texte style={{ flex: 1 }}>{l.aliment.nom}</Texte>
+                  <Texte style={{ fontFamily: P.fort }}>{nb(l.aCuire)} g</Texte>
+                </View>
+              ))}
+            </Carte>
+          ))}
+
+          {/* ---- la répartition ---- */}
+          <Texte style={s.titreEtape}>
+            À répartir · {boites.length} boîte{boites.length > 1 ? 's' : ''}
+          </Texte>
+          <Discret style={s.aide}>
+            Ces poids-là sont ceux du produit CUIT. La colonne « boîte » est ce
+            qu'on y met pour tout le monde ; la colonne « 1 pers. », en doré,
+            est ce que TU te sers le jour venu pour tenir tes macros.
+          </Discret>
+
+          {boites.map((b) => (
+            <Pliant
+              key={b.cle}
+              titre={nomDeLaBoite(b.cle)}
+              resume={`${nb(b.cuits.reduce((n, x) => n + x.assiette, 0))} g cuits`
+                + (b.convives > 1 ? `  ·  ${b.convives} personnes` : '')
+                + (b.crus.length > 0 ? `  ·  ${b.crus.length} à ajouter après` : '')}
+              ouvert={boiteOuverte === b.cle}
+              onBascule={() => setBoiteOuverte(boiteOuverte === b.cle ? null : b.cle)}
+            >
+              {/* DEUX colonnes, et les confondre ruine tout : la boîte
+                  contient de quoi servir tout le monde, mais les macros du
+                  plan ne valent que pour UNE personne. Sans la seconde, il
+                  faudrait recomposer le repas le jour du repas pour savoir
+                  combien s'en servir — soit refaire tout le travail que le
+                  batch cooking venait d'éviter. */}
+              <View style={s.entete}>
+                <Discret style={[s.col, { flex: 2 }]}>aliment</Discret>
+                <Discret style={s.col}>boîte</Discret>
+                <Discret style={s.col}>1 pers.</Discret>
+              </View>
+              {b.cuits.map((x) => (
+                <View key={String(x.aliment.id)} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(x.aliment.categorie) }]} />
+                  <Texte style={{ flex: 2 }}>{x.aliment.nom}</Texte>
+                  <Texte style={[s.col, { textAlign: 'right' }]}>{nb(x.assiette)} g</Texte>
+                  <Texte style={[s.col, { textAlign: 'right', color: C.vif }]}>
+                    {nb(x.parPersonne)} g
+                  </Texte>
+                </View>
+              ))}
+
+              {/* On ne met pas un skyr dans une boîte cinq jours à l'avance.
+                  Mais le taire ferait une boîte qui ne correspond plus au
+                  repas, et des macros fausses le jour venu. */}
+              {b.crus.length > 0 && (
+                <>
+                  <Discret style={s.colTitre}>à ajouter au moment de manger</Discret>
+                  {b.crus.map((x) => (
+                    <View key={String(x.aliment.id)} style={s.ligneCourse}>
+                      <View style={[s.pastille, { backgroundColor: C.discret }]} />
+                      <Discret style={{ flex: 2 }}>{x.aliment.nom}</Discret>
+                      <Discret style={[s.col, { textAlign: 'right' }]}>{nb(x.assiette)} g</Discret>
+                      <Discret style={[s.col, { textAlign: 'right', color: C.vif }]}>
+                        {nb(x.parPersonne)} g
+                      </Discret>
+                    </View>
+                  ))}
+                </>
+              )}
+            </Pliant>
+          ))}
+        </ScrollView>
+
+        <View style={[s.pied, { paddingBottom: E.m + insets.bottom, gap: E.s }]}>
+          {/* Sans enregistrement, il faudrait recomposer tout le plan le
+              jeudi — avec un frigo qui a changé — pour lire un chiffre décidé
+              le dimanche. Le nom est libre : « Semaine du 11/08 » ou ce qu'on
+              veut, tant qu'on s'y retrouve. */}
+          <Champ
+            valeur={nomDuPlan}
+            onChange={setNomDuPlan}
+            placeholder="Semaine du 11/08"
+            etiquette="Enregistrer ce plan sous"
+          />
+          <Bouton
+            onPress={() => enregistrerPlan.mutate({
+              libelle: nomDuPlan.trim(),
+              contenu: figerLePlan(aAcheter, parFournee, boites, nomDeLaBoite),
+            }, { onSuccess: () => { setNomDuPlan(''); setBatch(false); setPlan(null); } })}
+            desactive={nomDuPlan.trim() === '' || enregistrerPlan.isPending}
+          >
+            {enregistrerPlan.isPending ? 'Enregistrement…' : 'Enregistrer'}
+          </Bouton>
+          {enregistrerPlan.isError && (
+            <Discret style={[s.aide, { color: C.erreur }]}>
+              {enregistrerPlan.error.message}
+            </Discret>
+          )}
+          <Bouton variante="contour" onPress={() => setBatch(false)}>
+            ← Revenir au plan
+          </Bouton>
+        </View>
+      </View>
+    );
+  }
+
   /* ------------------------------------------- correction du plan */
 
   /* Les aliments proposés en remplacement : même rôle, en stock, et pas
@@ -606,27 +990,24 @@ export default function Calculateur() {
           mets 0 pour écarter un aliment de ce repas.
         </Discret>
 
-        {/* ---- la liste de courses ---- */}
-        {aAcheter.length > 0 && (
+        {/* Un plan de sept jours porte une trentaine de lignes, dont beaucoup
+            ne se cuisent pas — skyr, amandes, fruits, huile. Les pointer une
+            par une pour dire « rien à faire » serait absurde : ce qui EST
+            cuit se choisit à la main, le reste se règle d'un geste. Les choix
+            déjà faits ne sont pas écrasés. */}
+        {restentASituer > 0 && (
           <Carte style={{ gap: E.xs }}>
-            <Pressable onPress={() => setCourses(!courses)}>
-              <Texte style={{ fontFamily: P.fort }}>
-                Liste de courses · {aAcheter.length} aliment
-                {aAcheter.length > 1 ? 's' : ''}
-              </Texte>
-              <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
-                Ce qu'il manque pour cuisiner ce plan tel qu'il est prévu, ton
-                frigo déjà déduit. {courses ? '' : 'Touche pour voir.'}
-              </Discret>
-            </Pressable>
-
-            {courses && aAcheter.map(({ aliment, grammes }) => (
-              <View key={String(aliment.id)} style={s.ligneCourse}>
-                <View style={[s.pastille, { backgroundColor: couleurRole(aliment.categorie) }]} />
-                <Texte style={{ flex: 1 }}>{aliment.nom}</Texte>
-                <Texte style={{ fontFamily: P.fort }}>{nb(grammes)} g</Texte>
-              </View>
-            ))}
+            <Discret style={s.aide}>
+              {restentASituer} aliment{restentASituer > 1 ? 's' : ''} sans cuisson
+              renseignée. Touche « cuisson » sous un repas pour dire comment le
+              cuire, ou déclare le reste d'un coup.
+            </Discret>
+            <Bouton
+              variante="contour"
+              onPress={() => setCuissons((c) => resteSansCuisson(plat, c))}
+            >
+              Les {restentASituer} autres se mangent sans cuisson
+            </Bouton>
           </Carte>
         )}
 
@@ -663,6 +1044,15 @@ export default function Calculateur() {
                       ...p!,
                       [cle]: { ...p![cle]!, restes: { ...p![cle]!.restes, [k]: valeurs } },
                     }))}
+                    cuissonDe={(a) => {
+                      const choix = cuissons[cleDeCuisson(cle, a)];
+                      if (choix === undefined) return 'a choisir';
+
+                      return choix === null
+                        ? null
+                        : (modesCuisson.data ?? []).find((m) => m.id === choix) ?? 'a choisir';
+                    }}
+                    onCuisson={(a) => setChoisirCuisson({ cle, aliment: a })}
                   />
                 );
               })}
@@ -697,8 +1087,16 @@ export default function Calculateur() {
 
       </ScrollView>
 
-      <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
-        <Bouton variante="contour" onPress={() => setPlan(null)}>
+      <View style={[s.pied, { paddingBottom: E.m + insets.bottom, gap: E.s }]}>
+        {/* Le batch cooking vient APRÈS, une fois les cuissons décidées. Le
+            proposer plus tôt donnerait des fournées incomplètes sans le dire,
+            et on découvrirait l'oubli devant les casseroles. */}
+        <Bouton onPress={() => setBatch(true)} desactive={restentASituer > 0}>
+          {restentASituer > 0
+            ? `${restentASituer} cuisson${restentASituer > 1 ? 's' : ''} à renseigner`
+            : 'Passer au batch cooking →'}
+        </Bouton>
+        <Bouton variante="contour" onPress={() => { setPlan(null); setBatch(false); }}>
           ← Modifier la sélection
         </Bouton>
       </View>
@@ -737,6 +1135,30 @@ export default function Calculateur() {
         onFermer={() => setRemplacer(null)}
       />
 
+      {/* Changer la cuisson d'un aliment POUR CE REPAS. La fiche ne bouge
+          pas : c'est un choix du jour, pas une habitude. */}
+      <ChoixDansListe
+        visible={choisirCuisson !== null}
+        titre={choisirCuisson ? `Cuisson · ${choisirCuisson.aliment.nom}` : ''}
+        /* « Sans cuisson » porte l'identifiant 0, qu'aucune ligne de la table
+           n'a. Il n'a rien à faire dans la table : ce n'est pas une façon de
+           cuire, c'est l'absence de cuisson — et l'y mettre obligerait
+           `enFournees` à connaître un identifiant particulier. */
+        elements={[
+          { id: 0, nom: 'Sans cuisson', detail: 'se mange tel quel' },
+          ...(modesCuisson.data ?? []).map((m) => ({ id: m.id, nom: m.libelle })),
+        ]}
+        onChoisir={(id) => {
+          if (choisirCuisson === null) return;
+          setCuissons((c) => ({
+            ...c,
+            [cleDeCuisson(choisirCuisson.cle, choisirCuisson.aliment)]: id === 0 ? null : id,
+          }));
+          setChoisirCuisson(null);
+        }}
+        onFermer={() => setChoisirCuisson(null)}
+      />
+
       <ChoixDansListe
         visible={ajouter !== null}
         titre="Ajouter un aliment"
@@ -771,6 +1193,7 @@ export default function Calculateur() {
 function CarteRepas({
   repas, compose, cible, portions, resultat, fibresDe,
   ouvert, onOuvrir, onRemplacer, onAjouter, onRetirerAjout, onReste,
+  cuissonDe, onCuisson,
 }: {
   repas: Repas;
   compose: Compose;
@@ -788,6 +1211,13 @@ function CarteRepas({
   onAjouter: () => void;
   onRetirerAjout: (id: number | string) => void;
   onReste: (cle: string, valeurs: { grammes: string; unite: 'cru' | 'cuit' }) => void;
+  /**
+   * La cuisson de cet aliment DANS CE REPAS : un mode, `null` quand on a
+   * décidé qu'il ne se cuit pas, ou « a choisir » tant que personne n'a
+   * tranché. Les deux derniers ne se confondent pas.
+   */
+  cuissonDe: (a: Aliment) => ModeCuisson | null | 'a choisir';
+  onCuisson: (a: Aliment) => void;
 }) {
   /* Le résultat n'est plus calculé ici : il vient du plan, où les quatre
      repas ont été résolus dans l'ordre sur un frigo qui se vide. Une carte
@@ -1046,6 +1476,50 @@ function CarteRepas({
             + Ajouter un aliment
           </Bouton>
 
+          {/* ---- comment on cuit, pour CE repas ----
+
+              Sous le tableau et non dans une colonne : la cuisson ne pèse rien
+              et ne change aucun chiffre. La mêler aux grammes lui donnerait une
+              importance qu'elle n'a pas, et volerait de la place à ce qu'on
+              lit vraiment à la balance.
+
+              Ce qu'on change ici ne touche PAS la fiche de l'aliment : des
+              pommes de terre au four ce soir n'engagent pas celles de demain. */}
+          {(resultat?.resultat.quantites ?? []).length > 0 && (
+            <>
+              <Discret style={s.colTitre}>cuisson</Discret>
+              <View style={s.puces}>
+                {(resultat?.resultat.quantites ?? []).map((q) => (
+                  <Pressable
+                    key={`cuisson-${q.aliment.id}`}
+                    onPress={() => onCuisson(q.aliment)}
+                    style={s.puce}
+                    accessibilityLabel={`Changer la cuisson de ${q.aliment.nom}`}
+                  >
+                    <View style={[
+                      s.pastille,
+                      { backgroundColor: couleurRole(q.aliment.categorie) },
+                    ]}
+                    />
+                    {/* Trois états, trois apparences : décidé et cuit,
+                        décidé et cru, pas encore décidé. Le troisième doit
+                        se voir — c'est le seul qui demande une action. */}
+                    <Discret style={cuissonDe(q.aliment) === 'a choisir'
+                      ? { color: C.vif } : undefined}
+                    >
+                      {q.aliment.nom} · {(() => {
+                        const c = cuissonDe(q.aliment);
+                        if (c === 'a choisir') return 'à choisir';
+
+                        return c === null ? 'sans cuisson' : c.libelle;
+                      })()}
+                    </Discret>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
           {(resultat?.resultat.diagnostics ?? [])
             .filter((d) => d.gravite !== 'info')
             .map((d) => (
@@ -1070,6 +1544,15 @@ const s = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: C.ligne, backgroundColor: C.fond,
   },
   interrupteur: { flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: TOUCHE },
+  colTitre: { fontSize: T.minuscule, textTransform: 'uppercase' },
+  titreEtape: { fontFamily: P.fort, fontSize: T.moyen, marginTop: E.s },
+  puces: { flexDirection: 'row', flexWrap: 'wrap', gap: E.xs },
+  puce: {
+    flexDirection: 'row', alignItems: 'center', gap: E.xs,
+    paddingHorizontal: E.s, paddingVertical: E.xs,
+    borderRadius: R.m, borderWidth: 1, borderColor: C.ligne,
+    minHeight: TOUCHE - 14,
+  },
   aide: { fontSize: T.petit, lineHeight: T.moyen },
   /* Un seul jour : pas d'encart pliant, juste la pile de repas. */
   jourSeul: { gap: E.xs },

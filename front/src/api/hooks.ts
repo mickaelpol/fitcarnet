@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ModeCuisson, PlanEnregistre } from '@/calcul/cuisson';
 import {
   api, definirJeton, definirRafraichissement, lireRafraichissement, membres,
 } from './client';
@@ -301,6 +302,57 @@ export const useStock = () =>
     queryKey: ['stock'],
     queryFn: async () => membres(await api<{ member: LigneStock[] }>('/stocks?itemsPerPage=500')),
   });
+
+/**
+ * Les façons de cuire, partagées par TOUS les comptes.
+ *
+ * Une table et non une liste figée : le frigo a deux sources — la base pour
+ * les comptes ordinaires, Grocy pour l'administrateur — et un vocabulaire
+ * écrit des deux côtés finirait par diverger. Tout le monde lit, seul
+ * l'administrateur ajoute.
+ */
+export const useModesCuisson = () =>
+  useQuery({
+    queryKey: ['modes-cuisson'],
+    queryFn: async () => membres(await api<{ member: ModeCuisson[] }>('/mode_cuissons')),
+    ...REFERENTIEL,
+  });
+
+/* ---------- plans de batch cooking conservés ---------- */
+
+export interface PlanRepas {
+  id: number;
+  libelle: string;
+  creeLe: string;
+  contenu: PlanEnregistre;
+}
+
+export const usePlans = () =>
+  useQuery({
+    queryKey: ['plans'],
+    queryFn: async () => membres(await api<{ member: PlanRepas[] }>('/plan_repas')),
+  });
+
+export function useEnregistrerPlan() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (v: { libelle: string; contenu: PlanEnregistre }) =>
+      api<PlanRepas>('/plan_repas', { methode: 'POST', corps: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['plans'] }),
+  });
+}
+
+export function useSupprimerPlan() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    /* Un instantané ne se modifie pas — sinon ce n'en est plus un. On en
+       refait un, et on supprime l'ancien. */
+    mutationFn: (id: number) => api<void>(`/plan_repas/${id}`, { methode: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['plans'] }),
+  });
+}
 
 export const useCibles = () =>
   useQuery({

@@ -5,8 +5,7 @@ l'écran, dans quel ordre, et pourquoi chaque choix a été fait plutôt qu'un
 autre. Tout ce qui y figure a été arrêté avec Mickaël ; ce qui reste à
 trancher est marqué **À TRANCHER**.
 
-**Les étapes 1 et 2 sont livrées.** L'étape 3 — le batch cooking — reste à
-faire. Ce qui suit décrit le parcours complet ; les écarts entre le texte et
+**Les trois étapes sont livrées.** Ce qui suit décrit le parcours complet ; les écarts entre le texte et
 le code sont signalés au fil.
 
 **Un seul jour n'est pas un cas particulier.** C'est une période de longueur
@@ -32,9 +31,31 @@ de temps de cuisson. Il produit une liste d'aliments avec leurs quantités —
 et les macros correspondantes. C'est une liste de pesées, et c'est
 exactement ce que le solveur sait faire depuis ses 47 tests.
 
-**Rien n'est enregistré.** Le plan est un outil d'organisation, pas un
-journal. On ferme l'écran, tout disparaît. Aucun stock n'est décrémenté :
-c'est l'inventaire du frigo qui fait foi, et lui seul.
+**Aucun stock n'est décrémenté** : c'est l'inventaire du frigo qui fait foi,
+et lui seul.
+
+**Un plan de batch cooking, lui, s'enregistre** — et cette règle-là a changé
+en cours de route. Elle disait « rien n'est enregistré, le plan est un outil
+d'organisation, pas un journal ». Le batch cooking l'a rendue intenable : on
+cuisine le dimanche pour la semaine, et le jeudi midi, devant sa boîte, il
+faut savoir combien s'en servir. Sans conservation il faudrait recomposer tout
+le plan ce jeudi-là — avec un frigo qui a changé, donc des quantités
+différentes — pour lire un chiffre décidé le dimanche.
+
+**On enregistre un INSTANTANÉ, pas une recette à rejouer.** Le contenu est le
+résultat déjà calculé : des noms et des grammes, jamais des identifiants
+d'aliments. Un plan doit rester lisible même si un aliment a été supprimé
+depuis, et surtout il ne doit PAS se recalculer à la lecture — le jeudi, on ne
+veut pas savoir ce qu'on cuisinerait aujourd'hui, on veut savoir ce qu'on a
+cuisiné dimanche.
+
+La liste de courses fait partie de l'instantané : savoir ce qu'il manquait au
+moment où le plan a été fait fait partie du plan. Et les boîtes sont datées en
+toutes lettres à l'enregistrement — « jeudi 14/08 · 16 h » — parce qu'un rang
+de calendrier ne désigne plus le même jour trois jours plus tard.
+
+Un instantané **ne se modifie pas**, sinon ce n'en est plus un : il n'y a pas
+de `PATCH` sur cette ressource. On en refait un, et on supprime l'ancien.
 
 **Le nombre de personnes ne multiplie pas des besoins, il multiplie des
 portions.** Une portion vaut TES cibles macro, celles des réglages du compte.
@@ -134,9 +155,85 @@ quantités et les macros atteintes. Le pliage n'est pas un détail de
 présentation : sur cinq jours et quatre repas, vingt blocs dépliés seraient
 illisibles.
 
-**Batch cooking.** Tout est cuisiné d'un coup. On regroupe par fournée ce qui
-partage un mode de cuisson et une température, et on termine par le tableau
-de répartition.
+**Batch cooking.** Une ÉTAPE, et la dernière — pas un affichage qu'on bascule.
+On y arrive une fois toutes les cuissons décidées ; le bouton reste inactif
+tant qu'il en manque une, parce que proposer des fournées incomplètes sans le
+dire ferait découvrir l'oubli devant les casseroles.
+
+L'écran suit l'ordre des **gestes** :
+
+1. **La liste de courses**, pliée en haut, et seulement s'il manque quelque
+   chose — ce qu'il faut aller chercher avant de commencer.
+2. **Les fournées** : ce qui part ensemble, en poids de BALANCE. Les quantités
+   s'additionnent sur toute la période — cuire 300 g de riz en une fois pour
+   trois repas, c'est tout l'intérêt. « Four 180 °C » et « Four 200 °C » sont
+   deux lignes de la table, donc deux fournées : on ne met pas le poisson à
+   180 avec les légumes à 200 en espérant que ça passe.
+3. **La répartition**, une boîte par repas de chaque jour, en poids CUIT.
+
+**Les deux poids ne sont pas les mêmes, et c'est le point.** On pèse du riz
+sec pour le mettre à cuire ; on répartit du riz cuit à la cuillère. Annoncer
+le poids sec devant des boîtes ferait servir trois fois trop — la même erreur
+que le riz de mars, un cran plus loin dans la chaîne.
+
+**Ce qui ne se cuit pas figure quand même dans la boîte**, à part, sous « à
+ajouter au moment de manger ». On ne met pas un skyr dans une boîte cinq jours
+à l'avance ; mais le taire ferait une boîte qui ne correspond plus au repas, et
+des macros fausses le jour venu.
+
+### D'où vient le mode de cuisson
+
+**D'une table partagée, et de nulle part ailleurs.** `mode_cuisson` liste des
+façons de cuire toutes faites — « Vapeur », « Eau bouillante », « Four
+180 °C » — lisibles par tous les comptes, alimentées par le seul
+administrateur. Un utilisateur qui veut « plancha » le demande.
+
+**Rien n'est stocké sur la fiche de l'aliment**, et c'est la décision qui
+compte. Deux raisons :
+
+- Le frigo a **deux sources** : la table `aliment` pour les comptes ordinaires,
+  Grocy pour l'administrateur. Un mode posé sur la fiche aurait existé en
+  double — une colonne SQL et un champ personnalisé Grocy — avec deux
+  vocabulaires libres de diverger. C'est exactement la structure qui a produit
+  le désastre de `etat_reference`.
+- Le mode de cuisson **n'est pas une propriété de l'aliment**. Les mêmes
+  pommes de terre passent au four un soir et à la vapeur le lendemain. Le
+  figer sur la fiche revenait à arrêter un choix qu'on refait à chaque plan.
+
+Il se choisit donc **au moment de composer**, sous le tableau de chaque repas.
+Sous le tableau et non dans une colonne : la cuisson ne pèse rien et ne change
+aucun chiffre, la mêler aux grammes lui donnerait une importance qu'elle n'a
+pas. Le choix porte sur le couple **repas + aliment**, jamais sur l'aliment
+seul — sans quoi régler ce soir engagerait demain.
+
+**Une seule colonne décrit une cuisson.** « Four 180 °C » est un libellé, pas
+un mode plus une température. Ajouter une colonne `degres` reviendrait à
+écrire deux fois le même fait, et ce projet sait ce que ça coûte. Le libellé
+s'affiche, l'**identifiant** regroupe : deux aliments partagent une fournée
+s'ils pointent la même ligne.
+
+**« Sans cuisson » est un CHOIX, pas une absence de réponse.** Le skyr, les
+amandes, les fruits se mangent tels quels. Trois états, donc, et la différence
+entre les deux derniers compte :
+
+- un mode → cet aliment se cuit ainsi ;
+- **sans cuisson** → il ne se cuit pas, et c'est décidé ;
+- **à choisir** → personne n'a encore tranché.
+
+Sans cette distinction, le skyr resterait éternellement « à situer » et on ne
+saurait jamais si un plan est complet. C'est la même différence que le zéro et
+le champ vide dans les restes.
+
+L'écran annonce toujours combien d'aliments restent **à situer** — une fournée
+incomplète affichée sans un mot laisserait croire que tout est prévu, et on
+découvrirait l'oubli devant les casseroles. Et comme un plan de sept jours
+porte une trentaine de lignes dont beaucoup ne se cuisent pas, un bouton règle
+**tout le reste d'un geste** : ce qui est cuit se choisit à la main, le reste
+se déclare en bloc. Les choix déjà faits ne sont jamais écrasés.
+
+**Rien de tout cela ne touche une macro**, et le regroupement ne recalcule
+rien : il additionne ce que le solveur a déjà résolu. C'est la garantie qu'une
+fournée ne peut pas fausser un gramme.
 
 ### 5. Le tableau — quatre colonnes
 
@@ -402,8 +499,9 @@ bâtir dessus sans un mot.
 **Rien pour les étapes 1 et 2.** Ni colonne, ni champ Grocy, ni migration,
 ni stockage local : le calculateur ne retient rien entre deux ouvertures.
 
-Restent la cuisson et la température, nécessaires à l'étape 3 seulement.
-**À TRANCHER À L'ÉTAPE 3**, avec de l'usage derrière nous :
+La cuisson et la température ont été **tranchées à l'étape 3** : une table
+partagée, choisie au moment de composer. Voir plus haut. Ce qui suit est le
+raisonnement qui y a mené, gardé parce qu'il explique ce qu'on n'a PAS fait :
 
 - *Une API ?* Je n'en connais pas qui donne un mode de cuisson et une
   température par ingrédient. Ciqual ne le fait pas ; Open Food Facts non
@@ -411,9 +509,12 @@ Restent la cuisson et la température, nécessaires à l'étape 3 seulement.
   ici ; les API de recettes donnent des plats, pas des paramètres par
   ingrédient, sont payantes au-delà d'un quota et en anglais. **À vérifier
   avant d'y compter.** Une API supposerait aussi du réseau dans la cuisine.
-- *Saisi une fois, sur l'appareil.* On ne fait pas du batch cooking avec
-  cinquante aliments : une dizaine suffit. Dix modes de cuisson renseignés une
-  fois. Pas de base, pas de Grocy, pas de réseau.
+- *Saisi une fois, sur l'appareil.* Écarté : le réglage ne suivrait pas d'un
+  téléphone à l'autre, et un utilisateur ordinaire repartirait de zéro.
+- *Un champ sur la fiche de l'aliment.* Écrit, puis retiré avant d'être joué :
+  le frigo ayant deux sources, ce champ aurait existé en double avec deux
+  vocabulaires libres de diverger — et un mode de cuisson n'est de toute
+  façon pas une propriété de l'aliment.
 
 ---
 

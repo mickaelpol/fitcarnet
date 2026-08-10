@@ -58,6 +58,7 @@ class Aliment
 {
     public const CATEGORIES = ['prot', 'fec', 'leg', 'ole', 'huile', 'lait', 'fruit', 'autre'];
 
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::BIGINT)]
