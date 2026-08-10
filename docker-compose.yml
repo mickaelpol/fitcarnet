@@ -1,3 +1,20 @@
+# =====================================================================
+#  fitcarnet — stack de PRODUCTION, deployee par Portainer depuis Gitea.
+#
+#  LES CHEMINS SONT RELATIFS, ET C'EST CE QUI REND LE DEPLOIEMENT POSSIBLE.
+#
+#  Ils etaient absolus — /volume1/docker/fitcarnet/api — ce qui supposait
+#  qu'on ait depose les fichiers sur le NAS a la main avant de demarrer la
+#  stack. Portainer clone lui-meme le depot : `./api`, `./db` et `./docker`
+#  designent le clone, donc TOUJOURS le commit qui vient d'etre tire. Un
+#  `git pull` met le code a jour, sans copie manuelle et sans decalage
+#  possible entre ce qui tourne et ce qui est versionne.
+#
+#  UNE SEULE EXCEPTION, ET ELLE EST VOULUE : le repertoire de donnees de
+#  PostgreSQL reste un chemin ABSOLU sur le disque du NAS. Les donnees ne
+#  vivent pas dans un depot, et un clone qu'on refait ne doit surtout pas
+#  emporter la base avec lui.
+# =====================================================================
 services:
 
   fitcarnet-db:
@@ -10,8 +27,10 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?definis DB_PASSWORD dans les variables de la stack}
     volumes:
       - /volume1/docker/fitcarnet/pgdata:/var/lib/postgresql/data
-      # joues UNE SEULE FOIS, a la creation de la base
-      - /volume1/docker/fitcarnet/db:/docker-entrypoint-initdb.d:ro
+      # Joues UNE SEULE FOIS, a la creation du volume. Sur une base qui
+      # existe deja, PostgreSQL les ignore : c'est le point d'entree du
+      # conteneur applicatif qui joue `db/manuel/` a chaque demarrage.
+      - ./db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fitcarnet -d fitcarnet"]
       interval: 10s
@@ -24,7 +43,7 @@ services:
   # FrankenPHP : un seul service pour l'API Symfony ET le front React
   fitcarnet-app:
     build:
-      context: /volume1/docker/fitcarnet/docker
+      context: ./docker
       dockerfile: Dockerfile
       target: prod                     # passe a "dev" pour le rechargement a chaud
     container_name: fitcarnet-app
@@ -47,9 +66,15 @@ services:
     ports:
       - "8094:80"
     volumes:
-      - /volume1/docker/fitcarnet/api:/app                       # code Symfony
-      - /volume1/docker/fitcarnet/front/dist:/app/front:ro       # build React
-      - /volume1/docker/fitcarnet/docker/Caddyfile:/etc/frankenphp/Caddyfile:ro
+      - ./api:/app                                    # code Symfony, depuis le clone
+      # `db/` sert DEUX fois : a l'initialisation de PostgreSQL ci-dessus, et
+      # ici pour que le point d'entree puisse jouer `db/manuel/` au demarrage.
+      - ./db:/app/db:ro
+      # Construit dans WSL avant le push : l'image de production n'a pas Node,
+      # et l'y ajouter pour un build statique serait payer un compilateur a
+      # chaque demarrage.
+      - ./front/dist:/app/front:ro
+      - ./docker/Caddyfile:/etc/frankenphp/Caddyfile:ro
       - fitcarnet_caddy_data:/data
       - fitcarnet_caddy_config:/config
 

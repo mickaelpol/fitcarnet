@@ -18,6 +18,25 @@
 --  A jouer APRES 14-etat-reference-coherent.sql. Idempotent.
 -- =====================================================================
 
+-- ---------------------------------------------------------------------
+--  GARDE : ce fichier ne concerne QUE les bases anterieures a la
+--  migration 18, celle qui a supprime `etat_reference`.
+--
+--  Depuis que `db/01-schema.sql` cree la base telle qu'elle est aujourd'hui,
+--  une installation neuve n'a pas cette colonne — et ce fichier echouait sur
+--  la premiere ligne qui la nomme, arretant tout l'installateur. Or il n'a
+--  rien a y faire : il n'existe plus que pour les bases qui n'ont pas encore
+--  franchi le 18.
+--
+--  `\if` de psql plutot qu'un bloc DO : le corps contient des SELECT de
+--  compte-rendu, qui ne peuvent pas vivre dans une procedure.
+-- ---------------------------------------------------------------------
+SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'aliment' AND column_name = 'etat_reference'
+) AS a_etat_reference \gset
+
+\if :a_etat_reference
 BEGIN;
 
 -- 1. Les contraintes du 14 portaient l'ancienne regle : on les remplace
@@ -85,3 +104,7 @@ SELECT categorie, etat_reference, count(*) AS lignes,
 FROM   aliment
 GROUP  BY categorie, etat_reference
 ORDER  BY categorie;
+
+\else
+\echo '   (sans objet : etat_reference a deja disparu, voir la migration 18)'
+\endif

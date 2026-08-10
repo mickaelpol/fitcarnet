@@ -5,6 +5,22 @@ vendor/
 # ---------- artefacts de build ----------
 dist/
 build/
+# EXCEPTION : le build web du front EST versionne, et c'est un choix.
+#
+# C'est un artefact, donc en principe il n'a rien a faire ici. Mais la
+# production le recupere par `git pull`, et l'image de production n'a pas
+# Node : l'y ajouter reviendrait a embarquer un compilateur JavaScript pour
+# regenerer, a chaque demarrage, des fichiers qui ne changent qu'au moment ou
+# l'on pousse.
+#
+# On le construit donc dans WSL avant de pousser :
+#     cd front && npm run build:web
+#
+# Le prix est un gros diff a chaque deploiement. On l'accepte : il est
+# illisible mais inoffensif, alors qu'un front absent en production ne se voit
+# qu'une fois la stack demarree.
+!/front/dist/
+!/front/dist/**
 /api/var/
 /front/.expo/
 # régénéré par « tsc -p tsconfig.tests.json » avant chaque npm test

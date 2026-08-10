@@ -114,6 +114,44 @@ sans intervention. En contrepartie, une base **existante** ne recevra pas ces
 changements : c'est sans conséquence, puisque tu les as déjà appliqués en
 développement.
 
-Pour la suite : une évolution du schéma va dans `db/` si elle s'applique à
-une base vierge, dans `db/manuel/` si elle dépend d'un compte ou de données
-existantes. Et elle est documentée ici.
+## Août 2026 — le schéma décrit enfin la base d'aujourd'hui
+
+`db/01-schema.sql` décrivait l'état INITIAL du projet. Tout ce qui est venu
+après — les fibres, les jetons de rafraîchissement, les modes de cuisson, les
+plans enregistrés — vivait uniquement dans `db/manuel/`. Installer sur une
+machine neuve demandait donc quatorze migrations à la main, dans le bon ordre,
+et une seule oubliée donnait une application qui démarre et casse plus tard.
+
+**Désormais `db/01-schema.sql` suffit à obtenir la base d'aujourd'hui.**
+
+`db/manuel/` ne disparaît pas : c'est le seul chemin pour faire évoluer une
+base qui EXISTE DÉJÀ, puisque PostgreSQL ne rejoue `db/` qu'à la création du
+volume. Tous ces fichiers sont idempotents, donc `./installer.sh` les joue
+dans les deux cas sans avoir à savoir lequel il a devant lui.
+
+Les migrations de DONNÉES (14 à 19) ne sont pas repliées dans le schéma et ne
+peuvent pas l'être : elles corrigent des valeurs saisies, pas une structure.
+Les 14 et 15 portent maintenant une garde qui les rend sans objet sur une base
+où `etat_reference` n'a jamais existé.
+
+`db/02-donnees.sql` a été regénéré : ses cinquante aliments sont le RÉSULTAT
+de la chaîne 14→19 rejouée sur l'ancien jeu, relevé tel quel. Personne n'a
+retapé un chiffre. Deux lignes restent fausses et le fichier le dit —
+« Boulgour » et « Pates completes » portent encore des valeurs de cuit, que la
+migration 18 a refusé de convertir faute de retomber dans la bande du grain
+sec.
+
+**L'ordre des migrations est écrit à la main dans `installer.sh`**, et ce n'est
+plus un tri alphabétique. `aliment-fibres.sql` passait après `23-…` alors qu'il
+crée la colonne dont 16, 17 et 19 ont besoin : sur une base vierge, trois
+migrations échouaient. `jeu-essai.sql` — un jeu de démonstration — était joué
+comme une migration sur toute installation, et `audit-catalogue.sql`, qui est
+un rapport de lecture, aussi. Les trois sont désormais hors de la boucle.
+
+---
+
+Pour la suite : une évolution du schéma va dans `db/01-schema.sql` **ET** dans
+un fichier numéroté de `db/manuel/` — le premier pour les bases neuves, le
+second pour celles qui existent déjà. Les deux doivent produire la même chose,
+et c'est vérifiable : construire une base par chaque chemin et comparer les
+deux `pg_dump --schema-only`.

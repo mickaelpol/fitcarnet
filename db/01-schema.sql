@@ -3,6 +3,28 @@
 --  Principe : un référentiel COMMUN (aliments, exercices, emplacements)
 --             et des données PRIVÉES par utilisateur (stock, cibles,
 --             séances, modèles).
+--
+--  CE FICHIER DÉCRIT LA BASE TELLE QU'ELLE EST AUJOURD'HUI, pas telle
+--  qu'elle était au départ.
+--
+--  Il a longtemps décrit l'état initial, et tout le reste — les fibres, les
+--  jetons de rafraîchissement, les modes de cuisson, les plans enregistrés —
+--  vivait dans `db/manuel/`, à rejouer une par une. Installer sur une machine
+--  neuve demandait donc quatorze migrations à la main, et une seule oubliée
+--  donnait une application qui démarre et casse plus tard.
+--
+--  Désormais : ce fichier suffit à obtenir la base d'aujourd'hui.
+--
+--  `db/manuel/` NE DISPARAÎT PAS POUR AUTANT. Ces fichiers restent le seul
+--  chemin pour faire évoluer une base qui EXISTE DÉJÀ — la tienne, celle du
+--  NAS — puisque PostgreSQL ne rejoue `db/` qu'à la création du volume. Ils
+--  sont tous idempotents : les jouer sur une base construite avec ce fichier
+--  ne fait rien, ce qui est exactement ce qu'on veut d'un installateur qui
+--  doit marcher dans les deux cas sans savoir lequel il a devant lui.
+--
+--  Les migrations de DONNÉES (14, 15, 16, 17, 18, 19) ne sont pas repliées
+--  ici, et ne peuvent pas l'être : elles corrigent des valeurs saisies, pas
+--  une structure. Sur une base vierge elles ne trouvent rien à corriger.
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -36,17 +58,38 @@ COMMENT ON COLUMN utilisateur.source_frigo IS
 -- ---------------------------------------------------------------------
 CREATE TABLE aliment (
     id              BIGSERIAL PRIMARY KEY,
-    nom             TEXT        NOT NULL UNIQUE,
+    -- Pas d'UNIQUE en ligne : l'unicité dépend du propriétaire, et deux index
+    -- partiels plus bas s'en chargent. Un UNIQUE global interdirait à deux
+    -- comptes d'avoir chacun son « Riz basmati ».
+    nom             TEXT        NOT NULL,
     categorie       TEXT        NOT NULL
                     CHECK (categorie IN ('prot','fec','leg','ole','huile','lait','fruit','autre')),
-    -- valeurs pour 100 g dans l'état de référence
+
+    -- UNE SEULE CONVENTION, ET C'EST TOUT LE PROJET QUI EN DÉPEND : ces
+    -- valeurs décrivent le produit TEL QU'ON LE PÈSE, avant cuisson. Riz sec,
+    -- viande crue. Il n'y a pas de colonne disant « ces valeurs sont-elles
+    -- celles du cru ou du cuit » — il y en a eu une, `etat_reference`, et
+    -- écrire le même fait à deux endroits a fini par faire peser trois fois
+    -- trop de riz. Voir `db/manuel/18-un-seul-etat.sql`.
     kcal_100        NUMERIC(7,2) NOT NULL,
     prot_100        NUMERIC(6,2) NOT NULL,
     gluc_100        NUMERIC(6,2) NOT NULL,
     lip_100         NUMERIC(6,2) NOT NULL,
-    -- féculents : cuit/sec (riz 3, patate douce 1) | protéines : cuit/cru (0.85, 0.75)
+    -- Facultatif. Comptées 2 kcal/g et SÉPARÉES des glucides, convention
+    -- européenne : sans elles, le contrôle « 4·P + 4·G + 2·F + 9·L = kcal »
+    -- perd sa fiabilité sur les légumes et les céréales complètes.
+    fibres_100      NUMERIC(6,2),
+
+    -- Cuit / pesé. N'entre dans AUCUN calcul de macros — la cuisson n'ajoute
+    -- que de l'eau. Sert uniquement à annoncer le poids qu'on aura dans
+    -- l'assiette.
     ratio           NUMERIC(5,3) NOT NULL DEFAULT 1,
-    etat_reference  TEXT        NOT NULL DEFAULT 'cuit' CHECK (etat_reference IN ('cru','cuit')),
+    -- Les deux pesées d'où vient un ratio mesuré par l'utilisateur. Gardées
+    -- pour qu'on sache d'où sort le chiffre : une valeur de table et une
+    -- mesure faite chez soi ne se corrigent pas de la même façon.
+    pesee_avant     NUMERIC(7,1),
+    pesee_apres     NUMERIC(7,1),
+
     code_barres     TEXT,
     source          TEXT        NOT NULL DEFAULT 'manuel'
                     CHECK (source IN ('manuel','openfoodfacts','reference')),
@@ -54,6 +97,31 @@ CREATE TABLE aliment (
     cree_par        UUID        REFERENCES utilisateur(id) ON DELETE SET NULL,
     cree_le         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Un aliment COMMUN — sans propriétaire — porte un nom unique pour tout le
+-- monde. Un aliment PRIVÉ est unique chez son propriétaire, et seulement chez
+-- lui : deux comptes peuvent avoir chacun leur « Riz basmati », avec leurs
+-- propres valeurs.
+CREATE UNIQUE INDEX aliment_nom_commun_unique
+    ON aliment (lower(nom)) WHERE cree_par IS NULL;
+CREATE UNIQUE INDEX aliment_nom_prive_unique
+    ON aliment (lower(nom), cree_par) WHERE cree_par IS NOT NULL;
+
+-- Ce qui ne peut PAS être vrai physiquement, refusé par la base plutôt que
+-- rattrapé par du code. Ces deux contraintes viennent de vraies erreurs :
+-- des macros américaines qui comptent les fibres deux fois, et des valeurs
+-- de riz cuit posées sur un riz qu'on pèse sec.
+ALTER TABLE aliment ADD CONSTRAINT aliment_matiere_plausible
+    CHECK (prot_100 + gluc_100 + lip_100 + COALESCE(fibres_100, 0) <= 100.5);
+-- Une protéine et un légume PERDENT de l'eau à la cuisson, un féculent en
+-- GAGNE. Un rendement qui dit l'inverse est une saisie fausse, pas un aliment
+-- exotique.
+ALTER TABLE aliment ADD CONSTRAINT aliment_ratio_sens
+    CHECK (
+        ratio > 0
+        AND (categorie NOT IN ('prot', 'leg') OR ratio <= 1.05)
+        AND (categorie <> 'fec'               OR ratio >= 1)
+    );
+
 CREATE INDEX ON aliment (categorie);
 CREATE INDEX ON aliment (code_barres) WHERE code_barres IS NOT NULL;
 -- Recherche insensible aux accents.
@@ -104,6 +172,10 @@ CREATE TABLE cible (
     prot           NUMERIC(6,2) NOT NULL,
     gluc           NUMERIC(6,2) NOT NULL,
     lip            NUMERIC(6,2) NOT NULL,
+    -- Certains plans — nord-américains surtout — expriment les glucides
+    -- FIBRES COMPRISES. Le dire ici évite de retrancher les fibres à la main
+    -- et de se tromper d'un repas sur deux.
+    glucides_totaux BOOLEAN NOT NULL DEFAULT FALSE,
     UNIQUE (utilisateur_id, repas)
 );
 
@@ -252,3 +324,130 @@ JOIN    seance_exercice se ON se.seance_id = s.id
 JOIN    serie sr           ON sr.seance_exercice_id = se.id
 WHERE   sr.faite
 GROUP BY s.utilisateur_id, se.exercice_id, s.date;
+
+-- ---------------------------------------------------------------------
+--  Sessions : jetons de rafraîchissement
+--
+--  Le jeton JWT d'accès ne dure qu'une heure. C'est CELUI-CI qui tient la
+--  session ouverte, et le fait qu'il vive en base est le point : effacer les
+--  jetons du téléphone ne suffirait pas à se déconnecter, une copie
+--  rouvrirait la session. Une déconnexion supprime la ligne.
+--
+--  On stocke une EMPREINTE, jamais le jeton. Une base lue par un tiers ne
+--  doit ouvrir aucune session.
+-- ---------------------------------------------------------------------
+CREATE TABLE jeton_rafraichissement (
+    id             UUID        PRIMARY KEY,
+    empreinte      VARCHAR(64) NOT NULL UNIQUE,
+    utilisateur_id UUID        NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
+    expire_le      TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    cree_le        TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL
+);
+CREATE INDEX idx_jeton_rafraichissement_utilisateur
+    ON jeton_rafraichissement (utilisateur_id);
+-- Le balayage des jetons périmés passe par cette colonne.
+CREATE INDEX idx_jeton_rafraichissement_expire
+    ON jeton_rafraichissement (expire_le);
+
+-- ---------------------------------------------------------------------
+--  Batch cooking : les façons de cuire
+--
+--  Une TABLE PARTAGÉE, et non un champ sur l'aliment. Le frigo a deux
+--  sources — la table `aliment` pour les comptes ordinaires, Grocy pour
+--  l'administrateur : un mode de cuisson posé sur la fiche existerait en
+--  double, avec deux vocabulaires libres de diverger. Et un mode de cuisson
+--  n'est de toute façon pas une propriété de l'aliment — les mêmes pommes de
+--  terre passent au four un soir et à la vapeur le lendemain.
+--
+--  Deux aliments partagent une fournée s'ils pointent la MÊME LIGNE d'ici.
+--  D'où une seule colonne de libellé : « Four 180 °C » est un libellé, pas un
+--  mode plus une température. Le libellé s'affiche, l'identifiant regroupe.
+--
+--  Tout le monde lit, seul l'administrateur écrit. Une liste ouverte finirait
+--  avec « four », « Four », « au four » et « four 180 » — quatre fournées là
+--  où il en faut une.
+-- ---------------------------------------------------------------------
+CREATE TABLE mode_cuisson (
+    id      SERIAL PRIMARY KEY,
+    libelle TEXT     NOT NULL,
+    -- On ne trie pas par ordre alphabétique : « Air fryer » n'a aucune raison
+    -- de passer avant « Vapeur ». Les cuissons les plus courantes en haut.
+    ordre   SMALLINT NOT NULL DEFAULT 100
+);
+CREATE UNIQUE INDEX mode_cuisson_libelle ON mode_cuisson (lower(libelle));
+
+-- ---------------------------------------------------------------------
+--  Batch cooking : comment ce compte cuit, d'habitude
+--
+--  Un DÉFAUT, rien de plus : à la composition d'un repas l'écran pré-remplit
+--  les cuissons à partir d'ici, et l'utilisateur change ce qu'il veut. Sans
+--  ça, une semaine de quatre repas demandait une trentaine de choix — les
+--  mêmes que la semaine précédente.
+--
+--  LA CLÉ EST LE NOM, normalisé par l'écran. C'est le seul identifiant que
+--  les deux frigos aient en commun : un aliment Grocy porte « grocy:12 », un
+--  aliment de la base porte un entier, et ces deux mondes n'ont aucun
+--  identifiant partagé. Côté base, `aliment` n'est qu'une chaîne opaque :
+--  personne ici ne l'interprète.
+-- ---------------------------------------------------------------------
+CREATE TABLE cuisson_habituelle (
+    id              BIGSERIAL PRIMARY KEY,
+    utilisateur_id  UUID NOT NULL REFERENCES utilisateur (id) ON DELETE CASCADE,
+    -- le nom normalisé de l'aliment : minuscules, sans accent
+    aliment         TEXT NOT NULL,
+    -- NULL = « se mange sans cuisson », et c'est une réponse, pas un trou.
+    --
+    -- CASCADE et non SET NULL : si l'administrateur supprime « Eau
+    -- bouillante », le riz qui la visait ne doit PAS se retrouver à NULL — il
+    -- serait pré-rempli « se mange tel quel », c'est-à-dire une réponse
+    -- fausse et muette, découverte devant la boîte. La ligne s'en va, l'écran
+    -- repose la question. Une question de trop coûte un geste ; une réponse
+    -- fausse coûte un repas.
+    mode_cuisson_id INTEGER REFERENCES mode_cuisson (id) ON DELETE CASCADE,
+    maj_le          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Une seule habitude par aliment et par compte. C'est cette contrainte qui
+-- fait de l'écriture un remplacement et non un empilement.
+CREATE UNIQUE INDEX cuisson_habituelle_unique
+    ON cuisson_habituelle (utilisateur_id, aliment);
+
+-- ---------------------------------------------------------------------
+--  Batch cooking : les plans conservés
+--
+--  `CALCULATEUR.md` disait « rien n'est enregistré : le plan est un outil
+--  d'organisation, pas un journal ». Le batch cooking a rendu cette règle
+--  intenable : on cuisine le dimanche pour la semaine, et le jeudi midi,
+--  devant sa boîte, il faut savoir combien s'en servir.
+--
+--  ON ENREGISTRE UN INSTANTANÉ, PAS UNE RECETTE À REJOUER. `contenu` porte le
+--  RÉSULTAT déjà calculé — des noms et des grammes. Rejouer le solveur à la
+--  lecture donnerait un autre plan : le stock a bougé. Le jeudi, on ne veut
+--  pas savoir ce qu'on cuisinerait aujourd'hui.
+--
+--  D'où le `jsonb` plutôt qu'un schéma en cinq tables : ces données ne sont
+--  jamais requêtées par leur contenu, jamais jointes, jamais modifiées ligne
+--  à ligne. On les écrit une fois et on les relit entières.
+-- ---------------------------------------------------------------------
+CREATE TABLE plan_repas (
+    id             BIGSERIAL PRIMARY KEY,
+    utilisateur_id UUID        NOT NULL REFERENCES utilisateur (id) ON DELETE CASCADE,
+    -- « Semaine du 11/08 », ou ce que l'utilisateur aura tapé.
+    libelle        TEXT        NOT NULL,
+    cree_le        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- NULL = PRÉVU : la nourriture est encore dans le frigo mais elle est
+    -- promise, et le plan RÉSERVE son stock — les compositions suivantes ne
+    -- comptent plus dessus. Renseigné = CUISINÉ : le stock a été décrémenté
+    -- pour de vrai, le plan ne réserve plus rien.
+    --
+    -- Sans cette colonne, deux batch cooking d'affilée comptaient deux fois
+    -- le même frigo : chacun juste tout seul, faux ensemble, et rien ne le
+    -- disait.
+    cuisine_le     TIMESTAMPTZ,
+    contenu        JSONB       NOT NULL
+);
+-- On liste toujours SES plans, du plus récent au plus ancien.
+CREATE INDEX plan_repas_par_compte ON plan_repas (utilisateur_id, cree_le DESC);
+-- « Que reste-t-il de promis ? », posée à chaque composition. Index partiel :
+-- les plans déjà cuisinés ne sont jamais dans cette réponse, et ce sont eux
+-- qui s'accumulent avec le temps.
+CREATE INDEX plan_repas_prevus ON plan_repas (utilisateur_id) WHERE cuisine_le IS NULL;

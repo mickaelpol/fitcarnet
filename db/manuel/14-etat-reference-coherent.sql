@@ -14,6 +14,25 @@
 --  Idempotent : rejouable sans dommage.
 -- =====================================================================
 
+-- ---------------------------------------------------------------------
+--  GARDE : ce fichier ne concerne QUE les bases anterieures a la
+--  migration 18, celle qui a supprime `etat_reference`.
+--
+--  Depuis que `db/01-schema.sql` cree la base telle qu'elle est aujourd'hui,
+--  une installation neuve n'a pas cette colonne — et ce fichier echouait sur
+--  la premiere ligne qui la nomme, arretant tout l'installateur. Or il n'a
+--  rien a y faire : il n'existe plus que pour les bases qui n'ont pas encore
+--  franchi le 18.
+--
+--  `\if` de psql plutot qu'un bloc DO : le corps contient des SELECT de
+--  compte-rendu, qui ne peuvent pas vivre dans une procedure.
+-- ---------------------------------------------------------------------
+SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'aliment' AND column_name = 'etat_reference'
+) AS a_etat_reference \gset
+
+\if :a_etat_reference
 BEGIN;
 
 -- 1. Ce que la base contenait de faux, avant de le corriger.
@@ -70,3 +89,7 @@ FROM   aliment
 WHERE  categorie = 'fec' AND ratio > 1.3
   AND (kcal_100 * ratio < 300 OR kcal_100 * ratio > 400)
 ORDER  BY nom;
+
+\else
+\echo '   (sans objet : etat_reference a deja disparu, voir la migration 18)'
+\endif

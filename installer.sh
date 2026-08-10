@@ -115,7 +115,7 @@ ok "Base prête"
 
 # le schéma n'est joué qu'à la création du volume : on vérifie qu'il est là
 nb_tables=$(sql "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
-(( nb_tables >= 12 )) || echec "Seulement $nb_tables tables. Le schéma n'a pas été appliqué — relance avec --repartir-de-zero."
+(( nb_tables >= 16 )) || echec "Seulement $nb_tables tables, il en faut au moins 16. Le schéma n'a pas été appliqué — relance avec --repartir-de-zero."
 ok "$nb_tables tables"
 
 nb_aliments=$(sql "SELECT count(*) FROM aliment;")
@@ -128,11 +128,37 @@ ok "$nb_aliments aliments, $nb_perso exercices personnels dont $nb_chrono en chr
 titre "Migrations"
 
 # db/ est monté dans docker-entrypoint-initdb.d et ne s'exécute qu'à la
-# création de la base. db/manuel/ contient ce qui vient APRÈS : évolutions
-# du schéma sur une base existante, ou scripts dépendant d'un compte.
-# Les fichiers dont le nom contient « cible » sont traités plus loin, une
-# fois le compte créé.
-migrations=$(find db/manuel -name '*.sql' ! -name '*cible*' 2>/dev/null | sort)
+# création de la base ; il décrit désormais le schéma d'AUJOURD'HUI. Sur une
+# base neuve, ce qui suit ne trouve donc rien à faire — et c'est normal.
+# db/manuel/ reste le seul chemin pour faire évoluer une base qui EXISTE
+# DÉJÀ, puisque PostgreSQL ne rejoue jamais db/.
+#
+# L'ORDRE EST EXPLICITE, ET C'EST UNE CORRECTION.
+#
+# On listait ces fichiers avec `find … | sort`, c'est-à-dire dans l'ordre
+# ALPHABÉTIQUE. Trois conséquences, toutes silencieuses jusqu'au jour de
+# l'installation :
+#
+#   - « aliment-fibres.sql » passait APRÈS « 23-… » alors qu'il crée la
+#     colonne `fibres_100` dont les migrations 16, 17 et 19 ont besoin.
+#     Vérifié : sur une base vierge, trois migrations sur quatorze
+#     échouaient, et l'installateur s'arrêtait là.
+#   - « jeu-essai.sql » — un jeu de DÉMONSTRATION rattaché à un compte
+#     d'essai — était joué comme une migration, sur toute installation.
+#   - « audit-catalogue.sql » n'est pas une migration : c'est un rapport de
+#     lecture, qu'on lance quand on le décide.
+#
+# Un tri alphabétique qui fait office d'ordre de dépendances marche jusqu'au
+# jour où un nom commence par une lettre. On liste donc à la main.
+migrations=""
+for fichier in \
+    db/manuel/aliment-fibres.sql \
+    db/manuel/1[0-9]-*.sql \
+    db/manuel/2[0-9]-*.sql
+do
+    [[ -f "$fichier" ]] && migrations+="$fichier"$'\n'
+done
+migrations=$(printf '%s' "$migrations")
 
 if [[ -z "$migrations" ]]; then
     info "aucune migration à jouer"

@@ -57,6 +57,17 @@ CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile", "--watch"]
 # ---------- production ----------
 FROM base AS prod
 
+# Trois outils, trois raisons precises :
+#   - git et unzip : composer en a besoin pour poser les paquets. L'etape
+#     `dev` les avait, pas `prod` — et depuis que le conteneur installe
+#     lui-meme ses dependances au demarrage, il lui les faut aussi.
+#   - postgresql-client : les migrations de `db/manuel/` sont du SQL joue par
+#     psql, meta-commandes comprises (`\gset`, `\if`). Doctrine ne sait pas
+#     les executer ; psql si.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git unzip postgresql-client \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV APP_ENV=prod
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
  && { \
@@ -70,3 +81,16 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
       echo 'realpath_cache_size=4096K'; \
       echo 'realpath_cache_ttl=600'; \
     } > "$PHP_INI_DIR/conf.d/fitcarnet.ini"
+
+# Ce qui doit etre vrai avant que l'application reponde : dependances, cles
+# JWT, migrations, cache. Voir `entrypoint-prod.sh` — c'est lui qui rend le
+# deploiement possible sans ouvrir un terminal sur le NAS.
+COPY entrypoint-prod.sh /usr/local/bin/entrypoint-prod
+RUN chmod +x /usr/local/bin/entrypoint-prod
+
+ENTRYPOINT ["/usr/local/bin/entrypoint-prod"]
+
+# La commande par defaut de l'image de base ne designe pas forcement le
+# Caddyfile que la stack monte. On l'ecrit, comme le fait deja l'etape `dev` :
+# une montee de version de FrankenPHP ne doit pas changer le fichier lu.
+CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
