@@ -57,6 +57,17 @@ UPDATE aliment SET
     ratio          = 1,
     etat_reference = 'cuit'
 WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%ananas%';
+-- Asperge, verte, crue
+UPDATE aliment SET
+    categorie      = 'leg',
+    kcal_100       = 24.7,
+    prot_100       = 2.46,
+    gluc_100       = 2.03,
+    lip_100        = 0.27,
+    fibres_100     = 2.15,
+    ratio          = 1,
+    etat_reference = 'cru'
+WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%asperge%';
 -- Banane, chair sans peau, crue
 UPDATE aliment SET
     categorie      = 'fruit',
@@ -167,6 +178,17 @@ UPDATE aliment SET
     ratio          = 1,
     etat_reference = 'cru'
 WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%carotte%';
+-- Champignon de Paris ou champignon de couche, cru
+UPDATE aliment SET
+    categorie      = 'leg',
+    kcal_100       = 21,
+    prot_100       = 2.11,
+    gluc_100       = 1.83,
+    lip_100        = 0.36,
+    fibres_100     = 1,
+    ratio          = 1,
+    etat_reference = 'cru'
+WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%champignon%';
 -- Chou-fleur, cru
 UPDATE aliment SET
     categorie      = 'leg',
@@ -178,6 +200,17 @@ UPDATE aliment SET
     ratio          = 1,
     etat_reference = 'cru'
 WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%chou%' AND fitcarnet_normaliser(nom) LIKE '%fleur%';
+-- Lieu noir, cru
+UPDATE aliment SET
+    categorie      = 'prot',
+    kcal_100       = 82.5,
+    prot_100       = 18.8,
+    gluc_100       = 0,
+    lip_100        = 0.8,
+    fibres_100     = 0,
+    ratio          = 0.85,
+    etat_reference = 'cru'
+WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%colin%';
 -- Concombre, chair et peau, cru
 UPDATE aliment SET
     categorie      = 'leg',
@@ -277,6 +310,17 @@ UPDATE aliment SET
     ratio          = 1,
     etat_reference = 'cuit'
 WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%framboise%';
+-- Fromage blanc, nature, 0% MG
+UPDATE aliment SET
+    categorie      = 'lait',
+    kcal_100       = 48.4,
+    prot_100       = 7.34,
+    gluc_100       = 4.22,
+    lip_100        = 0.1,
+    fibres_100     = 0.042,
+    ratio          = 1,
+    etat_reference = 'cuit'
+WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%fromage%' AND fitcarnet_normaliser(nom) LIKE '%blanc%';
 -- Haricot vert, cru
 UPDATE aliment SET
     categorie      = 'leg',
@@ -552,6 +596,17 @@ UPDATE aliment SET
     ratio          = 1,
     etat_reference = 'cru'
 WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%thon%' AND fitcarnet_normaliser(nom) LIKE '%au%' AND fitcarnet_normaliser(nom) LIKE '%naturel%';
+-- Tofu nature, préemballé
+UPDATE aliment SET
+    categorie      = 'prot',
+    kcal_100       = 147,
+    prot_100       = 13.4,
+    gluc_100       = 2.87,
+    lip_100        = 8.5,
+    fibres_100     = 0.5,
+    ratio          = 1,
+    etat_reference = 'cru'
+WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%tofu%';
 -- Truite de mer, crue
 UPDATE aliment SET
     categorie      = 'prot',

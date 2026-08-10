@@ -163,6 +163,19 @@ ETIQUETTES = {
 # plus aucune macro. Une pesee suffit a le rendre exact.
 CORRESPONDANCE = {
     # produit Grocy (mots-cles)   : (mots-cles Ciqual, categorie, ratio)
+
+    # Ces cinq-la ne sont pas dans MON Grocy : ils viennent du catalogue
+    # COMMUN, celui dont part tout nouveau compte. Ils y restaient sans
+    # fibres — donc faux des qu'une cible est exprimee en glucides totaux —
+    # simplement parce que cette table ne decrivait que mes produits a moi.
+    # Les mots-cles sont un pari : si l'un ne trouve rien, l'export le dit et
+    # l'aliment reste intact. « --chercher » donnera alors le bon libelle.
+    "fromage blanc":        ("fromage blanc, nature",       "lait", 1),
+    "asperge":              ("asperge, crue",               "leg",  1),
+    "champignon":           ("champignon de paris, cru",    "leg",  1),
+    "colin":                ("lieu noir, cru",              "prot", 0.85),
+    "tofu":                 ("tofu nature",                 "prot", 1),
+
     "flocons d avoine":     ("flocons d'avoine",            "fec",  1),
     "fraise":               ("fraise, crue",                "fruit", 1),
     "oeufs entiers":        ("oeuf, cru",                   "prot", 1),
