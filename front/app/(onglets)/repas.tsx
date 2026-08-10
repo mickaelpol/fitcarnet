@@ -1,18 +1,23 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import {
-  useCibles, useEnregistrerPlan, useModesCuisson, useMonFrigo, usePlans,
-  useSupprimerPlan,
+  useCibles, useEnregistrerCuissons, useEnregistrerPlan, useMarquerCuisine,
+  useMesCuissons, useModesCuisson, useMonFrigo, usePlans, useSupprimerPlan,
 } from '@/api/hooks';
+import type { PlanRepas } from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
+import { Confirmer } from '@/composants/confirmer';
 import { Calendrier, libelleCourt, libelleDuJour } from '@/composants/calendrier';
+import { Etapes } from '@/composants/etapes';
 import { Pliant } from '@/composants/pliant';
 import {
-  type Cuissons, type ModeCuisson, type PlanEnregistre, cleDeCuisson,
-  enFournees, figerLePlan, repartition, resteSansCuisson, sansCuisson,
+  type Cuissons, type ModeCuisson, type PlanEnregistre, cleDHabitude,
+  cleDeCuisson, dejaPromis, depuisLesHabitudes, enFournees, estCuisine,
+  figerLePlan, habitudesAEcrire, repartition, resteSansCuisson, sansCuisson,
 } from '@/calcul/cuisson';
 import {
   MODELE, NOM_REPAS, REPAS,
@@ -20,6 +25,7 @@ import {
   cleDuRepas, composer, listeDeCourses, resoudreLaPeriode, roleDe, rolesDuRepas,
 } from '@/solveur/composer';
 import { verifierCatalogue } from '@/calcul/plausibilite';
+import { basculer, estCoche } from '@/calcul/selectionRepas';
 import { versReference } from '@/solveur/solveur';
 import type { Aliment, Fixe } from '@/solveur/types';
 import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
@@ -173,6 +179,11 @@ export default function Calculateur() {
   const plansGardes = usePlans();
   const enregistrerPlan = useEnregistrerPlan();
   const supprimerPlan = useSupprimerPlan();
+  /* Les cuissons déjà décidées les fois précédentes. Elles ne DÉCIDENT rien :
+     elles pré-remplissent, et l'utilisateur change ce qu'il veut. */
+  const mesCuissons = useMesCuissons();
+  const enregistrerCuissons = useEnregistrerCuissons();
+  const marquerCuisine = useMarquerCuisine();
   const insets = useSafeAreaInsets();
 
   /* --------------------------------------------------------- la période
@@ -209,13 +220,24 @@ export default function Calculateur() {
      rien d'autre à faire à cet instant — et se referme dès qu'on a choisi. */
   const [calendrierOuvert, setCalendrierOuvert] = useState(false);
   const [nomDuPlan, setNomDuPlan] = useState('');
-  /* Un plan relu. Il ne se recalcule pas : on affiche ce qui a été figé. */
-  const [relu, setRelu] = useState<{ libelle: string; contenu: PlanEnregistre } | null>(null);
+  /* Un plan relu. Il ne se recalcule pas : on affiche ce qui a été figé.
+     On garde le PLAN ENTIER et non ses seuls libellé et contenu : c'est
+     depuis cet écran qu'on déclare l'avoir cuisiné, et ça demande son
+     identifiant et son état. */
+  const [relu, setRelu] = useState<PlanRepas | null>(null);
   const [plansOuverts, setPlansOuverts] = useState(false);
-  /* Les cuissons choisies POUR CE PLAN, par repas et par aliment. Rien n'est
-     stocké sur la fiche de l'aliment : les mêmes pommes de terre passent au
-     four ce soir et à la vapeur demain. Clé : « jour|repas|idAliment ». */
-  const [cuissons, setCuissons] = useState<Cuissons>({});
+  const [planASupprimer, setPlanASupprimer] = useState<{ id: number; libelle: string } | null>(null);
+  /* Les cuissons choisies À LA MAIN pour ce plan, par repas et par aliment.
+     Rien n'est stocké sur la fiche de l'aliment : les mêmes pommes de terre
+     passent au four ce soir et à la vapeur demain. Clé : « jour|repas|id ».
+
+     Cet état ne contient QUE les choix explicites. Les habitudes se
+     superposent dessous (voir `cuissons`, plus bas) plutôt que d'être
+     recopiées ici : recopier obligerait à savoir quand recopier, à ne pas
+     écraser ce que l'utilisateur vient de faire, et à distinguer « il n'a pas
+     encore choisi » de « il a choisi la même chose ». Trois questions qui ne
+     se posent pas si le défaut reste en dessous. */
+  const [cuissonsChoisies, setCuissonsChoisies] = useState<Cuissons>({});
   const [choisirCuisson, setChoisirCuisson] = useState<
     { cle: string; aliment: Aliment } | null>(null);
 
@@ -226,8 +248,20 @@ export default function Calculateur() {
     [plusieurs, rangs],
   );
 
+  /**
+   * Ce repas est-il à cuisiner ?
+   *
+   * PRÉ-COCHÉ DÈS QU'UN OBJECTIF EXISTE POUR CE REPAS, et c'est le geste
+   * qu'on économise le plus souvent. Avoir renseigné une cible pour le
+   * déjeuner, c'est avoir dit qu'on déjeune : redemander de le cocher, quatre
+   * fois par jour sur sept jours, faisait vingt-huit appuis pour redire ce
+   * que le compte savait déjà.
+   *
+   * `??` et non `||` : décocher écrit `false`, et `false || défaut` le
+   * remettrait à `true`. Un repas décoché doit le rester.
+   */
   const coche = (rang: number, repas: Repas): boolean =>
-    choisis[cleDuRepas(rang, repas)] === true;
+    estCoche(choisis, cleDuRepas(rang, repas), cibleDe(repas) !== undefined);
   const convives = (rang: number, repas: Repas): number =>
     portions[cleDuRepas(rang, repas)] ?? 1;
 
@@ -252,8 +286,28 @@ export default function Calculateur() {
     return m;
   }, [frigo.data]);
 
+  /**
+   * CE QUI EST DÉJÀ PROMIS À UN PLAN PRÉVU.
+   *
+   * Le bug que ça corrige : deux batch cooking d'affilée comptaient DEUX FOIS
+   * le même frigo. On compose lundi-mercredi, on enregistre ; on compose
+   * jeudi-samedi, et le solveur repartait du stock d'avant. Le premier plan
+   * avait beau vider les 800 g de poulet, le second annonçait « objectifs
+   * atteints » sur du poulet qui n'existait plus — et rien ne le disait,
+   * puisque chaque plan était juste tout seul.
+   */
+  const promis = useMemo(
+    () => dejaPromis(plansGardes.data ?? []), [plansGardes.data]);
+
+  /**
+   * Combien il y en a vraiment, DISPONIBLE — stock moins ce qui est promis.
+   *
+   * Le plancher à zéro compte : un frigo négatif n'existe pas, et le solveur
+   * le lirait comme une dette à rembourser sur les repas suivants.
+   */
   const stockDe = useCallback(
-    (a: Aliment) => grammesEnStock.get(a.id) ?? 0, [grammesEnStock]);
+    (a: Aliment) => Math.max(0, (grammesEnStock.get(a.id) ?? 0) - (promis.get(a.id) ?? 0)),
+    [grammesEnStock, promis]);
 
   /* Les fibres ne sont pas des macros pour le solveur — elles n'entrent dans
      aucune cible — mais elles pèsent 2 kcal par gramme. Sans elles à l'écran,
@@ -337,6 +391,53 @@ export default function Calculateur() {
     [resultats, joursRetenus, portions],
   );
 
+  /**
+   * LES CUISSONS EFFECTIVES : tes habitudes, puis tes choix par-dessus.
+   *
+   * Deux couches, jamais une seule. Ce qui vient des habitudes est un DÉFAUT ;
+   * ce que tu touches à l'écran passe toujours devant, et le reste devant
+   * même si l'habitude change entre-temps. C'est ce qui rend un choix
+   * explicite indéracinable, sans un seul effet de bord.
+   *
+   * Tout le reste de l'écran lit CETTE valeur — le compteur d'aliments à
+   * situer, les fournées, les boîtes. Un endroit du code qui lirait encore
+   * `cuissonsChoisies` verrait un plan à moitié réglé et redemanderait des
+   * cuissons déjà connues.
+   */
+  const cuissons = useMemo(
+    (): Cuissons => ({
+      ...depuisLesHabitudes(plat, mesCuissons.data ?? {}),
+      ...cuissonsChoisies,
+    }),
+    [plat, mesCuissons.data, cuissonsChoisies],
+  );
+
+  /* Ce que ce plan apprend, et qui n'était pas déjà su. Rien si rien n'a
+     changé : une semaine sans nouveauté doit pouvoir se composer sans une
+     seule écriture. */
+  const habitudesNouvelles = useMemo(
+    () => habitudesAEcrire(plat, cuissons, mesCuissons.data ?? {}),
+    [plat, cuissons, mesCuissons.data],
+  );
+
+  /**
+   * Retenir ce qui vient d'être décidé — au passage au batch cooking.
+   *
+   * C'est le moment JUSTE : l'utilisateur vient de finir de régler ses
+   * cuissons, il ne reviendra pas dessus. Écrire plus tôt — à chaque appui
+   * dans le sélecteur — enregistrerait des aller-retours d'hésitation ;
+   * écrire plus tard, à l'enregistrement du plan, raterait les plans qu'on
+   * consulte sans enregistrer.
+   *
+   * L'échec ne bloque RIEN et ne s'affiche pas. Une habitude perdue coûte un
+   * appui la semaine prochaine ; interrompre quelqu'un qui va cuisiner pour
+   * lui dire qu'un défaut n'a pas été mémorisé coûte plus cher que ça.
+   */
+  const retenirLesCuissons = () => {
+    if (habitudesNouvelles.length === 0) return;
+    enregistrerCuissons.mutate(habitudesNouvelles, { onError: () => {} });
+  };
+
   const parFournee = useMemo(
     () => enFournees(plat, cuissons, modesCuisson.data ?? []),
     [plat, cuissons, modesCuisson.data],
@@ -346,11 +447,60 @@ export default function Calculateur() {
 
   const boites = useMemo(() => repartition(plat, cuissons), [plat, cuissons]);
 
-  /** « Aujourd'hui · Midi » — le nom d'une boîte. */
+  /**
+ * « le mercredi 13/08 », ou rien du tout si la date est illisible.
+ *
+ * `new Date('n'importe quoi')` ne lève PAS : il rend un objet dont
+ * `toLocaleDateString` écrit « Invalid Date » en toutes lettres, au milieu
+ * d'une phrase. C'est ce qui s'est affiché sur un plan jamais cuisiné, et ça
+ * a l'air d'un bug de données alors que c'est un bug de lecture.
+ *
+ * On préfère ne rien dire de la date que d'en dire une fausse : la phrase
+ * reste juste sans elle.
+ */
+const dateCourte = (iso: string | null | undefined): string => {
+  if (iso === null || iso === undefined || iso === '') return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+
+  return ` le ${d.toLocaleDateString('fr-FR', {
+    weekday: 'long', day: '2-digit', month: '2-digit',
+  })}`;
+};
+
+/** « Aujourd'hui · Midi » — le nom d'une boîte. */
   const nomDeLaBoite = (cle: string): string => {
     const [rang, repas] = cle.split('|');
 
     return `${libelleDuJour(Number(rang))} · ${NOM_REPAS[repas as Repas]}`;
+  };
+
+  /**
+   * Tout remettre à zéro.
+   *
+   * Appelé après un enregistrement. Sans cela, revenir sur l'écran affichait
+   * encore les jours cochés, les convives et les cuissons du plan qu'on vient
+   * de ranger — on croyait repartir de zéro et on repartait de la veille, en
+   * corrigeant à l'aveugle une sélection qu'on ne voyait plus.
+   *
+   * Un plan enregistré est fini. Le suivant commence sur une page blanche.
+   */
+  const toutRecommencer = () => {
+    setPlan(null);
+    setBatch(false);
+    setRelu(null);
+    setChoisis({});
+    setPortions({});
+    setCuissonsChoisies({});
+    setRangs([0]);
+    setPlusieurs(false);
+    setCalendrierOuvert(false);
+    setOuvert(null);
+    setDetaille(null);
+    setJourOuvert(0);
+    setBoiteOuverte(null);
+    setCourses(false);
+    setNomDuPlan('');
   };
 
   /** Compose tous les repas cochés, en évitant de resservir le même aliment. */
@@ -399,6 +549,189 @@ export default function Calculateur() {
 
   const aucunCoche = joursRetenus.every((r) => REPAS.every((x) => !coche(r, x)));
 
+  /* ------------------------------------------- un plan qu'on relit
+
+     AVANT l'écran de réglage, et c'est un bug qui a coûté une manipulation :
+     ce test était placé après `if (plan === null)`, qui rend le réglage et
+     sort de la fonction. Toucher un plan enregistré le posait bien dans
+     l'état, puis le composant se redessinait… et rendait le réglage. Le clic
+     marchait, l'écran ne changeait jamais.
+
+     La règle : les écrans se testent du plus SPÉCIFIQUE au plus général. Un
+     plan relu est plus spécifique qu'un réglage vide. */
+
+  if (relu !== null) {
+    const p = relu.contenu;
+
+    return (
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={s.page}>
+          <Carte style={{ gap: E.xs }}>
+            <Texte style={{ fontFamily: P.fort }}>{relu.libelle}</Texte>
+            <Discret style={s.aide}>
+              {/* Rien n'est recalculé ici, et c'est le point : le stock a
+                  bougé depuis, les cibles ont peut-être changé. On ne veut
+                  pas savoir ce qu'on cuisinerait aujourd'hui, on veut savoir
+                  ce qu'on a cuisiné ce jour-là. */}
+              Ce plan est figé tel qu'il a été enregistré. Les quantités ne se
+              recalculent pas : c'est ce que tu as cuisiné, pas ce que ton
+              frigo permettrait aujourd'hui.
+            </Discret>
+
+            {/* L'ÉTAT DU PLAN, dit en toutes lettres. C'est lui qui explique
+                pourquoi le calculateur trouve moins d'aliments qu'il n'y en a
+                dans le frigo : ce qui est promis à un plan prévu n'est plus
+                disponible pour le suivant. Sans cette ligne, on croirait à un
+                bug du solveur. */}
+            {!estCuisine(relu) ? (
+              <Discret style={[s.aide, { color: C.vif }]}>
+                {(relu.contenu.consomme ?? []).length > 0
+                  ? 'Prévu. Les ingrédients de ce plan sont mis de côté : tes '
+                    + 'prochains calculs ne comptent plus dessus.'
+                  /* Un plan version 1 ne sait pas ce qu'il prend au frigo. Le
+                     TAIRE serait le pire des deux mondes : on croirait ses
+                     ingrédients réservés alors que le plan suivant peut les
+                     reprendre entièrement. C'est exactement comme ça que trois
+                     plans se sont partagé 800 g de brocoli sur 500. */
+                  : 'Enregistré avant la mise de côté des ingrédients : ce plan '
+                    + 'ne réserve rien, et tes prochains calculs peuvent '
+                    + 'reprendre les mêmes aliments. Refais-en un pour que le '
+                    + 'frigo soit compté juste.'}
+              </Discret>
+            ) : (
+              <Discret style={[s.aide, { color: C.ok }]}>
+                Cuisiné{dateCourte(relu.cuisineLe)} · ton frigo a été
+                décrémenté à ce moment-là.
+              </Discret>
+            )}
+          </Carte>
+
+          {/* Ce qui n'a pas pu être retiré du frigo. On le dit une seule fois,
+              juste après l'appui, et on ne le devine jamais : un aliment
+              disparu du frigo ne doit pas faire vider le bac voisin. */}
+          {(marquerCuisine.data?.ignores ?? []).length > 0 && (
+            <Carte style={{ gap: E.xs, backgroundColor: C.vifFond }}>
+              <Texte style={{ fontFamily: P.fort }}>À retirer toi-même du frigo</Texte>
+              {marquerCuisine.data!.ignores.map((x) => (
+                <Discret key={x.nom} style={s.aide}>• {x.nom} — {x.motif}</Discret>
+              ))}
+            </Carte>
+          )}
+
+          {p.courses.length > 0 && (
+            <Pliant
+              titre="Liste de courses"
+              resume={`${p.courses.length} aliment${p.courses.length > 1 ? 's' : ''} manquant`
+                + `${p.courses.length > 1 ? 's' : ''} ce jour-là`}
+              ouvert={courses}
+              onBascule={() => setCourses(!courses)}
+              teinte="jour"
+            >
+              {p.courses.map((c) => (
+                <View key={c.nom} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(c.categorie) }]} />
+                  <Texte style={{ flex: 1 }}>{c.nom}</Texte>
+                  <Texte style={{ fontFamily: P.fort }}>{nb(c.grammes)} g</Texte>
+                </View>
+              ))}
+            </Pliant>
+          )}
+
+          <Texte style={s.titreEtape}>
+            À cuire · {p.fournees.length} fournée{p.fournees.length > 1 ? 's' : ''}
+          </Texte>
+          {p.fournees.map((f) => (
+            <Carte key={f.libelle} style={{ gap: E.xs }}>
+              <Texte style={{ fontFamily: P.fort }}>{f.libelle}</Texte>
+              {f.lignes.map((l) => (
+                <View key={l.nom} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(l.categorie) }]} />
+                  <Texte style={{ flex: 1 }}>{l.nom}</Texte>
+                  <Texte style={{ fontFamily: P.fort }}>{nb(l.aCuire)} g</Texte>
+                </View>
+              ))}
+            </Carte>
+          ))}
+
+          <Texte style={s.titreEtape}>
+            À servir · {p.boites.length} boîte{p.boites.length > 1 ? 's' : ''}
+          </Texte>
+          <Discret style={s.aide}>
+            La colonne dorée est ce que TU te sers pour tenir tes macros.
+          </Discret>
+
+          {p.boites.map((b) => (
+            <Pliant
+              key={b.titre}
+              titre={b.titre}
+              resume={`${nb(b.cuits.reduce((n, x) => n + x.assiette, 0))} g cuits`
+                + (b.convives > 1 ? `  ·  ${b.convives} personnes` : '')}
+              ouvert={boiteOuverte === b.titre}
+              onBascule={() => setBoiteOuverte(boiteOuverte === b.titre ? null : b.titre)}
+            >
+              <View style={s.entete}>
+                <Discret style={[s.col, { flex: 2 }]}>aliment</Discret>
+                <Discret style={s.col}>boîte</Discret>
+                <Discret style={s.col}>1 pers.</Discret>
+              </View>
+              {[...b.cuits, ...b.crus].map((x) => (
+                <View key={x.nom} style={s.ligneCourse}>
+                  <View style={[s.pastille, { backgroundColor: couleurRole(x.categorie) }]} />
+                  <Texte style={{ flex: 2 }}>{x.nom}</Texte>
+                  <Texte style={[s.col, { textAlign: 'right' }]}>{nb(x.assiette)} g</Texte>
+                  <Texte style={[s.col, { textAlign: 'right', color: C.vif }]}>
+                    {nb(x.parPersonne)} g
+                  </Texte>
+                </View>
+              ))}
+            </Pliant>
+          ))}
+        </ScrollView>
+
+        <View style={[s.pied, { paddingBottom: E.m + insets.bottom, gap: E.s }]}>
+          {/* LE GESTE QUI REND LE FRIGO HONNÊTE.
+              Tant qu'on ne l'a pas fait, ce plan met ses ingrédients de côté :
+              le calcul suivant ne compte plus dessus, mais le frigo, lui, est
+              encore plein. L'appui fait basculer les deux d'un coup — le stock
+              baisse vraiment, la mise de côté tombe. Les séparer laisserait,
+              au moindre incident, soit un stock déduit deux fois, soit un
+              frigo intact pour un plan déclaré cuisiné. */}
+          {!estCuisine(relu) && (
+            <>
+              <Bouton
+                onPress={() => marquerCuisine.mutate(relu.id, {
+                  /* On recharge le plan depuis la liste plutôt que de bricoler
+                     l'état local : c'est le serveur qui date la cuisson, et
+                     recopier une date à la main ferait deux vérités. */
+                  onSuccess: () => setRelu((v) => (v === null ? null : {
+                    ...v, cuisineLe: new Date().toISOString(),
+                  })),
+                })}
+                desactive={marquerCuisine.isPending}
+              >
+                {marquerCuisine.isPending
+                  ? 'Déduction en cours…'
+                  : "J'ai cuisiné — retirer du frigo"}
+              </Bouton>
+              <Discret style={s.aide}>
+                Les quantités de ce plan seront retirées de ton stock, en poids
+                pesé. À faire une fois les casseroles vidées.
+              </Discret>
+            </>
+          )}
+          {marquerCuisine.isError && (
+            <Discret style={[s.aide, { color: C.erreur }]}>
+              {marquerCuisine.error.message}
+            </Discret>
+          )}
+          <Bouton variante="contour" onPress={() => { setRelu(null); marquerCuisine.reset(); }}>
+            ← Fermer
+          </Bouton>
+        </View>
+      </View>
+    );
+  }
+
   /* ------------------------------------------------ paramétrage */
 
   if (plan === null) {
@@ -409,37 +742,69 @@ export default function Calculateur() {
          corriger. Il reste sous le pouce, là où on l'attend. */
       <View style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.page}>
+        {/* Trois étapes, annoncées dès la première. Un écran qui enchaîne des
+            questions sans dire combien il en reste se lit comme un formulaire
+            sans fin. Ici on sait, dès le départ, qu'on en a pour trois. */}
+        <Etapes courante={0} />
+
         <Carte style={{ gap: E.s }}>
           {/* Un interrupteur, pas deux boutons. Deux boutons demandent de lire
               lequel est enfoncé ; un interrupteur se lit d'un coup d'œil et
               dit tout seul dans quel état il est. */}
-          <View style={s.interrupteur}>
+          {/* TOUTE LA LIGNE BASCULE, pas seulement l'interrupteur.
+
+              Le petit interrupteur d'Android fait une cible d'une quinzaine de
+              pixels de large, posée dans un ScrollView : au moindre mouvement
+              du pouce pendant l'appui, c'est le défilement qui prend la main
+              et le geste se perd. D'où l'impression qu'il « ne prend pas » et
+              qu'il faut insister. Une ligne entière de 44 px se vise sans
+              regarder, et un pouce qui glisse d'un millimètre la touche quand
+              même.
+
+              L'interrupteur reste, mais comme INDICATEUR : `pointerEvents:
+              none` le rend transparent au toucher, sinon un appui dessus
+              déclencherait à la fois son propre gestionnaire et celui de la
+              ligne — deux bascules, donc rien de visible. Exactement le bug du
+              double appui, pris par l'autre bout. */}
+          <Pressable
+            onPress={() => {
+              const v = !plusieurs;
+              setPlusieurs(v);
+              if (!v) setRangs([0]);
+              /* En activant « plusieurs jours », la seule chose à faire est de
+                 choisir ses jours : on ouvre le calendrier plutôt que de
+                 demander un appui de plus. */
+              setCalendrierOuvert(v);
+            }}
+            style={s.interrupteur}
+            accessibilityRole="switch"
+            accessibilityLabel="Planifier plusieurs jours"
+            accessibilityState={{ checked: plusieurs }}
+          >
             <View style={{ flex: 1 }}>
               <Texte style={{ fontFamily: P.fort }}>Plusieurs jours</Texte>
               <Discret style={s.aide}>
                 {plusieurs ? 'Choisis tes jours au calendrier' : "Aujourd'hui seulement"}
               </Discret>
             </View>
-            <Switch
-              value={plusieurs}
-              onValueChange={(v) => {
-                setPlusieurs(v);
-                if (!v) setRangs([0]);
-                /* En activant « plusieurs jours », la seule chose à faire est
-                   de choisir ses jours : on ouvre le calendrier plutôt que de
-                   demander un appui de plus. */
-                setCalendrierOuvert(v);
-              }}
-              trackColor={{ false: C.ligne, true: C.vifFond }}
-              thumbColor={plusieurs ? C.vif : C.attenue}
-              accessibilityLabel="Planifier plusieurs jours"
-            />
-          </View>
+            {/* `style` et non la prop `pointerEvents` : react-native-web a
+                déprécié la seconde et le prévient à chaque rendu. */}
+            <View style={{ pointerEvents: 'none' }}>
+              <Switch
+                value={plusieurs}
+                trackColor={{ false: C.ligne, true: C.vifFond }}
+                thumbColor={plusieurs ? C.vif : C.attenue}
+                /* Pas d'`onValueChange` : il ne peut pas se déclencher, et en
+                   poser un laisserait croire qu'il sert. La ligne au-dessus
+                   est le seul chemin. */
+              />
+            </View>
+          </Pressable>
           <Discret style={s.aide}>
             {plusieurs
-              ? 'Les jours choisis partagent le MÊME frigo : le premier est servi '
-                + 'en entier, le dernier hérite de ce qui reste. La liste de courses '
-                + 'dira ce qui manque.'
+              ? 'Tous ces jours puisent dans le MÊME frigo : le premier se sert '
+                + "d'abord, le dernier prend ce qui reste. S'il manque quelque "
+                + 'chose, tu auras la liste de courses à la fin.'
               : 'Coche les repas à cuisiner et dis pour combien de personnes. '
                 + "L'application composera à partir de ton frigo."}
           </Discret>
@@ -451,9 +816,29 @@ export default function Calculateur() {
              de dimanche. */
           <Pliant
             titre="Mes plans enregistrés"
-            resume={`${(plansGardes.data ?? []).length} plan`
-              + `${(plansGardes.data ?? []).length > 1 ? 's' : ''}`
-              + `  ·  le plus récent : ${plansGardes.data![0]!.libelle}`}
+            /* En tête de l'écran et dépliable : c'est ce qu'on vient chercher
+               le jeudi midi. On l'ouvre d'un appui sur son titre, puis on
+               touche un plan pour le relire. */
+            /* Replié, on veut savoir UNE chose : combien mettent encore des
+               ingrédients de côté. C'est ce qui explique un frigo qui paraît
+               plus vide qu'il ne l'est. */
+            resume={(() => {
+              const tous = plansGardes.data ?? [];
+              const prevus = tous.filter((x) => !estCuisine(x)).length;
+
+              /* Un plan sans `consomme` ne met rien de côté : ses aliments
+                 restent comptés comme disponibles, et le plan suivant peut
+                 les reprendre entièrement. C'est LE chiffre à voir sans
+                 déplier. */
+              const muets = tous.filter(
+                (x) => !estCuisine(x) && (x.contenu.consomme ?? []).length === 0).length;
+
+              return `${tous.length} plan${tous.length > 1 ? 's' : ''}`
+                + (prevus > 0
+                  ? `  ·  ${prevus} en attente de cuisson`
+                  : '  ·  tous cuisinés')
+                + (muets > 0 ? `  ·  ${muets} sans mise de côté` : '');
+            })()}
             ouvert={plansOuverts}
             onBascule={() => setPlansOuverts(!plansOuverts)}
             teinte="jour"
@@ -462,24 +847,55 @@ export default function Calculateur() {
               <View key={pl.id} style={s.ligneCourse}>
                 <Pressable
                   onPress={() => { setRelu(pl); setBoiteOuverte(null); setCourses(false); }}
-                  style={{ flex: 1, minHeight: TOUCHE }}
-                  accessibilityLabel={`Relire le plan ${pl.libelle}`}
+                  style={s.plan}
+                  accessibilityLabel={`Ouvrir le plan ${pl.libelle}`}
                 >
-                  <Texte>{pl.libelle}</Texte>
-                  <Discret style={s.aide}>
-                    {pl.contenu.boites.length} boîte
-                    {pl.contenu.boites.length > 1 ? 's' : ''}
-                    {'  ·  '}
-                    {pl.contenu.fournees.length} fournée
-                    {pl.contenu.fournees.length > 1 ? 's' : ''}
-                  </Discret>
+                  <View style={{ flex: 1 }}>
+                    <Texte style={{ fontFamily: P.fort }}>
+                      {pl.libelle}
+                      {/* Un plan PRÉVU garde des ingrédients au chaud pour
+                          lui. Le dire ici évite de chercher pourquoi le
+                          calculateur trouve moins que ce qu'on voit dans le
+                          frigo. */}
+                      {/* TROIS ÉTATS, et le troisième est celui qui a coûté
+                          800 g de brocoli pour 500 en stock : un plan
+                          enregistré avant cette version ne sait pas ce qu'il
+                          prend au frigo, donc il ne met RIEN de côté. Le
+                          taire ferait croire l'inverse. */}
+                      {!estCuisine(pl) && (
+                        <Discret style={{
+                          fontSize: T.minuscule,
+                          color: (pl.contenu.consomme ?? []).length > 0 ? C.vif : C.erreur,
+                        }}
+                        >
+                          {(pl.contenu.consomme ?? []).length > 0
+                            ? '  ·  à cuisiner'
+                            : '  ·  ne réserve rien'}
+                        </Discret>
+                      )}
+                    </Texte>
+                    <Discret style={s.aide}>
+                      {pl.contenu.boites.length} boîte
+                      {pl.contenu.boites.length > 1 ? 's' : ''}
+                      {'  ·  '}
+                      {pl.contenu.fournees.length} fournée
+                      {pl.contenu.fournees.length > 1 ? 's' : ''}
+                      {'  ·  touche pour ouvrir'}
+                    </Discret>
+                  </View>
+                  <Texte style={s.chevronPlan}>›</Texte>
                 </Pressable>
+                {/* Une CROIX, pas le mot « Supprimer ». Le mot débordait sur
+                    le chevron voisin : viser « ouvrir » supprimait le plan.
+                    Et la suppression passe désormais par une confirmation —
+                    un appui de travers ne doit pas détruire un plan qu'on a
+                    mis une semaine à cuisiner. */}
                 <Pressable
-                  onPress={() => supprimerPlan.mutate(pl.id)}
-                  style={s.persBouton}
+                  onPress={() => setPlanASupprimer(pl)}
+                  style={s.croix}
                   accessibilityLabel={`Supprimer le plan ${pl.libelle}`}
                 >
-                  <Discret style={{ color: C.erreur }}>Supprimer</Discret>
+                  <Texte style={s.croixTexte}>×</Texte>
                 </Pressable>
               </View>
             ))}
@@ -546,7 +962,20 @@ export default function Calculateur() {
                            faire attendre un second appui n'apporte rien.
                            Décocher referme, pour la même raison. */
                         onPress={() => {
-                          setChoisis((c) => ({ ...c, [cle]: !c[cle] }));
+                          /* ON PART DE CE QUI EST AFFICHÉ, pas de ce qui est
+                             stocké — et c'est tout le bug du double appui.
+
+                             Un repas pré-coché parce qu'il a un objectif n'a
+                             AUCUNE entrée dans `choisis` : la case est cochée,
+                             le dictionnaire est vide. `!choisis[cle]` valait
+                             donc `!undefined`, c'est-à-dire `true` — le
+                             premier appui réécrivait exactement ce qui était
+                             déjà à l'écran, sans rien changer. Il fallait
+                             taper deux fois pour décocher.
+
+                             `pris` est la valeur affichée, défaut compris.
+                             L'inverser fait toujours basculer quelque chose. */
+                          setChoisis((c) => basculer(c, cle, pris));
                           setDetaille(pris ? null : cle);
                         }}
                         style={s.coche}
@@ -662,8 +1091,29 @@ export default function Calculateur() {
           );
         })}
 
+        {/* UN FRIGO INUTILISABLE EST UNE IMPASSE, et il faut en sortir d'ici.
+            Auparavant l'écran disait « le calculateur ne devine rien » et
+            s'arrêtait là : le bouton « Composer » restait éteint, sans dire
+            où aller. Il fallait trouver soi-même l'onglet Frigo, y renseigner
+            un poids, revenir. On dit maintenant quoi faire, et on y emmène. */}
         {stock.length === 0 && (
-          <Vide message="Ton frigo est vide, ou aucun aliment n'a de poids et de macros connus. Le calculateur ne devine rien." />
+          <Carte style={{ gap: E.s }}>
+            <Texte style={{ fontFamily: P.fort }}>
+              {(frigo.data?.probleme ?? null) !== null
+                ? 'Ton frigo est injoignable'
+                : "Rien d'utilisable dans ton frigo"}
+            </Texte>
+            <Discret style={s.aide}>
+              {frigo.data?.probleme
+                ?? "Le calculateur ne travaille qu'avec des aliments dont il "
+                  + 'connaît le poids par unité et les calories. Un litre ou un '
+                  + 'paquet ne se pèse pas, et un aliment sans calories fausserait '
+                  + 'tout le repas — les deux sont donc écartés.'}
+            </Discret>
+            <Bouton variante="contour" onPress={() => router.push('/frigo')}>
+              Ouvrir mon frigo →
+            </Bouton>
+          </Carte>
         )}
 
         {anomalies.length > 0 && (
@@ -678,8 +1128,9 @@ export default function Calculateur() {
                 : 'Des données de ton frigo méritent une vérification'}
             </Texte>
             <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
-              Le calcul sera exact, mais il partira de valeurs qui ne peuvent pas
-              être vraies. Corrige-les avant de cuisiner.
+              Le calcul sera juste, mais il partira de chiffres qui ne peuvent
+              pas être vrais — et un résultat juste sur des chiffres faux reste
+              faux. Corrige-les avant de cuisiner.
             </Discret>
             {anomalies.slice(0, 6).map((d) => (
               <Texte
@@ -698,116 +1149,33 @@ export default function Calculateur() {
                 … et {anomalies.length - 6} autre(s).
               </Discret>
             )}
+            {/* Ces corrections se font dans le frigo, pas ici. Nommer le
+                problème sans donner le chemin oblige à le retenir jusqu'à
+                l'onglet suivant. */}
+            <Bouton variante="contour" onPress={() => router.push('/frigo')}>
+              Corriger dans mon frigo →
+            </Bouton>
           </Carte>
         )}
 
         </ScrollView>
 
         <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
-          <Bouton onPress={composerTout} desactive={aucunCoche || stock.length === 0}>
+          <Confirmer
+          visible={planASupprimer !== null}
+          titre={`Supprimer « ${planASupprimer?.libelle ?? ''} » ?`}
+          message="Ce plan et sa liste de courses seront perdus. Les repas déjà cuisinés, eux, sont dans ton frigo."
+          onConfirmer={() => {
+            if (planASupprimer !== null) supprimerPlan.mutate(planASupprimer.id);
+            setPlanASupprimer(null);
+          }}
+          onAnnuler={() => setPlanASupprimer(null)}
+        />
+
+        <Bouton onPress={composerTout} desactive={aucunCoche || stock.length === 0}>
             {joursRetenus.length > 1
               ? `Composer les ${joursRetenus.length} jours`
               : 'Composer les repas'}
-          </Bouton>
-        </View>
-      </View>
-    );
-  }
-
-  /* ------------------------------------------- un plan qu'on relit */
-
-  if (relu !== null) {
-    const p = relu.contenu;
-
-    return (
-      <View style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={s.page}>
-          <Carte style={{ gap: E.xs }}>
-            <Texte style={{ fontFamily: P.fort }}>{relu.libelle}</Texte>
-            <Discret style={s.aide}>
-              {/* Rien n'est recalculé ici, et c'est le point : le stock a
-                  bougé depuis, les cibles ont peut-être changé. On ne veut
-                  pas savoir ce qu'on cuisinerait aujourd'hui, on veut savoir
-                  ce qu'on a cuisiné ce jour-là. */}
-              Ce plan est figé tel qu'il a été enregistré. Les quantités ne se
-              recalculent pas : c'est ce que tu as cuisiné, pas ce que ton
-              frigo permettrait aujourd'hui.
-            </Discret>
-          </Carte>
-
-          {p.courses.length > 0 && (
-            <Pliant
-              titre="Liste de courses"
-              resume={`${p.courses.length} aliment${p.courses.length > 1 ? 's' : ''} manquant`
-                + `${p.courses.length > 1 ? 's' : ''} ce jour-là`}
-              ouvert={courses}
-              onBascule={() => setCourses(!courses)}
-              teinte="jour"
-            >
-              {p.courses.map((c) => (
-                <View key={c.nom} style={s.ligneCourse}>
-                  <View style={[s.pastille, { backgroundColor: couleurRole(c.categorie) }]} />
-                  <Texte style={{ flex: 1 }}>{c.nom}</Texte>
-                  <Texte style={{ fontFamily: P.fort }}>{nb(c.grammes)} g</Texte>
-                </View>
-              ))}
-            </Pliant>
-          )}
-
-          <Texte style={s.titreEtape}>
-            À cuire · {p.fournees.length} fournée{p.fournees.length > 1 ? 's' : ''}
-          </Texte>
-          {p.fournees.map((f) => (
-            <Carte key={f.libelle} style={{ gap: E.xs }}>
-              <Texte style={{ fontFamily: P.fort }}>{f.libelle}</Texte>
-              {f.lignes.map((l) => (
-                <View key={l.nom} style={s.ligneCourse}>
-                  <View style={[s.pastille, { backgroundColor: couleurRole(l.categorie) }]} />
-                  <Texte style={{ flex: 1 }}>{l.nom}</Texte>
-                  <Texte style={{ fontFamily: P.fort }}>{nb(l.aCuire)} g</Texte>
-                </View>
-              ))}
-            </Carte>
-          ))}
-
-          <Texte style={s.titreEtape}>
-            À servir · {p.boites.length} boîte{p.boites.length > 1 ? 's' : ''}
-          </Texte>
-          <Discret style={s.aide}>
-            La colonne dorée est ce que TU te sers pour tenir tes macros.
-          </Discret>
-
-          {p.boites.map((b) => (
-            <Pliant
-              key={b.titre}
-              titre={b.titre}
-              resume={`${nb(b.cuits.reduce((n, x) => n + x.assiette, 0))} g cuits`
-                + (b.convives > 1 ? `  ·  ${b.convives} personnes` : '')}
-              ouvert={boiteOuverte === b.titre}
-              onBascule={() => setBoiteOuverte(boiteOuverte === b.titre ? null : b.titre)}
-            >
-              <View style={s.entete}>
-                <Discret style={[s.col, { flex: 2 }]}>aliment</Discret>
-                <Discret style={s.col}>boîte</Discret>
-                <Discret style={s.col}>1 pers.</Discret>
-              </View>
-              {[...b.cuits, ...b.crus].map((x) => (
-                <View key={x.nom} style={s.ligneCourse}>
-                  <View style={[s.pastille, { backgroundColor: couleurRole(x.categorie) }]} />
-                  <Texte style={{ flex: 2 }}>{x.nom}</Texte>
-                  <Texte style={[s.col, { textAlign: 'right' }]}>{nb(x.assiette)} g</Texte>
-                  <Texte style={[s.col, { textAlign: 'right', color: C.vif }]}>
-                    {nb(x.parPersonne)} g
-                  </Texte>
-                </View>
-              ))}
-            </Pliant>
-          ))}
-        </ScrollView>
-
-        <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
-          <Bouton variante="contour" onPress={() => setRelu(null)}>
-            ← Fermer
           </Bouton>
         </View>
       </View>
@@ -822,6 +1190,14 @@ export default function Calculateur() {
         <ScrollView contentContainerStyle={s.page}>
           {/* L'ordre de cet écran est celui des GESTES : ce qu'il faut aller
               chercher, ce qu'on met à cuire, ce qu'on range dans les boîtes. */}
+          {/* Revenir à « Jours » depuis ici efface le plan : les jours
+              changés, les quantités ne veulent plus rien dire. On enlève donc
+              les deux, plutôt que de garder un plan qui parle d'autre chose
+              que ce que l'écran affiche. */}
+          <Etapes
+            courante={2}
+            onRevenir={(etape) => { if (etape === 0) setPlan(null); setBatch(false); }}
+          />
 
           {aAcheter.length > 0 && (
             <Pliant
@@ -850,9 +1226,22 @@ export default function Calculateur() {
           <Texte style={s.titreEtape}>
             À cuire · {parFournee.length} fournée{parFournee.length > 1 ? 's' : ''}
           </Texte>
+          {/* POURQUOI ON PÈSE SEC, dit une fois et à l'endroit où la question
+              se pose — devant la balance, un riz annoncé à 80 g alors qu'on
+              en servira 240 a l'air d'une erreur.
+
+              Cuire n'ajoute que de l'EAU. 80 g de riz sec deviennent 240 g de
+              riz cuit et n'ont pas gagné une calorie au passage ; le même riz
+              cuit pèse trois fois plus pour les mêmes macros. Peser cuit
+              obligerait donc à connaître le temps de cuisson, le couvercle,
+              l'altitude — tout ce qui fait varier l'eau absorbée. Peser sec ne
+              dépend de rien. */}
           <Discret style={s.aide}>
-            Les poids sont ceux de la BALANCE, avant cuisson : riz sec, viande
-            crue. Tout ce qui partage une fournée part ensemble.
+            Ces poids sont ceux de la BALANCE, avant cuisson : riz sec, pâtes
+            sèches, viande crue. La cuisson n'ajoute que de l'eau — elle change
+            le poids, jamais les calories — et l'eau absorbée varie d'une fois
+            sur l'autre. Sec, le chiffre est toujours le même. Tout ce qui
+            partage une fournée part ensemble.
           </Discret>
 
           {parFournee.length === 0 && (
@@ -953,8 +1342,20 @@ export default function Calculateur() {
           <Bouton
             onPress={() => enregistrerPlan.mutate({
               libelle: nomDuPlan.trim(),
-              contenu: figerLePlan(aAcheter, parFournee, boites, nomDeLaBoite),
-            }, { onSuccess: () => { setNomDuPlan(''); setBatch(false); setPlan(null); } })}
+              /* `plat` porte ce que le plan prend au frigo, aliment par
+                 aliment, en poids PESÉ. Sans lui, l'instantané ne saurait pas
+                 ce qu'il consomme — il ne pourrait ni réserver son stock, ni
+                 le décrémenter au moment de cuisiner. */
+              contenu: figerLePlan(aAcheter, parFournee, boites, nomDeLaBoite, plat),
+            }, {
+              onSuccess: () => {
+                toutRecommencer();
+                /* On ouvre la liste des plans en repartant : c'est la preuve
+                   que l'enregistrement a eu lieu, et c'est là qu'on ira le
+                   rechercher jeudi. Sans ça, le plan semble s'évaporer. */
+                setPlansOuverts(true);
+              },
+            })}
             desactive={nomDuPlan.trim() === '' || enregistrerPlan.isPending}
           >
             {enregistrerPlan.isPending ? 'Enregistrement…' : 'Enregistrer'}
@@ -984,10 +1385,13 @@ export default function Calculateur() {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={s.page}>
+        <Etapes courante={1} onRevenir={() => { setPlan(null); setBatch(false); }} />
+
         <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
-          Remplace ce qui ne va pas : les quantités du repas se recalculent
-          pour retomber sur tes objectifs. Un reste déclaré fige la quantité —
-          mets 0 pour écarter un aliment de ce repas.
+          Voilà ce que ton frigo permet. Change ce qui ne te va pas : les
+          quantités se recalculent toutes seules pour retomber sur tes
+          objectifs. S'il te reste un fond de casserole, écris son poids dans
+          la case « reste » — mets 0 pour retirer un aliment de ce repas.
         </Discret>
 
         {/* Un plan de sept jours porte une trentaine de lignes, dont beaucoup
@@ -998,17 +1402,35 @@ export default function Calculateur() {
         {restentASituer > 0 && (
           <Carte style={{ gap: E.xs }}>
             <Discret style={s.aide}>
-              {restentASituer} aliment{restentASituer > 1 ? 's' : ''} sans cuisson
-              renseignée. Touche « cuisson » sous un repas pour dire comment le
-              cuire, ou déclare le reste d'un coup.
+              {restentASituer} aliment{restentASituer > 1 ? 's' : ''} dont on ne
+              sait pas encore comment {restentASituer > 1 ? 'ils se cuisent' : 'il se cuit'}.
+              Touche-{restentASituer > 1 ? 'les' : 'le'} sous « cuisson » dans le
+              repas, ou règle tout le reste d'un coup.
             </Discret>
             <Bouton
               variante="contour"
-              onPress={() => setCuissons((c) => resteSansCuisson(plat, c))}
+              /* On part des cuissons EFFECTIVES, habitudes comprises. Partir
+                 des seuls choix explicites marquerait « sans cuisson » un riz
+                 dont l'habitude dit « à l'eau » — une réponse fausse, posée
+                 par un bouton censé ne remplir que les trous. */
+              onPress={() => setCuissonsChoisies(resteSansCuisson(plat, cuissons))}
             >
-              Les {restentASituer} autres se mangent sans cuisson
+              {restentASituer > 1
+                ? `Les ${restentASituer} autres se mangent tels quels`
+                : 'Le dernier se mange tel quel'}
             </Bouton>
           </Carte>
+        )}
+
+        {/* Ce qui a été pré-rempli. On le DIT, parce qu'une valeur apparue
+            toute seule qu'on ne s'explique pas est plus inquiétante qu'une
+            case vide — et parce qu'il faut savoir qu'on peut la changer. */}
+        {restentASituer === 0 && Object.keys(mesCuissons.data ?? {}).length > 0 && (
+          <Discret style={s.aide}>
+            Les cuissons sont déjà remplies avec ce que tu avais fait la
+            dernière fois. Touche-en une pour la changer — c'est la nouvelle
+            qui sera retenue.
+          </Discret>
         )}
 
         {joursRetenus.map((rang) => {
@@ -1091,14 +1513,16 @@ export default function Calculateur() {
         {/* Le batch cooking vient APRÈS, une fois les cuissons décidées. Le
             proposer plus tôt donnerait des fournées incomplètes sans le dire,
             et on découvrirait l'oubli devant les casseroles. */}
-        <Bouton onPress={() => setBatch(true)} desactive={restentASituer > 0}>
+        <Bouton
+          onPress={() => { retenirLesCuissons(); setBatch(true); }}
+          desactive={restentASituer > 0}
+        >
           {restentASituer > 0
             ? `${restentASituer} cuisson${restentASituer > 1 ? 's' : ''} à renseigner`
             : 'Passer au batch cooking →'}
         </Bouton>
         <Bouton variante="contour" onPress={() => { setPlan(null); setBatch(false); }}>
-          ← Modifier la sélection
-        </Bouton>
+          ← Changer les jours</Bouton>
       </View>
 
       <ChoixDansListe
@@ -1135,22 +1559,39 @@ export default function Calculateur() {
         onFermer={() => setRemplacer(null)}
       />
 
-      {/* Changer la cuisson d'un aliment POUR CE REPAS. La fiche ne bouge
-          pas : c'est un choix du jour, pas une habitude. */}
+      {/* Changer la cuisson d'un aliment POUR CE REPAS.
+          La fiche de l'aliment ne bouge jamais — les mêmes pommes de terre
+          passent au four ce soir et à la vapeur demain. En revanche le
+          DERNIER choix du plan devient l'habitude, et c'est ce qui sera
+          pré-rempli la prochaine fois. */}
       <ChoixDansListe
         visible={choisirCuisson !== null}
-        titre={choisirCuisson ? `Cuisson · ${choisirCuisson.aliment.nom}` : ''}
+        titre={choisirCuisson ? `Comment cuire ${choisirCuisson.aliment.nom} ?` : ''}
         /* « Sans cuisson » porte l'identifiant 0, qu'aucune ligne de la table
            n'a. Il n'a rien à faire dans la table : ce n'est pas une façon de
            cuire, c'est l'absence de cuisson — et l'y mettre obligerait
            `enFournees` à connaître un identifiant particulier. */
-        elements={[
-          { id: 0, nom: 'Sans cuisson', detail: 'se mange tel quel' },
-          ...(modesCuisson.data ?? []).map((m) => ({ id: m.id, nom: m.libelle })),
-        ]}
+        elements={(() => {
+          /* Ce qu'on faisait d'habitude avec CET aliment, marqué dans la
+             liste. Sans cette marque, la valeur pré-remplie n'a pas
+             d'origine visible : on se demande d'où elle sort, et on n'ose
+             pas la changer. */
+          const habitude = choisirCuisson === null
+            ? undefined
+            : (mesCuissons.data ?? {})[cleDHabitude(choisirCuisson.aliment.nom)];
+          const marque = (valeur: number | null) =>
+            (habitude === valeur ? 'ce que tu fais d\'habitude' : undefined);
+
+          return [
+            { id: 0, nom: 'Se mange tel quel', detail: marque(null) ?? 'aucune cuisson' },
+            ...(modesCuisson.data ?? []).map((m) => ({
+              id: m.id, nom: m.libelle, detail: marque(m.id),
+            })),
+          ];
+        })()}
         onChoisir={(id) => {
           if (choisirCuisson === null) return;
-          setCuissons((c) => ({
+          setCuissonsChoisies((c) => ({
             ...c,
             [cleDeCuisson(choisirCuisson.cle, choisirCuisson.aliment)]: id === 0 ? null : id,
           }));
@@ -1307,12 +1748,20 @@ function CarteRepas({
 
       {ouvert && (
         <View style={{ gap: E.s }}>
+          {/* « à peser » et non « à cuire » : la colonne vaut aussi pour les
+              amandes et le skyr, qui ne cuisent pas. C'est ce qu'on met sur
+              la balance, cuisson ou pas. Et « servi » plutôt que « cuit »,
+              pour la même raison. */}
           <View style={s.entete}>
             <Discret style={[s.col, { flex: 2 }]}>aliment</Discret>
-            <Discret style={s.col}>à cuire</Discret>
-            <Discret style={s.col}>cuit</Discret>
+            <Discret style={s.col}>à peser</Discret>
+            <Discret style={s.col}>servi</Discret>
             <Discret style={s.col}>1 pers.</Discret>
           </View>
+          <Discret style={{ fontSize: T.minuscule, lineHeight: 15 }}>
+            On pèse AVANT cuisson : la cuisson n'ajoute que de l'eau, jamais
+            de calories, et l'eau absorbée change d'une fois sur l'autre.
+          </Discret>
 
           {ROLES.map(({ cle, titre, cat }) => {
             const aliment = compose.roles[cle];
@@ -1511,7 +1960,7 @@ function CarteRepas({
                         const c = cuissonDe(q.aliment);
                         if (c === 'a choisir') return 'à choisir';
 
-                        return c === null ? 'sans cuisson' : c.libelle;
+                        return c === null ? 'tel quel' : c.libelle;
                       })()}
                     </Discret>
                   </Pressable>
@@ -1546,6 +1995,17 @@ const s = StyleSheet.create({
   interrupteur: { flexDirection: 'row', alignItems: 'center', gap: E.s, minHeight: TOUCHE },
   colTitre: { fontSize: T.minuscule, textTransform: 'uppercase' },
   titreEtape: { fontFamily: P.fort, fontSize: T.moyen, marginTop: E.s },
+  /* `flex: 1` sur la zone d'ouverture : elle prend toute la largeur
+     restante, la croix garde la sienne, et les deux ne se chevauchent
+     jamais quelle que soit la longueur du nom du plan. */
+  plan: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: TOUCHE },
+  chevronPlan: { fontSize: T.grand, color: C.attenue, paddingHorizontal: E.s },
+  /* Assez large pour le pouce, assez loin du chevron pour ne pas le toucher. */
+  croix: {
+    width: TOUCHE, height: TOUCHE, alignItems: 'center', justifyContent: 'center',
+    marginLeft: E.xs,
+  },
+  croixTexte: { fontSize: T.grand, color: C.erreur },
   puces: { flexDirection: 'row', flexWrap: 'wrap', gap: E.xs },
   puce: {
     flexDirection: 'row', alignItems: 'center', gap: E.xs,
@@ -1566,7 +2026,17 @@ const s = StyleSheet.create({
   pastille: { width: 8, height: 8, borderRadius: 4 },
 
   ligneRepas: { flexDirection: 'row', alignItems: 'center', gap: E.s },
-  coche: { flexDirection: 'row', alignItems: 'center', gap: E.s, flex: 1, minHeight: TOUCHE },
+  /* La case à cocher prend la place d'un doigt, PAS la moitié de la ligne.
+     Avec `flex: 1`, elle partageait la largeur à parts égales avec la zone du
+     titre : le résumé du repas se retrouvait coupé en plein milieu d'une
+     valeur — « 579 kcal · 26.8 P · 64.7 … » — alors qu'il était censé dire
+     l'essentiel sans qu'on ait à déplier. */
+  coche: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: TOUCHE,
+    minHeight: TOUCHE,
+  },
   carre: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: C.ligne,
     alignItems: 'center', justifyContent: 'center',

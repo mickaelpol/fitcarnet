@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  cleDeCuisson, enFournees, figerLePlan, repartition, resteSansCuisson,
-  sansCuisson,
+  cleDHabitude, cleDeCuisson, consommationDuPlan, dejaPromis,
+  depuisLesHabitudes, enFournees, estCuisine, figerLePlan, habitudesAEcrire,
+  repartition, resteSansCuisson, sansCuisson,
 } from './cuisson';
-import type { Cuissons, ModeCuisson } from './cuisson';
+import type { Cuissons, ModeCuisson, PlanEnregistre } from './cuisson';
 import type { Aliment } from '@/solveur/types';
 
 /**
@@ -360,5 +361,292 @@ describe('Un plan enregistré se relit sans rien recalculer', () => {
     /* C'est ce que fait la base : le contenu part en jsonb et revient. Une
        forme qui ne survit pas au voyage ne sert à rien. */
     assert.deepEqual(JSON.parse(JSON.stringify(fige())), fige());
+  });
+});
+
+/* ============================================ les cuissons habituelles */
+
+describe('cleDHabitude', () => {
+  it('rend la même clé quelle que soit la façon d\'écrire le nom', () => {
+    /* Sans cela, « Riz Basmati » et « riz basmati » feraient deux habitudes
+       pour un seul riz, et l'utilisateur verrait ses réglages disparaître au
+       moindre changement de casse. */
+    const attendu = 'riz basmati';
+    for (const ecriture of [
+      'Riz basmati', 'RIZ BASMATI', 'riz  basmati', '  Riz Basmati  ',
+      'riz-basmati', 'Riz (basmati)',
+    ]) {
+      assert.equal(cleDHabitude(ecriture), attendu, ecriture);
+    }
+  });
+
+  it('enlève les accents sans passer par normalize()', () => {
+    /* Hermes n'implémente pas toujours String.prototype.normalize. La table
+       de lettres doit donc suffire — c'est ce que ce test vérifie. */
+    assert.equal(cleDHabitude('Pâtes complètes'), 'pates completes');
+    assert.equal(cleDHabitude('Œufs'), 'oeufs');
+    assert.equal(cleDHabitude('Bœuf haché 5%'), 'boeuf hache 5');
+  });
+
+  it('ne confond pas deux aliments différents', () => {
+    assert.notEqual(cleDHabitude('Riz basmati'), cleDHabitude('Riz complet'));
+  });
+});
+
+describe('depuisLesHabitudes', () => {
+  const plan = [
+    repas('0|R2', { aliment: RIZ, aCuire: 100 }, { aliment: BROCOLI, aCuire: 200 }),
+    repas('1|R2', { aliment: RIZ, aCuire: 150 }),
+  ];
+
+  it('propose la même habitude dans tous les repas où l\'aliment revient', () => {
+    const pre = depuisLesHabitudes(plan, { riz: 1 });
+    assert.equal(pre[cleDeCuisson('0|R2', RIZ)], 1);
+    assert.equal(pre[cleDeCuisson('1|R2', RIZ)], 1);
+  });
+
+  it('« sans cuisson » est une habitude, pas une absence d\'habitude', () => {
+    /* C'est tout l'intérêt pour le skyr et les amandes : sans ça, l'écran
+       redemanderait éternellement pour des aliments dont on a déjà dit
+       qu'ils ne se cuisent pas. */
+    const pre = depuisLesHabitudes(plan, { brocoli: null });
+    const cle = cleDeCuisson('0|R2', BROCOLI);
+    assert.ok(cle in pre, 'l\'habitude « sans cuisson » a été perdue');
+    assert.equal(pre[cle], null);
+    assert.equal(sansCuisson(plan, pre), 2, 'seul le riz devrait rester à situer');
+  });
+
+  it('ne dit rien d\'un aliment jamais rencontré', () => {
+    assert.deepEqual(depuisLesHabitudes(plan, {}), {});
+  });
+
+  it('un choix de l\'écran passe TOUJOURS devant l\'habitude', () => {
+    /* La fusion, telle que l'écran la fait. C'est ce qui rend un choix
+       explicite indéracinable, quoi qu'il arrive aux habitudes. */
+    const cle = cleDeCuisson('0|R2', RIZ);
+    const fusion: Cuissons = { ...depuisLesHabitudes(plan, { riz: 1 }), [cle]: 4 };
+    assert.equal(fusion[cle], 4);
+    assert.equal(fusion[cleDeCuisson('1|R2', RIZ)], 1, 'l\'autre repas garde l\'habitude');
+  });
+});
+
+describe('habitudesAEcrire', () => {
+  const plan = [
+    repas('0|R2', { aliment: RIZ, aCuire: 100 }, { aliment: BROCOLI, aCuire: 200 }),
+    repas('1|R2', { aliment: RIZ, aCuire: 150 }),
+  ];
+
+  it('n\'écrit rien quand rien n\'a changé', () => {
+    /* Une semaine sans changement doit pouvoir se composer sans une seule
+       écriture. Sinon chaque plan repousse `maj_le` sur trente lignes pour
+       rien. */
+    const choisi = depuisLesHabitudes(plan, { riz: 1, brocoli: null });
+    assert.deepEqual(habitudesAEcrire(plan, choisi, { riz: 1, brocoli: null }), []);
+  });
+
+  it('écrit une habitude jamais vue', () => {
+    const choisi: Cuissons = { [cleDeCuisson('0|R2', BROCOLI)]: 1 };
+    assert.deepEqual(habitudesAEcrire(plan, choisi, {}), [{ aliment: 'brocoli', mode: 1 }]);
+  });
+
+  it('distingue « pas d\'habitude » de « habitude sans cuisson »', () => {
+    /* Les deux valent `undefined` et `null`, et les confondre ferait sauter
+       la première écriture d'un « sans cuisson » — le skyr redemanderait
+       indéfiniment. */
+    const choisi: Cuissons = { [cleDeCuisson('0|R2', BROCOLI)]: null };
+    assert.deepEqual(habitudesAEcrire(plan, choisi, {}), [{ aliment: 'brocoli', mode: null }]);
+    assert.deepEqual(habitudesAEcrire(plan, choisi, { brocoli: null }), []);
+  });
+
+  it('garde la DERNIÈRE décision quand un aliment est cuit de deux façons', () => {
+    /* Un riz au four lundi et à l'eau jeudi : l'habitude est « à l'eau ».
+       C'est le sens de « ce que tu as fait la dernière fois ». */
+    const choisi: Cuissons = {
+      [cleDeCuisson('0|R2', RIZ)]: 4,
+      [cleDeCuisson('1|R2', RIZ)]: 1,
+    };
+    assert.deepEqual(habitudesAEcrire(plan, choisi, {}), [{ aliment: 'riz', mode: 1 }]);
+  });
+
+  it('ne laisse pas une décision intermédiaire écraser la dernière', () => {
+    /* Le piège du passage unique : jeudi remet l'habitude connue, donc
+       « inchangé », donc écarté — et lundi resterait dans le lot. On
+       enregistrerait « four » pour un plan qui finit à l'eau. */
+    const choisi: Cuissons = {
+      [cleDeCuisson('0|R2', RIZ)]: 4,
+      [cleDeCuisson('1|R2', RIZ)]: 1,
+    };
+    assert.deepEqual(habitudesAEcrire(plan, choisi, { riz: 1 }), []);
+  });
+
+  it('ignore ce qui n\'a pas encore été décidé', () => {
+    assert.deepEqual(habitudesAEcrire(plan, {}, {}), []);
+  });
+});
+
+/* ================= le frigo n'est pas compté deux fois ================= */
+
+describe('consommationDuPlan', () => {
+  const plan = [
+    repas('0|R2', { aliment: RIZ, aCuire: 100 }, { aliment: BROCOLI, aCuire: 200 }),
+    repas('1|R2', { aliment: RIZ, aCuire: 150 }),
+  ];
+
+  it('additionne les grammes PESÉS sur toute la période', () => {
+    /* `aCuire`, jamais `assiette`. Ce qu'on sort du frigo, c'est du riz sec :
+       l'eau que la cuisson ajoute n'a jamais été dans le bac. Ici l'assiette
+       vaut le double du pesé — prendre la mauvaise colonne se verrait. */
+    const c = consommationDuPlan(plan);
+    assert.deepEqual(c.find((x) => x.nom === 'Riz')!.grammes, 250);
+    assert.deepEqual(c.find((x) => x.nom === 'Brocoli')!.grammes, 200);
+  });
+
+  it('donne UNE ligne par aliment, avec sa référence', () => {
+    const c = consommationDuPlan(plan);
+    assert.equal(c.length, 2);
+    assert.equal(c.find((x) => x.nom === 'Riz')!.reference, RIZ.id);
+  });
+
+  it('compte aussi ce qui ne se cuit pas', () => {
+    /* Le skyr et les amandes sortent du frigo comme le reste. Les fournées
+       n'en couvrent qu'une partie — s'appuyer sur elles oublierait tout ce
+       qui se mange tel quel, et le frigo ne baisserait jamais dessus. */
+    const c = consommationDuPlan([repas('0|R4', { aliment: BROCOLI, aCuire: 50 })]);
+    assert.deepEqual(c, [{ reference: BROCOLI.id, nom: 'Brocoli', grammes: 50 }]);
+  });
+
+  it('ne dit rien d\'un plan vide', () => {
+    assert.deepEqual(consommationDuPlan([]), []);
+  });
+});
+
+describe('dejaPromis', () => {
+  const contenu = (
+    lignes: { reference: string; nom: string; grammes: number }[],
+  ): PlanEnregistre => ({
+    version: 2, courses: [], fournees: [], boites: [], consomme: lignes,
+  });
+
+  it('LE BUG : deux plans prévus ne peuvent plus compter le même poulet', () => {
+    /* On compose lundi-mercredi, on enregistre ; on compose jeudi-samedi. Sans
+       réservation, le second repartait du stock d'avant et annonçait
+       « objectifs atteints » sur du poulet déjà promis. */
+    const promis = dejaPromis([
+      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]), cuisineLe: null },
+    ]);
+    assert.equal(promis.get('grocy:7'), 800);
+  });
+
+  it('un plan CUISINÉ ne réserve plus rien', () => {
+    /* Son stock a déjà été décrémenté pour de vrai. Le compter encore le
+       déduirait deux fois — la même erreur, prise par l'autre bout. */
+    const promis = dejaPromis([
+      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]),
+        cuisineLe: '2026-08-10T12:00:00Z' },
+    ]);
+    assert.equal(promis.size, 0);
+  });
+
+  it('deux plans prévus sur le même aliment s\'additionnent', () => {
+    const ligne = [{ reference: 'grocy:7', nom: 'Poulet', grammes: 300 }];
+    const promis = dejaPromis([
+      { contenu: contenu(ligne), cuisineLe: null },
+      { contenu: contenu(ligne), cuisineLe: null },
+    ]);
+    assert.equal(promis.get('grocy:7'), 600);
+  });
+
+  it('un plan version 1 ne réserve rien plutôt que d\'inventer', () => {
+    /* Il ne dit pas ce qu'il consomme. Deviner à partir de ses noms
+       d'aliments donnerait une réservation fausse, qu'on ne voit pas — pire
+       qu'une réservation manquante, qu'on voit. */
+    const ancien: PlanEnregistre = {
+      version: 1, courses: [], fournees: [], boites: [],
+    };
+    assert.equal(dejaPromis([{ contenu: ancien, cuisineLe: null }]).size, 0);
+  });
+
+  it('aucun plan, aucune réservation', () => {
+    assert.equal(dejaPromis([]).size, 0);
+  });
+
+  it('LE BUG DU 13/08 : un champ ABSENT vaut « prévu », pas « cuisiné »', () => {
+    /* Tant que le serveur n'a pas vidé son cache après la migration, il ne
+       renvoie pas `cuisineLe` du tout. `!== null` répondait alors « cuisiné »
+       pour TOUS les plans : plus aucune réservation, et l'écran affichait
+       « Cuisiné le Invalid Date » sur un plan jamais cuisiné.
+
+       Le défaut va vers PRÉVU. Réserver un stock qui ne l'était pas se voit
+       et se corrige d'un appui ; ne pas réserver laisse trois plans se
+       partager le même brocoli en silence. */
+    const promis = dejaPromis([
+      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]) },
+    ]);
+    assert.equal(promis.get('grocy:7'), 800);
+  });
+
+  it('le stock disponible ne descend jamais sous zéro', () => {
+    /* La règle telle que l'écran l'applique. Un frigo négatif n'existe pas,
+       et le solveur le lirait comme une dette à rembourser sur les repas
+       suivants. */
+    const promis = dejaPromis([
+      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 900 }]), cuisineLe: null },
+    ]);
+    const enStock = 400;
+    assert.equal(Math.max(0, enStock - (promis.get('grocy:7') ?? 0)), 0);
+  });
+
+  it('une chaîne vide vaut « prévu » elle aussi', () => {
+    const promis = dejaPromis([
+      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]),
+        cuisineLe: '' },
+    ]);
+    assert.equal(promis.get('grocy:7'), 800);
+  });
+});
+
+describe('estCuisine', () => {
+  it('ne dit « cuisiné » que sur une date réellement présente', () => {
+    assert.equal(estCuisine({ cuisineLe: '2026-08-13T10:00:00Z' }), true);
+    assert.equal(estCuisine({ cuisineLe: null }), false);
+    assert.equal(estCuisine({ cuisineLe: undefined }), false);
+    assert.equal(estCuisine({ cuisineLe: '' }), false);
+    assert.equal(estCuisine({}), false);
+  });
+
+  it('LE CAS RÉEL : trois plans qui se partagent 800 g de brocoli sur 500', () => {
+    /* Trois plans prévus, 300 + 300 + 200. Sans réservation, chacun repartait
+       des 500 g du frigo et se croyait servi. Avec, le troisième ne trouve
+       plus rien — et le dit. */
+    const brocoli = (g: number) => ({
+      contenu: {
+        version: 2 as const, courses: [], fournees: [], boites: [],
+        consomme: [{ reference: 'base:3', nom: 'Brocoli', grammes: g }],
+      },
+      cuisineLe: null,
+    });
+    const promis = dejaPromis([brocoli(300), brocoli(300), brocoli(200)]);
+
+    assert.equal(promis.get('base:3'), 800);
+    assert.equal(Math.max(0, 500 - promis.get('base:3')!), 0,
+      'il ne doit plus rien rester de disponible');
+  });
+
+});
+
+describe('l\'instantané sait ce qu\'il prend au frigo', () => {
+  it('figerLePlan écrit « consomme » et annonce la version 2', () => {
+    const plan = [repas('0|R2', { aliment: RIZ, aCuire: 100 })];
+    const fige = figerLePlan([], [], [], (c) => c, plan);
+    assert.equal(fige.version, 2);
+    assert.deepEqual(fige.consomme, [{ reference: RIZ.id, nom: 'Riz', grammes: 100 }]);
+  });
+
+  it('survit à un aller-retour JSON, « consomme » compris', () => {
+    /* C'est ce que fait la base : le contenu part en jsonb et revient. Une
+       réservation qui ne survit pas au voyage ne réserve rien. */
+    const plan = [repas('0|R2', { aliment: RIZ, aCuire: 100 })];
+    const fige = figerLePlan([], [], [], (c) => c, plan);
+    assert.deepEqual(JSON.parse(JSON.stringify(fige)), fige);
   });
 });

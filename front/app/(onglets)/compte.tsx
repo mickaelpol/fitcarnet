@@ -45,6 +45,9 @@ export default function Compte() {
           <Bouton variante="contour" onPress={() => router.push('/admin-fusion')}>
             Fusionner des exercices
           </Bouton>
+          <Bouton variante="contour" onPress={() => router.push('/admin-cuissons')}>
+            Façons de cuire
+          </Bouton>
         </>
       )}
 

@@ -231,6 +231,53 @@ porte une trentaine de lignes dont beaucoup ne se cuisent pas, un bouton règle
 **tout le reste d'un geste** : ce qui est cuit se choisit à la main, le reste
 se déclare en bloc. Les choix déjà faits ne sont jamais écrasés.
 
+### Ce que tu fais d'habitude est pré-rempli
+
+Le choix porte sur le couple repas + aliment, et c'est juste — mais rejouer ce
+choix à chaque plan ne l'est pas. Sur une semaine de quatre repas, c'était une
+trentaine de décisions à refaire, et les mêmes que la semaine précédente. Un
+outil qui fait recommencer ce qu'on vient de lui apprendre n'aide pas, il
+occupe.
+
+`cuisson_habituelle` retient donc, **par compte et par aliment**, la dernière
+cuisson employée. Elle sert de DÉFAUT au moment de composer ; les choix faits à
+l'écran passent toujours par-dessus.
+
+**La règle tient en une phrase : ce qui est pré-rempli est ce que tu as fait la
+dernière fois.** Pas de case « s'en souvenir » à cocher — ce serait une
+décision de plus à chaque choix, c'est-à-dire exactement la friction qu'on
+enlève. Pas de « seule la première fois compte » non plus : on ne pourrait plus
+jamais changer d'avis.
+
+**La clé est le NOM de l'aliment, normalisé.** C'est le seul identifiant que
+les deux frigos aient en commun : un aliment Grocy porte « grocy:12 », un
+aliment de la base porte un entier, et ces deux mondes n'ont aucun identifiant
+partagé. La normalisation — minuscules, sans accent, ponctuation ramenée à des
+espaces — est écrite **une seule fois, dans l'écran** (`cleDHabitude`). L'API
+transporte une chaîne opaque et ne la lit pas : la règle doit être la même à
+l'écriture et à la lecture, et l'écrire des deux côtés serait se donner deux
+règles libres de diverger.
+
+**Deux couches, jamais une seule.** Les habitudes se superposent SOUS les choix
+de l'écran au lieu d'y être recopiées. Recopier obligerait à savoir quand
+recopier, à ne pas écraser ce que l'utilisateur vient de faire, et à distinguer
+« il n'a pas encore choisi » de « il a choisi la même chose ». Trois questions
+qui ne se posent pas si le défaut reste en dessous.
+
+**On écrit au passage au batch cooking**, et seulement ce qui a changé. Plus
+tôt — à chaque appui dans le sélecteur — on enregistrerait des aller-retours
+d'hésitation ; plus tard, à l'enregistrement du plan, on raterait les plans
+qu'on consulte sans enregistrer. Un échec d'écriture ne bloque rien et ne
+s'affiche pas : une habitude perdue coûte un appui la semaine prochaine,
+interrompre quelqu'un qui va cuisiner coûte plus cher.
+
+**Un mode supprimé emporte les habitudes qui le visaient** (`ON DELETE
+CASCADE`). La première version posait `SET NULL` pour que l'habitude survive :
+le riz dont on supprime « Eau bouillante » se serait retrouvé pré-rempli « se
+mange tel quel » — une réponse fausse, et muette, découverte devant la boîte.
+`NULL` veut dire une seule chose ici. Une question de trop coûte un geste ; une
+réponse fausse coûte un repas.
+
 **Rien de tout cela ne touche une macro**, et le regroupement ne recalcule
 rien : il additionne ce que le solveur a déjà résolu. C'est la garantie qu'une
 fournée ne peut pas fausser un gramme.
@@ -544,3 +591,78 @@ piège qui n'existe pas sur un seul jour.
 **Étape 3 — batch cooking.**
 La cuisson et la température, le regroupement par fournée, et le tableau de
 répartition à quatre colonnes.
+
+### Deux batch cooking ne comptent plus deux fois le même frigo
+
+Le bug, tel qu'il s'est présenté : on compose lundi-mercredi, on enregistre ;
+on compose jeudi-samedi, et le solveur repartait du stock d'avant. Le premier
+plan avait beau vider les 800 g de poulet, le second annonçait « objectifs
+atteints » sur du poulet qui n'existait plus. Chaque plan était juste tout
+seul ; ensemble, ils mentaient — et rien ne le disait.
+
+C'est la pire forme d'erreur pour cette application : un résultat exact sur un
+stock imaginaire, découvert devant le frigo vide.
+
+**Un plan enregistré a désormais deux états.**
+
+- **Prévu** (`cuisine_le` NULL) — la nourriture est encore dans le frigo, mais
+  elle est promise. Le plan RÉSERVE son stock : les compositions suivantes ne
+  peuvent plus compter dessus. Rien n'est écrit ; supprimer le plan libère la
+  réservation.
+- **Cuisiné** — la nourriture a quitté le frigo, et le stock a été décrémenté
+  pour de vrai au moment de l'appui sur « J'ai cuisiné ». Le plan ne réserve
+  plus rien, sinon on déduirait deux fois.
+
+**Pourquoi un geste et pas une déduction automatique à l'enregistrement.**
+Enregistrer et cuisiner ne sont pas le même moment. On enregistre le samedi
+soir en préparant sa liste de courses ; on cuisine le dimanche après-midi.
+Décrémenter dès le samedi ferait mentir le frigo pendant vingt heures — et un
+plan enregistré puis abandonné laisserait un stock faux que rien ne viendrait
+corriger. La réservation couvre l'entre-deux sans rien écrire d'irréversible.
+
+**Le décrément et le marquage sont un SEUL appel.** Les séparer laisserait, au
+moindre échec entre les deux, soit un stock baissé pour un plan qui réserve
+encore — donc déduit deux fois —, soit un plan marqué cuisiné sur un frigo
+intact. Les deux erreurs sont silencieuses.
+
+**Ce qui est déduit, ce sont les grammes de la BALANCE** — poids pesé, avant
+cuisson. L'eau que la cuisson ajoute n'est jamais sortie du frigo ; déduire le
+poids cuit ferait disparaître trois fois trop de riz.
+
+**L'instantané porte donc une liste `consomme`, et c'est la seule partie du
+plan qui contienne des IDENTIFIANTS.** Le reste se lit ; celle-ci se calcule
+avec — réserver puis décrémenter demande de désigner une ligne du frigo, pas de
+l'appeler par son nom. Un aliment disparu depuis rend sa ligne inapplicable, et
+c'est dit plutôt que deviné : retirer du mauvais bac serait pire que ne rien
+retirer. Les plans enregistrés avant (version 1) ne réservent rien et ne
+peuvent pas être marqués cuisinés — ils ne savent pas ce qu'ils prennent, et on
+ne l'invente pas.
+
+### Les façons de cuire s'administrent depuis l'application
+
+`mode_cuisson` était en écriture réservée à l'administrateur depuis le début,
+sans aucun écran pour l'exercer : ajouter « Plancha » demandait un appel HTTP à
+la main. Une permission sans écran est une permission que personne n'exerce.
+L'écran vit avec les deux autres outils d'administration, dans l'onglet Compte.
+
+On y renomme, on y réordonne — en montant et descendant, pas en tapant un
+nombre — et on y supprime. La suppression annonce sa conséquence : les
+habitudes qui visaient ce mode s'en vont avec lui, et la question sera reposée.
+Elles ne deviennent pas « se mange tel quel », ce qui serait une réponse fausse
+et muette.
+
+**Allègement du parcours.** Ajouté après coup, une fois les trois étapes
+utilisables et le parcours jugé trop lourd à l'usage :
+
+- un **indicateur d'étapes** en haut de chaque écran, qui dit où on en est et
+  combien il en reste — et par lequel on revient en arrière ;
+- les **cuissons habituelles**, pré-remplies (ci-dessus) ;
+- les repas **pré-cochés** dès qu'un objectif existe pour eux : avoir renseigné
+  une cible pour le déjeuner, c'est avoir dit qu'on déjeune ;
+- une **sortie vers le frigo** quand il est vide ou injoignable, au lieu d'un
+  bouton éteint sans explication ;
+- le **vocabulaire** revu : « à peser » plutôt que « à cuire » — la colonne vaut
+  aussi pour les amandes —, « servi » plutôt que « cuit », « se mange tel quel »
+  plutôt que « sans cuisson » ;
+- **pourquoi on pèse sec**, dit à l'endroit où la question se pose : devant la
+  balance, un riz annoncé à 80 g quand on en servira 240 a l'air d'une erreur.

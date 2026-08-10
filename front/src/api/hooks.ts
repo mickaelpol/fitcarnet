@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ModeCuisson, PlanEnregistre } from '@/calcul/cuisson';
+import type { Habitudes, ModeCuisson, PlanEnregistre } from '@/calcul/cuisson';
 import {
   api, definirJeton, definirRafraichissement, lireRafraichissement, membres,
 } from './client';
@@ -318,12 +318,79 @@ export const useModesCuisson = () =>
     ...REFERENTIEL,
   });
 
+/* ---------- les cuissons habituelles ---------- */
+
+/**
+ * COMMENT CE COMPTE CUIT, D'HABITUDE.
+ *
+ * Sert de DÉFAUT au moment de composer : le riz est déjà à l'eau, le poulet
+ * déjà à la poêle, et il ne reste qu'à changer ce qui change. Sans ça, une
+ * semaine de quatre repas demandait une trentaine de choix — les mêmes que la
+ * semaine dernière.
+ *
+ * La clé est le nom NORMALISÉ de l'aliment (`cleDHabitude`) : c'est le seul
+ * identifiant que les deux frigos aient en commun. La valeur a trois états —
+ * un entier, `null` pour « se mange tel quel », et la clé ABSENTE pour
+ * « jamais décidé ».
+ *
+ * Ce n'est pas un référentiel : ça change à chaque plan, et une réponse
+ * gardée une demi-heure ferait réapparaître des questions déjà réglées.
+ */
+export const useMesCuissons = () =>
+  useQuery({
+    queryKey: ['mes-cuissons'],
+    queryFn: async (): Promise<Habitudes> => {
+      const r = await api<{ habitudes: { aliment: string; mode: number | null }[] }>(
+        '/mes-cuissons');
+      const out: Habitudes = {};
+      for (const h of r.habitudes) out[h.aliment] = h.mode;
+
+      return out;
+    },
+  });
+
+/**
+ * Enregistre, ou remplace, des habitudes — EN UN SEUL ENVOI.
+ *
+ * « Les 12 autres se mangent sans cuisson » est UN geste de l'utilisateur.
+ * Douze appels le feraient réussir à moitié : sept habitudes écrites, cinq
+ * perdues dans une coupure, et aucun moyen de savoir lesquelles. Le serveur
+ * écrit le lot dans une transaction — il passe ou il ne passe pas.
+ *
+ * PUT et non POST : rejoué deux fois, l'envoi donne le même état. C'est la
+ * définition, et ça évite à l'écran de lire avant d'écrire pour savoir lequel
+ * des deux verbes employer.
+ */
+export function useEnregistrerCuissons() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (habitudes: { aliment: string; mode: number | null }[]) =>
+      api<{ enregistrees: number }>('/mes-cuissons', { methode: 'PUT', corps: { habitudes } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mes-cuissons'] }),
+  });
+}
+
 /* ---------- plans de batch cooking conservés ---------- */
 
 export interface PlanRepas {
   id: number;
   libelle: string;
   creeLe: string;
+  /**
+   * NULL tant que le plan n'est pas cuisiné.
+   *
+   * Tant qu'il l'est, le plan RÉSERVE son stock : les compositions suivantes
+   * ne comptent plus dessus. C'est ce qui empêche deux batch cooking de
+   * compter deux fois le même frigo.
+   *
+   * OPTIONNEL, et pas par confort : tant que l'API n'a pas vidé son cache
+   * après la migration, elle ne renvoie pas ce champ du tout. Le typer
+   * `string | null` était un mensonge qui a coûté une réservation entière —
+   * `!== null` répondait « cuisiné » pour tous les plans. On lit toujours via
+   * `estCuisine()`, jamais en comparant à `null` à la main.
+   */
+  cuisineLe?: string | null;
   contenu: PlanEnregistre;
 }
 
@@ -350,7 +417,80 @@ export function useSupprimerPlan() {
     /* Un instantané ne se modifie pas — sinon ce n'en est plus un. On en
        refait un, et on supprime l'ancien. */
     mutationFn: (id: number) => api<void>(`/plan_repas/${id}`, { methode: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['plans'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plans'] });
+      /* Supprimer un plan PRÉVU rend son stock : les compositions suivantes
+         peuvent à nouveau compter dessus. Sans cette invalidation, le frigo
+         resterait amputé à l'écran d'une réservation qui n'existe plus. */
+      qc.invalidateQueries({ queryKey: ['mon-frigo'] });
+    },
+  });
+}
+
+/**
+ * « J'AI CUISINÉ CE PLAN. »
+ *
+ * Un seul appel pour deux gestes qui n'en font qu'un : le frigo est
+ * décrémenté de ce que le plan prend, et le plan cesse de réserver. Les
+ * séparer laisserait, au moindre échec entre les deux, soit un stock baissé
+ * pour un plan qui réserve encore — donc déduit deux fois —, soit un plan
+ * marqué cuisiné sur un frigo intact.
+ *
+ * `ignores` rend les lignes qui n'ont pas pu être décrémentées : un aliment
+ * sorti du frigo depuis, un produit sans poids par unité. On ne les devine
+ * pas — on les dit, pour qu'elles se corrigent à la main.
+ */
+export function useMarquerCuisine() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api<{
+      cuisineLe: string;
+      deduits: number;
+      ignores: { nom: string; motif: string }[];
+    }>(`/plan_repas/${id}/cuisine`, { methode: 'POST', corps: {} }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plans'] });
+      qc.invalidateQueries({ queryKey: ['mon-frigo'] });
+    },
+  });
+}
+
+/* ---------- modes de cuisson : écriture réservée à l'administrateur ---------- */
+
+export function useCreerModeCuisson() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (v: { libelle: string; ordre: number }) =>
+      api<ModeCuisson>('/mode_cuissons', { methode: 'POST', corps: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['modes-cuisson'] }),
+  });
+}
+
+export function useMajModeCuisson() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (v: { id: number } & Partial<ModeCuisson>) =>
+      api<ModeCuisson>(`/mode_cuissons/${v.id}`, { methode: 'PATCH', corps: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['modes-cuisson'] }),
+  });
+}
+
+export function useSupprimerModeCuisson() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/mode_cuissons/${id}`, { methode: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['modes-cuisson'] });
+      /* Supprimer un mode emporte les habitudes qui le visaient (ON DELETE
+         CASCADE) : l'écran reposera la question plutôt que de pré-remplir
+         « se mange tel quel », qui serait une réponse fausse. Les habitudes
+         en mémoire ne valent donc plus rien. */
+      qc.invalidateQueries({ queryKey: ['mes-cuissons'] });
+    },
   });
 }
 

@@ -85,6 +85,7 @@ export default function Racine() {
           <Stack.Screen name="reglages" options={{ title: 'Réglages de l’app' }} />
           <Stack.Screen name="admin-videos" options={{ title: 'Vidéos des exercices' }} />
           <Stack.Screen name="admin-fusion" options={{ title: 'Fusionner des exercices' }} />
+          <Stack.Screen name="admin-cuissons" options={{ title: 'Façons de cuire' }} />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

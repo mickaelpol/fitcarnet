@@ -84,6 +84,30 @@ class PlanRepas implements ProprieteUtilisateur
     private \DateTimeImmutable $creeLe;
 
     /**
+     * QUAND ce plan a ete cuisine — NULL tant qu'il ne l'est pas.
+     *
+     * Ce n'est PAS une retouche de l'instantane, et la regle « un instantane
+     * ne se modifie pas » tient toujours : cette colonne ne dit rien de CE QUI
+     * a ete cuisine, elle dit QUAND. C'est un fait nouveau pose a cote, pas
+     * une correction de l'ancien. Le jeudi, on relit toujours exactement ce
+     * qui a ete decide le dimanche.
+     *
+     * Tant qu'elle est NULL, le plan RESERVE son stock : les compositions
+     * suivantes ne peuvent plus compter sur ces grammes. Une fois renseignee,
+     * le frigo a deja ete decremente pour de vrai et le plan ne reserve plus
+     * rien — sinon on deduirait deux fois.
+     *
+     * En LECTURE SEULE pour l'API : elle se pose par
+     * `POST /api/plan_repas/{id}/cuisine`, qui decremente le frigo dans le
+     * meme appel. Un PATCH la poserait sans toucher au stock, et on aurait un
+     * plan « cuisine » sur un frigo intact — c'est-a-dire le double comptage
+     * qu'on vient de corriger, pris par l'autre bout.
+     */
+    #[ORM\Column(name: 'cuisine_le', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['plan:lire'])]
+    private ?\DateTimeImmutable $cuisineLe = null;
+
+    /**
      * L'instantane : courses, fournees et boites, deja calcules.
      *
      * Sa forme appartient a l'ecran qui l'ecrit et le relit. L'API ne
@@ -117,6 +141,22 @@ class PlanRepas implements ProprieteUtilisateur
     public function setLibelle(string $v): self { $this->libelle = \trim($v); return $this; }
 
     public function getCreeLe(): \DateTimeImmutable { return $this->creeLe; }
+
+    public function getCuisineLe(): ?\DateTimeImmutable { return $this->cuisineLe; }
+
+    /**
+     * Pas de `setCuisineLe()`, et c'est deliberé.
+     *
+     * On ne choisit pas la date a laquelle on a cuisine : c'est maintenant, ou
+     * ce n'est pas. Un setteur ouvert laisserait ecrire une date passee — donc
+     * antidater une deduction de stock qui, elle, vient d'avoir lieu.
+     */
+    public function marquerCuisine(): self
+    {
+        $this->cuisineLe = new \DateTimeImmutable();
+
+        return $this;
+    }
 
     /** @return array<string, mixed> */
     public function getContenu(): array { return $this->contenu; }

@@ -240,9 +240,40 @@ allumé indéfiniment.
 
 ## Ce qui reste
 
-**Calculateur, étapes 2 et 3.** L'étape 1 — aujourd'hui — sert tous les
-jours, et le stock cumulé fonctionne déjà sur la journée. Restent le
-calendrier sur plusieurs jours, puis le batch cooking. Voir `CALCULATEUR.md`.
+**Le calculateur est livré en entier — étapes 1, 2 et 3.** Le calendrier
+multi-jours, le stock partagé sur la période, la liste de courses, les
+fournées, la répartition en boîtes, l'enregistrement des plans et
+l'allègement du parcours (indicateur d'étapes, cuissons habituelles, repas
+pré-cochés, sortie vers le frigo). Voir `CALCULATEUR.md`.
+
+**Deux batch cooking ne comptent plus deux fois le même frigo.** Un plan
+enregistré est PRÉVU tant qu'on n'a pas dit l'avoir cuisiné : il met ses
+ingrédients de côté, et les calculs suivants ne comptent plus dessus. Le bouton
+« J'ai cuisiné » décrémente le stock pour de vrai et libère la réservation,
+dans le même appel. Voir `CALCULATEUR.md`.
+
+**Les façons de cuire s'administrent depuis l'application**, avec les deux
+autres outils d'administration dans l'onglet Compte : ajouter, renommer,
+réordonner, supprimer.
+
+**Ce qui manque encore autour du calculateur :**
+
+- **Les tests PHP ne couvrent pas les contrôleurs, seulement leur calcul.**
+  Ce qui pouvait se tromper — validation d'un lot d'habitudes, arithmétique de
+  la déduction — a été sorti dans `LotDHabitudes` et `DeductionDuPlan`, deux
+  classes pures éprouvées sans base ni noyau. Le routage, la sécurité et la
+  sérialisation, eux, n'ont aucun test : il faudrait un `WebTestCase` avec une
+  base de test, qui n'existe pas encore.
+- **Les plans enregistrés avant août 2026 (version 1) ne réservent rien** et ne
+  peuvent pas être marqués cuisinés : ils ne portent pas la liste de ce qu'ils
+  prennent au frigo. Ils restent lisibles. Il suffit d'en refaire un.
+
+**Quatre saisies de données en attente.** Elles ne se devinent pas et
+personne ne peut les faire à ma place : les pâtes complètes (336 kcal, 12 P,
+62 G, 2 L, 11 fibres), le riz basmati (346 / 8,3 / 75,3 / 1,1 / 0,9 avec la
+pesée 83 → 393), la suppression de « Semoule complete » dans Grocy, et les
+fibres du skyr. S'ajoute la pesée du brocoli, 200 g crus → 150 g vapeur,
+jamais saisie — et le rendement 1,87 du riz complet, dont je doute.
 
 **Les rendements non mesurés.** Ceux des légumes et de quelques féculents
 valent 1 faute de mesure. Sans conséquence sur les macros — elles se comptent

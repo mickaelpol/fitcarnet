@@ -134,7 +134,10 @@ const renouvelerUneSeuleFois = uneSeuleFois(
   async (): Promise<boolean> => renouveler().catch(() => false));
 
 interface Options {
-  methode?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  /* PUT sert aux écritures qui REMPLACENT par clé naturelle — les cuissons
+     habituelles. Rejouées deux fois, elles donnent le même état ; un POST
+     empilerait, ou échouerait sur l'index unique dès la deuxième fois. */
+  methode?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   corps?: unknown;
   /** certains appels (connexion, renouvellement) n'ont pas encore de jeton */
   sansJeton?: boolean;

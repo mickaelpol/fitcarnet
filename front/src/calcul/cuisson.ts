@@ -262,7 +262,7 @@ export function repartition(repas: readonly Repas[], choisi: Cuissons): Boite[] 
  */
 export interface PlanEnregistre {
   /** version de la forme, pour qu'une évolution ne rende pas l'ancien illisible */
-  version: 1;
+  version: 1 | 2;
   courses: { nom: string; categorie: string; grammes: number }[];
   fournees: {
     libelle: string;
@@ -275,6 +275,23 @@ export interface PlanEnregistre {
     cuits: LigneEnregistree[];
     crus: LigneEnregistree[];
   }[];
+  /**
+   * CE QUE CE PLAN PREND AU FRIGO. Absent des plans version 1.
+   *
+   * La seule partie de l'instantané qui porte des IDENTIFIANTS, et c'est
+   * assumé. Le reste du plan se lit ; celle-ci se CALCULE avec — réserver du
+   * stock puis le décrémenter demande de désigner une ligne du frigo, pas de
+   * l'appeler par son nom. Un nom se réécrit, un identifiant non ; se tromper
+   * de ligne ici viderait le mauvais bac.
+   *
+   * Un aliment disparu du frigo depuis rend sa ligne inapplicable, et c'est
+   * dit plutôt que deviné.
+   *
+   * Les grammes sont ceux de la BALANCE — le poids pesé, additionné sur toute
+   * la période, cuisson ou pas. C'est ce qui sort réellement du frigo : ce
+   * qu'on y a mis n'a jamais été de l'eau de cuisson.
+   */
+  consomme?: { reference: number | string; nom: string; grammes: number }[];
 }
 
 export interface LigneEnregistree {
@@ -299,6 +316,8 @@ export function figerLePlan(
   fournees: readonly Fournee[],
   boites: readonly Boite[],
   nomDeLaBoite: (cle: string) => string,
+  /** le plan à plat — sert à savoir ce qui sort du frigo, cuisson ou pas */
+  repas: readonly Repas[] = [],
 ): PlanEnregistre {
   const ligne = (p: Portion): LigneEnregistree => ({
     nom: p.aliment.nom,
@@ -308,7 +327,8 @@ export function figerLePlan(
   });
 
   return {
-    version: 1,
+    version: 2,
+    consomme: consommationDuPlan(repas),
     courses: courses.map((c) => ({
       nom: c.aliment.nom, categorie: c.aliment.categorie, grammes: c.grammes,
     })),
@@ -325,4 +345,242 @@ export function figerLePlan(
       crus: b.crus.map(ligne),
     })),
   };
+}
+
+/**
+ * Ce que ce plan prend au frigo, aliment par aliment.
+ *
+ * `aCuire` et non `assiette` : c'est le poids de la BALANCE. Ce qu'on sort du
+ * frigo, c'est du riz sec et de la viande crue — l'eau que la cuisson ajoute
+ * n'a jamais été dans le bac. Prendre l'assiette ferait déduire trois fois
+ * trop de riz, et le frigo se viderait sur le papier bien avant de se vider
+ * en vrai.
+ *
+ * Les quantités s'additionnent sur toute la période : un aliment servi à
+ * quatre repas donne une seule ligne et son total.
+ *
+ * Tous les aliments, cuits ou non. Les fournées n'en couvrent qu'une partie —
+ * le skyr et les amandes sortent du frigo comme le reste.
+ */
+export function consommationDuPlan(
+  repas: readonly Repas[],
+): { reference: number | string; nom: string; grammes: number }[] {
+  const par = new Map<number | string, { nom: string; grammes: number }>();
+
+  for (const r of repas) {
+    for (const q of r.quantites) {
+      const deja = par.get(q.aliment.id);
+      if (deja === undefined) {
+        par.set(q.aliment.id, { nom: q.aliment.nom, grammes: q.aCuire });
+      } else {
+        deja.grammes += q.aCuire;
+      }
+    }
+  }
+
+  return [...par]
+    .map(([reference, x]) => ({ reference, nom: x.nom, grammes: x.grammes }))
+    .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+}
+
+/**
+ * CE QUI EST DÉJÀ PROMIS À UN AUTRE PLAN.
+ *
+ * Le bug qu'elle corrige : deux batch cooking d'affilée comptaient deux fois
+ * le même frigo. On compose lundi-mercredi, on enregistre ; on compose
+ * jeudi-samedi, et le solveur repartait du stock d'avant. Le premier plan
+ * avait beau vider les 800 g de poulet, le second annonçait « objectifs
+ * atteints » sur du poulet qui n'existait plus — et personne n'était prévenu,
+ * puisque chaque plan était juste tout seul.
+ *
+ * Seuls les plans PRÉVUS réservent. Un plan cuisiné a déjà fait baisser le
+ * stock pour de vrai : le compter encore le déduirait deux fois.
+ *
+ * Un plan version 1 ne réserve rien — il ne dit pas ce qu'il consomme, et
+ * inventer une consommation à partir de ses noms d'aliments serait deviner.
+ * Mieux vaut une réservation manquante, qu'on voit, qu'une réservation fausse,
+ * qu'on ne voit pas.
+ */
+export function estCuisine(plan: { cuisineLe?: string | null }): boolean {
+  /* `!= null` attrape `null` ET `undefined`, et la différence a coûté cher :
+     tant que le serveur n'a pas vidé son cache après la migration, il ne
+     renvoie pas du tout le champ. `!== null` répondait alors « cuisiné » pour
+     TOUS les plans — donc aucune réservation, et l'écran affichait
+     « Cuisiné le Invalid Date » sur un plan qu'on n'avait jamais cuisiné.
+
+     Le défaut va vers PRÉVU, et c'est le bon sens du risque : réserver un
+     stock qui ne l'était pas se voit tout de suite et se corrige d'un appui ;
+     ne pas réserver laisse trois plans se partager le même brocoli en
+     silence, et on le découvre devant le bac. */
+  return plan.cuisineLe != null && plan.cuisineLe !== '';
+}
+
+export function dejaPromis(
+  plans: readonly { contenu: PlanEnregistre; cuisineLe?: string | null }[],
+): Map<number | string, number> {
+  const promis = new Map<number | string, number>();
+
+  for (const p of plans) {
+    if (estCuisine(p)) continue;
+    for (const c of p.contenu.consomme ?? []) {
+      promis.set(c.reference, (promis.get(c.reference) ?? 0) + c.grammes);
+    }
+  }
+
+  return promis;
+}
+
+/* --------------------------------------------- les cuissons habituelles */
+
+/**
+ * CE QUE TU FAIS D'HABITUDE, PRÉ-REMPLI.
+ *
+ * Le problème tel qu'il s'est présenté : à chaque plan, il fallait redire que
+ * le riz passe à l'eau et le poulet à la poêle. Sur une semaine de quatre
+ * repas, une trentaine de choix à refaire — et les mêmes que la semaine
+ * dernière. Un outil qui fait recommencer ce qu'on vient de lui apprendre
+ * n'aide pas, il occupe.
+ *
+ * LA RÈGLE TIENT EN UNE PHRASE : **ce qui est pré-rempli est ce que tu as
+ * fait la dernière fois.** Pas de case « s'en souvenir » à cocher — ce serait
+ * une décision de plus à chaque choix, c'est-à-dire exactement la friction
+ * qu'on enlève. Pas de « seule la première fois compte » non plus : on ne
+ * pourrait plus jamais changer d'avis.
+ *
+ * Et ce n'est QU'UN DÉFAUT. Il se change d'un geste, repas par repas.
+ */
+
+/** La clé d'une habitude : ce qui reste d'un nom quand on l'écrit calmement. */
+export type Habitudes = Record<string, number | null>;
+
+/*
+ * Les accents, à la main.
+ *
+ * `String.prototype.normalize('NFD')` ferait la même chose en une ligne, et
+ * c'est ce que j'avais écrit d'abord. Mais Hermes — le moteur JavaScript de
+ * React Native — ne l'implémente pas toujours : selon la version et selon que
+ * l'Intl complet est embarqué ou non, `normalize` est là ou n'y est pas. Une
+ * table de quinze lettres ne dépend d'aucun moteur, et le français n'en
+ * demande pas plus.
+ */
+const SANS_ACCENT: Record<string, string> = {
+  à: 'a', â: 'a', ä: 'a', á: 'a', ã: 'a', å: 'a',
+  ç: 'c',
+  è: 'e', é: 'e', ê: 'e', ë: 'e',
+  ì: 'i', í: 'i', î: 'i', ï: 'i',
+  ñ: 'n',
+  ò: 'o', ó: 'o', ô: 'o', ö: 'o', õ: 'o',
+  ù: 'u', ú: 'u', û: 'u', ü: 'u',
+  ý: 'y', ÿ: 'y',
+  œ: 'oe', æ: 'ae',
+};
+
+/**
+ * La clé sous laquelle une habitude s'écrit ET se relit.
+ *
+ * C'est le seul identifiant que les deux frigos aient en commun : un aliment
+ * Grocy porte « grocy:12 », un aliment de la base porte un entier, et ces
+ * deux mondes n'ont aucun identifiant partagé. Le NOM, lui, en est un.
+ *
+ * Minuscules, sans accent, espaces réduits. Sans cela « Riz Basmati », « riz
+ * basmati » et « Riz basmati  » feraient trois habitudes pour un seul riz, et
+ * l'utilisateur verrait ses réglages disparaître au moindre changement de
+ * casse.
+ *
+ * CETTE FONCTION EST LA SEULE À NORMALISER, dans tout le projet. L'API stocke
+ * ce qu'elle reçoit sans le lire. La règle doit être la même à l'écriture et
+ * à la lecture ; l'écrire des deux côtés, ce serait se donner deux règles
+ * libres de diverger — et le jour où elles divergent, l'habitude s'écrit sous
+ * une clé et se cherche sous une autre, sans que rien ne le signale.
+ */
+export const cleDHabitude = (nom: string): string =>
+  nom
+    .toLowerCase()
+    .replace(/[À-ÿœæ]/g, (c) => SANS_ACCENT[c] ?? c)
+    /* Tout ce qui n'est ni lettre ni chiffre devient une coupure : « riz
+       basmati », « riz-basmati » et « riz (basmati) » sont le même riz. */
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/**
+ * Les cuissons qu'on propose d'office, avant tout choix de l'utilisateur.
+ *
+ * Rendu SÉPARÉMENT des choix faits à l'écran, et fusionné dessous eux. C'est
+ * ce qui rend un choix explicite indéracinable : il est toujours au-dessus du
+ * défaut, quoi qu'il arrive aux habitudes entre-temps. L'inverse — recopier
+ * les habitudes dans l'état de l'écran au chargement — obligerait à savoir
+ * quand recopier, à ne pas écraser ce que l'utilisateur vient de faire, et à
+ * distinguer « il n'a pas encore choisi » de « il a choisi la même chose ».
+ * Trois questions qui ne se posent pas ici.
+ */
+export function depuisLesHabitudes(
+  repas: readonly Repas[],
+  habitudes: Habitudes,
+): Cuissons {
+  const out: Cuissons = {};
+
+  for (const r of repas) {
+    for (const q of r.quantites) {
+      const cle = cleDHabitude(q.aliment.nom);
+      /* `in` et non `!== undefined` : `null` est une réponse — « se mange
+         sans cuisson » — et la confondre avec l'absence ferait redemander
+         éternellement pour le skyr et les amandes.
+
+         HONNÊTEMENT : la mutation qui remplace ce `in` par
+         `habitudes[cle] !== undefined` SURVIT, et c'est normal — le type
+         `Habitudes` interdit la valeur `undefined`, donc les deux écritures
+         disent la même chose ici. Ce n'est pas un trou de test : c'est une
+         équivalence garantie par le typage. Le `in` reste parce qu'il dit
+         l'intention — on demande si l'habitude EXISTE, pas ce qu'elle vaut —
+         et parce qu'il resterait juste si le type s'élargissait un jour. */
+      if (cle in habitudes) out[cleDeCuisson(r.cle, q.aliment)] = habitudes[cle]!;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Ce qu'il faut renvoyer au serveur : les habitudes que ce plan vient de
+ * décider, celles-là seulement.
+ *
+ * On ne réécrit PAS ce qui n'a pas bougé. Une semaine sans changement doit
+ * pouvoir se composer sans une seule écriture — sinon chaque plan repousserait
+ * inutilement `maj_le` sur trente lignes, et un envoi qui échoue à moitié
+ * porterait sur des données qui n'avaient aucune raison de partir.
+ *
+ * Un aliment cuit différemment dans deux repas du même plan ne donne qu'UNE
+ * habitude : la dernière rencontrée dans l'ordre du plan, c'est-à-dire la
+ * plus tardive. C'est le sens de « ce que tu as fait la dernière fois ».
+ */
+export function habitudesAEcrire(
+  repas: readonly Repas[],
+  choisi: Cuissons,
+  connues: Habitudes,
+): { aliment: string; mode: number | null }[] {
+  /* DEUX TEMPS, et l'ordre compte. On retient d'abord la dernière décision de
+     chaque aliment, on compare ensuite à ce qui est déjà connu.
+
+     Faire les deux en un seul passage — « si c'est inchangé, passer » — a
+     l'air plus court et se trompe : un riz mis au four lundi puis remis à
+     l'eau jeudi verrait le jeudi écarté comme inchangé, et le lundi resterait
+     dans le lot. On enregistrerait « four » pour un plan qui finit à l'eau. */
+  const derniere = new Map<string, number | null>();
+
+  for (const r of repas) {
+    for (const q of r.quantites) {
+      const decide = choisi[cleDeCuisson(r.cle, q.aliment)];
+      if (decide === undefined) continue;
+
+      derniere.set(cleDHabitude(q.aliment.nom), decide);
+    }
+  }
+
+  return [...derniere]
+    /* Inchangé : rien à dire.
+       Une habitude ABSENTE rend `undefined`, et `mode` ne peut pas valoir
+       `undefined` — la boucle ci-dessus l'a écarté. L'absence est donc
+       toujours un écart, sans qu'on ait besoin de la tester à part. */
+    .filter(([cle, mode]) => connues[cle] !== mode)
+    .map(([aliment, mode]) => ({ aliment, mode }));
 }
