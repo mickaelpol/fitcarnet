@@ -144,7 +144,7 @@ const vers = (a: AlimentDisponible): Aliment => ({
      `glucidesTotaux`. Elles sont toujours transmises : c'est la cible qui
      décide de s'en servir, pas l'aliment. */
   fibres100: a.fibres100 ?? 0,
-  ratio: a.ratio, etatReference: a.etatReference,
+  ratio: a.ratio,
 });
 
 export default function Calculateur() {
@@ -520,12 +520,10 @@ function CarteRepas({
      que ne le donne le calcul 4/4/9 : la convention européenne les compte à
      part, à 2 kcal le gramme. */
   const fibres = (resultat?.resultat.quantites ?? []).reduce((n, q) => {
-    /* Les macros valent pour l'état de référence : le poids cru d'une viande,
-       le poids cuit d'un féculent. Prendre la mauvaise colonne fausserait les
-       fibres du double du ratio de cuisson. */
-    const reference = q.aliment.etatReference === 'cru' ? q.aCuire : q.assiette;
-
-    return n + (fibresDe(q.aliment) * reference) / 100;
+    /* Les macros valent pour le poids PESÉ, jamais pour le poids servi : la
+       cuisson n'ajoute que de l'eau. C'est donc toujours la colonne « à
+       cuire ». Prendre l'assiette fausserait les fibres du rendement. */
+    return n + (fibresDe(q.aliment) * q.aCuire) / 100;
   }, 0);
 
   return (

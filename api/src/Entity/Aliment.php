@@ -122,11 +122,6 @@ class Aliment
     #[Assert\Positive]
     private ?string $peseeApres = null;
 
-    #[ORM\Column(name: 'etat_reference', type: Types::TEXT, options: ['default' => 'cuit'])]
-    #[Assert\Choice(choices: ['cru', 'cuit'])]
-    #[Groups(['aliment:lire', 'aliment:ecrire'])]
-    private string $etatReference = 'cuit';
-
     #[ORM\Column(name: 'code_barres', type: Types::TEXT, nullable: true)]
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private ?string $codeBarres = null;
@@ -185,8 +180,6 @@ class Aliment
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getPeseeApres(): ?float { return null !== $this->peseeApres ? (float) $this->peseeApres : null; }
     public function setPeseeApres(float|string|null $v): self { $this->peseeApres = null !== $v ? (string) $v : null; return $this; }
-    public function getEtatReference(): string { return $this->etatReference; }
-    public function setEtatReference(string $v): self { $this->etatReference = $v; return $this; }
     public function getCodeBarres(): ?string { return $this->codeBarres; }
     public function setCodeBarres(?string $v): self { $this->codeBarres = $v; return $this; }
     public function getSource(): string { return $this->source; }

@@ -116,7 +116,7 @@ describe('les macros affichées correspondent aux quantités pesées', () => {
     // on recompose les macros à la main depuis les quantités annoncées
     let kcal = 0, prot = 0, gluc = 0, lip = 0;
     for (const x of r.quantites) {
-      const ref = x.aliment.etatReference === 'cru' ? x.aCuire : x.assiette;
+      const ref = x.aCuire;   // les macros valent pour le poids PESÉ, toujours
       kcal += (x.aliment.kcal100 * ref) / 100;
       prot += (x.aliment.prot100 * ref) / 100;
       gluc += (x.aliment.gluc100 * ref) / 100;
@@ -140,10 +140,13 @@ describe('les macros affichées correspondent aux quantités pesées', () => {
 
 describe('quantité imposée (reste à écouler)', () => {
   it('complète avec un second féculent', () => {
-    // 180 g de riz cuit imposés, la patate douce complète les glucides
+    /* 180 g de riz CUIT imposés — un reste de la veille, qu'on pèse forcément
+       cuit. Depuis qu'il n'y a plus qu'une convention, « 180 g de riz » veut
+       dire 180 g de riz SEC : l'unité doit donc être dite. C'est une saisie
+       plus bavarde, mais elle n'a plus qu'une seule lecture possible. */
     const r = calculer(CIBLES.R4, { proteine: A.poulet, glucide: A.patateDouce, lipide: A.amandes },
       [
-        { aliment: A.riz, grammes: 180 },
+        { aliment: A.riz, grammes: 180, unite: 'cuit' },
         { aliment: A.haricots, grammes: 200 },
         { aliment: A.huile, grammes: 2 },
       ]);
@@ -156,7 +159,7 @@ describe('quantité imposée (reste à écouler)', () => {
 
   it('signale quand la quantité imposée sature déjà les glucides', () => {
     const r = calculer(CIBLES.R4, { proteine: A.poulet, glucide: A.patateDouce, lipide: A.amandes },
-      [{ aliment: A.riz, grammes: 600 }, { aliment: A.haricots, grammes: 200 }]);
+      [{ aliment: A.riz, grammes: 600, unite: 'cuit' }, { aliment: A.haricots, grammes: 200 }]);
     assert.equal(r.ok, false);
     assert.ok(r.diagnostics.some((d) => d.code === 'glucides_hors_cible'));
     assert.equal(q(r, 'Patate douce'), undefined);
@@ -568,35 +571,52 @@ describe('cible exprimée en glucides TOTAUX', () => {
   });
 });
 
-describe('etat de reference : ce qu on pese vs ce qu on sert', () => {
-  /* Le bug qui a failli faire manger 165 g de glucides au lieu de 73.
-     Les macros d'un feculent valent pour son etat CUIT : 100 g de riz cuit
-     portent 33 g de glucides. Les lire comme si elles valaient pour du riz
-     SEC multiplie tout par le ratio de cuisson. */
-  const rizCuit = {
+describe('ce qu on pese vs ce qu on sert', () => {
+  /* Le riz du bug de mars, decrit dans l unique convention : les valeurs du
+     grain SEC, celui qu on pose sur la balance. Ce sont les 155 kcal du riz
+     cuit multipliees par 2,26.
+
+     La conversion est exacte, et c est tout l interet : le solveur trouvait
+     97 g a peser en lisant 220 g cuits, il trouve toujours 97 g en lisant
+     directement le sec. Meme riz, meme balance, un champ de moins. */
+  const rizSec = {
     id: 'riz', nom: 'Riz basmati', categorie: 'fec' as const,
-    kcal100: 155, prot100: 3.1, gluc100: 33.2, lip100: 0.7,
-    ratio: 2.26, etatReference: 'cuit' as const,
+    kcal100: 350.3, prot100: 7, gluc100: 75, lip100: 1.6,
+    ratio: 2.26,
   };
 
-  it('pese le riz SEC et le sert cuit', () => {
-    const { aCuire, assiette } = convertir(rizCuit, 220);
+  it('ce qu on pese EST la reference, et l assiette s en deduit', () => {
+    const { aCuire, assiette } = convertir(rizSec, 97);
 
-    assert.ok(Math.abs(aCuire - 97) < 1, `${aCuire} g secs pour 220 g cuits`);
-    assert.equal(assiette, 220, 'l assiette porte bien les 220 g qui font 73 g de glucides');
+    assert.equal(aCuire, 97, 'la colonne a peser ne depend pas du rendement');
+    assert.ok(Math.abs(assiette - 220) < 1, `${assiette} g cuits pour 97 g secs`);
   });
 
   it('donne les grammes a peser pour la cible', () => {
     const r = calculer(
       { kcal: 340, prot: 7, gluc: 73, lip: 1.5 },
-      { glucide: rizCuit });
+      { glucide: rizSec });
 
     const q = r.quantites.find((x) => x.aliment.id === 'riz')!;
     assert.ok(q.aCuire < q.assiette, 'un feculent pese moins sec que cuit');
     assert.ok(Math.abs(q.aCuire - 97) < 5, `${q.aCuire} g a peser, environ 97 attendus`);
   });
 
-  /* La protéine fait l'inverse : on pese le cru, l'assiette pese moins. */
+  it('le rendement ne deplace PAS la colonne a peser', () => {
+    /* L invariant central de la refonte. Trois rendements tres differents sur
+       le meme grain sec : la balance dit la meme chose, seule l annonce du
+       poids servi change. Avant, faire varier le rendement changeait les
+       grammes a peser — d ou le besoin de le verifier a tout prix. */
+    const cible = { kcal: 340, prot: 7, gluc: 73, lip: 1.5 };
+    const peser = (ratio: number) => calculer(cible, { glucide: { ...rizSec, ratio } })
+      .quantites.find((x) => x.aliment.id === 'riz')!;
+
+    assert.equal(peser(2.26).aCuire, peser(3).aCuire);
+    assert.equal(peser(3).aCuire, peser(4.68).aCuire);
+    assert.ok(peser(4.68).assiette > peser(2.26).assiette, 'seule l assiette bouge');
+  });
+
+  /* La proteine perd du poids au lieu d en gagner : meme regle, autre sens. */
   it('pese la viande CRUE et en sert moins', () => {
     const { aCuire, assiette } = convertir(A.poulet, 150);
 

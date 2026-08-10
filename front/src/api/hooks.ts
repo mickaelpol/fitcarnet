@@ -198,7 +198,6 @@ export interface AlimentEcriture {
   lip100: number;
   fibres100: number | null;
   ratio: number;
-  etatReference: 'cru' | 'cuit';
   peseeAvant: number | null;
   peseeApres: number | null;
 }

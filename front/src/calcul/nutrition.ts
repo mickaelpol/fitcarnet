@@ -229,18 +229,10 @@ export function ratioVraisemblable(ratio: number): boolean {
   return ratio >= 0.4 && ratio <= 5;
 }
 
-/* ---------------------------------------------- état de référence */
-
-/**
- * Les macros valent-elles pour le produit cru ou cuit ?
- *
- * Sur un emballage, c'est toujours l'état TEL QUE VENDU : sec pour le riz,
- * cru pour la viande. On le déduit de la catégorie plutôt que de poser une
- * question de plus, tout en laissant l'utilisateur corriger.
- */
-export function etatParDefaut(categorie: string): 'cru' | 'cuit' {
-  return ['prot', 'fec'].includes(categorie) ? 'cru' : 'cuit';
-}
+/* `etatParDefaut()` vivait ici. Il répondait à « ces macros valent-elles pour
+   le produit cru ou cuit ? » — une question que l'application ne pose plus,
+   parce qu'elle n'a plus qu'une seule réponse possible : le produit tel qu'on
+   le pèse. Voir l'en-tête de `solveur/types.ts`. */
 
 export const CATEGORIES = [
   { cle: 'prot',  libelle: 'Protéine',   exemple: 'viande, poisson, œufs' },

@@ -27,8 +27,8 @@ import sys
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "ciqual_vers_grocy.py")
 
-A_EXTRAIRE = {"macros_depuis_le_sec", "sens_du_rendement", "ECART_PESEE_MAX",
-              "AUTRE_ETAT", "CORRESPONDANCE", "desaccords", "normaliser",
+A_EXTRAIRE = {"sens_du_rendement",
+              "ETAT_CUIT", "CORRESPONDANCE", "desaccords", "normaliser",
               "MOTS_DECISIFS", "valeurs_saisies_a_la_main", "SAISIE_MANUELLE",
               "EXACTS", "CHAMPS_REQUIS"}
 
@@ -59,8 +59,9 @@ def fonctions_pures():
 
 
 BOITE = fonctions_pures()
-macros_depuis_le_sec = BOITE["macros_depuis_le_sec"]
 sens_du_rendement = BOITE["sens_du_rendement"]
+normaliser = BOITE["normaliser"]
+EXACTS = BOITE["EXACTS"]
 
 # Riz blanc cru, Ciqual. C'est l'etiquette : une valeur stable, mesuree sur un
 # produit sec, qui ne depend d'aucune facon de cuisiner.
@@ -85,61 +86,47 @@ def presque(a, b, marge=1e-9):
     return abs(a - b) <= marge
 
 
-# ---------------------------------------------------- la pesee du 8 aout
+# -------------------------------- ce que le rendement ne peut PLUS faire
 
-recalcule = macros_depuis_le_sec(RIZ_SEC, 4.68)
+# Riz blanc CRU, Ciqual. C'est desormais ce que le script exporte pour un
+# grain : l'etiquette du produit qu'on pose sur la balance. Une valeur stable,
+# qui ne depend d'aucune facon de cuisiner.
+RIZ_SEC = {
+    "nom": "Riz blanc, cru", "cle": "riz blanc cru",
+    "kcal": 350, "prot": 7.12, "gluc": 75.0, "lip": 1.58, "fibres": 3.2,
+}
 
-verifier("84 g secs pour 393 g cuits donnent ~75 kcal/100 g",
-         presque(recalcule["kcal"], 74.79, 0.1))
-verifier("... et ~16 g de glucides pour 100 g",
-         presque(recalcule["gluc"], 16.03, 0.1))
-
-verifier("la cuisson n'ajoute que de l'eau : la part de glucides ne bouge pas",
-         presque(recalcule["gluc"] / recalcule["kcal"], 75.0 / 350))
-verifier("... ni celle des lipides",
-         presque(recalcule["lip"] / recalcule["kcal"], 1.58 / 350))
-verifier("... ni celle des fibres",
-         presque(recalcule["fibres"] / recalcule["kcal"], 3.2 / 350))
-
-# Le rendement de Ciqual redonne les valeurs de Ciqual : le calcul n'invente
-# rien, il applique la meme conservation d'energie dans l'autre sens.
-table = macros_depuis_le_sec(RIZ_SEC, 2.26)
-verifier("le rendement de la table redonne les macros de la table (kcal)",
-         presque(table["kcal"], 155, 1))
-verifier("... et les glucides", presque(table["gluc"], 33.2, 0.5))
-
-# ------------------------------------------- ce qui compte a la cuisine
-
-# L'invariant central, et il est contre-intuitif : quel que soit le rendement,
-# le poids SEC a peser pour atteindre une cible de glucides ne bouge pas. Le
-# rendement se simplifie. Seule la colonne « cuit » en depend.
+# LE test de la refonte.
+#
+# Il y avait ici une batterie sur `macros_depuis_le_sec`, la fonction qui
+# recalculait les macros CUITES a partir du rendement mesure. Elle verifiait,
+# entre autres, que le poids sec a peser ne bougeait pas quand le rendement
+# changeait — un invariant vrai mais fragile, qui tenait a une simplification
+# algebrique qu'il fallait surveiller a chaque modification.
+#
+# Les macros exportees decrivent maintenant le grain sec. Le poids a peser se
+# lit directement dessus, et le rendement n'apparait plus dans le calcul. Ce
+# n'est plus une propriete a verifier, c'est une impossibilite d'ecriture — et
+# le test ci-dessous le constate au lieu de le surveiller.
 CIBLE_GLUCIDES = 60.0
 attendu = CIBLE_GLUCIDES * 100 / RIZ_SEC["gluc"]
 
 for rendement in (1.87, 2.26, 3.0, 4.68, 5.5):
-    a = macros_depuis_le_sec(RIZ_SEC, rendement)
-    grammes_cuits = CIBLE_GLUCIDES / (a["gluc"] / 100)
-    a_peser = grammes_cuits / rendement
+    a_peser = CIBLE_GLUCIDES * 100 / RIZ_SEC["gluc"]
+    servi = a_peser * rendement
     verifier(f"poids sec a peser identique a un rendement de {rendement}",
              presque(a_peser, attendu, 1e-9))
+    verifier(f"... et le poids servi suit le rendement de {rendement}",
+             presque(servi, attendu * rendement, 1e-9))
 
-# ... mais le poids servi, lui, change du simple au triple.
-petit = macros_depuis_le_sec(RIZ_SEC, 1.87)
-gros = macros_depuis_le_sec(RIZ_SEC, 4.68)
-verifier("le poids servi, lui, suit bien le rendement",
-         (CIBLE_GLUCIDES / (gros["gluc"] / 100))
-         > 2 * (CIBLE_GLUCIDES / (petit["gluc"] / 100)))
+verifier("le poids servi change du simple au double entre 1.87 et 4.68",
+         attendu * 4.68 > 2 * (attendu * 1.87))
 
-# ------------------------------------------------------- les garde-fous
-
-verifier("un rendement nul ne produit rien",
-         macros_depuis_le_sec(RIZ_SEC, 0) is None)
-verifier("un rendement negatif ne produit rien",
-         macros_depuis_le_sec(RIZ_SEC, -2) is None)
-verifier("sans etat sec connu, on ne recalcule pas",
-         macros_depuis_le_sec(None, 3) is None)
-verifier("un etat sec sans energie ne sert a rien",
-         macros_depuis_le_sec({"nom": "x", "cle": "x", "kcal": 0}, 3) is None)
+# Le rendement derive de l'energie, dans le sens qui est maintenant le bon :
+# sec / cuit. 350 kcal de riz sec pour 155 kcal de riz cuit donnent 2,26.
+RIZ_CUIT_KCAL = 155
+verifier("le rendement se deduit du couple sec / cuit",
+         presque(round(RIZ_SEC["kcal"] / RIZ_CUIT_KCAL, 2), 2.26, 0.01))
 
 # ------------------------------------------------- le sens du rendement
 
@@ -170,23 +157,81 @@ verifier("un rendement de 8 est hors de tout ordre de grandeur",
 # La version precedente y avait mis les legumes, et le resultat parlait de
 # lui-meme : epinard 1 -> 1.70, soit 119 g crus pour servir 200 g cuits, la
 # ou il en faut 500 a 700. Facteur cinq, sur toutes les portions de legumes.
-AUTRE_ETAT = BOITE["AUTRE_ETAT"]
+ETAT_CUIT = BOITE["ETAT_CUIT"]
 CORRESPONDANCE = BOITE["CORRESPONDANCE"]
 
-for cle in AUTRE_ETAT:
+for cle in ETAT_CUIT:
     entree = CORRESPONDANCE.get(cle)
     verifier(f"« {cle} » est bien un féculent, pas un légume",
              entree is not None and entree[1] == "fec")
+
+# Et ETAT_CUIT doit bien viser des libelles CUITS : c'est l'autre bout du
+# couple dont on tire le rendement. Le jour ou l'un d'eux pointe vers une
+# entree crue, le rendement vaut 1 et la colonne « cuit » ment.
+for cle, libelle in ETAT_CUIT.items():
+    verifier(f"« {cle} » derive son rendement d'une entree CUITE",
+             "cuit" in normaliser(libelle))
+
+# Symetriquement, les grains eux-memes doivent viser une entree CRUE ou
+# SECHE : c'est ce qu'on pese, donc ce que les macros doivent decrire. Poser
+# ici une entree cuite reintroduirait exactement le bug de mars.
+for cle in ETAT_CUIT:
+    motifs = CORRESPONDANCE[cle][0]
+    verifier(f"« {cle} » porte les valeurs du grain SEC",
+             any(m in normaliser(motifs) for m in ("cru", "crue", "crues", "seches")))
 
 for interdit in ("brocoli", "epinard", "courgette", "carotte", "poireau",
                  "chou fleur", "haricots verts", "petits pois",
                  "patate douce", "pommes de terre"):
     verifier(f"« {interdit} » ne doit plus déduire son rendement de l'énergie",
-             interdit not in AUTRE_ETAT)
+             interdit not in ETAT_CUIT)
 
 verifier("les grains secs, eux, y sont restés",
          {"riz basmati", "riz complet", "quinoa", "boulgour",
-          "pates completes", "semoule complete"} <= set(AUTRE_ETAT))
+          "pates completes"} <= set(ETAT_CUIT))
+
+# La semoule, apres le degat du 10 aout : EXACTS la pointait sur un libelle
+# CUIT a 142 kcal. Le libelle SEC existe — « Semoule de blé dur, crue », 350
+# kcal — mais il n'est pas COMPLET, et Ciqual n'a aucune semoule complete
+# crue. On decrit donc ce qu'on peut prouver.
+for table in ("ETAT_CUIT", "CORRESPONDANCE", "EXACTS"):
+    verifier(f"l'ancienne cle « semoule complete » a disparu de {table}",
+             "semoule complete" not in BOITE[table])
+
+# ------------------- LA regle generale : rien ne vise un libelle CUIT
+#
+# Trois lignes ont vise l'etat cuit sans que personne ne le voie : la semoule
+# (142 kcal au lieu de 350), la pomme de terre (95 au lieu de 80) et la patate
+# douce (79 au lieu de 81). Toutes trois etaient JUSTES du temps ou les
+# feculents portaient leurs valeurs cuites, et sont devenues fausses le jour
+# de la refonte. Aucune relecture ne les a attrapees — il a fallu un audit de
+# la base, apres coup.
+#
+# Depuis qu'il n'y a plus qu'une convention, la regle est absolue : les macros
+# decrivent ce qu'on PESE, donc aucune correspondance ne peut viser une entree
+# cuite. ETAT_CUIT est la seule exception, et pour la seule chose qui ne soit
+# pas une macro : deriver un rendement.
+CUISSON = ("cuit", "cuite", "cuits", "cuites", "bouilli", "roti", "poele")
+
+for cle, (motifs, _cat, _r) in CORRESPONDANCE.items():
+    mots = normaliser(motifs).split()
+    verifier(f"« {cle} » ne vise pas un libelle CUIT",
+             not any(m in CUISSON for m in mots))
+
+for cle, libelle in EXACTS.items():
+    mots = normaliser(libelle).split()
+    verifier(f"le libelle exact de « {cle} » n'est pas un produit CUIT",
+             not any(m in CUISSON for m in mots))
+
+verifier("la semoule vise un libelle SEC verifie",
+         BOITE["EXACTS"]["semoule"] == "Semoule de blé dur, crue")
+verifier("... et son entree cuite est la NATURE, pas la complete",
+         "complete" not in normaliser(BOITE["ETAT_CUIT"]["semoule"]))
+
+# Le couple doit etre coherent : 350 / 164 = 2,13. Apparier la seche nature a
+# la cuite COMPLETE donnerait 2,46 — deux produits differents.
+verifier("le rendement de table de la semoule vaut le rendement derive",
+         abs(BOITE["CORRESPONDANCE"]["semoule"][2] - 350 / 164) < 0.01)
 
 # ------------------------------------------- un légume se pèse CRU
 

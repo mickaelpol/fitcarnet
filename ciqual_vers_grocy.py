@@ -57,12 +57,17 @@ if not GROCY_URL.startswith(("http://", "https://")):
     sys.exit(
         f"GROCY_URL doit commencer par https:// — reçu « {GROCY_URL} ».\n"
         f"  export GROCY_URL=https://{GROCY_URL}")
-if not FICHIERS:
+# --convertir-en-pese ne lit PAS Ciqual : il multiplie les valeurs deja
+# presentes dans Grocy par leur propre rendement. Exiger le tableur pour cette
+# commande-la reviendrait a demander une piece qui ne sert a rien.
+SANS_CIQUAL = "--convertir-en-pese" in sys.argv
+
+if not FICHIERS and not SANS_CIQUAL:
     sys.exit("Indique le fichier Ciqual :  python3 ciqual_vers_grocy.py Table_Ciqual.xlsx")
 
-CIQUAL = FICHIERS[0]
+CIQUAL = FICHIERS[0] if FICHIERS else ""
 
-if not os.path.isfile(CIQUAL):
+if CIQUAL and not os.path.isfile(CIQUAL):
     voisins = sorted(f for f in os.listdir('.') if f.lower().endswith(('.xlsx', '.xls')))
     sys.exit(
         f"Fichier introuvable : {CIQUAL}\n"
@@ -87,7 +92,29 @@ if not os.path.isfile(CIQUAL):
 # Utilise --chercher « amande » pour découvrir le libellé réel, puis
 # recopie-le ici. Une correspondance exacte n'est jamais réinterprétée.
 EXACTS = {
-    "semoule complete": "Semoule ou graine de couscous complète, cuite, sans sel ajouté",
+    # « semoule complete » pointait ici sur « Semoule ou graine de couscous
+    # complète, CUITE ». Ce n'est pas la recherche par mots-cles qui a derape,
+    # c'est cette ligne, ecrite a la main du temps ou les feculents portaient
+    # leurs valeurs cuites. Depuis la refonte elle faisait ecrire 142 kcal
+    # comme du grain sec, et en deduire un rendement de 0,41.
+    #
+    # Le libelle SEC existe bel et bien, et c'est « Semoule de blé dur, crue »
+    # a 350 kcal. Mais il n'est pas COMPLET, et Ciqual n'a aucune entree de
+    # semoule complete crue — seulement des cuites. On decrit donc ce qu'on
+    # peut prouver, une semoule de ble dur, et la migration 19 renomme la
+    # ligne du catalogue commun en consequence. Garder le nom « complète » sur
+    # des valeurs de semoule blanche serait remettre un mensonge a la place
+    # d'un autre.
+    "semoule":          "Semoule de blé dur, crue",
+    # Ces deux-la visaient l'entree CUITE, comme la semoule et pour la meme
+    # raison : ecrites du temps ou les feculents portaient leurs valeurs
+    # cuites. L'audit du catalogue commun les a mises en evidence, et je les
+    # ai d'abord ecartees en disant « normal pour un tubercule ». Elles ne
+    # l'etaient pas : le catalogue annoncait 95 kcal pour une pomme de terre
+    # qu'on pese crue a 80. Une erreur de 19 %, sur tous les comptes.
+    "pommes de terre":  "Pomme de terre, sans peau, crue",
+    "patate douce":     "Patate douce, crue",
+    "pates completes":  "Pâtes sèches, au blé complet, crues",
     "boeuf hache 5":    "Boeuf, steak haché 5% MG cru",
     "blanc de poulet":  "Poulet, filet sans peau cru",
     # Verifie : c'est bien du demi-ecreme. Sans cette ligne, le controle des
@@ -125,19 +152,34 @@ EXACTS = {
 #  c'est le seul chiffre qui vaille pour un légume.
 # ---------------------------------------------------------------------
 
-AUTRE_ETAT = {
-    "riz complet":      "Riz complet, cru",
-    "riz basmati":      "Riz blanc, cru",
-    "quinoa":           "Quinoa, cru",
-    "pates completes":  "Pâtes sèches, semi-complètes, crues",
-    "semoule complete": "Semoule de blé dur, crue",
-    "boulgour":         "Boulgour de blé, cru",
+# Cette table a change de sens avec la refonte, et c'est le meilleur resume
+# de ce qui a change partout ailleurs.
+#
+# AVANT : les macros exportees etaient celles du produit CUIT, et cette table
+# donnait l'entree SECHE pour en deduire le rendement. Deux etats circulaient
+# en meme temps, et il fallait un champ de plus pour dire lequel etait le bon.
+#
+# MAINTENANT : les macros exportees sont TOUJOURS celles du produit qu'on
+# pese, donc du grain SEC. Cette table donne l'entree CUITE, et elle ne sert
+# plus qu'a une chose : deduire le rendement par conservation de l'energie.
+# Le rendement n'entre dans aucune macro — s'il est faux, seule l'annonce du
+# poids servi est fausse.
+ETAT_CUIT = {
+    "riz complet":      "Riz complet, cuit",
+    "riz basmati":      "Riz blanc, cuit",
+    "quinoa":           "Quinoa, cuit",
+    "pates completes":  "Pâtes sèches, au blé complet, cuites, sans sel ajouté",
+    # La cuite qui va avec la seche : la NATURE, pas la complete. Les apparier
+    # de force donnerait 2,46 au lieu de 2,13 — deux produits differents.
+    "semoule":          "Semoule ou graine de couscous, cuite, sans sel ajouté",
+    "boulgour":         "Boulgour de blé, cuit",
 }
 
-# Garde-fou : cette table ne doit contenir QUE des grains secs. Le jour ou
-# quelqu'un y remet un legume, le script refuse de demarrer plutot que de
-# recalculer une portion cinq fois trop petite.
-GRAINS_SECS = set(AUTRE_ETAT)
+# Garde-fou : cette table ne doit contenir QUE des grains secs. L'energie ne
+# se conserve qu'a la vapeur ou dans l'eau absorbee ; a l'eau bouillante, un
+# legume perd ses sucres dans la casserole et le calcul rend une portion cinq
+# fois trop petite. Le script refuse de demarrer plutot que de le faire.
+GRAINS_SECS = set(ETAT_CUIT)
 
 # Aliments absents de Ciqual : valeurs relevées sur l'emballage.
 # Renseigne ici ce que dit ta boîte, c'est toujours plus juste qu'une moyenne.
@@ -183,7 +225,7 @@ CORRESPONDANCE = {
     "skyr":                 ("skyr",                        "lait", 1),
     "banane":               ("banane, crue",                "fruit", 1),
     "amandes":              ("amande",                      "ole",  1),
-    "patate douce":         ("patate douce, cuite",         "fec",  1),
+    "patate douce":         ("patate douce, crue",          "fec",  1),
     "concombre":            ("concombre, cru",              "leg",  1),
     "haricots verts":       ("haricot vert, cru",           "leg",  1),
     "saumon":               ("saumon, cru",                 "prot", 0.85),
@@ -202,7 +244,7 @@ CORRESPONDANCE = {
     "chou fleur":           ("chou-fleur, cru",             "leg",  1),
     "poireau":              ("poireau, cru",                "leg",  1),
     "ratatouille":          ("ratatouille",                 "leg",  1),
-    "pommes de terre":      ("pomme de terre, cuite",       "fec",  1),
+    "pommes de terre":      ("pomme de terre, sans peau, crue", "fec", 1),
     "truite":               ("truite, crue",                "prot", 0.85),
     "cabillaud":            ("cabillaud, cru",              "prot", 0.85),
     "haut de cuisse de poulet": ("poulet, cuisse, crue",    "prot", 0.75),
@@ -212,12 +254,15 @@ CORRESPONDANCE = {
     "noix":                 ("noix, séchée",                "ole",  1),
     "noisette":             ("noisette",                    "ole",  1),
     "beurre de cacahuete":  ("beurre de cacahuète",         "ole",  1),
-    "riz complet":          ("riz complet, cuit",           "fec",  3),
-    "riz basmati":          ("riz blanc, cuit",             "fec",  3),
-    "quinoa":               ("quinoa, cuit",                "fec",  2.75),
-    "pates completes":      ("pâtes complètes, cuites",     "fec",  2.2),
-    "semoule complete":     ("semoule, cuite",              "fec",  3),
-    "boulgour":             ("boulgour, cuit",              "fec",  2.5),
+    # Les grains visent desormais leur entree SECHE : c'est ce qu'on pose sur
+    # la balance, et donc ce que les macros doivent decrire. Leur entree cuite
+    # est dans ETAT_CUIT, et ne sert qu'a deduire le rendement.
+    "riz complet":          ("riz complet, cru",            "fec",  3),
+    "riz basmati":          ("riz blanc, cru",              "fec",  3),
+    "quinoa":               ("quinoa, cru",                 "fec",  2.75),
+    "pates completes":      ("pâtes sèches, au blé complet, crues", "fec", 2.2),
+    "semoule":              ("semoule de blé dur, crue",     "fec",  2.13),
+    "boulgour":             ("boulgour de blé, cru",        "fec",  2.5),
     "thon au naturel":      ("thon, au naturel",            "prot", 1),
     "petits pois":          ("petit pois, cru",             "leg",  1),
     "jus de citron":        ("jus de citron",               "autre", 1),
@@ -411,51 +456,53 @@ def candidats_pour(aliments, motifs: str, combien: int = 6):
     return trouves[:combien]
 
 
-# A partir de cet ecart avec la table, une pesee ne decrit plus le meme
-# produit qu'elle : on ne peut plus melanger le rendement de l'un avec les
-# macros de l'autre.
+# ECART_PESEE_MAX et macros_depuis_le_sec vivaient ici.
 #
-# CE SEUIL NE SERT PLUS A JETER UNE PESEE. Il a longtemps fait exactement ca :
-# 84 g de riz sec pour 393 g cuits donnaient 4,68 la ou Ciqual disait 2,26, et
-# le script gardait 2,26 en silence — juste sous un commentaire affirmant que
-# « TA balance passe avant Ciqual ». La regle contredisait sa propre phrase.
+# Leur histoire vaut d'etre gardee, parce qu'elle explique pourquoi ce fichier
+# a maigri. Le seuil a d'abord servi a JETER une pesee : 84 g de riz sec pour
+# 393 g cuits donnaient 4,68 la ou Ciqual disait 2,26, et le script gardait
+# 2,26 en silence — juste sous un commentaire affirmant que « TA balance passe
+# avant Ciqual ». La regle contredisait sa propre phrase.
 #
-# Ce qu'on a compris depuis : une pesee et une table ne se contredisent pas,
-# elles decrivent deux produits differents. 84 g de riz sec portent 73 g de
-# matiere seche ; qu'ils rendent 393 g veut dire que CE riz-la contient 81 %
-# d'eau, contre 70 % pour le riz moyen de la table. Les deux existent.
+# Il a ensuite servi a RECALCULER les macros cuites depuis l'etat sec, pour
+# que le rendement mesure et les macros decrivent enfin le meme riz. C'etait
+# juste, mais c'etait un rattrapage : il ne fallait reconcilier ces deux
+# nombres que parce que les macros decrivaient le produit CUIT, donc dependaient
+# du rendement.
 #
-# Le seuil declenche donc desormais le RECALCUL des macros cuites depuis
-# l'etat sec, pour que le couple reste coherent. On ne jette plus rien.
-ECART_PESEE_MAX = 0.5
+# Les macros decrivent desormais le grain SEC. Le grain sec est le meme quelle
+# que soit la casserole : une pesee ne peut plus contredire une table, elle ne
+# fixe que le rendement. Il n'y a plus rien a reconcilier, donc plus de seuil,
+# plus de recalcul, et plus de message a lire pour comprendre lequel des deux
+# chiffres l'application a choisi.
 
 
-def macros_depuis_le_sec(sec, mesure: float):
+# Bande dans laquelle tombe toute cereale ou legumineuse SECHE : c'est de la
+# matiere seche, et la matiere seche fait 300 a 400 kcal aux 100 g. Toujours.
+# Meme borne que `front/src/calcul/plausibilite.ts`.
+SEC_MINI, SEC_MAXI = 300, 400
+
+
+def grain_sec_credible(aliment) -> bool:
     """
-    Les macros du produit CUIT que la pesee impose, a partir de l'etat SEC.
+    L'entree Ciqual retenue pour un grain decrit-elle vraiment le produit SEC ?
 
-    La cuisson n'ajoute que de l'eau : l'energie et les nutriments se
-    conservent, seule la masse change. 100 g de riz sec a 350 kcal qui rendent
-    `mesure` fois leur poids donnent un produit cuit a 350 / mesure kcal pour
-    100 g, et toutes les autres valeurs suivent le meme facteur.
+    Ce controle a ete ajoute apres un vrai degat. EXACTS pointait
+    « semoule complete » sur « Semoule ou graine de couscous complète, CUITE »
+    a 142 kcal — une ligne ecrite a la main du temps ou les feculents
+    portaient leurs valeurs cuites, et restee juste jusqu'a la refonte. Le
+    script a donc ecrit 142 kcal comme si c'etait du sec, puis en a deduit un
+    rendement de 0,41 : un feculent qui RETRECIT en cuisant. Deux valeurs
+    fausses, ecrites sans un mot.
 
-    C'est le calcul le plus honnete quand une pesee personnelle s'ecarte de la
-    table : la pesee est un fait mesure sur CE produit, la table est une
-    moyenne. On garde ce qui a ete mesure — le rendement — et ce qui est
-    stable — l'etiquette du sec — et on en deduit le reste.
+    La lecon vaut au-dela de cette ligne : un mauvais appariement ne se
+    detecte pas sur les mots, puisque c'est justement quelqu'un qui a choisi
+    ces mots. Il se detecte par la physique. 142 kcal ne peut pas etre de la
+    matiere seche, quel que soit le libelle en face. On refuse alors
+    l'aliment plutot que d'ecrire n'importe quoi.
     """
-    if not mesure or mesure <= 0 or not sec or not sec.get("kcal"):
-        return None
-
-    return {
-        "nom": f"{sec['nom']} ÷ {mesure:.2f} (ta pesée)",
-        "cle": sec["cle"],
-        "kcal": sec["kcal"] / mesure,
-        "prot": (sec.get("prot") or 0) / mesure,
-        "gluc": (sec.get("gluc") or 0) / mesure,
-        "lip": (sec.get("lip") or 0) / mesure,
-        "fibres": (sec.get("fibres") or 0) / mesure,
-    }
+    return bool(aliment) and bool(aliment.get("kcal")) \
+        and SEC_MINI <= aliment["kcal"] <= SEC_MAXI
 
 
 def sens_du_rendement(categorie: str, ratio: float):
@@ -638,20 +685,29 @@ def exporter_catalogue(aliments) -> int:
             introuvables.append((motif, motifs_ciqual))
             continue
 
-        # meme regle que pour Grocy : l'energie ne derive le rendement que
-        # pour un grain sec
-        if motif in AUTRE_ETAT:
-            sec = chercher(aliments, AUTRE_ETAT[motif])
-            if sec and sec["kcal"]:
-                calcule = round(sec["kcal"] / aliment["kcal"], 2)
-                if 0.4 <= calcule <= 5:
+        # `aliment` porte deja les valeurs du produit PESE — c'est ce que
+        # CORRESPONDANCE vise desormais. L'entree CUITE ne sert qu'a deduire
+        # le rendement, et seulement pour un grain sec : l'energie s'y
+        # conserve, l'eau absorbee ne pesant rien en calories.
+        if motif in ETAT_CUIT:
+            # Un grain doit avoir ete apparie a son entree SECHE. Sinon on
+            # ecrirait des valeurs de produit cuit en les declarant seches.
+            if not grain_sec_credible(aliment):
+                introuvables.append(
+                    (motif, f"{motifs_ciqual} — « {aliment['nom']} » a "
+                            f"{aliment['kcal']:.0f} kcal, ce n'est pas du grain sec"))
+                continue
+
+            cuit = chercher(aliments, ETAT_CUIT[motif])
+            if cuit and cuit["kcal"]:
+                calcule = round(aliment["kcal"] / cuit["kcal"], 2)
+                if 0.4 <= calcule <= 5 and sens_du_rendement(categorie, calcule) is None:
                     ratio = calcule
 
         contresens = sens_du_rendement(categorie, ratio)
         if contresens is not None:
             ratio = 1
 
-        etat = "cru" if categorie in ("prot", "leg") else "cuit"
         ou = " AND ".join(
             f"fitcarnet_normaliser(nom) LIKE '%{mot}%'" for mot in motif.split())
 
@@ -664,8 +720,7 @@ UPDATE aliment SET
     gluc_100       = {_sql(aliment['gluc'] or 0)},
     lip_100        = {_sql(aliment['lip'] or 0)},
     fibres_100     = {_sql(aliment['fibres'])},
-    ratio          = {ratio:g},
-    etat_reference = '{etat}'
+    ratio          = {ratio:g}
 WHERE cree_par IS NULL AND {ou};""")
 
     entete = f"""-- =====================================================================
@@ -702,13 +757,15 @@ CREATE OR REPLACE FUNCTION fitcarnet_normaliser(t text) RETURNS text AS $$
 $$ LANGUAGE sql IMMUTABLE;
 
 SELECT 'avant' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
-       count(*) FILTER (WHERE categorie = 'leg' AND etat_reference <> 'cru') AS legumes_cuits
+       count(*) FILTER (WHERE categorie = 'fec' AND ratio > 1.3
+                          AND kcal_100 NOT BETWEEN 300 AND 400) AS grains_hors_bande
 FROM   aliment WHERE cree_par IS NULL;
 """
 
     pied = """
 SELECT 'apres' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
-       count(*) FILTER (WHERE categorie = 'leg' AND etat_reference <> 'cru') AS legumes_cuits
+       count(*) FILTER (WHERE categorie = 'fec' AND ratio > 1.3
+                          AND kcal_100 NOT BETWEEN 300 AND 400) AS grains_hors_bande
 FROM   aliment WHERE cree_par IS NULL;
 
 COMMIT;
@@ -738,7 +795,95 @@ ORDER  BY categorie, nom;
 
 # -------------------------------------------------------------------- main
 
+# Bande dans laquelle tombe toute cereale ou legumineuse SECHE. C'est de la
+# matiere seche : 300 a 400 kcal aux 100 g, toujours. Meme borne que
+# `front/src/calcul/plausibilite.ts` — si tu la changes ici, change-la la-bas.
+SEC_MINI, SEC_MAXI = 300, 400
+
+
+def convertir_en_pese(appliquer: bool) -> int:
+    """
+    Repasse au SEC les produits Grocy qui portent encore des valeurs CUITES.
+
+    A lancer UNE fois, apres la refonte. Le passage normal du script suffit
+    pour tout ce qu'il apparie lui-meme : il reecrit les valeurs depuis
+    Ciqual, deja en etat sec. Restent les produits marques « moi » — ceux dont
+    tu as saisi les macros a la main — que le script s'interdit de toucher.
+    C'est justement le cas de ton riz basmati.
+
+    LA CONVERSION EST UNE MULTIPLICATION PAR LE RENDEMENT, et rien d'autre :
+    la cuisson n'ajoute que de l'eau, elle dilue tout dans les memes
+    proportions. 99 kcal et 22 g de glucides pour 100 g de riz cuit, avec un
+    rendement de 3,53, redonnent 350 kcal et 78 g pour 100 g de riz sec.
+
+    ON NE CONVERTIT QUE CE QU'ON PEUT PROUVER. Si le resultat ne tombe pas
+    dans la bande du grain sec, c'est que ces valeurs etaient deja fausses
+    avant : les multiplier donnerait une autre valeur fausse, avec en prime
+    l'air d'avoir ete verifiee. On les laisse et on les liste.
+    """
+    produits = api("GET", "/objects/products")
+    convertis, laisses = [], []
+
+    for produit in produits:
+        champs = produit.get("userfields") or {}
+        if str(champs.get("cat") or "").strip() != "fec":
+            continue
+
+        kcal = nombre(champs.get("kcal100"))
+        ratio = nombre(champs.get("ratio"))
+        if not kcal or not ratio or ratio <= 1.3:
+            continue          # un aliment qui ne gonfle pas n'a rien a convertir
+        if kcal >= SEC_MINI:
+            continue          # deja au sec : rien a faire, et c'est idempotent
+
+        vise = kcal * ratio
+        if not SEC_MINI <= vise <= SEC_MAXI:
+            laisses.append((produit["name"], kcal, ratio, vise))
+            continue
+
+        nouveaux = {}
+        for champ in ("kcal100", "prot100", "gluc100", "lip100", "fibres100"):
+            valeur = champs.get(champ)
+            if valeur is None or str(valeur).strip() == "":
+                continue      # « inconnu » ne devient pas zero
+            nouveaux[champ] = round(nombre(valeur) * ratio, 2)
+
+        convertis.append((produit["name"], kcal, nouveaux.get("kcal100"), ratio))
+        if appliquer:
+            api("PUT", f"/userfields/products/{produit['id']}", nouveaux)
+
+    if convertis:
+        etat = "converti(s)" if appliquer else "a convertir (--appliquer le fera)"
+        print(f"{len(convertis)} produit(s) {etat} :")
+        for nom, avant, apres, ratio in convertis:
+            print(f"  {nom[:30]:32} {avant:6.1f} -> {apres:6.1f} kcal/100 g "
+                  f"(x {ratio:g})")
+        print("  Les valeurs decrivent desormais le produit tel que tu le peses.")
+    else:
+        print("Aucun produit ne porte encore des valeurs cuites. Rien a faire.")
+
+    if laisses:
+        print(f"\n{len(laisses)} produit(s) LAISSE(S) tels quels :")
+        for nom, kcal, ratio, vise in laisses:
+            print(f"  ! {nom[:30]:32} {kcal:6.1f} kcal, rendement {ratio:g} "
+                  f"-> {vise:.0f}")
+        print(f"  Aucun rendement ne les ramene entre {SEC_MINI} et {SEC_MAXI} kcal :")
+        print("  leurs valeurs etaient deja fausses avant. Recopie la ligne du")
+        print("  paquet dans « mon frigo », c'est la seule source fiable.")
+
+    if not appliquer and convertis:
+        print("\nRien n'a ete ecrit. Relance avec --appliquer.")
+
+    return 0
+
+
 def main() -> int:
+    # --convertir-en-pese : le passage unique d'apres la refonte. Ne lit pas
+    # Ciqual : il ne fait que multiplier les valeurs de Grocy par leur propre
+    # rendement.
+    if "--convertir-en-pese" in sys.argv:
+        return convertir_en_pese(APPLIQUER)
+
     aliments = lire_ciqual(CIQUAL)
 
     # --exporter-catalogue : écrit la migration du catalogue COMMUN
@@ -767,7 +912,7 @@ def main() -> int:
 
     trouves, sans_correspondance, introuvables, suspects = [], [], [], []
     ratios_corriges, depuis_etiquette, ratios_mesures = [], [], []
-    pesees_ecartees, macros_refaites, appariements_douteux = [], [], []
+    pesees_ecartees, appariements_douteux, ratios_refuses = [], [], []
     valeurs_a_toi = []
 
     for produit in produits:
@@ -818,66 +963,63 @@ def main() -> int:
 
         # ratio dérivé de Ciqual quand les deux états sont connus — et
         # seulement pour un GRAIN SEC, seul cas où l'énergie se conserve.
-        sec = None
-        if categorie != "fec" and motif_produit in AUTRE_ETAT:
+        if categorie != "fec" and motif_produit in ETAT_CUIT:
             sys.exit(
-                f"« {motif_produit} » figure dans AUTRE_ETAT mais n'est pas un\n"
+                f"« {motif_produit} » figure dans ETAT_CUIT mais n'est pas un\n"
                 "féculent. La dérivation du rendement par l'énergie ne vaut que\n"
                 "pour un grain sec : un légume perd ses sucres dans l'eau de\n"
                 "cuisson, et le calcul rend une portion cinq fois trop petite.")
 
-        if motif_produit in AUTRE_ETAT and aliment and aliment["kcal"]:
-            sec = chercher(aliments, AUTRE_ETAT[motif_produit])
-            if sec and sec["kcal"]:
-                calcule = round(sec["kcal"] / aliment["kcal"], 2)
-                if 0.4 <= calcule <= 5:
+        if motif_produit in ETAT_CUIT:
+            # Meme controle que pour l'export, et pour la meme raison : une
+            # entree cuite prise pour de la matiere seche ecrit deux valeurs
+            # fausses d'un coup, les macros ET le rendement qui s'en deduit.
+            if not grain_sec_credible(aliment):
+                introuvables.append(
+                    (produit["name"],
+                     f"{motifs_ciqual} — « {aliment['nom']} » a "
+                     f"{aliment['kcal'] or 0:.0f} kcal, ce n'est pas du grain "
+                     f"sec (on attend {SEC_MINI} a {SEC_MAXI})"))
+                continue
+
+            cuit = chercher(aliments, ETAT_CUIT[motif_produit])
+            if cuit and cuit["kcal"]:
+                calcule = round(aliment["kcal"] / cuit["kcal"], 2)
+                # Le SENS ne se discute pas : un feculent ne retrecit pas. Une
+                # derivation a contresens vient d'un mauvais appariement de
+                # l'entree cuite, pas d'une cuisson exotique.
+                if 0.4 <= calcule <= 5 and sens_du_rendement(categorie, calcule) is None:
                     if abs(calcule - ratio) / ratio > 0.1:
                         ratios_corriges.append(
-                            (produit["name"], ratio, calcule, sec["nom"]))
+                            (produit["name"], ratio, calcule, cuit["nom"]))
                     ratio = calcule
-            else:
-                sec = None
+                elif sens_du_rendement(categorie, calcule) is not None:
+                    ratios_refuses.append(
+                        (produit["name"], calcule, ratio, cuit["nom"]))
 
-        # TA balance passe avant Ciqual — et cette fois le code le fait.
+        # TA balance passe avant Ciqual, et ce bloc a beaucoup maigri.
         #
-        # Une mesure et une table ne se contredisent pas : elles decrivent
-        # deux produits differents. Ton riz rend 4,68 fois son poids, celui de
-        # la table 2,26 ; les deux existent, ils n'ont simplement pas la meme
-        # teneur en eau. Le seul tort serait de garder le rendement de l'un
-        # avec les macros de l'autre — c'est ce que faisait ce bloc.
+        # Il fallait auparavant reconcilier une pesee avec des macros, parce
+        # que les macros decrivaient le produit CUIT : ton riz rend 4,68 fois
+        # son poids, celui de la table 2,26, et garder le rendement de l'un
+        # avec les macros de l'autre decrivait un troisieme riz qui n'existe
+        # pas. Le script recalculait donc les macros depuis l'etat sec — un
+        # rattrapage qui n'aurait jamais du etre necessaire.
         #
-        # On garde donc la mesure, et on recalcule les macros CUITES depuis
-        # l'etat SEC divise par elle : deux valeurs qui viennent l'une de ta
-        # balance, l'autre d'une etiquette, et qui ne peuvent plus se
-        # contredire. Sans etat sec connu, on garde les macros de la table et
-        # on dit franchement ce qui restera faux.
+        # Les macros decrivent desormais le grain SEC, et le grain sec est le
+        # meme quelle que soit la casserole. Une pesee ne peut plus les
+        # contredire : elle fixe le rendement, un point c'est tout. Le seul
+        # refus qui reste est le contresens — deux chiffres intervertis.
         pesees = pesees_de(produit)
         if pesees is not None:
             mesure = round(pesees[1] / pesees[0], 2)
             contresens = sens_du_rendement(categorie, mesure)
 
             if contresens is not None:
-                # Le sens, lui, ne se discute pas : a contresens, les deux
-                # colonnes de l'ecran s'inversent.
                 pesees_ecartees.append(
                     (produit["name"], mesure, ratio, pesees, contresens))
             else:
-                ecart = abs(mesure - ratio) / ratio
-                if ecart > ECART_PESEE_MAX:
-                    refait = macros_depuis_le_sec(sec, mesure)
-                    if refait is not None:
-                        macros_refaites.append(
-                            (produit["name"], aliment["nom"], aliment["kcal"],
-                             refait["kcal"], mesure, ratio))
-                        aliment = refait
-                    else:
-                        # Pas d'etat sec connu : on ne peut pas rendre le
-                        # couple coherent, alors on le dit au lieu de le taire.
-                        pesees_ecartees.append(
-                            (produit["name"], mesure, ratio, pesees,
-                             f"{ecart:.0%} d'ecart avec Ciqual, et aucun etat sec "
-                             "connu pour recalculer les macros"))
-                if ecart > 0.02:
+                if abs(mesure - ratio) / ratio > 0.02:
                     ratios_mesures.append((produit["name"], ratio, mesure, pesees))
                 ratio = mesure
 
@@ -942,14 +1084,13 @@ def main() -> int:
         print("  Ces mots-la changent les valeurs, pas seulement le libelle.")
         print("  Utilise --chercher pour trouver le bon, puis ajoute-le a EXACTS.")
 
-    if macros_refaites:
-        print(f"\n{len(macros_refaites)} macro(s) recalculée(s) depuis TA pesée :")
-        for nom, libelle, avant, apres, mesure, table in macros_refaites:
-            print(f"  {nom:28} {avant:6.1f} → {apres:6.1f} kcal/100 g cuits")
-            print(f"  {'':28} ton rendement {mesure} contre {table} pour « {libelle} ».")
-        print("  Ta balance décrit TON produit ; la table décrit une moyenne.")
-        print("  On garde ta mesure et on en déduit les macros, pour que les")
-        print("  deux colonnes « à cuire » et « cuit » disent la même chose.")
+    if ratios_refuses:
+        print(f"\n{len(ratios_refuses)} rendement(s) DERIVE(S) REFUSE(S) :")
+        for nom, calcule, garde, libelle in ratios_refuses:
+            print(f"  ! {nom[:26]:28} l'energie donnerait {calcule}, a contresens.")
+            print(f"  {'':28} « {libelle[:44]} » n'est pas l'etat cuit de ce grain.")
+        print(f"  Le rendement de la table est conserve. Corrige ETAT_CUIT,")
+        print("  --chercher te donnera le bon libelle.")
 
     if pesees_ecartees:
         print(f"\n{len(pesees_ecartees)} pesee(s) ECARTEE(S) — le ratio de Ciqual est conserve :")

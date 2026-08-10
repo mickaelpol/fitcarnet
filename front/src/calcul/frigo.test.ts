@@ -11,7 +11,7 @@ const aliment = (
 ): AlimentDisponible => ({
   reference, nom, categorie: 'autre',
   kcal100: 0, prot100: 0, gluc100: 0, lip100: 0, fibres100: null,
-  ratio: 1, etatReference: 'cru',
+  ratio: 1,
   stock, unite: 'g', grammesParUnite: 1,
   emplacement, peseeAvant: null, peseeApres: null, provenanceRatio: 'table',
 });

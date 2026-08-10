@@ -14,19 +14,6 @@ namespace App\Service;
 final readonly class AlimentDisponible
 {
     /**
-     * A quel etat se rapportent les valeurs ci-dessus — DEDUIT, jamais recu.
-     *
-     * Ce n'est plus un parametre. Tant qu'il en etait un, chaque source
-     * pouvait le remplir a sa facon : Grocy le deduisait de la categorie, la
-     * base le lisait dans une colonne. Deux sources, deux verites, le meme
-     * type en sortie — et un compte ordinaire mangeait trois fois trop de
-     * glucides sans que rien ne le signale.
-     *
-     * En le derivant ici, la divergence devient impossible a ecrire.
-     */
-    public string $etatReference;
-
-    /**
      * LE RENDEMENT RETENU — la pesee de l'utilisateur d'abord, toujours.
      *
      * Quand quelqu'un s'est donne la peine de peser son aliment cru, de le
@@ -41,9 +28,15 @@ final readonly class AlimentDisponible
      * y ait eu d'ecrit.
      *
      * Seule exception, et elle ne se discute pas : une mesure a CONTRESENS.
-     * Une viande qui grossit en cuisant, un feculent qui retrecit — la, les
-     * deux colonnes de l'ecran s'inverseraient. On garde alors la valeur de
-     * la table, et `incoherences()` le dit en clair.
+     * Une viande qui grossit en cuisant, un feculent qui retrecit — les deux
+     * pesees ont ete interverties. On garde alors la valeur de la table, et
+     * `incoherences()` le dit en clair.
+     *
+     * A noter depuis la refonte : ce rendement n'entre dans AUCUNE macro. Les
+     * valeurs decrivent le produit tel qu'on le pese, et la cuisson n'ajoute
+     * que de l'eau. Se tromper de rendement ne fausse donc plus que le poids
+     * annonce dans l'assiette — plus jamais ce qu'il faut poser sur la
+     * balance.
      */
     public float $ratio;
 
@@ -88,11 +81,9 @@ final readonly class AlimentDisponible
          */
         public ?float $grammesParUnite = 1.0,
     ) {
-        $this->etatReference = EtatReference::pour($categorie);
-
         $mesure = self::rendementMesure($peseeAvant, $peseeApres);
         $retenu = null !== $mesure
-            && null === EtatReference::sensDuRendement($categorie, $mesure);
+            && null === RendementPlausible::sens($categorie, $mesure);
 
         $this->ratio = $retenu ? $mesure : ($ratio > 0 ? $ratio : 1.0);
         $this->provenanceRatio = $retenu ? 'mesure' : 'table';
@@ -128,7 +119,7 @@ final readonly class AlimentDisponible
     {
         $dits = [];
 
-        $sens = EtatReference::sensDuRendement($this->categorie, $this->ratio);
+        $sens = RendementPlausible::sens($this->categorie, $this->ratio);
         if (null !== $sens) {
             $dits[] = $sens;
         }
@@ -142,7 +133,7 @@ final readonly class AlimentDisponible
                 'ta pesee (%.0f g -> %.0f g, soit %.2f) n\'a pas ete retenue : %s '
                 . 'Le rendement %.2f de la table est utilise a la place.',
                 $this->peseeAvant, $this->peseeApres, $mesure,
-                EtatReference::sensDuRendement($this->categorie, $mesure) ?? '',
+                RendementPlausible::sens($this->categorie, $mesure) ?? '',
                 $this->ratio);
         }
 
@@ -182,7 +173,6 @@ final readonly class AlimentDisponible
             'fibres100' => $this->fibres100,
             'ratio' => $this->ratio,
             'provenanceRatio' => $this->provenanceRatio,
-            'etatReference' => $this->etatReference,
             'stock' => $this->stock,
             'unite' => $this->unite,
             'grammesParUnite' => $this->grammesParUnite,

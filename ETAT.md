@@ -67,11 +67,32 @@ même rôle.
 
 **Garde-fou sur les données.** `src/calcul/plausibilite.ts` regarde chaque
 aliment du frigo et se demande si ce qu'il raconte est physiquement possible :
-rendement à contresens, plus de 100 g de nutriments dans 100 g de produit,
-calories qui ne collent pas aux macros, couple rendement/macros impossible. Ce
-qu'il trouve s'affiche en tête du calculateur, avant de composer.
+plus de 100 g de nutriments dans 100 g de produit, calories qui ne collent pas
+aux macros, rendement à contresens, valeurs de produit cuit posées sur un
+grain qu'on pèse sec. Ce qu'il trouve s'affiche en tête du calculateur, avant
+de composer.
 
-**Tests.** 216 côté front (`npm test`), 93 + 29 côté Python, 45 côté PHP.
+Le module a perdu la moitié de son volume et quatre de ses codes d'anomalie
+avec la refonte de l'état de référence (voir plus bas). Ceux qui restent
+portent tous sur UNE seule valeur, et se réparent donc d'une seule façon :
+l'application donne la correction au lieu de demander à l'utilisateur laquelle
+de ses deux valeurs était la bonne.
+
+**Tests.** 217 côté front (`npm test`), 172 + 47 côté Python, 20 côté PHP.
+
+**Audit du catalogue commun.** `db/manuel/audit-catalogue.sql`, en lecture
+seule, relit les aliments de référence — ceux dont part tout nouveau compte,
+la seule couche où une erreur ne peut être rattrapée par personne. Il ne rend
+que les lignes portant un défaut nommable, classées par gravité, et se tait
+quand tout va bien. Une première version marquait « à relire » sur 47 lignes
+sur 50 : un diagnostic qui signale tout ne signale rien.
+
+Il nomme aussi les deux angles morts, ceux qu'aucune règle ne tranche : un
+féculent léger à rendement 1 (une patate douce à 81 kcal est normale, une
+semoule à 142 ne l'est pas — rien ne les distingue) et un grain sec à
+rendement 1 (normal pour des flocons qu'on ne cuit pas). Ces trois lignes
+ressortent à chaque passage, et c'est voulu : les faire taire supprimerait le
+seul signal qui a fini par attraper la semoule.
 
 Le gros morceau est `src/solveur/garanties.test.ts` : 250 frigos tirés au sort
 — avec une graine fixe, donc rejouables à l'identique — × 4 repas, soit mille
@@ -120,9 +141,10 @@ resolved`). Un œuf déclaré « 1 pièce = 65 g » affiche « soit 715 g » pou
 et écarté du calculateur.
 
 **Éditeur d'aliment, côté Grocy.** Bouton sur une carte du frigo,
-`POST /api/mon-frigo/aliment` écrit les neuf champs personnalisés. Le nom et
-l'état de référence sont verrouillés : Grocy est maître du premier, et le
-second s'y déduit de la catégorie au lieu d'être stocké. Une valeur absente
+`POST /api/mon-frigo/aliment` écrit les champs personnalisés. Le nom est
+verrouillé : Grocy en est maître. Le sélecteur « cru ou sec / déjà cuit » a
+disparu — les valeurs décrivent toujours le produit tel qu'on le pèse, et
+c'est ce que dit l'emballage. Une valeur absente
 est écrite vide et non omise, sans quoi effacer une fibre saisie par erreur
 serait impossible.
 
@@ -311,23 +333,63 @@ l'eau part, les nutriments de 200 g de brocoli cru sont encore dans les 150 g
 cuits. Le rendement ne sert alors plus qu'à AFFICHER le poids servi, et peut
 être approximatif sans qu'une macro bouge.
 
-**L'état de référence se DÉDUIT de la catégorie, il ne se stocke pas.** Il y
-a eu deux règles pour la même chose : Grocy la déduisait, la base la lisait
-dans une colonne qui pouvait dire le contraire. Les deux rendaient pourtant le
-même `AlimentDisponible`, et rien ne pouvait signaler qu'elles divergeaient —
-un compte ordinaire dont la colonne portait « cru » sur un féculent mangeait
-jusqu'à trois fois trop de glucides. La règle vit dans
-`App\Service\EtatReference` et `AlimentDisponible` la dérive : la divergence
-est devenue impossible à écrire. La colonne survit pour l'historique et ne
-décide plus rien.
+**Il n'y a plus d'état de référence du tout.** C'est la décision la plus
+importante du projet, et elle consiste à retirer du code, pas à en ajouter.
 
-**La colonne « à cuire » d'un féculent est exacte même si son rendement est
-faux.** Les macros cuites sont les macros sèches divisées par le rendement, et
-le poids à peser est le poids cuit divisé par ce même rendement : il se
-simplifie. Seule la colonne « cuit » en dépend. Conséquence contre-intuitive
-et importante : **il faut peser le féculent SEC.** Peser le poids cuit affiché
-quand le rendement est faux fait manger jusqu'à deux fois moins de glucides
-que prévu. Trois tests verrouillent cette propriété.
+Un aliment portait trois champs pour un seul fait : ses macros, son rendement
+de cuisson, et un `etat_reference` disant si les macros décrivaient le produit
+cru ou cuit. Trois champs, donc trois façons de se contredire. Il a fallu
+quatre migrations SQL, un service PHP, un module de garde-fous de 258 lignes
+et un grand bandeau rouge pour rattraper leurs désaccords — dont un message
+qui devait DEMANDER à l'utilisateur laquelle de ses deux valeurs était la
+vraie. Une question à laquelle personne n'a envie de répondre en ouvrant son
+frigo. Dix-neuf fichiers manipulaient cette colonne.
+
+Désormais les valeurs décrivent TOUJOURS le produit tel qu'on le pèse avant de
+cuisiner : riz sec, viande crue, légume cru, yaourt tel quel. C'est ce que dit
+l'emballage, toujours. Le rendement n'est plus qu'un facteur d'affichage et
+n'entre dans aucune macro.
+
+La conversion a été exacte, et c'est ce qui rend la refonte sûre : la cuisson
+n'ajoute que de l'eau, elle dilue tout dans les mêmes proportions. Repasser du
+cuit au pesé est une multiplication par le rendement — 130 kcal et 28,2 g de
+glucides pour 100 g de riz cuit à 3 redonnent 390 et 84,6 pour 100 g de riz
+sec. Même riz, décrit à l'autre bout de la casserole. Pas une portion ne bouge,
+pas une cible n'est à refaire. `db/manuel/18-un-seul-etat.sql` fait la
+conversion en base, `ciqual_vers_grocy.py --convertir-en-pese` la fait dans
+Grocy pour les produits saisis à la main.
+
+Ce qui a disparu avec la colonne : `App\Service\EtatReference` (remplacé par
+`RendementPlausible`, qui ne juge plus que le SENS d'une pesée), le sélecteur
+« cru ou sec » de l'éditeur, `etatParDefaut()`, les codes d'anomalie
+`proteine_reference_cuite`, `legume_reference_cuite`, `feculent_reference_crue`
+et `rendement_contredit_par_energie`, ainsi que `ECART_PESEE_MAX` et
+`macros_depuis_le_sec` côté Python — tout un mécanisme qui réconciliait une
+pesée avec des macros qui ne pouvaient plus la contredire.
+
+**Une convention qu'on change doit s'accompagner d'un test qui interdit
+l'ancienne.** Quatre correspondances Ciqual — semoule, pommes de terre, patate
+douce, pâtes complètes — visaient l'entrée CUITE de la table. Elles étaient
+JUSTES quand elles ont été écrites : les féculents portaient alors leurs
+valeurs cuites. La refonte les a rendues fausses en un instant, et rien dans
+le code ne pouvait le signaler, parce que rien n'exprimait la règle qu'elles
+violaient. Le catalogue commun a annoncé 142 kcal pour une semoule qui en fait
+350, et 95 pour une pomme de terre qui en fait 80, jusqu'à ce qu'un audit de
+la base les trouve — trois jours plus tard.
+
+`test_ciqual.py` interdit désormais à toute entrée de `CORRESPONDANCE` et de
+`EXACTS` de viser un libellé contenant « cuit », « bouilli », « rôti » ou
+« poêlé ». `ETAT_CUIT` est la seule exception, et pour la seule chose qui ne
+soit pas une macro : dériver un rendement. Une vérification par ligne, et la
+mutation confirme que les quatre cas historiques tombent.
+
+**La colonne « à cuire » ne dépend PAS du rendement.** C'était déjà vrai
+avant, mais par une simplification algébrique qu'il fallait surveiller ; c'est
+désormais structurel, puisque le rendement n'apparaît plus dans le calcul. Le
+poids à peser se lit directement sur les macros du produit pesé, et seule la
+colonne « cuit » suit le rendement. Un rendement approximatif rend l'annonce
+du poids servi approximative, et rien d'autre. Verrouillé par un test qui
+balaie toute la plage de rendements, et par une batterie de mutations.
 
 **Deux dossiers SQL.** `db/` ne contient que ce qui s'applique à une base
 vierge — PostgreSQL ne le joue qu'à la création. `db/manuel/` contient les

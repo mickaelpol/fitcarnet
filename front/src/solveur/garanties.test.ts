@@ -114,12 +114,15 @@ const pourTous = (
 /* ------------------------------------------------------------ outillage */
 
 /**
- * La quantité d'un aliment ramenée à son état de référence, LUE SUR
- * L'AFFICHAGE — pas reprise du calcul interne. C'est tout l'intérêt : on
- * refait le chemin depuis ce que l'utilisateur a sous les yeux.
+ * La quantité sur laquelle se comptent les macros, LUE SUR L'AFFICHAGE — pas
+ * reprise du calcul interne. C'est tout l'intérêt : on refait le chemin depuis
+ * ce que l'utilisateur a sous les yeux.
+ *
+ * C'est toujours la colonne « à cuire », pour tous les aliments : la cuisson
+ * n'ajoute que de l'eau. Il fallait auparavant choisir la colonne selon l'état
+ * de référence, et se tromper de colonne faussait les macros du rendement.
  */
-const referenceAffichee = (q: Quantite): number =>
-  (q.aliment.etatReference === 'cru' ? q.aCuire : q.assiette);
+const referenceAffichee = (q: Quantite): number => q.aCuire;
 
 const macrosAffichees = (quantites: Quantite[], glucidesTotaux: boolean): Macros =>
   quantites.reduce<Macros>((acc, q) => {
@@ -444,15 +447,14 @@ describe('Ce que l\'utilisateur décide reste décidé', () => {
   it('une quantité imposée disponible est servie exactement', () => {
     pourTous('Une quantité imposée n\'est pas respectée.', (s) => {
       for (const f of s.depart.fixes) {
-        /* Sans `unite`, la quantité s'entend dans l'état de référence de
-           l'aliment : ce qu'on SERT pour un légume, ce qu'on PÈSE pour une
-           viande. C'est cette valeur-là qui doit se retrouver telle quelle. */
+        /* Sans `unite`, la quantité s'entend dans l'unique état de
+           l'application : ce qu'on PÈSE. C'est cette valeur-là qui doit se
+           retrouver telle quelle, pour un légume comme pour un féculent. */
         const attendu = f.grammes;
         const dispo = s.frigo.stockDe(f.aliment);
 
         /* Le frigo peut la raboter — un autre invariant s'en charge. */
-        const aCuireVoulu = f.aliment.etatReference === 'cru'
-          ? attendu : attendu / (f.aliment.ratio > 0 ? f.aliment.ratio : 1);
+        const aCuireVoulu = attendu;
         if (aCuireVoulu > dispo + 0.5) continue;
 
         /* L'huile peut cesser d'être une quantité figée pour porter les
@@ -661,11 +663,16 @@ describe('Le rendement ne change PAS ce qu\'il faut peser', () => {
    */
   const SEC = { kcal: 350, prot: 7.12, gluc: 75, lip: 1.58 };
 
+  /* Ce riz-ci ne change pas d'un rendement à l'autre : ses macros décrivent le
+     grain sec, et le grain sec est le même quelle que soit la casserole.
+     C'est la refonte qui rend le fixture aussi bête — et l'invariant testé
+     plus bas devient structurel au lieu d'être une coïncidence algébrique
+     qu'il fallait surveiller. On le garde quand même : c'est la garantie que
+     l'utilisateur pèse juste, et elle mérite de tomber si elle se casse. */
   const rizSelonLeRendement = (ratio: number): Aliment => ({
     id: 'riz', nom: 'Riz', categorie: 'fec',
-    kcal100: SEC.kcal / ratio, prot100: SEC.prot / ratio,
-    gluc100: SEC.gluc / ratio, lip100: SEC.lip / ratio,
-    fibres100: 0, ratio, etatReference: 'cuit',
+    kcal100: SEC.kcal, prot100: SEC.prot, gluc100: SEC.gluc, lip100: SEC.lip,
+    fibres100: 0, ratio,
   });
 
   it('le poids à peser est le même à 2.26, à 3 et à 4.68', () => {

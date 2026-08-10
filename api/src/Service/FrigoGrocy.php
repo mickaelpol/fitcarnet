@@ -118,18 +118,19 @@ final readonly class FrigoGrocy
                 fibres100: isset($champs['fibres100']) && '' !== $champs['fibres100']
                     ? (float) $champs['fibres100'] : null,
                 ratio: (float) $champs['ratio'] ?: 1.0,
-                /* L'etat de reference n'est plus decide ici. La regle etait
-                   juste — seules les proteines sont renseignees crues — mais
-                   elle etait ECRITE ICI, et FrigoBase en appliquait une autre.
-                   Elle vit desormais dans EtatReference, et AlimentDisponible
-                   la derive : les deux sources ne peuvent plus diverger.
+                /* Il n'y a plus d'etat de reference a decider ici, ni nulle
+                   part ailleurs. Pour memoire, l'erreur qu'il fallait eviter
+                   quand il existait : les feculents etaient apparies a leur
+                   etat CUIT — « Riz blanc, cuit ». Les declarer crus faisait
+                   lire les macros du riz cuit comme si elles valaient pour du
+                   riz sec, et l'application annoncait 220 g a peser pour 73 g
+                   de glucides quand 220 g de riz SEC en apportent 165. Plus du
+                   double, sans un mot.
 
-                   Pour memoire, l'erreur que cette regle evite : les feculents
-                   sont apparies a leur etat CUIT — « Riz blanc, cuit ». Les
-                   declarer crus faisait lire les macros du riz cuit comme si
-                   elles valaient pour du riz sec, et l'application annoncait
-                   220 g a peser pour 73 g de glucides quand 220 g de riz SEC
-                   en apportent 165. Plus du double, sans un mot. */
+                   Les produits Grocy portent desormais les valeurs du produit
+                   PESE — le riz sec a 350 kcal, pas le riz cuit a 99. La
+                   conversion a ete faite une fois pour toutes par
+                   `ciqual_vers_grocy.py --convertir-en-pese`. */
                 stock: $quantites[$id] ?? 0.0,
                 emplacement: $parEmplacement[(int) ($produit['location_id'] ?? 0)] ?? null,
                 peseeAvant: isset($champs['pesee_avant']) && '' !== $champs['pesee_avant']

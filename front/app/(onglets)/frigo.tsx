@@ -20,7 +20,7 @@ import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 /** Point de départ d'une création sans modèle. */
 const ALIMENT_VIDE: AlimentSaisi = {
   nom: '', categorie: 'prot', kcal100: 0, prot100: 0, gluc100: 0, lip100: 0,
-  fibres100: null, ratio: 1, etatReference: 'cru', peseeAvant: null, peseeApres: null,
+  fibres100: null, ratio: 1, peseeAvant: null, peseeApres: null,
 };
 
 /** Un aliment du frigo tel que l'éditeur l'attend. */
@@ -33,7 +33,6 @@ const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
   lip100: a.lip100,
   fibres100: a.fibres100 ?? null,
   ratio: a.ratio,
-  etatReference: a.etatReference,
   peseeAvant: a.peseeAvant ?? null,
   peseeApres: a.peseeApres ?? null,
 });
@@ -342,7 +341,6 @@ export default function MonFrigo() {
         enCours={enregistrer.isPending}
         erreur={enregistrer.error?.message ?? null}
         nomModifiable={false}
-        etatModifiable={false}
         onFermer={() => setEdite(null)}
         onEnregistrer={(v) => {
           if (edite === null) return;
@@ -384,7 +382,6 @@ export default function MonFrigo() {
             lip100: v.lip100,
             fibres100: v.fibres100,
             ratio: v.ratio,
-            etatReference: v.etatReference,
             peseeAvant: v.peseeAvant ?? null,
             peseeApres: v.peseeApres ?? null,
           };
@@ -457,7 +454,6 @@ export default function MonFrigo() {
             lip100: modele.lip100,
             fibres100: modele.fibres100 ?? null,
             ratio: modele.ratio,
-            etatReference: modele.etatReference,
             peseeAvant: modele.peseeAvant ?? null,
             peseeApres: modele.peseeApres ?? null,
           });
@@ -504,7 +500,9 @@ function LigneStock({
     kcal: aliment.kcal100, prot: aliment.prot100, gluc: aliment.gluc100,
     lip: aliment.lip100, fibres: aliment.fibres100,
   });
-  const sec = aliment.etatReference === 'cuit' && aliment.ratio > 1;
+  /* Un féculent qui gonfle se pèse sec, tout le reste se pèse cru. C'est la
+     seule nuance de vocabulaire qui reste : le geste est le même. */
+  const sec = aliment.categorie === 'fec' && aliment.ratio > 1;
 
   return (
     <Carte style={[s.carte, ouvert && { borderColor: C.vif }]}>

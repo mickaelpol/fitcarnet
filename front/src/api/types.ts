@@ -11,7 +11,6 @@ export interface Aliment {
   lip100: number;
   fibres100: number | null;
   ratio: number;
-  etatReference: 'cru' | 'cuit';
   /** pesées ayant servi à mesurer le ratio ; null s'il vient d'une valeur courante */
   peseeAvant: number | null;
   peseeApres: number | null;
@@ -156,7 +155,6 @@ export interface AlimentDisponible {
   lip100: number;
   fibres100: number | null;
   ratio: number;
-  etatReference: 'cru' | 'cuit';
   /** quantité réellement disponible, exprimée dans l'unité ci-dessous */
   stock: number;
   /**

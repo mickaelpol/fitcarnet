@@ -78,6 +78,30 @@ def etat_neuf():
             # auraient ete epargnees pour une tout autre raison.
             {"id": 6, "name": "Amandes effilées", "userfields": {
                 "cat": "ole", "gluc100": "21.5", "source_valeurs": "moi"}},
+            # LE cas de la refonte : un feculent saisi a la main, qui porte
+            # encore ses valeurs CUITES. Le passage normal du script s'interdit
+            # d'y toucher — c'est « moi ». Seul --convertir-en-pese le reprend.
+            {"id": 7, "name": "Riz basmati (le mien)", "userfields": {
+                "cat": "fec", "kcal100": "99", "prot100": "2", "gluc100": "22",
+                "lip100": "0.2", "fibres100": "0.6", "ratio": "3.53",
+                "source_valeurs": "moi"}},
+            # Un feculent dont AUCUN rendement n'explique les valeurs : elles
+            # etaient deja fausses. On ne doit pas y toucher.
+            {"id": 8, "name": "Semoule complète douteuse", "userfields": {
+                "cat": "fec", "kcal100": "40", "gluc100": "8.7",
+                "ratio": "3", "source_valeurs": "moi"}},
+            # LE degat reel du 10 aout : « semoule complete » ne trouve pas son
+            # libelle sec et tombe sur du couscous CUIT a 142 kcal. Le script
+            # ecrivait alors 142 kcal comme du grain sec, et en deduisait un
+            # rendement de 0,41 — un feculent qui retrecit en cuisant. Il doit
+            # desormais refuser d'ecrire quoi que ce soit.
+            {"id": 9, "name": "Boulgour", "userfields": {"cat": "fec"}},
+            # L'autre moitie du meme piege : le grain SEC est bien apparie
+            # (358 kcal, matiere seche), mais c'est l'entree CUITE qui est
+            # fausse. Le rendement derive tombe alors sous 1 — un feculent qui
+            # retrecit en cuisant. Les macros sont bonnes, le rendement non :
+            # on ecrit les premieres et on refuse le second.
+            {"id": 10, "name": "Quinoa", "userfields": {"cat": "fec"}},
         ],
         "ecritures": {},
         "champs_crees": [],
@@ -138,7 +162,15 @@ class FauxGrocy(BaseHTTPRequestHandler):
                     f"Field {inconnus[0]} is not a valid userfield "
                     "of the given entity"})
 
-            ETAT["ecritures"][int(self.path.rsplit("/", 1)[1])] = corps
+            ident = int(self.path.rsplit("/", 1)[1])
+            ETAT["ecritures"][ident] = corps
+
+            # un vrai Grocy relit ce qu'on lui a ecrit : sans cela, aucun
+            # test de rejeu ne prouve quoi que ce soit.
+            for produit in ETAT["products"]:
+                if produit["id"] == ident:
+                    produit.setdefault("userfields", {}).update(
+                        {k: str(v) for k, v in corps.items()})
 
             return self._repondre(204, {})
 
@@ -152,6 +184,17 @@ CIQUAL_FACTICE = [
     ("Riz blanc, cru", 350, 7.12, 75.0, 1.58, 3.2),
     ("Riz blanc, cuit, sans sel ajouté", 155, 3.15, 33.2, 0.70, 1.4),
     ("Brocoli, cru", 31.9, 2.9, 2.1, 0.40, 2.6),
+    # LE piege du 10 aout, rejoue sur le boulgour. En production c'etait la
+    # semoule : EXACTS la pointait sur « Semoule ou graine de couscous
+    # complète, CUITE » a 142 kcal. Le libelle portait tous les bons mots — il
+    # avait ete choisi a la main — donc rien dans les mots ne pouvait le
+    # trahir. Seule la physique le peut : 142 kcal n'est pas de la matiere
+    # seche, quel que soit ce qui est ecrit en face.
+    ("Boulgour de blé, cru, en salade préparée", 142, 4.3, 26.8, 1.0, 1.9),
+    ("Quinoa, cru", 358, 13.2, 58.1, 6.1, 6.8),
+    # Une entree « cuite » plus dense que le grain sec : impossible. Elle
+    # donnerait un rendement de 0,85 sur un feculent.
+    ("Quinoa, cuit en galette frite", 420, 12.0, 50.0, 18.0, 5.0),
     ("Amande, émondée, sans sel ajouté", 631, 21.4, 8.8, 52.5, 10.4),
 ]
 
@@ -208,6 +251,34 @@ def main():
                      GROCY_API_KEY="factice"),
             capture_output=True, text=True)
 
+    # Ce que l'import a ecrit, mis de cote avant de lancer la conversion sur
+    # le meme faux Grocy.
+    importees = dict(ETAT["ecritures"])
+
+    # --------------------------------- le passage unique d'apres la refonte
+    #
+    # Lance APRES l'import, sur le meme faux Grocy : c'est l'ordre reel. Il ne
+    # lit pas Ciqual, il multiplie les valeurs de Grocy par leur propre
+    # rendement.
+    ETAT["ecritures"] = {}
+    conversion = subprocess.run(
+        [sys.executable, SCRIPT, "--convertir-en-pese", "--appliquer"],
+        env=dict(os.environ,
+                 GROCY_URL=f"http://127.0.0.1:{PORT}",
+                 GROCY_API_KEY="factice"),
+        capture_output=True, text=True)
+    converties = dict(ETAT["ecritures"])
+
+    # ... et une seconde fois, pour prouver qu'elle ne double pas les valeurs.
+    ETAT["ecritures"] = {}
+    rejeu = subprocess.run(
+        [sys.executable, SCRIPT, "--convertir-en-pese", "--appliquer"],
+        env=dict(os.environ,
+                 GROCY_URL=f"http://127.0.0.1:{PORT}",
+                 GROCY_API_KEY="factice"),
+        capture_output=True, text=True)
+    apres_rejeu = dict(ETAT["ecritures"])
+
     serveur.shutdown()
 
     if resultat.returncode != 0:
@@ -223,7 +294,7 @@ def main():
     verifier("Grocy n'a JAMAIS refusé une écriture (le 400 de production)",
              ETAT["refus"] == [])
 
-    ecrites = ETAT["ecritures"]
+    ecrites = importees
     verifier("le riz a été écrit", 1 in ecrites)
     verifier("le brocoli a été écrit", 2 in ecrites)
     verifier("les amandes ont été écrites", 3 in ecrites)
@@ -235,11 +306,36 @@ def main():
              "sont épargnées alors que les autres amandes sont écrites",
              6 not in ecrites and 3 in ecrites)
 
+    # LE controle ajoute apres le degat du 10 aout : un grain apparie a une
+    # entree CUITE ne doit RIEN ecrire. Ecrire 142 kcal comme du grain sec
+    # produisait aussi un rendement de 0,41 — deux valeurs fausses d'un coup.
+    verifier("un grain apparié à une entrée CUITE n'est pas écrit du tout",
+             9 not in ecrites)
+    verifier("... et le script dit pourquoi, avec le nombre de kcal",
+             "ce n'est pas du grain sec" in resultat.stdout)
+
+    # Le grain sec est bon, seule l'entrée cuite est fausse : on garde les
+    # macros et on refuse le rendement, au lieu d'écrire un féculent qui
+    # rétrécit en cuisant.
+    quinoa = ecrites.get(10, {})
+    verifier("un grain sec valide est écrit malgré une entrée cuite absurde",
+             abs(nombre(quinoa, "kcal100") - 358) < 0.5)
+    verifier("... mais le rendement dérivé à contresens est REFUSÉ",
+             abs(nombre(quinoa, "ratio") - 2.75) < 0.01)
+    verifier("... et le refus est annoncé, pas tu",
+             "REFUSE(S)" in resultat.stdout)
+
     riz = ecrites.get(1, {})
-    verifier("riz : macros recalculées depuis SA pesée (~74,8 kcal)",
-             abs(nombre(riz, "kcal100") - 74.8) < 0.5)
-    verifier("riz : ~16,0 g de glucides, pas les 33,2 de la table",
-             abs(nombre(riz, "gluc100") - 16.0) < 0.3)
+    # Ce que la refonte change, vu depuis Grocy : le riz porte desormais les
+    # valeurs du grain SEC, celui qu'on pose sur la balance. Sa pesee ne
+    # touche plus les macros — elle ne fixe que le rendement — donc elles sont
+    # exactement celles de Ciqual, sans recalcul intermediaire.
+    verifier("riz : les valeurs du grain SEC (350 kcal), pas du riz cuit",
+             abs(nombre(riz, "kcal100") - 350) < 0.5)
+    verifier("riz : 75 g de glucides pour 100 g SECS",
+             abs(nombre(riz, "gluc100") - 75.0) < 0.3)
+    verifier("riz : SA pesée ne déplace plus une seule macro",
+             abs(nombre(riz, "kcal100") - 350) < 0.5)
     verifier("riz : le rendement retenu est SA mesure (4,68)",
              abs(nombre(riz, "ratio") - 4.68) < 0.01)
     verifier("riz : la provenance est marquée « ciqual »",
@@ -296,8 +392,8 @@ def main():
              all("cree_par IS NULL" in m for m in mises_a_jour))
     verifier("CHAQUE mise à jour renseigne les fibres",
              all("fibres_100" in m for m in mises_a_jour))
-    verifier("CHAQUE mise à jour fixe l'état de référence",
-             all("etat_reference" in m for m in mises_a_jour))
+    verifier("PLUS AUCUNE mise à jour ne parle d'état de référence",
+             not any("etat_reference" in m for m in mises_a_jour))
 
     # Les valeurs viennent de Ciqual, pas d'une table americaine.
     verifier("les amandes passent aux glucides européens (8,8 et non 21,5)",
@@ -305,13 +401,46 @@ def main():
     verifier("... avec leurs fibres, jusqu'ici absentes",
              "fibres_100     = 10.4" in sql)
     verifier("le brocoli passe en valeurs CRUES",
-             "etat_reference = 'cru'" in sql and "kcal_100       = 31.9" in sql)
+             "kcal_100       = 31.9" in sql)
+    verifier("le riz du catalogue commun porte les valeurs du SEC",
+             "kcal_100       = 350" in sql)
     verifier("le rendement du riz est dérivé de l'énergie",
              "ratio          = 2.26" in sql)
 
     # Une catégorie sans mesure garde un rendement de 1 : on n'invente pas.
     verifier("aucun rendement inventé pour un légume",
-             "etat_reference = 'cru'" in sql)
+             "ratio          = 1" in sql)
+
+    # ------------------------------------------ la conversion, une seule fois
+
+    if conversion.returncode != 0:
+        print("--- conversion stdout ---"); print(conversion.stdout[-1500:])
+        print("--- conversion stderr ---"); print(conversion.stderr[-1500:])
+    verifier("la conversion se termine sans erreur", conversion.returncode == 0)
+    verifier("le riz saisi à la main passe au SEC (99 -> 349 kcal)",
+             abs(nombre(converties.get(7, {}), "kcal100") - 349.47) < 0.5)
+    verifier("... ses glucides suivent le même facteur (22 -> 77,7)",
+             abs(nombre(converties.get(7, {}), "gluc100") - 77.66) < 0.5)
+    verifier("... et ses fibres aussi (0,6 -> 2,1)",
+             abs(nombre(converties.get(7, {}), "fibres100") - 2.12) < 0.05)
+    verifier("le rendement, lui, n'est PAS touché : il était déjà juste",
+             "ratio" not in converties.get(7, {}))
+    verifier("la semoule douteuse est LAISSÉE telle quelle",
+             8 not in converties)
+    verifier("... et elle est signalée au lieu d'être tue",
+             "LAISSE(S)" in conversion.stdout)
+    verifier("les non-féculents ne sont pas touchés",
+             not any(i in converties for i in (2, 3, 4, 5, 6)))
+
+    verifier("rejouée, la conversion ne double RIEN", apres_rejeu == {})
+    verifier("... et elle le dit franchement",
+             "Aucun produit ne porte encore des valeurs cuites" in rejeu.stdout)
+    # Ne pas ecrire ne suffit pas : un produit deja converti ne doit pas non
+    # plus atterrir dans la liste des suspects, sinon chaque relance affiche
+    # une alerte sur un aliment parfaitement sain. Seule la semoule doit y
+    # rester.
+    verifier("... sans inventer de faux suspects au passage",
+             rejeu.stdout.count("  ! ") == 1)
 
     total = PASSES + len(ECHECS)
     print(f"{PASSES}/{total} vérifications de l'écriture")

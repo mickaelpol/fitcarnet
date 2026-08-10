@@ -1,4 +1,21 @@
-/** Macronutriments pour 100 g dans l'état de référence de l'aliment. */
+/**
+ * Un aliment, décrit dans UN SEUL état : celui où on le pèse.
+ *
+ * Toutes les valeurs qui suivent se rapportent à 100 g de produit **tel qu'on
+ * le pose sur la balance avant de cuisiner** — riz sec, viande crue, légume
+ * cru, yaourt tel quel. Il n'y a pas d'autre convention, et c'est délibéré :
+ * tant qu'un aliment pouvait porter ses valeurs tantôt crues tantôt cuites,
+ * ses macros et son rendement décrivaient deux choses différentes et
+ * pouvaient se contredire. Il fallait alors du code pour détecter la
+ * contradiction, la nommer, et demander à l'utilisateur laquelle des deux
+ * valeurs était la sienne. Un seul état, et la contradiction devient
+ * impossible à écrire.
+ *
+ * La cuisson n'ajoute ni ne retire de nutriment : elle ajoute ou retire de
+ * l'eau. Les macros d'une portion se comptent donc sur le poids PESÉ, jamais
+ * sur le poids servi. Le rendement ci-dessous ne sert qu'à annoncer ce poids
+ * servi — il ne déplace pas un gramme de macro.
+ */
 export interface Aliment {
   id: number | string;
   nom: string;
@@ -15,10 +32,15 @@ export interface Aliment {
    * prescription exprimée en glucides TOTAUX. Voir `Options.glucidesTotaux`.
    */
   fibres100?: number;
-  /** féculents : cuit/sec (riz 3) · protéines : cuit/cru (0,85 poisson, 0,75 volaille) */
+  /**
+   * Poids cuit / poids pesé. Riz sec ≈ 3, poisson ≈ 0,85, volaille ≈ 0,75,
+   * courgette ≈ 0,73. Vaut 1 pour tout ce qu'on ne cuit pas.
+   *
+   * N'entre dans AUCUN calcul de macro : il ne sert qu'à afficher le poids
+   * qu'on retrouvera dans le plat. Le changer ne change pas d'un gramme ce
+   * qu'il faut peser.
+   */
   ratio: number;
-  /** état auquel se rapportent les valeurs ci-dessus */
-  etatReference: 'cru' | 'cuit';
 }
 
 export interface Cibles {
@@ -40,9 +62,9 @@ export interface Macros {
  * surtout un RESTE à écouler.
  *
  * `unite` dit dans quel état la quantité est saisie :
- *   - 'cuit' : « il me reste 100 g de riz cuit », « 90 g de saumon cuit »
  *   - 'cru'  : « je vais cuire 120 g de saumon », « 40 g de riz sec »
- * Par défaut, l'état de référence de l'aliment.
+ *   - 'cuit' : « il me reste 100 g de riz cuit », « 90 g de saumon cuit »
+ * Par défaut 'cru', comme tout le reste de l'application.
  */
 export interface Fixe {
   aliment: Aliment;

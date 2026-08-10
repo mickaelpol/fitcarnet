@@ -30,7 +30,7 @@ final readonly class FrigoBase
             // un aliment peut occuper plusieurs emplacements : on additionne
             // les quantités et on retient l'emplacement principal
             'SELECT a.id, a.nom, a.categorie, a.kcal_100, a.prot_100, a.gluc_100,
-                    a.lip_100, a.fibres_100, a.ratio, a.etat_reference,
+                    a.lip_100, a.fibres_100, a.ratio,
                     a.pesee_avant, a.pesee_apres,
                     coalesce(sum(s.quantite), 0) AS quantite,
                     min(e.libelle)               AS emplacement
@@ -60,11 +60,12 @@ final readonly class FrigoBase
             lip100: (float) $l['lip_100'],
             fibres100: null !== $l['fibres_100'] ? (float) $l['fibres_100'] : null,
             ratio: (float) $l['ratio'] ?: 1.0,
-            /* `etat_reference` n'est plus lu. La regle est unique et vit dans
-               EtatReference ; la lire ici, c'etait laisser une colonne dire le
-               contraire de ce que Grocy deduisait, pour le meme aliment. La
-               colonne survit pour l'historique et ne decide plus rien —
-               voir db/manuel/14-etat-reference-coherent.sql. */
+            /* Il y avait ici une colonne `etat_reference`, lue puis
+               transmise. Elle disait a quel etat se rapportaient les macros
+               ci-dessus — et elle pouvait dire le contraire de ce que Grocy
+               deduisait pour le meme aliment. Elle a ete supprimee de la base
+               par db/manuel/18-un-seul-etat.sql : les valeurs decrivent
+               desormais toujours le produit tel qu'on le pese. */
             stock: (float) $l['quantite'],
             emplacement: null !== $l['emplacement'] ? (string) $l['emplacement'] : null,
             peseeAvant: null !== $l['pesee_avant'] ? (float) $l['pesee_avant'] : null,

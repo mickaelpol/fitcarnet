@@ -119,9 +119,10 @@ pèse SEC et non cru. Le mot juste évite la faute.
 **Pourquoi peser cru et manger cuit revient au même.** La cuisson ne détruit
 ni protéine, ni glucide, ni lipide : elle ne déplace que de l'eau. Les
 nutriments de 200 g de brocoli cru sont encore dans les 150 g cuits. Compter
-sur le poids pesé est donc exact — à condition que l'état de référence de
-chaque aliment soit le bon, ce que le type partagé garantit désormais par
-construction (voir `ETAT.md`).
+sur le poids pesé est donc exact — et c'est le SEUL état que l'application
+connaisse désormais. Il y a eu un champ pour dire si les valeurs se
+rapportaient au cru ou au cuit ; il a été supprimé, avec tout le code qui
+rattrapait ses contradictions (voir `ETAT.md`).
 
 **Un piège qui a coûté cher.** Pour un féculent, le rendement se simplifie
 entre les deux colonnes : le poids à peser est le même à 2,26 comme à 4,68,
@@ -298,9 +299,9 @@ solution unique.
 
 Le solveur est juste : il résout exactement le système qu'on lui donne. Sa
 faiblesse n'est pas l'algèbre, c'est ce qu'on lui raconte sur les aliments. Un
-riz dont les valeurs sont celles du sec mais qu'on déclare cuit se calcule
-parfaitement — il fait simplement manger deux fois trop de glucides, et aucun
-test du solveur ne peut le voir.
+riz dont les valeurs sont celles du produit cuit mais qu'on pèse sec se calcule
+parfaitement — il fait simplement peser trois fois trop, et aucun test du
+solveur ne peut le voir.
 
 `src/calcul/plausibilite.ts` regarde donc chaque aliment du frigo AVANT de
 composer, et se demande si ce qu'il raconte est physiquement possible :
@@ -308,10 +309,20 @@ composer, et se demande si ce qu'il raconte est physiquement possible :
 - des valeurs finies, positives, qui tiennent dans 100 g ;
 - des calories qui correspondent aux macros, à la règle d'Atwater près ;
 - un rendement qui va dans le bon SENS — une viande perd de l'eau, un féculent
-  en absorbe ;
-- un couple rendement/macros compatible : avec un rendement de 4,68 et
-  155 kcal/100 g cuits, 100 g de riz SEC porteraient 616 kcal, plus dense que
-  du beurre.
+  en absorbe. Aucun de ces contrôles ne bloque : le rendement n'entre dans
+  aucune macro, il n'annonce que le poids servi ;
+- un grain sec qui pèse ce que pèse la matière sèche : 300 à 400 kcal aux
+  100 g, toujours. C'est le seul contrôle qui attrape encore une erreur de
+  saisie — des valeurs de riz cuit posées sur un riz qu'on pèse sec — et il
+  sait la réparer : multiplier par le rendement. Une seule correction, pas un
+  choix à faire.
+
+Le contrôle du « couple rendement/macros » a disparu, et c'est une bonne
+nouvelle. Il existait parce que les deux nombres décrivaient chacun l'aliment
+de leur côté et pouvaient donc se contredire ; il fallait alors demander à
+l'utilisateur lequel était le sien. Depuis que les macros décrivent le produit
+pesé, le rendement ne peut plus les contredire — il n'y a plus rien à
+arbitrer.
 
 Ce dernier contrôle ne dépend d'aucune table : c'est la conservation de
 l'énergie, qu'aucune casserole ne viole. Il ne dit pas que la pesée est

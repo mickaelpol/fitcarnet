@@ -7,22 +7,21 @@ const TOLERANCE_DEFAUT: Macros = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 };
 const ARRONDI_DEFAUT = { proteine: 1, glucide: 5, lipide: 0.5 };
 
 /**
- * Ramène une quantité saisie en cru ou en cuit vers l'état de référence de
- * l'aliment, seul état dans lequel ses valeurs nutritionnelles ont un sens.
+ * Ramène une quantité vers le POIDS PESÉ, seul état dans lequel les valeurs
+ * nutritionnelles d'un aliment ont un sens dans cette application.
+ *
+ * Une seule opération possible, et une seule direction : ce qui est saisi
+ * cuit se divise par le rendement, le reste est déjà au bon endroit.
  *
  * Exemples :
- *   100 g de riz CUIT      → référence 'cuit'  → 100 g (identité)
- *   100 g de saumon CUIT   → référence 'cru'   → 117,6 g de saumon cru
- *   40 g de riz SEC        → référence 'cuit'  → 120 g de riz cuit
+ *   40 g de riz SEC       → 40 g   (identité : c'est déjà ce qu'on pèse)
+ *   120 g de riz CUIT     → 34 g de riz sec, avec un rendement de 3,53
+ *   100 g de saumon CUIT  → 118 g de saumon cru, avec un rendement de 0,85
  */
 export function versReference(a: Aliment, grammes: number, unite?: 'cru' | 'cuit'): number {
   const r = a.ratio > 0 ? a.ratio : 1;
-  const saisie = unite ?? a.etatReference;
-  if (saisie === a.etatReference) return grammes;
-  // saisie 'cuit' alors que la référence est 'cru'  → on divise par le rendement
-  if (saisie === 'cuit') return grammes / r;
-  // saisie 'cru' (ou sec) alors que la référence est 'cuit' → on multiplie
-  return grammes * r;
+
+  return unite === 'cuit' ? grammes / r : grammes;
 }
 
 /**
@@ -64,22 +63,20 @@ const somme = (liste: Macros[]): Macros =>
   );
 
 /**
- * Convertit une quantité exprimée dans l'état de référence de l'aliment
- * en couple « à cuire » / « dans l'assiette ».
+ * Convertit un poids pesé en couple « à cuire » / « dans l'assiette ».
  *
- *  - référence CRUE (viandes, poissons) : la quantité EST le poids à cuire,
- *    l'assiette vaut moins (perte à la cuisson, ratio ≈ 0,85 ou 0,75).
- *  - référence CUITE (féculents, légumes) : la quantité EST le poids dans
- *    l'assiette, le poids à peser vaut moins (riz sec, ratio 3).
+ * Le poids pesé EST le poids à cuire — c'est la définition de la convention.
+ * L'assiette s'en déduit par le rendement : 40 g de riz sec à 3,53 donnent
+ * 141 g dans le plat ; 120 g de poulet cru à 0,75 en donnent 90.
+ *
+ * Conséquence à ne jamais perdre de vue : la colonne « à cuire », celle que
+ * l'utilisateur pose sur sa balance, ne dépend PAS du rendement. Un rendement
+ * approximatif rend l'annonce du poids servi approximative, et rien d'autre.
  */
 export function convertir(a: Aliment, reference: number): { aCuire: number; assiette: number } {
   const r = a.ratio > 0 ? a.ratio : 1;
 
-  if (a.etatReference === 'cru') {
-    return { aCuire: reference, assiette: reference * r };
-  }
-
-  return { aCuire: reference / r, assiette: reference };
+  return { aCuire: reference, assiette: reference * r };
 }
 
 /**

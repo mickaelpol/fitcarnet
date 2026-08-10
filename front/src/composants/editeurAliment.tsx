@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Bouton, Champ, Discret, Texte } from './base';
 import {
-  CATEGORIES, RATIOS_GUIDES, controler, etatParDefaut, expliquerRatio,
+  CATEGORIES, RATIOS_GUIDES, controler, expliquerRatio,
   provenanceRatio, ratioDepuisPesees, ratioVraisemblable, soupconKilojoules,
 } from '@/calcul/nutrition';
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
@@ -19,7 +19,6 @@ export interface AlimentSaisi {
   lip100: number;
   fibres100: number | null;
   ratio: number;
-  etatReference: 'cru' | 'cuit';
   /** pesées ayant servi à mesurer le ratio ; absentes s'il vient d'une liste */
   peseeAvant?: number | null;
   peseeApres?: number | null;
@@ -27,7 +26,7 @@ export interface AlimentSaisi {
 
 const vide: AlimentSaisi = {
   nom: '', categorie: 'prot', kcal100: 0, prot100: 0, gluc100: 0,
-  lip100: 0, fibres100: null, ratio: 1, etatReference: 'cru',
+  lip100: 0, fibres100: null, ratio: 1,
   peseeAvant: null, peseeApres: null,
 };
 
@@ -63,7 +62,7 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
  */
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
-  quantite, onQuantiteChange, nomModifiable = true, etatModifiable = true,
+  quantite, onQuantiteChange, nomModifiable = true,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -83,13 +82,11 @@ export function EditeurAliment({
   /** faux quand le nom appartient à une source externe, Grocy par exemple */
   nomModifiable?: boolean;
   /** faux quand l'état de référence est déduit de la catégorie, non stocké */
-  etatModifiable?: boolean;
 }) {
   const [a, setA] = useState<AlimentSaisi>(aliment ?? vide);
   const [mesurer, setMesurer] = useState(false);
   const [avant, setAvant] = useState('');
   const [apres, setApres] = useState('');
-  const [etatTouche, setEtatTouche] = useState(false);
 
   /* Le texte saisi vit à part du nombre.
      Piloter l'input avec String(nombre) rendait la saisie impossible : « 0 »
@@ -107,7 +104,6 @@ export function EditeurAliment({
       // une mesure antérieure se retrouve, pour la vérifier ou la refaire
       setAvant(depart.peseeAvant ? String(depart.peseeAvant) : '');
       setApres(depart.peseeApres ? String(depart.peseeApres) : '');
-      setEtatTouche(false);
     }
   }, [visible, aliment]);
 
@@ -127,11 +123,7 @@ export function EditeurAliment({
     maj({ [cle]: nombre(texte) });
   };
 
-  /* L'état de référence suit la catégorie tant que l'utilisateur n'y a pas
-     touché : sur un emballage, les valeurs sont celles du produit tel que
-     vendu — sec pour le riz, cru pour la viande. */
-  const changerCategorie = (categorie: string) =>
-    maj(etatTouche ? { categorie } : { categorie, etatReference: etatParDefaut(categorie) });
+  const changerCategorie = (categorie: string) => maj({ categorie });
 
   const macros = {
     kcal: a.kcal100, prot: a.prot100, gluc: a.gluc100,
@@ -385,38 +377,18 @@ export function EditeurAliment({
                 </Discret>
               )}
 
-              {/* ---- état de référence ---- */}
-              <Discret style={s.section}>Ces valeurs sont celles du produit</Discret>
-              {etatModifiable ? (
-                <>
-                  <View style={s.mini}>
-                    {(['cru', 'cuit'] as const).map((e) => (
-                      <Pressable
-                        key={e}
-                        onPress={() => { maj({ etatReference: e }); setEtatTouche(true); }}
-                        style={[s.miniBouton, a.etatReference === e && s.miniActif]}
-                      >
-                        <Discret style={a.etatReference === e ? { color: C.encre } : undefined}>
-                          {e === 'cru' ? 'cru ou sec' : 'déjà cuit'}
-                        </Discret>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <Discret style={s.aide}>
-                    Sur un emballage, ce sont presque toujours les valeurs du produit
-                    tel qu'il est vendu : sec pour le riz, cru pour la viande.
-                  </Discret>
-                </>
-              ) : (
-                <>
-                  <Texte>{a.etatReference === 'cru' ? 'cru ou sec' : 'déjà cuit'}</Texte>
-                  <Discret style={s.aide}>
-                    Déduit de la catégorie : protéines et féculents sont pris crus
-                    ou secs, le reste cuit. Grocy ne stocke pas cette information,
-                    change la catégorie pour la changer.
-                  </Discret>
-                </>
-              )}
+              {/* Il y avait ici un sélecteur « cru ou sec / déjà cuit ». Il a
+                  disparu, et c'est la meilleure nouvelle de cet écran : il
+                  demandait à l'utilisateur de trancher une question à laquelle
+                  son paquet répondait déjà, et une erreur de clic faisait peser
+                  trois fois trop de riz sans que rien ne le signale. Les
+                  valeurs sont maintenant TOUJOURS celles du produit tel qu'on
+                  le pèse — c'est ce que dit l'emballage, toujours. */}
+              <Discret style={s.aide}>
+                Recopie les valeurs de l'emballage telles quelles : elles décrivent
+                le produit tel que tu le pèses, sec pour le riz, cru pour la viande.
+                Le poids une fois cuit se déduit du rendement ci-dessus.
+              </Discret>
             </ScrollView>
 
             {erreur !== null && erreur !== undefined && erreur !== '' && (
