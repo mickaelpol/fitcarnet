@@ -30,8 +30,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://fitcarnet.mickael-pol.fr/api",
-        "EXPO_PUBLIC_MAJ_URL": "https://fitcarnet.mickael-pol.fr/telecharger/version.json"
+        "EXPO_PUBLIC_API_URL": "https://carnet.mickael-pol.fr/api",
+        "EXPO_PUBLIC_MAJ_URL": "https://carnet.mickael-pol.fr/telecharger/version.json"
       }
     },
     "production": {
@@ -41,8 +41,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://fitcarnet.mickael-pol.fr/api",
-        "EXPO_PUBLIC_MAJ_URL": "https://fitcarnet.mickael-pol.fr/telecharger/version.json"
+        "EXPO_PUBLIC_API_URL": "https://carnet.mickael-pol.fr/api",
+        "EXPO_PUBLIC_MAJ_URL": "https://carnet.mickael-pol.fr/telecharger/version.json"
       }
     }
   },

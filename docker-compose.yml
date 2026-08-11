@@ -63,7 +63,7 @@ services:
       GROCY_API_KEY: ${GROCY_API_KEY:-}
       DATABASE_URL: "postgresql://fitcarnet:${DB_PASSWORD}@fitcarnet-db:5432/fitcarnet?serverVersion=16&charset=utf8"
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?definis JWT_PASSPHRASE dans les variables de la stack}
-      CORS_ALLOW_ORIGIN: '^https?://(fitcarnet\.mickael-pol\.fr|localhost:5173)$$'
+      CORS_ALLOW_ORIGIN: '^https?://(carnet\.mickael-pol\.fr|localhost:5173)$$'
       # L'adresse sous laquelle Symfony fabrique les URL absolues quand aucune
       # requete HTTP ne le renseigne : commandes en console, chauffe du cache
       # au demarrage. `config/packages/routing.yaml` l'exige SANS valeur par
@@ -74,7 +74,7 @@ services:
       # pas sur le NAS. Sa place est ici : c'est une valeur de production, pas
       # un secret, et elle doit etre lisible a cote de CORS_ALLOW_ORIGIN qui
       # nomme deja le meme domaine.
-      DEFAULT_URI: "https://fitcarnet.mickael-pol.fr"
+      DEFAULT_URI: "https://carnet.mickael-pol.fr"
       # Open Food Facts demande un User-Agent identifiant l'application
       OFF_USER_AGENT: "fitcarnet/1.0 (contact@mickael-pol.fr)"
       TZ: Europe/Paris

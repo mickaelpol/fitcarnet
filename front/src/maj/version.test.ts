@@ -46,7 +46,7 @@ describe('ce que le serveur publie est vérifié, pas cru', () => {
   it('accepte une publication bien formée', () => {
     const v = lireVersionPubliee({
       versionCode: 7, version: '1.3.0',
-      url: 'https://fitcarnet.mickael-pol.fr/telecharger/fitcarnet.apk',
+      url: 'https://carnet.mickael-pol.fr/telecharger/fitcarnet.apk',
       notes: 'batch cooking',
     });
     assert.equal(v?.versionCode, 7);

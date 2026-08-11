@@ -35,7 +35,7 @@ NOTES=""
 PROFIL="production"
 SANS_BUILD=0
 SANS_GIT=0
-DOMAINE="${DOMAINE:-fitcarnet.mickael-pol.fr}"
+DOMAINE="${DOMAINE:-carnet.mickael-pol.fr}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
