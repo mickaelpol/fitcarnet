@@ -2,43 +2,59 @@
 #  Ce qu'EAS n'a PAS a envoyer pour construire l'application Android.
 #
 #  EAS archive tout le depot depuis la racine git, pas seulement `front/`.
-#  Il tombait donc sur `api/var/cache/`, ecrit par le conteneur Docker sous
-#  l'utilisateur root, et s'arretait sur :
+#  Sans ce fichier il tombait sur `api/var/cache/`, ecrit par le conteneur
+#  Docker sous root, et s'arretait sur un EACCES.
 #
-#      EACCES: permission denied, scandir '.../api/var/cache/dev/pools/...'
+#  TOUS LES MOTIFS DE DOSSIER COMMENCENT PAR UNE BARRE OBLIQUE, ET C'EST LE
+#  POINT LE PLUS IMPORTANT DE CE FICHIER.
 #
-#  Rien de tout ce qui suit n'entre dans un APK. Les exclure corrige l'erreur
-#  et rend l'envoi bien plus leger au passage.
+#  La syntaxe est celle de .gitignore : un motif SANS barre initiale
+#  correspond a n'importe quel dossier de ce nom, A N'IMPORTE QUEL NIVEAU.
+#  La premiere version de ce fichier ecrivait `api/` en pensant au serveur
+#  Symfony — et excluait aussi `front/src/api/`, c'est-a-dire les hooks de
+#  l'application. Le build echouait chez EAS sur :
+#
+#      Unable to resolve module @/api/hooks ... could not be found
+#      within the project
+#
+#  ... alors que tout marchait en local, ou le dossier existe. Une heure
+#  perdue pour une barre oblique.
+#
+#  La barre initiale ancre le motif A LA RACINE du depot. `/api/` ne designe
+#  plus que le serveur.
 # =====================================================================
 
 # ---------- le serveur : aucun rapport avec l'application mobile ----------
-api/
-db/
-docker/
-docker-compose.yml
-compose.dev.yml
+/api/
+/db/
+/docker/
+/docker-compose.yml
+/compose.dev.yml
 
 # ---------- donnees et sauvegardes ----------
-sauvegardes/
-donnees-perso/
-telecharger/
-*.sql
-*.xlsx
+/sauvegardes/
+/donnees-perso/
+/telecharger/
+/sonneries/
 
 # ---------- outils Python ----------
 *.py
 __pycache__/
 
 # ---------- build web : sert au NAS, jamais a l'APK ----------
-front/dist/
+/front/dist/
 
 # ---------- documentation ----------
-*.md
-!front/README.md
+/*.md
+/db/manuel/*.md
+
+# ---------- scripts de la racine ----------
+/installer.sh
+/sauvegarde.sh
+/publier-android.sh
+/fitsync.sh
 
 # ---------- divers ----------
-sonneries/
-installer.sh
-sauvegarde.sh
-publier-android.sh
 *.log
+/*.sql
+/*.xlsx
