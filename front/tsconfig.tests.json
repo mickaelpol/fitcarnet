@@ -37,6 +37,8 @@
     "src/composants/etatMesure.test.ts",
     "src/api/uneSeuleFois.ts",
     "src/api/uneSeuleFois.test.ts",
+    "src/api/adresse.ts",
+    "src/api/adresse.test.ts",
     "src/theme/index.ts",
     "src/theme/charte.test.ts"
   ]

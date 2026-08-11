@@ -1,8 +1,28 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { adresseDeLApi, type Emplacement } from './adresse';
 import { uneSeuleFois } from './uneSeuleFois';
 
-const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080/api';
+/**
+ * `window.location`, quand il existe et qu'il dit quelque chose d'utilisable.
+ *
+ * On passe par `globalThis` plutôt que par `window` pour ne dépendre
+ * d'aucune bibliothèque de types : ce fichier est compilé aussi bien pour le
+ * navigateur que pour React Native, où `window` n'existe pas.
+ */
+function emplacement(): Emplacement | null {
+  if (Platform.OS !== 'web') return null;
+
+  const l = (globalThis as { location?: { protocol?: unknown; origin?: unknown } }).location;
+  if (typeof l?.protocol !== 'string' || typeof l.origin !== 'string') return null;
+
+  return { protocol: l.protocol, origin: l.origin };
+}
+
+/* Voir `adresse.ts` : sur une page HTTPS, l'API est sur la même origine, et
+   c'est décidé ici, à l'exécution — pas figé dans le bundle au moment du
+   build web par le `.env` de la machine qui l'a lancé. */
+const BASE = adresseDeLApi(process.env.EXPO_PUBLIC_API_URL, emplacement());
 const CLE_JETON = 'fitcarnet.jeton';
 const CLE_RAFRAICHISSEMENT = 'fitcarnet.rafraichissement';
 
