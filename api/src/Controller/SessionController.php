@@ -54,6 +54,22 @@ final class SessionController extends AbstractController
             return $this->refus('Session expiree, reconnecte-toi.');
         }
 
+        /* UN COMPTE DESACTIVE NE PROLONGE PAS SA SESSION.
+         *
+         * Cette route est HORS PARE-FEU, volontairement (voir security.yaml) :
+         * `App\Security\CompteActif`, qui refuse partout ailleurs, ne passe
+         * donc pas ici. Sans cette ligne, un jeton de rafraichissement valide
+         * redonnerait un jeton d'acces neuf toutes les heures, indefiniment —
+         * et « bloquer un compte » n'aurait d'effet qu'a la prochaine
+         * deconnexion volontaire. Personne ne se deconnecte volontairement.
+         *
+         * Meme message que pour un jeton inconnu : dans les deux cas il faut
+         * se reconnecter, et c'est l'ecran de connexion qui dira pourquoi ca
+         * ne passe pas. */
+        if (!$utilisateur->isActif()) {
+            return $this->refus('Session expiree, reconnecte-toi.');
+        }
+
         $this->jetons->purger();
 
         return new JsonResponse([

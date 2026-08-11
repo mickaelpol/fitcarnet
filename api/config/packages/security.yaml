@@ -16,6 +16,10 @@ security:
         connexion:
             pattern: ^/api/connexion$
             stateless: true
+            # UN COMPTE DESACTIVE NE PASSE PAS. `actif` existait depuis le
+            # debut et personne ne le lisait : « bloquer » un compte etait
+            # decoratif. Voir App\Security\CompteActif.
+            user_checker: App\Security\CompteActif
             json_login:
                 check_path: /api/connexion
                 username_path: email
@@ -33,11 +37,30 @@ security:
             pattern: ^/api/(jeton/rafraichir|deconnexion)$
             security: false
 
+        # ACCEPTER UNE INVITATION SE FAIT SANS COMPTE — c'est tout l'objet.
+        # Le jeton de 256 bits dans l'URL tient lieu d'authentification : on
+        # ne peut pas le deviner, et il ne sert qu'une fois.
+        #
+        # AU SINGULIER, ET LA BARRE OBLIQUE FINALE N'EST PAS DECORATIVE :
+        # `^/api/invitation/` ne peut pas attraper `/api/invitations`, qui est
+        # reserve a l'administrateur — le caractere suivant y est un « s ».
+        # Sans cette barre, la liste des invitations et le pouvoir d'en creer
+        # deviendraient publics.
+        #
+        # Doit rester AVANT `api` : le premier motif qui correspond gagne.
+        invitation:
+            pattern: ^/api/invitation/
+            security: false
+
         api:
             pattern: ^/api
             stateless: true
             provider: utilisateurs
             jwt: ~
+            # Verifie a CHAQUE requete portant un jeton : un compte desactive
+            # pendant qu'il est connecte perd l'acces des la requete suivante,
+            # pas a l'expiration de son jeton une heure plus tard.
+            user_checker: App\Security\CompteActif
 
         main:
             lazy: true
@@ -47,6 +70,8 @@ security:
         - { path: ^/api/connexion, roles: PUBLIC_ACCESS }
         - { path: ^/api/jeton/rafraichir, roles: PUBLIC_ACCESS }
         - { path: ^/api/deconnexion, roles: PUBLIC_ACCESS }
+        # Au singulier, avec la barre finale. Voir le pare-feu `invitation`.
+        - { path: ^/api/invitation/, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api$, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

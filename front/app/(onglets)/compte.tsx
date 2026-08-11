@@ -56,6 +56,9 @@ export default function Compte() {
           <Bouton variante="contour" onPress={() => router.push('/admin-cuissons')}>
             Façons de cuire
           </Bouton>
+          <Bouton variante="contour" onPress={() => router.push('/admin-utilisateurs')}>
+            Inviter quelqu’un
+          </Bouton>
         </>
       )}
 

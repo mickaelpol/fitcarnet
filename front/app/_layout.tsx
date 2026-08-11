@@ -86,6 +86,14 @@ export default function Racine() {
           <Stack.Screen name="admin-videos" options={{ title: 'Vidéos des exercices' }} />
           <Stack.Screen name="admin-fusion" options={{ title: 'Fusionner des exercices' }} />
           <Stack.Screen name="admin-cuissons" options={{ title: 'Façons de cuire' }} />
+          <Stack.Screen name="admin-utilisateurs" options={{ title: 'Inviter quelqu’un' }} />
+          {/* Ouvert SANS compte, depuis un lien : pas de flèche de retour, il
+              n'y a rien derrière. C'est souvent le premier écran de
+              l'application que la personne voit. */}
+          <Stack.Screen
+            name="invitation/[jeton]"
+            options={{ title: 'Créer mon compte', headerBackVisible: false }}
+          />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>
