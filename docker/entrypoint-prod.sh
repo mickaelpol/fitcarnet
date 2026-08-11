@@ -32,6 +32,32 @@ souci() { printf '  \033[0;31m✗ %s\033[0m\n' "$1" >&2; }
 
 cd "$APP"
 
+# ------------------------------------------------------ 0. le fichier `.env`
+#
+# SYMFONY EXIGE CE FICHIER, MÊME QUAND IL N'EN A BESOIN DE RIEN.
+#
+# `Dotenv::bootEnv()` ouvre `/app/.env` avant tout le reste, et lève
+#
+#     Unable to read the "/app/.env" environment file
+#
+# s'il est absent — y compris quand TOUTES les variables sont déjà dans
+# l'environnement du conteneur, ce qui est exactement notre cas.
+#
+# Ce fichier n'arrive pas par git : le `.gitignore` du dépôt ignore `.env` À
+# N'IMPORTE QUELLE PROFONDEUR, donc `api/.env` avec lui. Chez Symfony ce
+# fichier contient des valeurs par DÉFAUT et se versionne normalement ; ici
+# il a servi de fichier de secrets en développement, et le remettre dans git
+# reviendrait à y pousser un mot de passe. On préfère l'écrire ici.
+#
+# Deux lignes suffisent. Les vraies valeurs viennent de `docker-compose.yml`,
+# et Dotenv N'ÉCRASE PAS une variable déjà définie dans l'environnement : ce
+# fichier ne peut donc rien contredire.
+if [ ! -f "$APP/.env" ]; then
+    bleu "Fichier .env"
+    printf 'APP_ENV=prod\nAPP_DEBUG=0\n' > "$APP/.env"
+    ok "créé (les vraies valeurs viennent de l'environnement du conteneur)"
+fi
+
 # ------------------------------------------------------- 1. dépendances PHP
 
 # `vendor/` est hors du dépôt — c'est du code tiers, versionné par
