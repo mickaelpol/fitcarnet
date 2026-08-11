@@ -47,3 +47,10 @@ Thumbs.db
 *:Zone.Identifier
 donnees-perso/
 sauvegardes/
+
+# ---------- l'APK publie ----------
+# Le binaire ne va PAS dans git : des dizaines de megaoctets a chaque
+# version, et il vit deja sur le NAS. Son `version.json`, si — c'est lui qui
+# dit aux telephones quelle version existe, et il doit rester en face du
+# `versionCode` de app.json.
+/telecharger/*.apk

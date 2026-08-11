@@ -40,6 +40,29 @@
 		php_server
 	}
 
+	# ---------- l'APK Android, et ce qui dit sa version ----------
+	#
+	#  Android interdit a une application d'en installer une autre sans que
+	#  l'utilisateur appuie sur « Installer ». On ne peut donc pas pousser un
+	#  APK ; on peut seulement le POSER quelque part et dire qu'il existe.
+	#  C'est ce que sert ce bloc : `version.json` que l'application interroge
+	#  au demarrage, et l'APK a cote.
+	#
+	#  Le dossier est HORS du depot — un APK pese des dizaines de megaoctets
+	#  et n'a rien a faire dans git. Il est monte depuis le disque du NAS.
+	handle /telecharger/* {
+		root * /telecharger
+		# Sans ce type, le navigateur Android telecharge un fichier qu'il ne
+		# sait pas ouvrir, et rien ne se passe au moment du clic.
+		@apk path *.apk
+		header @apk Content-Type application/vnd.android.package-archive
+		# `version.json` doit etre relu a chaque fois : mis en cache, un
+		# telephone continuerait d'ignorer une version publiee la veille.
+		@manifeste path /telecharger/version.json
+		header @manifeste Cache-Control "no-store"
+		file_server browse
+	}
+
 	# ---------- front React ----------
 	handle {
 		root * /app/front

@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useDeconnexion, useMoi } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Texte } from '@/composants/base';
+import { BandeauMaj } from '@/composants/bandeauMaj';
 import { C, E, P, T } from '@/theme';
 
 export default function Compte() {
@@ -35,6 +36,13 @@ export default function Compte() {
       <Bouton variante="contour" onPress={() => router.push('/reglages')}>
         Réglages de l’app
       </Bouton>
+
+      {/* La mise à jour vit ICI et non en haut de chaque écran : elle
+          concerne quelques fois par an, et un bandeau permanent au-dessus du
+          calculateur volerait de la place à ce qu'on vient faire. L'onglet
+          Compte est l'endroit où l'on va quand on s'occupe de
+          l'application elle-même. */}
+      <BandeauMaj url={process.env.EXPO_PUBLIC_MAJ_URL} />
 
       {data?.roles?.includes('ROLE_ADMIN') === true && (
         <>

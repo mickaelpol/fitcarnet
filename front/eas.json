@@ -1,0 +1,30 @@
+{
+  "cli": { "version": ">= 12.0.0", "appVersionSource": "local" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_API_URL": "http://192.168.1.118:8080/api" }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://fitcarnet.mickael-pol.fr/api",
+        "EXPO_PUBLIC_MAJ_URL": "https://fitcarnet.mickael-pol.fr/telecharger/version.json"
+      }
+    },
+    "production": {
+      "distribution": "internal",
+      "channel": "production",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://fitcarnet.mickael-pol.fr/api",
+        "EXPO_PUBLIC_MAJ_URL": "https://fitcarnet.mickael-pol.fr/telecharger/version.json"
+      }
+    }
+  },
+  "submit": { "production": {} }
+}

@@ -75,6 +75,11 @@ services:
       # chaque demarrage.
       - ./front/dist:/app/front:ro
       - ./docker/Caddyfile:/etc/frankenphp/Caddyfile:ro
+      # L'APK Android et son `version.json`. HORS du depot, sur le disque du
+      # NAS : un APK pese des dizaines de megaoctets et git n'a rien a en
+      # faire. C'est le seul dossier que tu alimentes a la main, quelques fois
+      # par an, quand le code natif a bouge.
+      - /volume1/docker/fitcarnet/telecharger:/telecharger:ro
       - fitcarnet_caddy_data:/data
       - fitcarnet_caddy_config:/config
 

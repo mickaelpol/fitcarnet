@@ -31,6 +31,8 @@
     "src/calcul/cuisson.test.ts",
     "src/calcul/selectionRepas.ts",
     "src/calcul/selectionRepas.test.ts",
+    "src/maj/version.ts",
+    "src/maj/version.test.ts",
     "src/composants/etatMesure.ts",
     "src/composants/etatMesure.test.ts",
     "src/api/uneSeuleFois.ts",

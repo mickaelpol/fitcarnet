@@ -146,3 +146,118 @@ docker logs fitcarnet-app | head -40
   touche au schéma.
 
 Ces trois trous se bouchent le jour où ils font mal, pas avant.
+
+---
+
+# L'application Android
+
+Deux mécanismes, et il faut les distinguer une fois pour toutes.
+
+| Ce qui change | Comment ça arrive sur les téléphones |
+|---|---|
+| **JavaScript** — écrans, calculateur, solveur, textes. 90 % de ce que tu fais. | `eas update`. **Automatique et invisible**, au démarrage suivant. Personne ne touche à rien. |
+| **Natif** — un module ajouté, une permission, une sonnerie embarquée, une montée d'Expo SDK. Quelques fois par an. | Nouvel APK, et **un appui sur « Installer »** par téléphone. |
+
+Ce second cas n'est pas un manque de ce projet : **Android interdit à une
+application d'en installer une autre sans confirmation**. C'est une protection
+du système. Le seul moyen de s'en passer serait le Play Store, qui met à jour
+tout seul — 25 $ une fois, si un jour l'appui devient pesant.
+
+## La première fois
+
+```bash
+cd front
+npx expo install expo-updates expo-application expo-splash-screen
+
+# Le paquet s'appelle `eas-cli`, la commande `eas`. `npx eas` cherche un
+# paquet « eas » qui n'expose aucun exécutable, et npm répond « could not
+# determine executable to run » — un message qui n'aide personne.
+npm install -g eas-cli
+eas login && eas init          # écrit l'identifiant de projet dans app.json
+```
+
+`eas init` ajoute `extra.eas.projectId` et l'URL des mises à jour dans
+`app.json` : c'est ce qui relie tes `eas update` à ton application.
+
+Tu récupères un APK, tu l'envoies aux téléphones concernés. C'est le seul
+moment où il faut passer par un lien ou un câble.
+
+## Ensuite, au quotidien
+
+```bash
+eas update --branch production --message "ce qui change"
+```
+
+Les téléphones prennent la mise à jour au démarrage suivant. Rien à annoncer,
+rien à installer.
+
+**`runtimeVersion` est réglé sur `appVersion`** : une mise à jour JavaScript
+**refuse** de s'installer sur un APK dont la version ne correspond pas. C'est
+le garde-fou qui empêche de pousser du code appelant un module natif absent —
+sans lui, l'application planterait au démarrage sur les téléphones, et tu ne
+pourrais plus rien y pousser pour la réparer.
+
+## Quand le code natif change
+
+```bash
+./publier-android.sh --notes "Sonneries personnalisées"
+```
+
+**Ce script existe pour une seule raison** : `android.versionCode` dans
+`app.json` et le `versionCode` du `version.json` doivent être **le même
+nombre**. Le premier décide si Android accepte l'installation par-dessus
+l'existant ; le second décide si l'application propose la mise à jour. Tenus à
+la main dans deux fichiers, ils divergent — et la panne est silencieuse dans
+les deux sens : en avance, le `version.json` propose un APK qui n'existe pas ;
+en retard, il ne propose jamais celui qui existe.
+
+Le script lance les tests d'abord. Un APK publié avec des tests rouges se
+republie, et republier coûte un appui sur **chaque** téléphone : c'est le seul
+endroit du projet où une erreur se paie autant de fois qu'il y a
+d'utilisateurs.
+
+Il incrémente ensuite `versionCode` de un — toujours de un, jamais en arrière,
+Android n'accepte que des numéros croissants et un numéro sauté est perdu —,
+avance le dernier segment de la version, écrit `telecharger/version.json`, et
+lance EAS.
+
+Il te reste **deux gestes** :
+
+1. Télécharger l'APK depuis la page qu'EAS affiche, et le déposer sur le NAS
+   dans `/volume1/docker/fitcarnet/telecharger/`. **L'APK d'abord, le
+   `version.json` ensuite** — un manifeste qui annonce un fichier pas encore
+   arrivé envoie les téléphones sur une adresse morte.
+2. Commiter `front/app.json` et `telecharger/version.json`.
+
+Au démarrage suivant, chaque téléphone en retard affiche un bandeau dans
+l'onglet **Compte**, avec un bouton qui lance le téléchargement.
+
+L'APK lui-même n'est **pas** dans git : des dizaines de mégaoctets à chaque
+version, et il vit déjà sur le NAS. Son `version.json`, si — il doit rester en
+face du `versionCode`.
+
+---
+
+## L'identité visuelle
+
+Tout est dans `front/assets/images/`, et rien n'y a été choisi : le fond, le
+doré et les quatre couleurs de macro viennent de `src/theme/index.ts`, la
+police est celle des chiffres de l'application. Une icône qui n'a pas les
+couleurs de l'écran qu'elle ouvre n'est pas une icône, c'est un autocollant.
+
+Le motif est **l'anneau des quatre macros** — protéines, féculents, lipides,
+légumes — avec le « f » de fitcarnet au centre. C'est le code couleur de toute
+l'application, et le seul motif qui la résume ; il se lit encore à 48 pixels,
+ce qu'aucun pictogramme détaillé ne fait.
+
+| Fichier | Où il sert | Pourquoi il est différent |
+|---|---|---|
+| `icone.png` | iOS, web, magasins | carré plein, aucun masque |
+| `icone-adaptative.png` | Android, écran d'accueil | **fond transparent et un quart de vide autour** : le lanceur rogne l'image selon le masque du téléphone — rond, carré, goutte — et Android ne garantit que le disque central |
+| `lancement.png` | écran de chargement | **ni fond ni titre** : Expo le pose centré sur `backgroundColor`, une image avec fond donnerait un carré sur un carré |
+| `notification.png` | barre d'état Android | **silhouette blanche sur transparent** : Android aplatit cette icône en une seule couleur, toute couleur y deviendrait un carré blanc |
+| `favicon.png` | onglet du navigateur | coins arrondis, 196 px |
+
+Ils sont regénérables : le script qui les dessine lit la charte, donc changer
+une couleur dans `src/theme/index.ts` et redessiner suffit à tout remettre
+d'aplomb.
