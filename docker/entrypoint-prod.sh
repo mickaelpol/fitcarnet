@@ -107,6 +107,20 @@ fi
 #
 # `jeu-essai.sql` (démonstration) et `audit-catalogue.sql` (rapport de
 # lecture) n'en sont pas et n'ont rien à faire ici.
+#
+# ON COUPE LA QUERY STRING DE `DATABASE_URL` AVANT DE LA DONNER A psql.
+#
+# Cette URL est ecrite POUR DOCTRINE : `?serverVersion=16&charset=utf8`. Ce
+# sont des parametres de Doctrine, pas de PostgreSQL, et libpq les refuse :
+#
+#     psql: error: invalid URI query parameter: "serverVersion"
+#
+# La panne etait deroutante parce que la MEME migration, jouee a la main
+# depuis le conteneur PostgreSQL, passait sans un mot — la, on ne passe pas
+# par cette URL. Le point d'entree, lui, avalait la sortie d'erreur et ne
+# disait que « aliment-fibres.sql a echoue ».
+DSN_PSQL=${DATABASE_URL%%\?*}
+
 if [ -d "$APP/db/manuel" ]; then
     bleu "Migrations"
     for f in \
@@ -115,11 +129,19 @@ if [ -d "$APP/db/manuel" ]; then
         "$APP"/db/manuel/2[0-9]-*.sql
     do
         [ -f "$f" ] || continue
-        if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f" >/dev/null 2>&1; then
-            :
-        else
-            souci "$(basename "$f") a échoué. Rejoue-la seule pour voir l'erreur :"
-            souci "  docker exec -it fitcarnet-app psql \"\$DATABASE_URL\" -f $f"
+        # ON MONTRE L'ERREUR, ON NE LA CACHE PAS.
+        #
+        # La version precedente envoyait la sortie dans /dev/null et se
+        # contentait d'un « a echoue, rejoue-la pour voir ». Il a fallu un
+        # aller-retour complet sur le NAS pour apprendre que psql refusait la
+        # query string de DATABASE_URL — une ligne que le conteneur avait
+        # sous les yeux et qu'il a jetee.
+        if ! ERREUR=$(psql "$DSN_PSQL" -v ON_ERROR_STOP=1 -q -f "$f" 2>&1); then
+            souci "$(basename "$f") a échoué :"
+            printf '%s\n' "$ERREUR" | tail -15 >&2
+            souci "Pour la rejouer seule, depuis le NAS :"
+            souci "  docker exec -i fitcarnet-db psql -U fitcarnet -d fitcarnet \\"
+            souci "    -v ON_ERROR_STOP=1 < db/manuel/$(basename "$f")"
             exit 1
         fi
     done
