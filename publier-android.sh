@@ -6,6 +6,7 @@
 #   ./publier-android.sh --version 1.1.0    numéro choisi
 #   ./publier-android.sh --notes "Batch cooking"
 #   ./publier-android.sh --sans-build       incrémente et prépare, sans lancer EAS
+#   ./publier-android.sh --sans-git         passe outre les fichiers non commités
 #
 # CE SCRIPT EXISTE POUR UNE SEULE RAISON : `android.versionCode` et le
 # `versionCode` du `version.json` doivent être LE MÊME NOMBRE.
@@ -33,6 +34,7 @@ VERSION=""
 NOTES=""
 PROFIL="production"
 SANS_BUILD=0
+SANS_GIT=0
 DOMAINE="${DOMAINE:-fitcarnet.mickael-pol.fr}"
 
 while [[ $# -gt 0 ]]; do
@@ -41,6 +43,7 @@ while [[ $# -gt 0 ]]; do
         --notes)       NOTES="${2:?}"; shift 2 ;;
         --profil)      PROFIL="${2:?}"; shift 2 ;;
         --sans-build)  SANS_BUILD=1; shift ;;
+        --sans-git)    SANS_GIT=1; shift ;;
         -h|--help)     sed -n '2,20p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *)             echec "Option inconnue : $1" ;;
     esac
@@ -81,9 +84,60 @@ if [[ -n "$MANQUANTS" ]]; then
 fi
 ok "Greffons déclarés dans package.json"
 
-if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
-    info "Le dépôt a des modifications non commitées."
-    info "L'APK sera construit à partir de ce que voit EAS, pas de ce qui est commité."
+# ON ASSEMBLE LE JAVASCRIPT ICI AVANT DE L'ENVOYER LA-BAS.
+#
+# C'est exactement ce qu'EAS fait dans sa phase « Bundle JavaScript », avec le
+# meme Metro. Quand elle echoue chez eux, le resume dit « Unknown error » et il
+# faut ouvrir les journaux du build pour apprendre quel fichier est en cause —
+# apres dix minutes de file d'attente, et apres avoir incremente le
+# versionCode pour rien.
+#
+# Trente secondes ici valent mieux que dix minutes la-bas.
+titre "Assemblage du JavaScript"
+SORTIE=$(mktemp -d)
+# `--clear` VIDE LE CACHE DE METRO, et ce n'est pas du confort.
+#
+# Metro garde le resultat de chaque fichier transforme. Change ta
+# configuration Babel, il ressert quand meme l'ancienne version — sans un mot.
+# On a passe une heure a corriger un preset qui etait deja correct, en lisant
+# quatre fois la meme erreur aux memes numeros de ligne : la sortie n'avait
+# jamais ete recalculee.
+#
+# Assembler dure une minute de plus. C'est le prix pour que ce qu'on lit ici
+# soit ce que le code dit vraiment.
+if ( cd front && npx expo export --platform android --output-dir "$SORTIE" --clear >/tmp/fitcarnet-bundle.log 2>&1 ); then
+    rm -rf "$SORTIE"
+    ok "Metro assemble sans erreur"
+else
+    rm -rf "$SORTIE"
+    printf '\n'
+    tail -30 /tmp/fitcarnet-bundle.log
+    echec "L'assemblage échoue ICI, il échouerait donc chez EAS.
+   La sortie complète est dans /tmp/fitcarnet-bundle.log"
+fi
+
+# ON REFUSE DE PARTIR AVEC DES MODIFICATIONS NON COMMITEES.
+#
+# EAS installe les dependances avec `npm ci`, a partir du `package-lock.json`
+# COMMITE. Un verrou modifie mais pas commite veut dire : ca marche chez toi,
+# et la-bas ils installent l'ancien jeu de versions. Le build echoue sur
+# « Bundle JavaScript » avec un « Unknown error » qui ne dit rien.
+#
+# C'est exactement ce qui s'est passe, et le script se contentait de
+# PREVENIR. Un avertissement qu'on peut ignorer au milieu de dix lignes vertes
+# n'est pas un garde-fou.
+if (( ! SANS_GIT )) && [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    printf '\n'
+    git status --short
+    echec "Des fichiers ne sont pas commités.
+
+   EAS construit à partir du dépôt, pas de ton disque : ces modifications
+   n'arriveraient pas chez eux, et surtout package-lock.json y serait dans son
+   ancien état. Commite d'abord :
+
+     git add -A && git commit -m \"...\"
+
+   Si tu sais ce que tu fais et veux passer outre :  --sans-git"
 fi
 
 # ---------------------------------------------------------------- numéros
