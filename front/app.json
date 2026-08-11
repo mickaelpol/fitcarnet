@@ -2,7 +2,7 @@
   "expo": {
     "name": "fitcarnet",
     "slug": "fitcarnet",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "scheme": "fitcarnet",
     "userInterfaceStyle": "dark",
@@ -13,7 +13,7 @@
         "foregroundImage": "./assets/images/icone-adaptative.png",
         "backgroundColor": "#14161a"
       },
-      "versionCode": 6
+      "versionCode": 7
     },
     "ios": {
       "bundleIdentifier": "fr.mickaelpol.fitcarnet",
