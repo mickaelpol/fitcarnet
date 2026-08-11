@@ -182,6 +182,18 @@ eas login && eas init          # écrit l'identifiant de projet dans app.json
 Tu récupères un APK, tu l'envoies aux téléphones concernés. C'est le seul
 moment où il faut passer par un lien ou un câble.
 
+## Les quatre profils de build
+
+`eas.json` n'accepte aucune clé de son cru — pas de commentaire possible dans
+ce fichier, il est validé strictement. La différence qui compte est donc ici.
+
+| Profil | Ce que c'est | Quand |
+|---|---|---|
+| `local` | APK **autonome** qui parle au WSL (`192.168.1.118:8080`). Il embarque son JavaScript et se lance seul. | Vérifier l'icône, l'écran de lancement et le comportement réel avant que le NAS ne serve l'API. |
+| `development` | **Client de développement** : il ne contient pas ton code, il le charge depuis Metro à chaque lancement. Tire `expo-dev-client`. | Développer du natif. **Inutilisable pour montrer l'application à quelqu'un** — il exige un serveur allumé sur ton poste. |
+| `preview` | Autonome, pointé sur le NAS en HTTPS. | Essayer une version avant de la publier. |
+| `production` | Idem, canal de mise à jour `production`. | Ce que les gens installent. |
+
 ## Ensuite, au quotidien
 
 ```bash
