@@ -1,152 +1,217 @@
 # Déploiement
 
-Un `git push` sur `master` met la production à jour. Rien d'autre.
+```bash
+./publier.sh "ce qui change"
+```
 
-Ce document dit comment ça marche, ce qu'il faut faire **une seule fois** pour
-que ça marche, et ce qui reste à ta charge à chaque déploiement.
+Une commande. L'API, le site web et les téléphones. Le reste de ce document
+explique ce qu'elle fait, ce qu'il a fallu poser **une seule fois** pour
+qu'elle marche, et les deux cas où elle ne suffit pas.
 
 ---
 
-## Le principe
+## Il y a TROIS chemins, pas un
 
-```
-WSL ──push──▶ Gitea (NAS) ──▶ deployer-nas.sh, sur le NAS
-                                 │  git pull --ff-only
-                                 │  docker compose up -d --build
-                                 ▼
-                       le conteneur, en démarrant :
-                       1. installe les dépendances PHP
-                       2. génère les clés JWT si absentes
-                       3. joue les migrations
-                       4. chauffe le cache
+C'est la seule chose à retenir, et c'est ce qui rend `publier.sh` nécessaire.
+
+| Ce qui change | Par où ça passe | Qui le déclenche |
+|---|---|---|
+| **API Symfony** | `git push` → le NAS tire et redémarre | tâche planifiée, toutes les 5 min |
+| **Site web** (`carnet.mickael-pol.fr`) | `npm run build:web` → `front/dist` versionné → même `git push` | idem |
+| **JavaScript de l'app Android** | `eas update` → **serveurs d'Expo** | toi, à la main |
+| **Code natif de l'app Android** | nouvel APK déposé sur le NAS | toi, quelques fois par an |
+
+**Le NAS ne met pas à jour les téléphones.** Il ne le peut pas : une
+application installée n'interroge pas ton serveur, elle interroge celui
+d'Expo. Un `git push` ne touche **aucun** téléphone. C'est le piège de ce
+dispositif, et `publier.sh` existe pour que tu n'aies jamais à y penser.
+
+---
+
+## `publier.sh`
+
+```bash
+./publier.sh "correction du calcul des fibres"
+./publier.sh "…" --sans-mobile      # rien pour les téléphones
+./publier.sh "…" --sans-web         # pas de reconstruction du front
+./publier.sh "…" --nas root@nas     # déploie tout de suite au lieu d'attendre
 ```
 
-**Ce n'est pas Portainer qui déploie**, et c'est une correction, pas un choix
-initial. J'avais écrit cette stack en chemins relatifs — `./api`, `./db` — en
-comptant sur la stack Git de Portainer pour les résoudre dans son clone. Ça ne
-marche pas en édition **CE** : Portainer clone à l'intérieur de son propre
-conteneur, dans `/data/compose/<id>/`, un chemin que le démon Docker du NAS ne
-voit pas. Le déploiement s'arrête sur
+Quatre étapes : les tests du front, `npm run build:web`, `commit` + `push`,
+`eas update`.
+
+**Il refuse de publier du JavaScript quand du code natif a changé.** Si
+`front/package.json` bouge, ou les greffons et blocs `android`/`ios` de
+`app.json`, il s'arrête et t'envoie sur `publier-android.sh`. La raison n'est
+pas cosmétique : du JavaScript qui appelle un module natif absent fait planter
+l'application **au démarrage**, sur tous les téléphones — et une application
+qui ne démarre plus ne peut plus recevoir le correctif. Il faut alors passer
+chez chacun avec un APK.
+
+**Il refuse aussi si `updates.url` manque dans `app.json`.** Sans cette
+adresse, `eas update` publie dans le vide : la commande réussit, affiche un
+identifiant, et aucun téléphone ne voit jamais rien.
+
+---
+
+## Ce que tu fais toi-même, quand même
+
+**Le build web est dans le script**, mais si tu pousses à la main, ne
+l'oublie pas :
+
+```bash
+cd front && npm run build:web && cd ..
+```
+
+`front/dist` est versionné — volontairement. L'image de production n'a pas
+Node : l'y ajouter reviendrait à embarquer un compilateur JavaScript pour
+regénérer, à chaque démarrage, des fichiers qui ne changent qu'au moment où
+l'on pousse. Le prix est un gros diff à chaque déploiement, illisible mais
+inoffensif. Un front absent en production, lui, ne se voit qu'une fois la
+stack démarrée.
+
+---
+
+## Le NAS
+
+### Pourquoi pas une stack Git Portainer
+
+J'avais écrit cette stack en chemins relatifs — `./api`, `./db` — en comptant
+sur Portainer pour les résoudre dans son clone. Ça ne marche pas en édition
+**CE** : Portainer clone à l'intérieur de son propre conteneur, dans
+`/data/compose/<id>/`, un chemin que le démon Docker du NAS ne voit pas.
 
 ```
 Bind mount failed: '/data/compose/45/db' does not exist
 ```
 
 Résoudre les chemins relatifs d'une stack Git est une fonction de l'édition
-**Business**. On ne la contourne pas : on arrête de s'en servir.
+**Business**. On ne la contourne pas : on arrête de s'en servir. Le code
+arrive par un **vrai clone git** à `/volume1/docker/fitcarnet`, que le démon
+voit ; `docker-compose.yml` n'utilise que des chemins absolus ; et
+`deployer-nas.sh` fait le `pull` puis le `up`. Portainer reste utilisable pour
+regarder les conteneurs et lire les journaux — il ne possède plus la stack.
 
-Le code arrive donc par un **vrai clone git**, à `/volume1/docker/fitcarnet`,
-que le démon voit ; `docker-compose.yml` n'utilise que des chemins absolus ;
-et `deployer-nas.sh` fait le `pull` puis le `up`. **Portainer reste
-utilisable** pour regarder les conteneurs, lire les journaux, redémarrer — il
-ne possède simplement plus la stack.
-
----
-
-## Ce que tu fais à chaque déploiement
+### `deployer-nas.sh`
 
 ```bash
-cd front && npm run build:web && cd ..
-git add -A && git commit -m "…" && git push
+./deployer-nas.sh --etat     # dit où on en est, ne touche à rien
+./deployer-nas.sh            # déploie si le dépôt a bougé
+./deployer-nas.sh --force    # redéploie quand même
 ```
 
-**Le build du front est à toi**, et c'est le seul geste manuel qui reste.
-L'image de production n'a pas Node : l'y ajouter reviendrait à embarquer un
-compilateur JavaScript pour regénérer, à chaque démarrage, des fichiers qui ne
-changent qu'au moment où l'on pousse. `front/dist` est donc versionné —
-volontairement, malgré le gros diff que ça produit.
+**Il redémarre `fitcarnet-app` à chaque déploiement, systématiquement.** Ce
+n'est pas du confort : `docker compose up -d` ne recrée un conteneur que si sa
+*configuration* change, or presque tout ce qu'on déploie arrive par des
+montages — `api/`, `docker/Caddyfile`, `front/dist`, `telecharger/`. Un push
+qui ne touche qu'au code laissait donc le conteneur intact, et compose
+annonçait fièrement que tout était à jour. Sans redémarrage, **le point
+d'entrée ne rejoue ni les migrations ni le cache Symfony** : une migration
+poussée n'est jamais appliquée, et la panne n'apparaît que plus tard, sur une
+colonne absente.
 
-**Si tu oublies le build**, la production sert l'ancien front avec la nouvelle
-API. C'est le seul mode de panne de ce dispositif, et il est silencieux. Le
-jour où ça arrive une fois de trop, on ajoutera un hook `pre-push`.
+**Il se relance quand il vient d'être modifié.** `sh` lit un script au fur et
+à mesure, en retenant sa position ; un `git pull` qui le réécrit pendant qu'il
+tourne décale tout ce qui suit. Au mieux l'ancienne version finit
+tranquillement — c'est arrivé, et on a cru que le correctif n'avait pas pris.
+Au pire `sh` reprend sa lecture au milieu d'une ligne.
 
-Le NAS prend le commit dans les cinq minutes. Pour ne pas attendre :
+**Un verrou**, en `mkdir` — atomique partout, contrairement à `flock`. Deux
+`docker compose up --build` en parallèle laissent une production dans un état
+que personne ne sait décrire.
+
+**`merge --ff-only`.** Il refuse de fusionner. Si la production a divergé,
+c'est que quelqu'un a commité directement sur le NAS ; un merge automatique
+fabriquerait un état qui n'existe dans aucun dépôt.
+
+**Il regarde après.** `up -d` rend la main dès que Docker a *lancé* les
+conteneurs, pas quand l'application répond. Le script attend quinze secondes,
+cherche les conteneurs `fitcarnet-*` arrêtés, et recopie leurs trente
+dernières lignes de journal avant d'échouer.
+
+Journal : `/volume1/docker/fitcarnet/deploiement.log`.
+
+### `sauvegarde-nas.sh`
+
+Tous les jours à 4 h, quatorze conservées, dans
+`/volume1/docker/sauvegardes-fitcarnet` — **hors du clone git**, pour qu'un
+`git clean` ne puisse jamais les emporter.
+
+Il écrit d'abord un `.partiel` : une redirection `>` crée le fichier *avant*
+de savoir si `pg_dump` réussit, et un échec laisse un `.dump` de zéro octet
+avec la bonne date et le bon nom, qui ressemble à une sauvegarde jusqu'au jour
+où on en a besoin. Il vérifie ensuite la taille, puis **relit l'archive avec
+`pg_restore --list`** : une sauvegarde qu'on n'a jamais essayé d'ouvrir n'est
+pas une sauvegarde, c'est un espoir.
 
 ```bash
-ssh mickael@nas '/volume1/docker/fitcarnet/deployer-nas.sh'
+./sauvegarde-nas.sh --lister
 ```
+
+Pour restaurer, la marche à suivre est en commentaire à la fin du script.
 
 ---
 
 ## À faire une seule fois
 
-### 1. Le dépôt sur Gitea
+### 1. Le jeton Gitea
 
-Depuis WSL, le dépôt est déjà poussé :
-
-```bash
-git remote -v      # origin  ssh://git@gitea.mickael-pol.fr:2222/mickael/fitcarnet.git
-```
-
-Pour le NAS, crée un **jeton d'accès** dans Gitea : *Paramètres → Applications
-→ Générer un nouveau jeton*, portée **repository: read**. Un jeton en lecture
-seule, pas ton mot de passe : s'il fuite, il ne permet que de lire ce dépôt, et
-tu le révoques sans rien changer d'autre.
+*Paramètres → Applications → Générer un nouveau jeton*, portée **repository:
+read** uniquement. Il finira en clair dans `.git/config` sur le NAS : autant
+qu'il ne puisse rien faire d'autre que lire ce dépôt.
 
 ### 2. Le clone, sur le NAS
 
-En SSH sur le NAS, en `root` (ou `sudo -i`) :
+DSM n'a pas `git`. Ne l'installe pas par Entware — ça survit mal aux mises à
+jour de DSM ; `deployer-nas.sh` bascule tout seul sur une image Docker quand
+la commande manque. Pour l'installation, fais pareil :
 
 ```bash
+sudo -i
+GIT="docker run --rm -v /volume1/docker/fitcarnet:/git -w /git alpine/git"
+
 mkdir -p /volume1/docker/fitcarnet
-cd /volume1/docker/fitcarnet
+$GIT init
+$GIT remote add origin https://JETON@gitea.mickael-pol.fr/mickael/fitcarnet.git
+$GIT fetch origin master
+$GIT checkout -f -B master origin/master
+chmod 600 /volume1/docker/fitcarnet/.git/config
 ```
 
-**`git clone` refuse un dossier non vide**, et celui-ci contient déjà `pgdata/`
-et `telecharger/`. On fait donc l'équivalent en trois gestes :
-
-```bash
-git init
-git remote add origin https://JETON@gitea.mickael-pol.fr/mickael/fitcarnet.git
-git fetch origin master
-git checkout -f -B master origin/master
-```
-
-Remplace `JETON` par le jeton de l'étape 1. Il finit écrit en clair dans
-`.git/config` — c'est le prix du sans-mot-de-passe. Ferme la porte :
-
-```bash
-chmod 600 .git/config
-```
-
-> **Si `git` n'existe pas sur ton DSM**, ne l'installe pas par Entware : ça
-> survit mal aux mises à jour de DSM. `deployer-nas.sh` passe tout seul par une
-> image Docker quand la commande manque. Pour ces quatre lignes d'installation,
-> fais pareil :
-> ```bash
-> docker run --rm -v /volume1/docker/fitcarnet:/git -w /git alpine/git init
-> ```
-> …et ainsi de suite, en préfixant chaque commande.
+`git clone` refuse un dossier non vide, et celui-ci contient déjà `pgdata/` et
+`telecharger/` — d'où ces quatre gestes plutôt qu'un seul. Le `checkout -f`
+écrase les copies manuelles de `api/`, `db/`, `docker/`, `front/`. Il ne
+touche ni à `pgdata/`, ni à `.env`, ni à l'APK : git ne connaît pas ces
+fichiers.
 
 ### 3. Les secrets, dans `.env`
 
-Un seul fichier, **jamais dans le dépôt** (il est dans `.gitignore`) :
+Un seul fichier, sur le NAS, jamais dans le dépôt :
 
 ```bash
-cat > /volume1/docker/fitcarnet/.env <<'EOF'
+sudo sh -c 'umask 077; cat > /volume1/docker/fitcarnet/.env <<EOF
 DB_PASSWORD=…
-APP_SECRET=…
-JWT_PASSPHRASE=…
-GROCY_URL=
-GROCY_API_KEY=
-EOF
-chmod 600 /volume1/docker/fitcarnet/.env
+APP_SECRET=$(openssl rand -hex 32)
+JWT_PASSPHRASE=$(openssl rand -hex 32)
+GROCY_URL=https://grocy.mickael-pol.fr
+GROCY_API_KEY=…
+EOF'
 ```
 
 | Variable | Ce que c'est |
 |---|---|
-| `DB_PASSWORD` | mot de passe PostgreSQL. **Fixé à la création du volume** : le changer ensuite ne fait que casser la connexion. |
+| `DB_PASSWORD` | **Fixé à la création du volume PostgreSQL.** Sur une base qui existe déjà, le changer ne fait que casser la connexion — il faut remettre l'ancien, ou réaligner le rôle : `ALTER USER fitcarnet WITH PASSWORD '…'` par le socket local, qui est en `trust`. |
 | `APP_SECRET` | secret Symfony. Le changer invalide les cookies signés, sans plus. |
 | `JWT_PASSPHRASE` | protège la clé privée JWT. **La changer déconnecte tout le monde** et rend les clés existantes illisibles. |
 | `GROCY_URL`, `GROCY_API_KEY` | facultatifs. Vides, l'application le détecte et l'explique. |
 
-Note-les ailleurs qu'ici. Elles ne sont récupérables nulle part si tu les
-perds : le mot de passe de la base est dans le volume, la passphrase n'est
-écrite nulle part.
+`deployer-nas.sh` refuse de déployer si le fichier manque ou si une des trois
+premières clés est vide — et il refuse **avant** le `git pull`, pas au milieu.
 
-`deployer-nas.sh` **refuse de déployer** si ce fichier manque ou si une de ces
-trois clés est vide. Il refuse **avant** le `git pull` : mieux vaut ne rien
-faire que s'arrêter au milieu, avec une production à moitié à jour.
+> **Un piège qu'on a payé.** Le socket local de PostgreSQL est en `trust` :
+> une connexion par `127.0.0.1` réussit **sans vérifier le mot de passe**.
+> Tester une clé par là ne prouve rien. Le conteneur applicatif, lui, arrive
+> par le réseau Docker, où la règle est `scram-sha-256`.
 
 ### 4. Le premier déploiement
 
@@ -156,55 +221,38 @@ chmod +x /volume1/docker/fitcarnet/deployer-nas.sh
 ```
 
 `--force` parce que le clone est déjà au dernier commit : sans lui, le script
-constate qu'il n'y a rien de neuf et sort sans rien faire.
+constate qu'il n'y a rien de neuf et sort.
 
-Ce qui s'est passé est dans `/volume1/docker/fitcarnet/deploiement.log`.
-
-### 5. Le déclenchement automatique
+### 5. Les deux tâches planifiées
 
 *DSM → Panneau de configuration → Planificateur de tâches → Créer → Tâche
-déclenchée… non : **Tâche planifiée → Script défini par l'utilisateur**.*
+planifiée → Script défini par l'utilisateur.* Utilisateur **`root`** dans les
+deux cas — il faut le démon Docker.
 
-- **Utilisateur** : `root` (il faut le démon Docker)
-- **Planification** : tous les jours, **répéter toutes les 5 minutes**
-- **Script** : `/volume1/docker/fitcarnet/deployer-nas.sh`
-- **Notification par e-mail** : coche « envoyer uniquement en cas d'erreur »
+| Tâche | Planification | Commande |
+|---|---|---|
+| `fitcarnet — deploiement` | tous les jours, **toutes les 5 minutes** | `/volume1/docker/fitcarnet/deployer-nas.sh` |
+| `fitcarnet — sauvegarde` | tous les jours à **04:00** | `/volume1/docker/fitcarnet/sauvegarde-nas.sh` |
 
-**Cinq minutes de latence, et je préfère ça à un webhook.** Un webhook demande
-quelque chose qui écoute en HTTP sur le NAS et qui a le droit de lancer Docker
-— une pièce de plus à sécuriser et à réparer, pour gagner quatre minutes sur un
-déploiement que tu fais quelques fois par semaine. Le script sort en quelques
-dixièmes de seconde et **sans écrire une ligne** quand rien n'a bougé : il ne
-coûte rien et ne noie pas le journal.
+Coche **« Envoyer les détails d'exécution uniquement lorsque le script se
+termine anormalement »**. Le script de déploiement ne dit rien quand il n'y a
+rien à faire ; s'il parle, c'est que quelque chose a cassé.
 
-Si un jour l'attente devient pesante, le raccourci est déjà écrit :
-`ssh nas /volume1/docker/fitcarnet/deployer-nas.sh`.
+**Cinq minutes de latence, et c'est un choix.** Un webhook demanderait quelque
+chose qui écoute en HTTP sur le NAS et qui a le droit de lancer Docker — une
+pièce de plus à sécuriser, pour gagner quatre minutes. Quand tu es pressé :
+`./publier.sh "…" --nas root@nas`.
 
----
-
-## `deployer-nas.sh`, en trois garde-fous
+### 6. `eas update:configure`
 
 ```bash
-./deployer-nas.sh --etat     # dit où on en est, ne touche à rien
-./deployer-nas.sh            # déploie si le dépôt a bougé
-./deployer-nas.sh --force    # redéploie quand même
+cd front && eas update:configure
 ```
 
-**Un verrou.** Deux `docker compose up --build` en parallèle sur les mêmes
-conteneurs laissent une production dans un état que personne ne sait décrire.
-Le verrou est un `mkdir` — atomique partout, contrairement à `flock` — et il
-saute même si le NAS coupe le script au milieu.
-
-**`merge --ff-only`.** Le script refuse de fusionner. Si la production a
-divergé, c'est que quelqu'un a commité directement sur le NAS ; un merge
-automatique fabriquerait un état qui n'existe dans aucun dépôt. Il s'arrête, et
-il dit quoi taper.
-
-**Il regarde après.** `up -d` rend la main dès que Docker a *lancé* les
-conteneurs, pas quand l'application répond : un conteneur qui meurt sur une
-migration ratée sort de cette commande avec un code 0. Le script attend quinze
-secondes, cherche les conteneurs `fitcarnet-*` arrêtés, et recopie leurs trente
-dernières lignes de journal avant d'échouer.
+Écrit `updates.url` dans `app.json` : l'adresse où l'application ira chercher
+ses mises à jour. **Cette adresse doit être dans l'APK installé** — après
+cette commande, il faut donc republier un APK une fois. Ensuite seulement les
+mises à jour JavaScript arrivent toutes seules.
 
 ---
 
@@ -238,15 +286,21 @@ docker logs fitcarnet-app | head -40
 
 ## Ce que ce dispositif ne fait pas
 
-- **Il ne teste rien.** Un commit qui casse le typage part en production comme
-  un autre. `npm test` avant de pousser reste à ta charge.
+- **Il ne teste que si tu passes par `publier.sh`.** Un `git push` direct part
+  en production sans qu'une seule ligne de test soit jouée. Le NAS ne teste
+  rien : il tire, il redémarre.
 - **Il ne sait pas revenir en arrière.** Revenir à la version d'avant, c'est
-  `git revert` puis `git push` — donc un aller-retour complet, pas un bouton.
-- **Il ne sauvegarde pas avant de migrer.** Une migration destructive
-  s'appliquerait sans filet. `./sauvegarde.sh` avant tout déploiement qui
-  touche au schéma.
+  `git revert` puis `git push` — un aller-retour complet, pas un bouton. Pour
+  la base, en revanche, il y a quatorze sauvegardes, et la marche à suivre est
+  en commentaire à la fin de `sauvegarde-nas.sh`.
+- **Il ne sauvegarde pas avant de migrer.** La sauvegarde est quotidienne, à
+  4 h. Une migration destructive poussée à 14 h s'appliquerait sur des données
+  dont la dernière copie a dix heures. Avant un déploiement qui touche au
+  schéma, lance `sauvegarde-nas.sh` à la main d'abord.
+- **Il ne vérifie pas que le site répond.** Il vérifie que les conteneurs
+  tournent, ce qui n'est pas la même chose.
 
-Ces trois trous se bouchent le jour où ils font mal, pas avant.
+Ces trous se bouchent le jour où ils font mal, pas avant.
 
 ---
 
@@ -263,6 +317,30 @@ Ce second cas n'est pas un manque de ce projet : **Android interdit à une
 application d'en installer une autre sans confirmation**. C'est une protection
 du système. Le seul moyen de s'en passer serait le Play Store, qui met à jour
 tout seul — 25 $ une fois, si un jour l'appui devient pesant.
+
+## Comment les gens l'installent
+
+Tu envoies **une adresse**, et rien d'autre :
+
+```
+https://carnet.mickael-pol.fr/telecharger/
+```
+
+`telecharger/index.html` est versionné et arrive par `git pull`. La page dit
+les trois gestes qu'Android impose — l'avertissement « ce fichier peut être
+dangereux », l'autorisation de la source, puis Installer — parce que c'est
+exactement là que quelqu'un abandonne : le téléchargement réussit, l'appui sur
+le fichier ne donne rien, et personne ne comprend pourquoi.
+
+Elle porte aussi un QR code, pour passer d'un ordinateur à un téléphone, et la
+marche à suivre iPhone : pas d'APK, on épingle le site sur l'écran d'accueil.
+
+> **Le Caddyfile utilisait `handle` et pas `handle_path`.** `handle` ne retire
+> pas le préfixe de l'URL : avec `root * /telecharger`, une requête sur
+> `/telecharger/fitcarnet.apk` allait chercher
+> `/telecharger/telecharger/fitcarnet.apk`. 404 sur l'APK **et** sur
+> `version.json` — donc aucune mise à jour jamais proposée, sans une ligne
+> dans les journaux pour le dire.
 
 ## La première fois
 
@@ -298,11 +376,18 @@ ce fichier, il est validé strictement. La différence qui compte est donc ici.
 ## Ensuite, au quotidien
 
 ```bash
-eas update --branch production --message "ce qui change"
+./publier.sh "ce qui change"
 ```
 
+C'est `eas update --branch production` qui est lancé au bout, mais tu n'as pas
+à t'en souvenir — et surtout, le site web et l'API partent dans le même geste.
 Les téléphones prennent la mise à jour au démarrage suivant. Rien à annoncer,
 rien à installer.
+
+**`eas update` ne passe pas par le NAS.** Il publie sur les serveurs d'Expo,
+que l'application interroge au lancement. Un `git push` seul ne touche aucun
+téléphone : c'est la confusion la plus coûteuse de ce dispositif, parce que
+tout a l'air d'avoir marché.
 
 **`runtimeVersion` est réglé sur `appVersion`** : une mise à jour JavaScript
 **refuse** de s'installer sur un APK dont la version ne correspond pas. C'est
