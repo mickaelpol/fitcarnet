@@ -147,6 +147,26 @@ $COMPOSE --env-file "$DOSSIER/.env" -f "$DOSSIER/docker-compose.yml" up -d --bui
     || echec "docker compose a échoué. Les 40 dernières lignes :
 $(tail -40 "$JOURNAL")"
 
+# ON REDEMARRE L'APPLICATION, MEME QUAND COMPOSE DIT N'AVOIR RIEN A FAIRE.
+#
+# `up -d` ne recree un conteneur que si sa CONFIGURATION change. Or presque
+# tout ce qu'on deploie arrive par des montages : `api/`, `docker/Caddyfile`,
+# `front/dist`, `telecharger/`. Un push qui ne touche qu'au code laisse donc
+# le conteneur intact — et compose annonce fierement que tout est a jour.
+#
+# Ce n'est pas un detail de confort. Le point d'entree joue les MIGRATIONS et
+# vide le cache Symfony ; sans redemarrage, une migration poussee n'est jamais
+# appliquee et le cache continue de servir les anciennes routes. La panne est
+# silencieuse et n'apparait que plus tard, sur une colonne absente.
+#
+# On l'a decouvert sur un Caddyfile corrige qui ne prenait pas : le conteneur
+# affichait « Up 13 minutes » apres un deploiement qui venait de reussir.
+dire "redemarrage de fitcarnet-app"
+$COMPOSE --env-file "$DOSSIER/.env" -f "$DOSSIER/docker-compose.yml" \
+    restart fitcarnet-app >>"$JOURNAL" 2>&1 \
+    || echec "le redémarrage a échoué. Les 40 dernières lignes :
+$(tail -40 "$JOURNAL")"
+
 # ------------------------------------------------------------ verdict
 #
 # `up -d` rend la main des que Docker a LANCE les conteneurs, pas quand
