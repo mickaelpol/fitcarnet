@@ -10,25 +10,36 @@ que ça marche, et ce qui reste à ta charge à chaque déploiement.
 ## Le principe
 
 ```
-WSL ──push──▶ Gitea (NAS) ──webhook──▶ Portainer ──▶ git pull + rebuild + restart
-                                                          │
-                                                          ▼
-                                              le conteneur, en démarrant :
-                                              1. installe les dépendances PHP
-                                              2. génère les clés JWT si absentes
-                                              3. joue les migrations
-                                              4. chauffe le cache
+WSL ──push──▶ Gitea (NAS) ──▶ deployer-nas.sh, sur le NAS
+                                 │  git pull --ff-only
+                                 │  docker compose up -d --build
+                                 ▼
+                       le conteneur, en démarrant :
+                       1. installe les dépendances PHP
+                       2. génère les clés JWT si absentes
+                       3. joue les migrations
+                       4. chauffe le cache
 ```
 
-**Portainer clone le dépôt lui-même.** C'est pour ça que `docker-compose.yml`
-n'utilise plus que des chemins relatifs — `./api`, `./db`, `./docker`
-désignent le clone, donc toujours le commit qui vient d'être tiré. Il ne peut
-plus y avoir d'écart entre ce qui tourne et ce qui est versionné.
+**Ce n'est pas Portainer qui déploie**, et c'est une correction, pas un choix
+initial. J'avais écrit cette stack en chemins relatifs — `./api`, `./db` — en
+comptant sur la stack Git de Portainer pour les résoudre dans son clone. Ça ne
+marche pas en édition **CE** : Portainer clone à l'intérieur de son propre
+conteneur, dans `/data/compose/<id>/`, un chemin que le démon Docker du NAS ne
+voit pas. Le déploiement s'arrête sur
 
-**Une seule exception, voulue :** le répertoire de données de PostgreSQL reste
-un chemin absolu sur le disque du NAS (`/volume1/docker/fitcarnet/pgdata`).
-Les données ne vivent pas dans un dépôt, et un clone qu'on referait ne doit
-surtout pas emporter la base avec lui.
+```
+Bind mount failed: '/data/compose/45/db' does not exist
+```
+
+Résoudre les chemins relatifs d'une stack Git est une fonction de l'édition
+**Business**. On ne la contourne pas : on arrête de s'en servir.
+
+Le code arrive donc par un **vrai clone git**, à `/volume1/docker/fitcarnet`,
+que le démon voit ; `docker-compose.yml` n'utilise que des chemins absolus ;
+et `deployer-nas.sh` fait le `pull` puis le `up`. **Portainer reste
+utilisable** pour regarder les conteneurs, lire les journaux, redémarrer — il
+ne possède simplement plus la stack.
 
 ---
 
@@ -49,23 +60,78 @@ volontairement, malgré le gros diff que ça produit.
 API. C'est le seul mode de panne de ce dispositif, et il est silencieux. Le
 jour où ça arrive une fois de trop, on ajoutera un hook `pre-push`.
 
+Le NAS prend le commit dans les cinq minutes. Pour ne pas attendre :
+
+```bash
+ssh mickael@nas '/volume1/docker/fitcarnet/deployer-nas.sh'
+```
+
 ---
 
 ## À faire une seule fois
 
 ### 1. Le dépôt sur Gitea
 
-Crée le dépôt, puis depuis WSL :
+Depuis WSL, le dépôt est déjà poussé :
 
 ```bash
-git remote add nas https://gitea.ton-nas/mickael/fitcarnet.git
-git push -u nas master
+git remote -v      # origin  ssh://git@gitea.mickael-pol.fr:2222/mickael/fitcarnet.git
 ```
 
-### 2. Les secrets, dans Portainer
+Pour le NAS, crée un **jeton d'accès** dans Gitea : *Paramètres → Applications
+→ Générer un nouveau jeton*, portée **repository: read**. Un jeton en lecture
+seule, pas ton mot de passe : s'il fuite, il ne permet que de lire ce dépôt, et
+tu le révoques sans rien changer d'autre.
 
-Trois variables, dans la section « Environment variables » de la stack. Elles
-ne sont **jamais** dans le dépôt :
+### 2. Le clone, sur le NAS
+
+En SSH sur le NAS, en `root` (ou `sudo -i`) :
+
+```bash
+mkdir -p /volume1/docker/fitcarnet
+cd /volume1/docker/fitcarnet
+```
+
+**`git clone` refuse un dossier non vide**, et celui-ci contient déjà `pgdata/`
+et `telecharger/`. On fait donc l'équivalent en trois gestes :
+
+```bash
+git init
+git remote add origin https://JETON@gitea.mickael-pol.fr/mickael/fitcarnet.git
+git fetch origin master
+git checkout -f -B master origin/master
+```
+
+Remplace `JETON` par le jeton de l'étape 1. Il finit écrit en clair dans
+`.git/config` — c'est le prix du sans-mot-de-passe. Ferme la porte :
+
+```bash
+chmod 600 .git/config
+```
+
+> **Si `git` n'existe pas sur ton DSM**, ne l'installe pas par Entware : ça
+> survit mal aux mises à jour de DSM. `deployer-nas.sh` passe tout seul par une
+> image Docker quand la commande manque. Pour ces quatre lignes d'installation,
+> fais pareil :
+> ```bash
+> docker run --rm -v /volume1/docker/fitcarnet:/git -w /git alpine/git init
+> ```
+> …et ainsi de suite, en préfixant chaque commande.
+
+### 3. Les secrets, dans `.env`
+
+Un seul fichier, **jamais dans le dépôt** (il est dans `.gitignore`) :
+
+```bash
+cat > /volume1/docker/fitcarnet/.env <<'EOF'
+DB_PASSWORD=…
+APP_SECRET=…
+JWT_PASSPHRASE=…
+GROCY_URL=
+GROCY_API_KEY=
+EOF
+chmod 600 /volume1/docker/fitcarnet/.env
+```
 
 | Variable | Ce que c'est |
 |---|---|
@@ -78,32 +144,67 @@ Note-les ailleurs qu'ici. Elles ne sont récupérables nulle part si tu les
 perds : le mot de passe de la base est dans le volume, la passphrase n'est
 écrite nulle part.
 
-### 3. La stack Portainer
+`deployer-nas.sh` **refuse de déployer** si ce fichier manque ou si une de ces
+trois clés est vide. Il refuse **avant** le `git pull` : mieux vaut ne rien
+faire que s'arrêter au milieu, avec une production à moitié à jour.
 
-*Stacks → Add stack → Repository.*
+### 4. Le premier déploiement
 
-- **Repository URL** : celle de Gitea
-- **Reference** : `refs/heads/master`
-- **Compose path** : `docker-compose.yml`
-- **Automatic updates** : activer, et choisir **Webhook** plutôt que
-  *Polling*. Le polling interroge Gitea toutes les N minutes pour découvrir
-  qu'il ne s'est rien passé ; le webhook ne parle que quand il y a quelque
-  chose à dire.
-- Coche **Re-pull image and redeploy** — la stack construit son image depuis
-  `./docker`, elle doit la reconstruire quand le `Dockerfile` change.
+```bash
+chmod +x /volume1/docker/fitcarnet/deployer-nas.sh
+/volume1/docker/fitcarnet/deployer-nas.sh --force
+```
 
-Portainer affiche alors une URL de webhook. Copie-la.
+`--force` parce que le clone est déjà au dernier commit : sans lui, le script
+constate qu'il n'y a rien de neuf et sort sans rien faire.
 
-### 4. Le webhook, côté Gitea
+Ce qui s'est passé est dans `/volume1/docker/fitcarnet/deploiement.log`.
 
-*Dépôt → Settings → Webhooks → Add Webhook → Gitea.*
+### 5. Le déclenchement automatique
 
-- **Target URL** : celle donnée par Portainer
-- **HTTP Method** : `POST`
-- **Trigger** : *Push events* uniquement
-- **Branch filter** : `master`
+*DSM → Panneau de configuration → Planificateur de tâches → Créer → Tâche
+déclenchée… non : **Tâche planifiée → Script défini par l'utilisateur**.*
 
-Gitea et Portainer étant sur la même machine, l'appel ne sort pas du NAS.
+- **Utilisateur** : `root` (il faut le démon Docker)
+- **Planification** : tous les jours, **répéter toutes les 5 minutes**
+- **Script** : `/volume1/docker/fitcarnet/deployer-nas.sh`
+- **Notification par e-mail** : coche « envoyer uniquement en cas d'erreur »
+
+**Cinq minutes de latence, et je préfère ça à un webhook.** Un webhook demande
+quelque chose qui écoute en HTTP sur le NAS et qui a le droit de lancer Docker
+— une pièce de plus à sécuriser et à réparer, pour gagner quatre minutes sur un
+déploiement que tu fais quelques fois par semaine. Le script sort en quelques
+dixièmes de seconde et **sans écrire une ligne** quand rien n'a bougé : il ne
+coûte rien et ne noie pas le journal.
+
+Si un jour l'attente devient pesante, le raccourci est déjà écrit :
+`ssh nas /volume1/docker/fitcarnet/deployer-nas.sh`.
+
+---
+
+## `deployer-nas.sh`, en trois garde-fous
+
+```bash
+./deployer-nas.sh --etat     # dit où on en est, ne touche à rien
+./deployer-nas.sh            # déploie si le dépôt a bougé
+./deployer-nas.sh --force    # redéploie quand même
+```
+
+**Un verrou.** Deux `docker compose up --build` en parallèle sur les mêmes
+conteneurs laissent une production dans un état que personne ne sait décrire.
+Le verrou est un `mkdir` — atomique partout, contrairement à `flock` — et il
+saute même si le NAS coupe le script au milieu.
+
+**`merge --ff-only`.** Le script refuse de fusionner. Si la production a
+divergé, c'est que quelqu'un a commité directement sur le NAS ; un merge
+automatique fabriquerait un état qui n'existe dans aucun dépôt. Il s'arrête, et
+il dit quoi taper.
+
+**Il regarde après.** `up -d` rend la main dès que Docker a *lancé* les
+conteneurs, pas quand l'application répond : un conteneur qui meurt sur une
+migration ratée sort de cette commande avec un code 0. Le script attend quinze
+secondes, cherche les conteneurs `fitcarnet-*` arrêtés, et recopie leurs trente
+dernières lignes de journal avant d'échouer.
 
 ---
 

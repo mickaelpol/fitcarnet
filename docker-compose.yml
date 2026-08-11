@@ -1,19 +1,23 @@
 # =====================================================================
 #  fitcarnet — stack de PRODUCTION, deployee par Portainer depuis Gitea.
 #
-#  LES CHEMINS SONT RELATIFS, ET C'EST CE QUI REND LE DEPLOIEMENT POSSIBLE.
+#  LES CHEMINS SONT ABSOLUS, ET J'AI ESSAYE LE CONTRAIRE.
 #
-#  Ils etaient absolus — /volume1/docker/fitcarnet/api — ce qui supposait
-#  qu'on ait depose les fichiers sur le NAS a la main avant de demarrer la
-#  stack. Portainer clone lui-meme le depot : `./api`, `./db` et `./docker`
-#  designent le clone, donc TOUJOURS le commit qui vient d'etre tire. Un
-#  `git pull` met le code a jour, sans copie manuelle et sans decalage
-#  possible entre ce qui tourne et ce qui est versionne.
+#  J'avais mis des chemins relatifs — `./api`, `./db` — en comptant sur
+#  Portainer pour cloner le depot et les resoudre dans son clone. Ca ne marche
+#  PAS en Portainer CE : `/data/compose/<id>/` est un chemin a l'interieur du
+#  conteneur Portainer, que le demon Docker du NAS ne voit pas. Le deploiement
+#  echoue sur « Bind mount failed: '/data/compose/45/db' does not exist ».
+#  Resoudre les chemins relatifs d'une stack Git est une fonction de l'edition
+#  Business.
 #
-#  UNE SEULE EXCEPTION, ET ELLE EST VOULUE : le repertoire de donnees de
-#  PostgreSQL reste un chemin ABSOLU sur le disque du NAS. Les donnees ne
-#  vivent pas dans un depot, et un clone qu'on refait ne doit surtout pas
-#  emporter la base avec lui.
+#  Le code arrive donc sur le NAS par un VRAI clone git, a un endroit fixe, et
+#  `deployer-nas.sh` le met a jour. Voir DEPLOIEMENT.md.
+#
+#  /volume1/docker/fitcarnet/ contient :
+#    api/ db/ docker/ front/   le clone, mis a jour par git pull
+#    pgdata/                   les donnees PostgreSQL, HORS du depot
+#    telecharger/              l'APK et son version.json, HORS du depot
 # =====================================================================
 services:
 
@@ -30,7 +34,7 @@ services:
       # Joues UNE SEULE FOIS, a la creation du volume. Sur une base qui
       # existe deja, PostgreSQL les ignore : c'est le point d'entree du
       # conteneur applicatif qui joue `db/manuel/` a chaque demarrage.
-      - ./db:/docker-entrypoint-initdb.d:ro
+      - /volume1/docker/fitcarnet/db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fitcarnet -d fitcarnet"]
       interval: 10s
@@ -43,7 +47,7 @@ services:
   # FrankenPHP : un seul service pour l'API Symfony ET le front React
   fitcarnet-app:
     build:
-      context: ./docker
+      context: /volume1/docker/fitcarnet/docker
       dockerfile: Dockerfile
       target: prod                     # passe a "dev" pour le rechargement a chaud
     container_name: fitcarnet-app
@@ -66,15 +70,15 @@ services:
     ports:
       - "8094:80"
     volumes:
-      - ./api:/app                                    # code Symfony, depuis le clone
+      - /volume1/docker/fitcarnet/api:/app                       # code Symfony
       # `db/` sert DEUX fois : a l'initialisation de PostgreSQL ci-dessus, et
       # ici pour que le point d'entree puisse jouer `db/manuel/` au demarrage.
-      - ./db:/app/db:ro
+      - /volume1/docker/fitcarnet/db:/app/db:ro
       # Construit dans WSL avant le push : l'image de production n'a pas Node,
       # et l'y ajouter pour un build statique serait payer un compilateur a
       # chaque demarrage.
-      - ./front/dist:/app/front:ro
-      - ./docker/Caddyfile:/etc/frankenphp/Caddyfile:ro
+      - /volume1/docker/fitcarnet/front/dist:/app/front:ro
+      - /volume1/docker/fitcarnet/docker/Caddyfile:/etc/frankenphp/Caddyfile:ro
       # L'APK Android et son `version.json`. HORS du depot, sur le disque du
       # NAS : un APK pese des dizaines de megaoctets et git n'a rien a en
       # faire. C'est le seul dossier que tu alimentes a la main, quelques fois
