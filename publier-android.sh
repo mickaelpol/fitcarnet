@@ -59,6 +59,28 @@ titre "Avant de publier"
     || echec "Les tests du front échouent. Corrige avant de publier :  cd front && npm test"
 ok "Tests du front"
 
+# Chaque greffon declare dans `app.json` doit exister dans `package.json`.
+# EAS reinstalle les dependances sur SA machine a partir de ce fichier : un
+# module present dans ton node_modules mais absent de package.json passe les
+# tests ici et fait echouer le build la-bas, sur un « Unknown error » de la
+# phase « Read app config » qui ne nomme meme pas le coupable.
+#
+# On le verifie AVANT d'incrementer quoi que ce soit et avant d'occuper la
+# file d'attente d'Expo pendant dix minutes.
+MANQUANTS=$(python3 verifier-greffons.py)
+
+if [[ -n "$MANQUANTS" ]]; then
+    echec "Ces greffons sont déclarés dans front/app.json mais absents de front/package.json :
+     $MANQUANTS
+
+   EAS réinstalle les dépendances sur sa machine à partir de package.json :
+   le build échouerait là-bas sur « Read app config ». Corrige d'abord :
+
+     cd front && npx expo install $MANQUANTS
+     rm -rf node_modules package-lock.json && npm install"
+fi
+ok "Greffons déclarés dans package.json"
+
 if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
     info "Le dépôt a des modifications non commitées."
     info "L'APK sera construit à partir de ce que voit EAS, pas de ce qui est commité."

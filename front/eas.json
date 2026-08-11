@@ -6,7 +6,6 @@
   "build": {
     "local": {
       "distribution": "internal",
-      "channel": "local",
       "android": {
         "buildType": "apk"
       },

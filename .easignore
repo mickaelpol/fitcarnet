@@ -1,0 +1,44 @@
+# =====================================================================
+#  Ce qu'EAS n'a PAS a envoyer pour construire l'application Android.
+#
+#  EAS archive tout le depot depuis la racine git, pas seulement `front/`.
+#  Il tombait donc sur `api/var/cache/`, ecrit par le conteneur Docker sous
+#  l'utilisateur root, et s'arretait sur :
+#
+#      EACCES: permission denied, scandir '.../api/var/cache/dev/pools/...'
+#
+#  Rien de tout ce qui suit n'entre dans un APK. Les exclure corrige l'erreur
+#  et rend l'envoi bien plus leger au passage.
+# =====================================================================
+
+# ---------- le serveur : aucun rapport avec l'application mobile ----------
+api/
+db/
+docker/
+docker-compose.yml
+compose.dev.yml
+
+# ---------- donnees et sauvegardes ----------
+sauvegardes/
+donnees-perso/
+telecharger/
+*.sql
+*.xlsx
+
+# ---------- outils Python ----------
+*.py
+__pycache__/
+
+# ---------- build web : sert au NAS, jamais a l'APK ----------
+front/dist/
+
+# ---------- documentation ----------
+*.md
+!front/README.md
+
+# ---------- divers ----------
+sonneries/
+installer.sh
+sauvegarde.sh
+publier-android.sh
+*.log
