@@ -11,7 +11,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.1.118:8080/api"
-      }
+      },
+      "channel": "local"
     },
     "development": {
       "developmentClient": true,
@@ -21,7 +22,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.1.118:8080/api"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",

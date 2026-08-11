@@ -13,7 +13,13 @@
         "foregroundImage": "./assets/images/icone-adaptative.png",
         "backgroundColor": "#14161a"
       },
-      "versionCode": 9
+      "versionCode": 9,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "ios": {
       "bundleIdentifier": "fr.mickaelpol.fitcarnet",
@@ -59,7 +65,8 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/8c7364c4-ad6b-493e-af6f-a62c626954ec"
     },
     "icon": "./assets/images/icone.png",
     "extra": {
