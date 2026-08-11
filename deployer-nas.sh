@@ -123,6 +123,10 @@ trap 'rmdir "$VERROU" 2>/dev/null || true' EXIT INT TERM
 
 dire "=== deploiement : $ICI -> $LA"
 
+# On retient a quoi CE script ressemble avant le pull. Voir plus bas.
+MOI="$DOSSIER/deployer-nas.sh"
+EMPREINTE_AVANT=$(md5sum "$MOI" | cut -d' ' -f1)
+
 # --------------------------------------------------------------- pull
 #
 # `--ff-only` : on REFUSE de fusionner. Si la production a diverge, c'est que
@@ -134,6 +138,25 @@ $GIT merge --ff-only "origin/$BRANCHE" \
     Puis, si le NAS ne doit rien garder :  git reset --hard origin/$BRANCHE"
 
 dire "code a jour"
+
+# CE SCRIPT PEUT SE METTRE A JOUR LUI-MEME, ET C'EST UN PIEGE.
+#
+# `sh` ne charge pas le fichier en memoire : il le lit au fur et a mesure, en
+# retenant sa position. Un `git pull` qui reecrit ce fichier pendant qu'il
+# tourne decale tout ce qui suit — dans le meilleur des cas l'ancienne version
+# finit tranquillement (c'est ce qui est arrive la premiere fois, et on a
+# simplement cru que le correctif n'avait pas pris), dans le pire `sh` reprend
+# sa lecture au milieu d'une ligne et execute n'importe quoi.
+#
+# On se relance donc proprement quand on a change. `--force` parce que le code
+# est deja a jour : sans lui, la nouvelle instance constaterait qu'il n'y a
+# rien de neuf et sortirait sans rien deployer.
+if [ "$EMPREINTE_AVANT" != "$(md5sum "$MOI" | cut -d' ' -f1)" ]; then
+    dire "ce script vient d'etre mis a jour : je me relance"
+    rmdir "$VERROU" 2>/dev/null || true
+    trap - EXIT INT TERM
+    exec "$MOI" --force
+fi
 
 # ------------------------------------------------------------- stack
 #
