@@ -48,9 +48,21 @@
 	#  C'est ce que sert ce bloc : `version.json` que l'application interroge
 	#  au demarrage, et l'APK a cote.
 	#
-	#  Le dossier est HORS du depot — un APK pese des dizaines de megaoctets
-	#  et n'a rien a faire dans git. Il est monte depuis le disque du NAS.
-	handle /telecharger/* {
+	#  L'APK lui-meme est HORS du depot — des dizaines de megaoctets n'ont
+	#  rien a faire dans git. Il est depose a la main sur le disque du NAS,
+	#  dans le meme dossier que `index.html` et `version.json`, eux versionnes.
+	#
+	#  `handle_path` ET PAS `handle`, ET C'EST TOUTE LA DIFFERENCE.
+	#
+	#  `handle` ne retire pas le prefixe de l'URL. Avec `root * /telecharger`,
+	#  une requete sur `/telecharger/fitcarnet.apk` allait donc chercher
+	#  `/telecharger/telecharger/fitcarnet.apk`, qui n'existe pas : 404 sur
+	#  l'APK ET sur `version.json`, donc aucune mise a jour jamais proposee,
+	#  et rien nulle part qui dise pourquoi.
+	#
+	#  `handle_path` retire le prefixe avant de servir. Les motifs ci-dessous
+	#  voient donc l'URL SANS `/telecharger`, d'ou `/version.json`.
+	handle_path /telecharger/* {
 		root * /telecharger
 		# Sans ce type, le navigateur Android telecharge un fichier qu'il ne
 		# sait pas ouvrir, et rien ne se passe au moment du clic.
@@ -58,9 +70,14 @@
 		header @apk Content-Type application/vnd.android.package-archive
 		# `version.json` doit etre relu a chaque fois : mis en cache, un
 		# telephone continuerait d'ignorer une version publiee la veille.
-		@manifeste path /telecharger/version.json
+		@manifeste path /version.json
 		header @manifeste Cache-Control "no-store"
-		file_server browse
+		# `index.html` dit les trois gestes qu'Android impose pour installer
+		# une application venue d'ailleurs que du Play Store. Sans elle, un
+		# lien vers l'APK suffit a bloquer quelqu'un qui ne les connait pas.
+		file_server browse {
+			index index.html
+		}
 	}
 
 	# ---------- front React ----------

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installer fitcarnet</title>
+<!--
+  Page d'installation de fitcarnet.
+
+  ELLE EXISTE PARCE QU'UN LIEN VERS UN .apk NE SUFFIT PAS.
+
+  Android refuse d'installer une application venue d'ailleurs que du Play
+  Store tant que l'utilisateur n'a pas autorisé le navigateur à le faire. Le
+  téléchargement réussit, l'appui sur le fichier ne donne rien, et personne ne
+  comprend pourquoi. C'est le moment exact où l'on abandonne.
+
+  Cette page dit les trois gestes, dans l'ordre, avant qu'ils ne bloquent.
+
+  Elle est servie depuis /telecharger/, à côté de l'APK et de version.json.
+-->
+<style>
+  :root {
+    --fond: #14161a; --surface: #1d2026; --ligne: #2f343d;
+    --encre: #e8eaed; --attenue: #8b929c; --vif: #e3b23c;
+    --vif-fond: rgba(227,178,60,0.12); --vif-bord: rgba(227,178,60,0.4);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 20px 64px;
+    background: var(--fond); color: var(--encre);
+    font: 16px/1.55 -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+    max-width: 560px; margin-inline: auto;
+  }
+  h1 { font-size: 26px; margin: 18px 0 4px; letter-spacing: .3px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 1.2px;
+       color: var(--attenue); margin: 34px 0 10px; font-weight: 600; }
+  p  { margin: 0 0 12px; }
+  .sous { color: var(--attenue); margin-bottom: 26px; }
+  .marque { display: flex; align-items: center; gap: 14px; }
+  .bouton {
+    display: block; text-align: center; text-decoration: none;
+    background: var(--vif); color: #14161a; font-weight: 700; font-size: 18px;
+    padding: 16px; border-radius: 12px; margin: 8px 0 6px;
+  }
+  .bouton.secondaire {
+    background: transparent; color: var(--vif);
+    border: 1px solid var(--vif-bord); font-size: 15px; font-weight: 600;
+  }
+  ol { padding-left: 22px; margin: 0; }
+  li { margin-bottom: 14px; }
+  li b { color: var(--vif); font-weight: 600; }
+  .carte {
+    background: var(--surface); border: 1px solid var(--ligne);
+    border-radius: 14px; padding: 18px; margin: 16px 0;
+  }
+  .note { background: var(--vif-fond); border: 1px solid var(--vif-bord); }
+  .qr { text-align: center; }
+  .qr img { width: 190px; height: 190px; border-radius: 10px; }
+  code { background: #23272e; padding: 2px 6px; border-radius: 5px;
+         font-size: 14px; color: var(--vif); }
+  footer { color: #5d646e; font-size: 13px; margin-top: 40px;
+           border-top: 1px solid var(--ligne); padding-top: 16px; }
+</style>
+
+<div class="marque">
+  <svg width="52" height="52" viewBox="0 0 100 100" aria-hidden="true">
+    <circle cx="50" cy="50" r="38" fill="none" stroke="#2f343d" stroke-width="11"/>
+    <circle cx="50" cy="50" r="38" fill="none" stroke="#7ba7dd" stroke-width="11"
+            stroke-dasharray="60 179" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+    <circle cx="50" cy="50" r="38" fill="none" stroke="#e3b23c" stroke-width="11"
+            stroke-dasharray="60 179" stroke-dashoffset="-60" transform="rotate(-90 50 50)"/>
+    <circle cx="50" cy="50" r="38" fill="none" stroke="#e0906a" stroke-width="11"
+            stroke-dasharray="59 180" stroke-dashoffset="-120" transform="rotate(-90 50 50)"/>
+    <circle cx="50" cy="50" r="38" fill="none" stroke="#5ec080" stroke-width="11"
+            stroke-dasharray="59 180" stroke-dashoffset="-179" transform="rotate(-90 50 50)"/>
+  </svg>
+  <div>
+    <h1>fitcarnet</h1>
+    <div class="sous" style="margin:0">Carnet de musculation et de nutrition</div>
+  </div>
+</div>
+
+<h2>Sur Android</h2>
+
+<a class="bouton" href="fitcarnet.apk">Telecharger l'application</a>
+<a class="bouton secondaire" href="https://carnet.mickael-pol.fr/">Ou l'utiliser dans le navigateur</a>
+
+<div class="carte">
+  <ol>
+    <li>Appuie sur <b>Telecharger</b>. Android previent que ce type de fichier
+        peut etre dangereux : c'est le message normal pour toute application
+        installee hors du Play Store. <b>Conserver</b>.</li>
+    <li>Ouvre le fichier telecharge. Android demande d'autoriser
+        <b>l'installation depuis cette source</b> — il parle de ton navigateur,
+        pas de l'application. Accepte, puis reviens en arriere.</li>
+    <li>Appuie sur <b>Installer</b>.</li>
+  </ol>
+</div>
+
+<div class="carte note">
+  <p><b>Les mises a jour se font toutes seules.</b> L'application recupere les
+  nouveautes au demarrage suivant, sans rien demander.</p>
+  <p style="margin:0">Quelques fois par an, une mise a jour touche au coeur de
+  l'application et demande une nouvelle installation. Ce jour-la, un bandeau
+  apparait dans l'onglet <b>Compte</b> avec un bouton. Android impose cet appui,
+  aucune application ne peut en installer une autre sans lui.</p>
+</div>
+
+<h2>Sur iPhone</h2>
+<p class="sous">Pas d'application a installer. Ouvre
+<code>carnet.mickael-pol.fr</code> dans Safari, puis <b>Partager</b> &rarr;
+<b>Sur l'ecran d'accueil</b> : elle s'ouvre en plein ecran, comme une
+application.</p>
+
+<h2>Depuis un ordinateur</h2>
+<div class="carte qr">
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMYAAADGAQMAAACzVW0eAAAABlBMVEUUFhr////tmgqJAAABQUlEQVR42u1YQQrDMAwz6wP8pHw9T+oDAp4kp711sMvQYSaEtrkIW5KdRj3Eiv/Jx5MzEAcfR+QM7IyxXvEUvzoBtgGMR81IwCNILHw0wYYsAQ/3k6/YDy9sszPG5YcNxAPlygyb8IyVLCt2J75Jp6TZXkY63UGd1rnTSHfxqOnKKYUyewCJsvpg63Tdz9KFixZIM+GhVHN2fU341gaCnW0LKmDzssEGqeZUZeMG6VJTNvqt0LZfFy0o2ntbrT2NuGDrakICfIWH0EZMsPUcQo7R6JhAG2yqoKxjZy+N/K1HEUCimbRIbfh2+VuJaSJbOOUNkK6etennM4cob3u8VImN5jepVXIYW6pGc2+orOMuq909S6JQAssIGwfLNrfi1yy3e5YugKPc7lkaxQ/p1EkL1z1L3apHEZ9e//9f9f3JG25U8qaqsVKUAAAAAElFTkSuQmCC" alt="QR code vers cette page">
+  <p style="margin:12px 0 0; color:var(--attenue)">Scanne ce code avec le
+  telephone sur lequel installer l'application.</p>
+</div>
+
+<footer>
+  fitcarnet est heberge sur un serveur personnel. Tes donnees n'en sortent pas :
+  ni compte tiers, ni publicite, ni mesure d'audience.
+</footer>
+</html>

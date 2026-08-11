@@ -54,3 +54,18 @@ sauvegardes/
 # dit aux telephones quelle version existe, et il doit rester en face du
 # `versionCode` de app.json.
 /telecharger/*.apk
+
+# ---------- exports du carnet de l'ancienne app ----------
+# Donnees personnelles. Chaque fichier est une photo complete de l'etat de
+# l'app vanilla ; ils ne s'agregent pas et n'ont rien a faire dans git.
+/carnet*.json
+
+# ---------- ce que la PRODUCTION pose dans son propre clone ----------
+# Sur le NAS, /volume1/docker/fitcarnet EST le clone git. La base de donnees
+# vit dedans, sans etre suivie — et « git clean -xdf », la commande qu'on tape
+# pour repartir propre, l'effacerait sans poser de question.
+# Ces trois lignes ne protegent pas de tout, mais elles retirent pgdata de
+# la liste des fichiers que git dit pouvoir supprimer.
+/pgdata/
+/.deploiement-en-cours/
+/deploiement.log
