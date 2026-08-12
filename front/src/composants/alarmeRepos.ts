@@ -48,12 +48,17 @@ import { chargerSonnerie, SONNERIES } from './sonnerie';
  * existant est impossible : il faut en creer un nouveau. Passer de `_1` a
  * `_2` est la seule facon, et l'ancien se supprime pour ne pas laisser deux
  * entrees dans les parametres. */
-const VERSION_CANAUX = '1';
+const VERSION_CANAUX = '2';
 const canalDe = (sonnerie: string): string => `repos_${sonnerie}_${VERSION_CANAUX}`;
 
-/* Les canaux d'avant les sonneries natives. Supprimes au demarrage : ils
-   jouaient le son de notification du telephone, pas celui de l'application. */
-const CANAUX_PERIMES = ['repos', 'repos2'];
+/* Tous les canaux des versions precedentes, supprimes au demarrage.
+   `repos` et `repos2` jouaient le son de notification du telephone ; les
+   `_1` jouaient la bonne sonnerie, mais sur le flux NOTIFICATION — donc
+   muets des que le telephone passait en vibreur. */
+const CANAUX_PERIMES = [
+  'repos', 'repos2',
+  ...['bois', 'rappel', 'harpe', 'cloche', 'gong'].map((c) => `repos_${c}_1`),
+];
 const VIBRATION = [0, 300, 120, 300, 120, 300, 120, 500];
 
 /* Ce gestionnaire n'est appelé que si la notification arrive alors que
@@ -120,6 +125,24 @@ async function preparer(): Promise<boolean> {
         enableVibrate: true,
         vibrationPattern: VIBRATION,
         sound: `${sonnerie.cle}.wav`,
+        /* USAGE ALARME, ET C'EST TOUTE LA DIFFERENCE EN MODE VIBREUR.
+         *
+         * Android coupe les sons du flux NOTIFICATION des que le telephone
+         * passe en vibreur — c'est le comportement attendu de toute
+         * notification, et c'est pour ca qu'on n'entendait rien. Le flux
+         * ALARME, lui, n'est pas concerne : un reveil doit sonner meme
+         * telephone en silencieux, sinon il ne sert a rien.
+         *
+         * Une fin de repos est une alarme, pas une notification : on l'a
+         * demandee, on l'attend, et la manquer coute la serie suivante.
+         *
+         * CE QUE CA CHANGE POUR TOI : le volume suit desormais le curseur
+         * ALARME du telephone, pas celui des notifications. Un son trop
+         * faible se regle la, et nulle part ailleurs. */
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.ALARM,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        },
       });
     }
   }
