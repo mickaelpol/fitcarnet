@@ -177,7 +177,47 @@ print('oui' if (d.get('updates') or {}).get('url') else 'non')")
 
     if command -v eas >/dev/null 2>&1; then EAS="eas"; else EAS="npx eas-cli@latest"; fi
 
-    ( cd front && $EAS update --branch production --message "$MESSAGE" ) \
+    # ------------------------------------------------------------------
+    #  L'ADRESSE DE PRODUCTION, IMPOSEE A `eas update`.
+    #
+    #  LE PIEGE, ET IL A COUTE UNE SOIREE : les variables `EXPO_PUBLIC_*` sont
+    #  FIGEES DANS LE BUNDLE au moment de l'export. Or `eas update` exporte
+    #  avec l'environnement de CETTE machine — donc `front/.env`, qui pointe
+    #  sur le WSL de developpement. Le profil `production` d'`eas.json` ne
+    #  sert qu'aux BUILDS, jamais aux mises a jour.
+    #
+    #  Consequence : l'APK sortait correct, et la premiere mise a jour
+    #  JavaScript renvoyait les telephones vers `192.168.1.118`. Injoignable
+    #  pour tout le monde, y compris toi hors de chez toi — et le telephone
+    #  affichait la meme erreur que s'il etait simplement hors ligne.
+    #
+    #  On lit donc les valeurs dans `eas.json`, profil `production` — le seul
+    #  endroit ou elles sont deja ecrites — et on les impose a la commande.
+    # ------------------------------------------------------------------
+    ENV_PROD=$(python3 -c "
+import json
+env = json.load(open('front/eas.json', encoding='utf-8'))['build']['production'].get('env', {})
+print('\n'.join(f'{c}={v}' for c, v in env.items()))")
+
+    [[ -n "$ENV_PROD" ]] || echec "Le profil « production » d'eas.json ne declare aucune variable.
+   Sans elles, la mise a jour emporterait l'adresse de ton .env local."
+
+    # UNE ADRESSE PRIVEE OU EN CLAIR NE DOIT JAMAIS PARTIR SUR LES TELEPHONES.
+    URL_PROD=$(printf '%s\n' "$ENV_PROD" | sed -n 's/^EXPO_PUBLIC_API_URL=//p')
+    case "$URL_PROD" in
+        https://*) : ;;
+        *) echec "EXPO_PUBLIC_API_URL du profil production vaut « $URL_PROD ».
+   Ce n'est pas une adresse publique en HTTPS : les telephones ne la
+   joindraient pas. Corrige front/eas.json." ;;
+    esac
+    case "$URL_PROD" in
+        *192.168.*|*10.0.*|*localhost*|*127.0.0.1*)
+            echec "EXPO_PUBLIC_API_URL du profil production est une adresse LOCALE :
+   $URL_PROD" ;;
+    esac
+    info "adresse imposee aux telephones : $URL_PROD"
+
+    ( cd front && env $ENV_PROD $EAS update --branch production --message "$MESSAGE" ) \
         || echec "\`eas update\` a échoué. Le code est poussé et le NAS l'aura :
    seuls les téléphones sont en retard. Relance :
      cd front && $EAS update --branch production --message \"$MESSAGE\""

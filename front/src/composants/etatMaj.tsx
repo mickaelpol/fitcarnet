@@ -1,5 +1,5 @@
 import * as Updates from 'expo-updates';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
 import { adresseApi } from '@/api/client';
@@ -34,14 +34,57 @@ import { C, E, P, R, T } from '@/theme';
  * l'écran à chaque étape, y compris « tu es déjà à jour », qui est une réponse
  * et pas un silence.
  */
+/** Ce que le serveur répond, avant même qu'on lui demande des données. */
+type EtatServeur = 'inconnu' | 'joignable' | 'injoignable';
+
 export function EtatMaj() {
   const [message, setMessage] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
+  const [serveur, setServeur] = useState<EtatServeur>('inconnu');
 
-  /* Sur le web et en développement, `expo-updates` est inerte : il n'y a pas
-     de paquet à remplacer, le code vient du serveur. Afficher un panneau de
-     mise à jour y serait un mensonge poli. */
-  if (Platform.OS === 'web' || !Updates.isEnabled) return null;
+  /**
+   * LE SERVEUR RÉPOND-IL ?
+   *
+   * `/api` est publique — c'est la racine d'API Platform — donc cette
+   * vérification ne dépend ni d'un jeton valide ni d'une session ouverte.
+   * Elle distingue les deux erreurs qu'on confondait : « je n'arrive pas à
+   * joindre le serveur » et « le serveur me refuse ».
+   *
+   * Une adresse injoignable ET affichée juste au-dessus, c'est un diagnostic
+   * complet en une ligne : on voit QUELLE adresse ne répond pas.
+   */
+  const verifierServeur = useCallback(() => {
+    setServeur('inconnu');
+    const arret = new AbortController();
+    /* Cinq secondes. Au-delà, l'information n'a plus de valeur : on veut
+       savoir si le serveur est là, pas attendre qu'il se réveille. */
+    const minuteur = setTimeout(() => arret.abort(), 5000);
+
+    fetch(adresseApi(), { signal: arret.signal, headers: { Accept: 'application/json' } })
+      .then((r) => setServeur(r.status >= 500 ? 'injoignable' : 'joignable'))
+      .catch(() => setServeur('injoignable'))
+      .finally(() => clearTimeout(minuteur));
+
+    return () => { clearTimeout(minuteur); arret.abort(); };
+  }, []);
+
+  useEffect(() => verifierServeur(), [verifierServeur]);
+
+  /* SUR LE WEB, LE PANNEAU EXISTE MAIS SE TAIT SUR LES MISES À JOUR.
+   *
+   * Il n'y a pas de paquet JavaScript à remplacer : le code vient du serveur
+   * à chaque chargement, et « chercher une mise à jour » n'y voudrait rien
+   * dire. Mais l'adresse du serveur et sa disponibilité, elles, valent
+   * autant dans un navigateur que sur un téléphone.
+   *
+   * La première version cachait le panneau entier sur le web. Résultat : on
+   * a cherché un problème de cache pendant dix minutes parce que l'encart
+   * n'apparaissait pas. Un composant qui disparaît sans raison visible est
+   * un bug, même quand c'est intentionnel.
+   *
+   * `Updates.isEnabled` est faux aussi en développement, pour la même
+   * raison — le code vient de Metro. */
+  const avecMaj = Platform.OS !== 'web' && Updates.isEnabled;
 
   const chercher = () => {
     setOccupe(true);
@@ -79,29 +122,55 @@ export function EtatMaj() {
           `192.168.1.118` — injoignable hors du réseau de la maison — et
           l'application affiche exactement la même erreur que si le téléphone
           était hors ligne. Une ligne ici tranche en deux secondes. */}
-      <Ligne nom="Serveur" valeur={adresseApi()} />
-      <Ligne nom="Application" valeur={Updates.createdAt === null ? 'installée' : 'mise à jour'} />
-      <Ligne nom="Version d’exécution" valeur={Updates.runtimeVersion ?? '—'} />
-      <Ligne nom="Canal" valeur={Updates.channel ?? 'aucun'} />
-      <Ligne
-        nom="Paquet JavaScript"
-        /* `updateId` est null quand l'application tourne sur le JavaScript
-           embarqué dans l'APK — c'est-à-dire quand AUCUNE mise à jour n'a
-           jamais été appliquée. C'est l'information la plus utile du lot. */
-        valeur={Updates.updateId === null ? 'celui de l’APK' : Updates.updateId.slice(0, 8)}
-      />
-      {Updates.createdAt !== null && (
-        <Ligne
-          nom="Publié le"
-          valeur={Updates.createdAt.toLocaleDateString('fr-FR', {
-            day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
-          })}
-        />
+      <View style={s.ligne}>
+        <Discret style={{ flex: 1 }}>Serveur</Discret>
+        <Texte style={[s.valeur, {
+          color: serveur === 'joignable' ? C.ok
+            : serveur === 'injoignable' ? C.erreur : C.attenue,
+        }]}>
+          {serveur === 'joignable' ? 'joignable'
+            : serveur === 'injoignable' ? 'INJOIGNABLE' : 'vérification…'}
+        </Texte>
+      </View>
+      <Texte style={s.adresse} numberOfLines={2}>{adresseApi()}</Texte>
+      {avecMaj && (
+        <>
+          <Ligne nom="Application" valeur={Updates.createdAt === null ? 'installée' : 'mise à jour'} />
+          <Ligne nom="Version d’exécution" valeur={Updates.runtimeVersion ?? '—'} />
+          <Ligne nom="Canal" valeur={Updates.channel ?? 'aucun'} />
+          <Ligne
+            nom="Paquet JavaScript"
+            /* `updateId` est null quand l'application tourne sur le JavaScript
+               embarqué dans l'APK — c'est-à-dire quand AUCUNE mise à jour n'a
+               jamais été appliquée. C'est l'information la plus utile du lot. */
+            valeur={Updates.updateId === null ? 'celui de l’APK' : Updates.updateId.slice(0, 8)}
+          />
+          {Updates.createdAt !== null && (
+            <Ligne
+              nom="Publié le"
+              valeur={Updates.createdAt.toLocaleDateString('fr-FR', {
+                day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+              })}
+            />
+          )}
+        </>
+      )}
+      {!avecMaj && (
+        <Discret style={{ fontSize: T.petit }}>
+          Version web : le code vient du serveur à chaque chargement, il n’y a
+          rien à mettre à jour ici.
+        </Discret>
       )}
 
-      <Bouton variante="contour" onPress={chercher} desactive={occupe}>
-        {occupe ? 'Patiente…' : 'Chercher une mise à jour'}
+      <Bouton variante="contour" onPress={verifierServeur}>
+        Retester le serveur
       </Bouton>
+
+      {avecMaj && (
+        <Bouton variante="contour" onPress={chercher} desactive={occupe}>
+          {occupe ? 'Patiente…' : 'Chercher une mise à jour'}
+        </Bouton>
+      )}
 
       {message !== null && (
         <Discret style={s.message}>{message}</Discret>
@@ -120,6 +189,10 @@ const Ligne = ({ nom, valeur }: { nom: string; valeur: string }) => (
 const s = StyleSheet.create({
   ligne: { flexDirection: 'row', alignItems: 'center', gap: E.s },
   valeur: { fontSize: T.petit, color: C.attenue },
+  adresse: {
+    fontSize: T.petit, color: C.attenue,
+    backgroundColor: C.fond, borderRadius: R.s, padding: E.xs,
+  },
   message: {
     fontSize: T.petit,
     color: C.vif,
