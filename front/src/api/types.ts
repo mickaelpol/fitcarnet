@@ -63,11 +63,22 @@ export interface Exercice {
   groupes: string[];
   videoUrl: string | null;
   partieCorps: string | null;
-  equipement: string | null;
-  muscleCible: string | null;
-  musclesSecondaires: string | null;
-  instructions: string | null;
   source: 'perso' | 'import';
+
+  /* ABSENTS DE LA LISTE, PRESENTS SUR LA FICHE — d'où le « ? ».
+     Ces quatre champs ne servent que dans `ModaleExercice`, ouverte pour UN
+     exercice à la fois. Les livrer pour les 1338 entrées du catalogue à chaque
+     chargement revient à transporter des centaines de kilooctets de texte que
+     personne n'affiche. Côté API ils sont passés dans le groupe
+     `exercice:detail`, servi par `GET /api/exercices/{id}` uniquement.
+
+     Le « ? » n'est pas décoratif : sans lui, TypeScript affirmerait que ces
+     champs existent toujours, et le premier accès sans garde échouerait à
+     l'exécution sans que rien ne l'ait signalé à la compilation. */
+  equipement?: string | null;
+  muscleCible?: string | null;
+  musclesSecondaires?: string | null;
+  instructions?: string | null;
 }
 
 export interface Serie {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 export type EtatSauvegarde = 'repos' | 'attente' | 'envoi' | 'enregistre' | 'erreur';
 
@@ -50,6 +51,44 @@ export function useSauvegardeAuto<T>(
       enCours.current = false;
     }
   };
+
+  /* CE QUI SUIT EXISTE PARCE QUE 2,5 SECONDES SUFFISENT A PERDRE UNE SAISIE.
+     On tape une charge, on repose le telephone ou on revient en arriere : la
+     minuterie n'a pas fini de courir, l'ecran se demonte, et la valeur part
+     avec lui. En salle, ce n'est pas un cas limite — c'est le geste normal.
+
+     ON PASSE PAR UNE REFERENCE VERS `envoyer`, ET C'EST INDISPENSABLE. L'effet
+     ci-dessous ne s'installe qu'une fois (aucune dependance, sinon il se
+     reinstallerait a chaque rendu et le nettoyage enregistrerait en boucle).
+     Sans cette reference, il capturerait le `enregistrer` du PREMIER rendu et
+     rejouerait une fonction perimee au pire moment. */
+  const envoyerRef = useRef(envoyer);
+  envoyerRef.current = envoyer;
+  const actifRef = useRef(actif);
+  actifRef.current = actif;
+
+  useEffect(() => {
+    const vider = (): void => {
+      if (!actifRef.current) return;
+      if (minuteur.current) clearTimeout(minuteur.current);
+      /* `envoyer` compare la signature a la derniere envoyee : appele pour
+         rien, il ne fait rien. On peut donc etre large sans risquer d'ecrire
+         deux fois la meme chose. */
+      void envoyerRef.current();
+    };
+
+    // Arriere-plan, ecran verrouille, onglet du navigateur masque.
+    const abonnement = AppState.addEventListener('change', (etatAppli) => {
+      if (etatAppli !== 'active') vider();
+    });
+
+    // Sortie de l'ecran. La requete part meme si le composant disparait :
+    // elle ne depend plus de lui une fois lancee.
+    return () => {
+      abonnement.remove();
+      vider();
+    };
+  }, []);
 
   useEffect(() => {
     if (!actif || valeur === null) return;

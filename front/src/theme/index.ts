@@ -9,11 +9,38 @@ export const C = {
   surface2: '#23272e',
   ligne: '#2f343d',
   encre: '#e8eaed',
-  attenue: '#8b929c',
-  discret: '#5d646e',
+
+  /* LES QUATRE VALEURS SUIVANTES ONT ÉTÉ ÉCLAIRCIES, ET C'EST MESURÉ.
+   *
+   * Le seuil de lisibilité reconnu pour du texte courant est un contraste de
+   * 4,5:1 avec son fond. Sur `surface2`, le fond le plus clair de
+   * l'application, la palette d'origine donnait :
+   *
+   *     discret  #5d646e   2,51:1     ← la moitié du minimum
+   *     erreur   #d8352a   3,18:1
+   *     ok       #3d9a5c   4,26:1
+   *     attenue  #8b929c   4,77:1     (passait, de justesse)
+   *
+   * `discret` porte les unités — « kg », « rép » —, les étiquettes et les
+   * mentions secondaires. Du gris à 2,5:1 sur fond sombre, dans une salle au
+   * néon ou en plein soleil, ne se lit pas. Ce n'est pas une question de
+   * norme : c'est le texte qui dit ce que le chiffre signifie.
+   *
+   * TEINTE ET SATURATION INCHANGÉES : seule la luminosité monte. Ce sont les
+   * mêmes couleurs, assez claires pour être lues.
+   *
+   * `attenue` monte aussi, alors qu'il passait déjà. Sans cela il se
+   * confondrait avec le nouveau `discret` — 4,77 contre 4,53 — et les deux
+   * niveaux de mise en retrait n'en feraient plus qu'un : on aurait corrigé un
+   * défaut de lisibilité en créant un défaut de hiérarchie.
+   *
+   * `charte.test.ts` vérifie désormais ces rapports. La palette ne peut plus
+   * redescendre sous le seuil sans qu'un test le dise. */
+  attenue: '#adb2b9',
+  discret: '#868e99',
   vif: '#e3b23c',
-  ok: '#3d9a5c',
-  erreur: '#d8352a',
+  ok: '#3f9f5f',
+  erreur: '#e2675f',
   /* Une couleur par rôle nutritionnel. `fec` reprend volontairement la teinte
      de `vif` : le doré est à la fois la couleur d'accent de l'application et
      celle des féculents. Deux noms, une teinte, en connaissance de cause. */

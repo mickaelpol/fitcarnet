@@ -66,6 +66,23 @@ export default function DetailSeance() {
   const { parExercice: derniereFois } = useDerniereFois(seance?.date);
   const historique = useHistorique();
 
+  /* MEMOISE, PARCE QUE C'ETAIT ECRIT DANS LE JSX.
+     Ce filtrage porte sur les 1338 exercices du catalogue. Pose directement
+     dans les attributs de `ChoixDansListe`, il se rejouait a chaque rendu —
+     donc a chaque caractere tape, et meme modale fermee. La liste elle-meme
+     est virtualisee, ce n'etait donc pas un gel visible : juste 1338
+     iterations offertes par frappe. */
+  const elementsExercices = useMemo(
+    () => (exercices.data ?? [])
+      .filter((e) => seance === null || seance.type === null
+        || e.groupes.length === 0 || e.groupes.includes(seance.type))
+      .map((e) => ({
+        id: e.id, nom: e.nom, detail: e.formatPrescrit ?? '',
+        couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
+      })),
+    [exercices.data, seance?.type],
+  );
+
   /* La séance s'enregistre toute seule deux secondes et demie après la
      dernière modification. Tant qu'elle n'a pas d'identifiant, on ne
      déclenche rien : c'est le premier enregistrement qui la crée. */
@@ -352,12 +369,7 @@ export default function DetailSeance() {
       <ChoixDansListe
         visible={choixOuvert}
         titre="Ajouter un exercice"
-        elements={(exercices.data ?? [])
-          .filter((e) => seance.type === null || e.groupes.length === 0 || e.groupes.includes(seance.type))
-          .map((e) => ({
-            id: e.id, nom: e.nom, detail: e.formatPrescrit ?? '',
-            couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
-          }))}
+        elements={elementsExercices}
         onChoisir={ajouterExercice}
         onFermer={() => setChoixOuvert(false)}
       />

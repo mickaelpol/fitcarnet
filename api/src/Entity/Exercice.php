@@ -13,6 +13,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -22,10 +23,39 @@ use Symfony\Component\Validator\Constraints as Assert;
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'exercice')]
+/*
+ * DEUX EXERCICES NE PEUVENT PAS PORTER LE MEME NOM, ET LA BASE LE SAVAIT DEJA.
+ *
+ * `exercice.nom` est declare UNIQUE dans le schema. Mais rien ne le verifiait
+ * AVANT l'ecriture : un POST avec un nom deja pris traversait la validation,
+ * atteignait PostgreSQL, et remontait sous forme d'exception de contrainte —
+ * pas de 422 lisible, pas de champ designe, juste un echec brut.
+ *
+ * Et `POST` est ouvert a ROLE_USER : n'importe quel utilisateur pouvait le
+ * declencher en ajoutant « Developpe couche », un nom qui existe forcement
+ * dans un catalogue de 1338 entrees.
+ *
+ * COMPARAISON EXACTE, PAS INSENSIBLE A LA CASSE — et c'est deliberatement le
+ * meme choix que la contrainte SQL. Refuser ici « developpe couche » quand la
+ * base accepterait donnerait deux regles differentes sur la meme question :
+ * l'ecran refuserait un nom que la base tolere, et le jour ou l'un des deux
+ * change, personne ne saurait lequel fait foi.
+ */
+#[UniqueEntity(
+    fields: ['nom'],
+    message: 'Un exercice porte déjà ce nom.',
+)]
 #[ApiResource(
     operations: [
         new GetCollection(),
-        new Get(),
+        // LA FICHE RENVOIE PLUS QUE LA LISTE, ET C'EST TOUT L'INTERET.
+        //
+        // `exercice:detail` ajoute les textes longs — instructions, muscles,
+        // materiel — a ce que la collection expose deja. Ils ne servent que
+        // dans la fiche, ouverte pour UN exercice a la fois ; les livrer avec
+        // les 1338 entrees du catalogue revenait a transporter des centaines
+        // de kilooctets que personne n'affiche, a chaque chargement.
+        new Get(normalizationContext: ['groups' => ['exercice:lire', 'exercice:detail']]),
         new Post(security: "is_granted('ROLE_USER')"),
         // renseigner une vidéo ou un nom français relève de l'administration :
         // le catalogue est commun, une erreur s'afficherait pour tout le monde
@@ -37,6 +67,19 @@ use Symfony\Component\Validator\Constraints as Assert;
     // restent en tête, y compris si la collection est paginée.
     order: ['source' => 'DESC', 'nom' => 'ASC'],
     paginationItemsPerPage: 1500,
+    // UN CATALOGUE QUI CHANGE QUELQUES FOIS PAR AN N'A PAS A ETRE REFABRIQUE
+    // A CHAQUE APPEL.
+    //
+    // Il n'y avait aucun en-tete de cache : chaque requete rehydratait 1338
+    // entites et les reserialisait entierement, pour un contenu identique a
+    // celui de la veille.
+    //
+    // `shared_max_age` ne servira toutefois PAS a grand-chose ici tant que
+    // `Authorization` figure dans le `vary` global : un cache partage ne
+    // mutualise rien entre deux utilisateurs porteurs de jetons differents.
+    // Le gain reel est cote client et navigateur — c'est deja l'essentiel,
+    // mais autant le savoir plutot que d'attendre un miracle cote serveur.
+    cacheHeaders: ['max_age' => 3600, 'shared_max_age' => 86400],
 )]
 #[ApiFilter(SearchFilter::class, properties: [
     'nom' => 'ipartial', 'nomFr' => 'ipartial',
@@ -81,20 +124,30 @@ class Exercice
     #[Groups(['exercice:lire', 'exercice:ecrire'])]
     private ?string $partieCorps = null;
 
+    /* LES QUATRE CHAMPS QUI SUIVENT NE PARTENT PLUS AVEC LA COLLECTION.
+       Ils passent de `exercice:lire` a `exercice:detail`, servi par la seule
+       operation `Get`. Ils ne sont lus que dans la fiche d'un exercice —
+       `front/src/composants/modaleExercice.tsx` — ouverte pour un exercice a
+       la fois, et `instructions` pese a lui seul plusieurs centaines de
+       caracteres multiplies par 1338.
+
+       `exercice:ecrire` est conserve la ou il etait : l'administrateur doit
+       toujours pouvoir corriger ces champs. */
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['exercice:lire', 'exercice:ecrire'])]
+    #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $equipement = null;
 
     #[ORM\Column(name: 'muscle_cible', type: Types::TEXT, nullable: true)]
-    #[Groups(['exercice:lire', 'exercice:ecrire'])]
+    #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $muscleCible = null;
 
     #[ORM\Column(name: 'muscles_secondaires', type: Types::TEXT, nullable: true)]
-    #[Groups(['exercice:lire'])]
+    #[Groups(['exercice:detail'])]
     private ?string $musclesSecondaires = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['exercice:lire'])]
+    #[Groups(['exercice:detail'])]
     private ?string $instructions = null;
 
     /** 'perso' = tes exercices · 'import' = catalogue commun */

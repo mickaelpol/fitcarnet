@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type { Habitudes, ModeCuisson, PlanEnregistre } from '@/calcul/cuisson';
 import {
   api, definirJeton, definirRafraichissement, lireRafraichissement, membres,
 } from './client';
+import { oublierLeCacheDisque } from './persistance';
 import type {
   Aliment, Cible, Emplacement, Exercice, LigneStock, Modele, MonFrigo,
   Seance, Serie, Utilisateur,
@@ -53,6 +55,11 @@ export function useDeconnexion() {
     }
     await Promise.all([definirJeton(null), definirRafraichissement(null)]);
     qc.clear();
+    /* `clear()` ne vide que la mémoire. Le cache est aussi écrit sur le
+       disque : sans cette ligne, les séances, les objectifs et le frigo de
+       celui qui vient de partir resteraient sur le téléphone, et la personne
+       suivante les verrait s'afficher avant l'arrivée des siennes. */
+    await oublierLeCacheDisque();
   };
 }
 
@@ -82,6 +89,26 @@ export const useExercices = () =>
     // le catalogue dépasse 1 300 entrées : une fenêtre trop courte masquerait
     // les exercices personnels, classés après les importés
     queryFn: async () => membres(await api<{ member: Exercice[] }>('/exercices?itemsPerPage=2000')),
+    ...REFERENTIEL,
+  });
+
+/**
+ * La fiche complète d'UN exercice.
+ *
+ * La collection ci-dessus ne transporte plus les textes longs — instructions,
+ * muscles sollicités, matériel : ils ne servent que dans la fiche, ouverte un
+ * exercice à la fois, et les livrer pour les 1338 entrées coûtait des
+ * centaines de kilooctets à chaque chargement de l'application.
+ *
+ * Un aller-retour de plus à l'ouverture d'une fiche, donc — mais un seul, et
+ * mis en cache aussi longtemps que le reste du référentiel : rouvrir la même
+ * fiche ne redemande rien.
+ */
+export const useExerciceDetail = (id?: number) =>
+  useQuery({
+    queryKey: ['exercice', id],
+    queryFn: () => api<Exercice>(`/exercices/${id}`),
+    enabled: id !== undefined,
     ...REFERENTIEL,
   });
 
@@ -542,21 +569,33 @@ export const useSeances = () =>
 export function useRecordsAnterieurs(dateExclue?: string) {
   const seances = useSeances();
 
-  const records = new Map<number, number>();
-  for (const s of seances.data ?? []) {
-    if (dateExclue !== undefined && s.date.slice(0, 10) >= dateExclue.slice(0, 10)) continue;
-    for (const bloc of s.exercices) {
-      const idExercice = typeof bloc.exercice === 'string'
-        ? Number(bloc.exercice.split('/').pop())
-        : bloc.exercice.id;
-      for (const serie of bloc.series) {
-        if (serie.reps === null || serie.poids === null || serie.reps < 1 || serie.poids <= 0) continue;
-        const rm = serie.poids * (1 + 0.0333 * serie.reps);
-        const actuel = records.get(idExercice);
-        if (actuel === undefined || rm > actuel) records.set(idExercice, rm);
+  /* MEMOISE, ET C'EST L'ECRAN DE SEANCE QUI L'EXIGE.
+     Ce calcul parcourt TOUT l'historique. Ecrit dans le corps de la fonction,
+     il se rejouait a chaque rendu — donc a chaque caractere tape dans un champ
+     de poids ou de repetitions, puisque `seance/[id].tsx` consomme ce hook et
+     se re-rend a chaque frappe. Trois hooks de ce fichier faisaient pareil :
+     trois balayages complets de l'historique par touche.
+     Le cout ne se voit pas aujourd'hui ; il grandit avec l'anciennete du
+     compte, ce qui est la pire forme de lenteur — celle qui arrive trop
+     lentement pour qu'on sache quand elle a commence. */
+  const records = useMemo(() => {
+    const acc = new Map<number, number>();
+    for (const s of seances.data ?? []) {
+      if (dateExclue !== undefined && s.date.slice(0, 10) >= dateExclue.slice(0, 10)) continue;
+      for (const bloc of s.exercices) {
+        const idExercice = typeof bloc.exercice === 'string'
+          ? Number(bloc.exercice.split('/').pop())
+          : bloc.exercice.id;
+        for (const serie of bloc.series) {
+          if (serie.reps === null || serie.poids === null || serie.reps < 1 || serie.poids <= 0) continue;
+          const rm = serie.poids * (1 + 0.0333 * serie.reps);
+          const actuel = acc.get(idExercice);
+          if (actuel === undefined || rm > actuel) acc.set(idExercice, rm);
+        }
       }
     }
-  }
+    return acc;
+  }, [seances.data, dateExclue]);
 
   return { records, pret: !seances.isLoading };
 }
@@ -571,24 +610,29 @@ export function useRecordsAnterieurs(dateExclue?: string) {
 export function useDerniereFois(dateExclue?: string) {
   const seances = useSeances();
 
-  const parExercice = new Map<number, { reps: number | null; poids: number | null; secondes: number | null }[]>();
+  // Memoise pour la meme raison que `useRecordsAnterieurs`, et il y a un tri
+  // en plus : sans cela, l'historique entier est re-trie a chaque frappe.
+  const parExercice = useMemo(() => {
+    const acc = new Map<number, { reps: number | null; poids: number | null; secondes: number | null }[]>();
 
-  const triees = [...(seances.data ?? [])]
-    .filter((s) => dateExclue === undefined || s.date.slice(0, 10) < dateExclue.slice(0, 10))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    const triees = [...(seances.data ?? [])]
+      .filter((s) => dateExclue === undefined || s.date.slice(0, 10) < dateExclue.slice(0, 10))
+      .sort((a, b) => b.date.localeCompare(a.date));
 
-  for (const s of triees) {
-    for (const bloc of s.exercices) {
-      const idExercice = typeof bloc.exercice === 'string'
-        ? Number(bloc.exercice.split('/').pop())
-        : bloc.exercice.id;
-      if (parExercice.has(idExercice)) continue;   // la plus récente d'abord
-      const series = bloc.series
-        .filter((x) => x.reps !== null || x.poids !== null || x.secondes !== null)
-        .map((x) => ({ reps: x.reps, poids: x.poids, secondes: x.secondes }));
-      if (series.length > 0) parExercice.set(idExercice, series);
+    for (const s of triees) {
+      for (const bloc of s.exercices) {
+        const idExercice = typeof bloc.exercice === 'string'
+          ? Number(bloc.exercice.split('/').pop())
+          : bloc.exercice.id;
+        if (acc.has(idExercice)) continue;   // la plus récente d'abord
+        const series = bloc.series
+          .filter((x) => x.reps !== null || x.poids !== null || x.secondes !== null)
+          .map((x) => ({ reps: x.reps, poids: x.poids, secondes: x.secondes }));
+        if (series.length > 0) acc.set(idExercice, series);
+      }
     }
-  }
+    return acc;
+  }, [seances.data, dateExclue]);
 
   return { parExercice, pret: !seances.isLoading };
 }
@@ -603,32 +647,37 @@ export function useDerniereFois(dateExclue?: string) {
 export function useHistorique() {
   const seances = useSeances();
 
-  const rm = new Map<number, number[]>();
-  const volume = new Map<number, number[]>();
+  // Le plus lourd des trois : il construit deux séries de points par exercice,
+  // en réallouant un tableau à chaque ajout. Memoise pour la meme raison.
+  const { rm, volume } = useMemo(() => {
+    const rmAcc = new Map<number, number[]>();
+    const volumeAcc = new Map<number, number[]>();
 
-  const triees = [...(seances.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+    const triees = [...(seances.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
 
-  for (const s of triees) {
-    for (const bloc of s.exercices) {
-      const id = typeof bloc.exercice === 'string'
-        ? Number(bloc.exercice.split('/').pop())
-        : bloc.exercice.id;
+    for (const s of triees) {
+      for (const bloc of s.exercices) {
+        const id = typeof bloc.exercice === 'string'
+          ? Number(bloc.exercice.split('/').pop())
+          : bloc.exercice.id;
 
-      let meilleur = 0;
-      let total = 0;
-      for (const serie of bloc.series) {
-        if (serie.reps === null || serie.poids === null) continue;
-        if (serie.reps < 1 || serie.poids <= 0) continue;
-        total += serie.reps * serie.poids;
-        if (serie.reps <= 15) {
-          const e = serie.poids * (1 + 0.0333 * serie.reps);
-          if (e > meilleur) meilleur = e;
+        let meilleur = 0;
+        let total = 0;
+        for (const serie of bloc.series) {
+          if (serie.reps === null || serie.poids === null) continue;
+          if (serie.reps < 1 || serie.poids <= 0) continue;
+          total += serie.reps * serie.poids;
+          if (serie.reps <= 15) {
+            const e = serie.poids * (1 + 0.0333 * serie.reps);
+            if (e > meilleur) meilleur = e;
+          }
         }
+        if (meilleur > 0) rmAcc.set(id, [...(rmAcc.get(id) ?? []), Math.round(meilleur * 10) / 10]);
+        if (total > 0) volumeAcc.set(id, [...(volumeAcc.get(id) ?? []), Math.round(total)]);
       }
-      if (meilleur > 0) rm.set(id, [...(rm.get(id) ?? []), Math.round(meilleur * 10) / 10]);
-      if (total > 0) volume.set(id, [...(volume.get(id) ?? []), Math.round(total)]);
     }
-  }
+    return { rm: rmAcc, volume: volumeAcc };
+  }, [seances.data]);
 
   return { rm, volume, pret: !seances.isLoading };
 }

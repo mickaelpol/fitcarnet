@@ -69,6 +69,32 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 ENV APP_ENV=prod
+
+# LES DEUX DERNIERES PAIRES DE LIGNES CI-DESSOUS SONT NOUVELLES. POURQUOI.
+#
+# `opcache.preload` — `api/config/preload.php` existait depuis toujours et n'a
+# JAMAIS servi : sans cette directive, PHP ne le lit pas. Chaque requete
+# redemarrait donc le noyau Symfony au complet (autoload, conteneur de
+# services, metadonnees Doctrine) alors que ce fichier est fait pour les garder
+# en memoire partagee une fois pour toutes.
+#
+#   L'ORDRE EST DEJA BON, ET C'EST CE QUI REND LA DIRECTIVE SURE : dans
+#   `entrypoint-prod.sh`, `cache:warmup` tourne AVANT le `exec` qui lance
+#   FrankenPHP. Le fichier compile existe donc quand PHP demarre. S'il
+#   manquait, `preload.php` ne fait rien — il teste sa presence avant
+#   d'inclure quoi que ce soit.
+#
+#   `preload_user=root` N'EST PAS UN OUBLI DE DURCISSEMENT : PHP REFUSE tout
+#   prechargement lorsqu'il tourne en root sans cette valeur, et cette image
+#   n'a pas de directive USER. Sans elle, le prechargement serait simplement
+#   ignore — soit exactement la situation qu'on corrige.
+#
+# `opcache.jit` — gain modeste et honnetement incertain sur une charge dominee
+# par le SQL et la serialisation. Purement additif.
+#
+# SI L'APPLICATION NE DEMARRE PLUS APRES CE CHANGEMENT, c'est ici qu'il faut
+# regarder en premier : `docker logs fitcarnet-app` nommera la directive
+# fautive des les premieres lignes.
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
  && { \
       echo 'memory_limit=256M'; \
@@ -80,6 +106,10 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
       echo 'opcache.validate_timestamps=0'; \
       echo 'realpath_cache_size=4096K'; \
       echo 'realpath_cache_ttl=600'; \
+      echo 'opcache.preload=/app/config/preload.php'; \
+      echo 'opcache.preload_user=root'; \
+      echo 'opcache.jit=tracing'; \
+      echo 'opcache.jit_buffer_size=64M'; \
     } > "$PHP_INI_DIR/conf.d/fitcarnet.ini"
 
 # Ce qui doit etre vrai avant que l'application reponde : dependances, cles

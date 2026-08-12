@@ -90,6 +90,18 @@
 		# assets versionnés : cache long
 		@assets path /assets/*
 		header @assets Cache-Control "public, max-age=31536000, immutable"
+		# LE PLUS GROS FICHIER DU SITE N'ETAIT COUVERT PAR AUCUNE REGLE.
+		#
+		# `expo export --platform web` ne range pas tout sous /assets : le paquet
+		# JavaScript, de loin le plus lourd, sort dans
+		# `/_expo/static/js/web/entry-<empreinte>.js`. Le motif `/assets/*` ne le
+		# voyait donc jamais, et il repartait a chaque visite sans la moindre
+		# consigne de cache — pour un fichier qui ne change pas.
+		#
+		# Il porte deja son empreinte dans son nom : le garder un an est sans
+		# risque, une publication produit un autre nom.
+		@statiques path /_expo/*
+		header @statiques Cache-Control "public, max-age=31536000, immutable"
 		# index.html : jamais mis en cache, sinon les mises à jour ne passent pas
 		header /index.html Cache-Control "no-store"
 		try_files {path} /index.html

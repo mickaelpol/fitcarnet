@@ -1,17 +1,28 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useDeconnexion, useMoi } from '@/api/hooks';
-import { Bouton, Carte, Chargement, Discret, Texte } from '@/composants/base';
+import { Bouton, Carte, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { BandeauMaj } from '@/composants/bandeauMaj';
 import { EtatMaj } from '@/composants/etatMaj';
 import { C, E, P, T } from '@/theme';
 
 export default function Compte() {
   const router = useRouter();
-  const { data, isLoading } = useMoi();
+  const { data, isLoading, isError, error, refetch } = useMoi();
   const deconnecter = useDeconnexion();
 
   if (isLoading) return <Chargement />;
+
+  /* UN ECHEC DOIT SE VOIR, ET IL NE SE VOYAIT PAS.
+     Seul `isLoading` etait lu. Reseau coupe ou session expiree, l'ecran
+     s'affichait quand meme : un nom remplace par un tiret, une adresse vide,
+     et surtout « Gérés dans l'onglet Mon frigo » affiche comme un fait alors
+     que rien n'avait ete recu. Une information fausse presentee calmement est
+     pire qu'une erreur — on la croit. Tous les autres ecrans utilisent deja ce
+     composant. */
+  if (isError) {
+    return <Erreur message={error.message} onReessayer={() => void refetch()} />;
+  }
 
   return (
     <ScrollView contentContainerStyle={s.page}>

@@ -52,6 +52,20 @@ export default function DetailModele() {
     return m;
   }, [exercices.data]);
 
+  /* Meme motif que dans l'ecran de seance : ce filtrage des 1338 exercices
+     etait pose dans le JSX, donc rejoue a chaque rendu, modale fermee
+     comprise. */
+  const elementsExercices = useMemo(
+    () => (exercices.data ?? [])
+      .filter((e) => modele === null || modele.type === null
+        || e.groupes.length === 0 || e.groupes.includes(modele.type))
+      .map((e) => ({
+        id: e.id, nom: e.nomFr ?? e.nom, detail: e.formatPrescrit ?? '',
+        couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
+      })),
+    [exercices.data, modele?.type],
+  );
+
   if (exercices.isLoading || modeles.isLoading) return <Chargement />;
   if (exercices.isError) {
     return <Erreur message={exercices.error.message} onReessayer={() => void exercices.refetch()} />;
@@ -257,14 +271,7 @@ export default function DetailModele() {
       <ChoixDansListe
         visible={choix}
         titre="Ajouter un exercice"
-        elements={(exercices.data ?? [])
-          .filter((e) => modele.type === null
-            || e.groupes.length === 0
-            || e.groupes.includes(modele.type))
-          .map((e) => ({
-            id: e.id, nom: e.nomFr ?? e.nom, detail: e.formatPrescrit ?? '',
-            couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
-          }))}
+        elements={elementsExercices}
         onChoisir={ajouter}
         onFermer={() => setChoix(false)}
       />

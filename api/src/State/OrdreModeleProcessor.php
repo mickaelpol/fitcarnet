@@ -59,18 +59,38 @@ final readonly class OrdreModeleProcessor implements ProcessorInterface
             return $data;
         }
 
-        $seances = $this->em->getRepository(Seance::class)->findBy([
-            'utilisateur' => $utilisateur,
-        ]);
+        /* ON DEMANDE A LA BASE CE QU'ON CHERCHE, PLUTOT QUE TOUT PUIS TRIER.
+           Ici se trouvait `findBy(['utilisateur' => ...])` : TOUT l'historique
+           de l'utilisateur charge en memoire, sans limite, pour n'en garder
+           ensuite qu'une fraction. Puis, plus bas, `getExercices()` sur chacune
+           — une requete de plus par seance, et une par bloc pour son exercice.
+           Sur un compte de deux ans, un seul clic sur « appliquer l'ordre »
+           declenchait plusieurs centaines de requetes.
 
-        $concernees = [];
-        foreach ($seances as $seance) {
-            $issueDuModele = $seance->getModele()?->getId() === $modele->getId();
-            $memeType = null !== $modele->getType() && $seance->getType() === $modele->getType();
-            if ($issueDuModele || $memeType) {
-                $concernees[] = $seance;
-            }
+           Le WHERE part donc en SQL, et les deux relations sont jointes d'un
+           coup. Le comportement ne change pas d'un iota : meme condition,
+           « issue de ce modele OU du meme type », a ceci pres qu'un modele
+           sans type ne peut apparier que par filiation — ce que l'ancien code
+           faisait deja, via son `null !== $modele->getType()`. */
+        $requete = $this->em->createQueryBuilder()
+            ->select('s', 'bloc', 'ref')
+            ->from(Seance::class, 's')
+            ->leftJoin('s.exercices', 'bloc')
+            ->leftJoin('bloc.exercice', 'ref')
+            ->where('s.utilisateur = :utilisateur')
+            ->setParameter('utilisateur', $utilisateur);
+
+        if (null === $modele->getType()) {
+            $requete->andWhere('s.modele = :modele')
+                    ->setParameter('modele', $modele);
+        } else {
+            $requete->andWhere('s.modele = :modele OR s.type = :type')
+                    ->setParameter('modele', $modele)
+                    ->setParameter('type', $modele->getType());
         }
+
+        /** @var list<Seance> $concernees */
+        $concernees = $requete->getQuery()->getResult();
         $data->seancesConcernees = \count($concernees);
 
         if (!$data->appliquer) {

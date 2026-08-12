@@ -69,8 +69,15 @@ export function ChronoEffort({
         </Texte>
       </Pressable>
 
+      {/* Libellé absent, et cible à 40 px au lieu des 44 que le thème
+          s'impose : le `hitSlop` rattrape les 4 px sans rien déplacer. */}
       {!court && affiche > 0 && (
-        <Pressable onPress={onEffacer} style={s.effacer}>
+        <Pressable
+          onPress={onEffacer}
+          style={s.effacer}
+          hitSlop={2}
+          accessibilityLabel="Effacer le temps mesuré"
+        >
           <Discret style={{ fontSize: T.moyen }}>×</Discret>
         </Pressable>
       )}

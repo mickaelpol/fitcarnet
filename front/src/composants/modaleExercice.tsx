@@ -1,5 +1,6 @@
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useExerciceDetail } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
 import { Bouton, Discret, Texte } from './base';
 import { C, E, P, R, T } from '@/theme';
@@ -35,18 +36,33 @@ export function ModaleExercice({
   visible: boolean;
   onFermer: () => void;
 }) {
+  /* LA FICHE VA CHERCHER SES PROPRES TEXTES.
+     Le catalogue chargé au démarrage n'en transporte plus : instructions,
+     muscles et matériel ne partent que sur `GET /api/exercices/{id}`. On les
+     demande donc ici, et seulement quand la fiche s'ouvre vraiment.
+
+     APPELÉ AVANT TOUT `return`, sans condition : un hook React doit s'exécuter
+     à chaque rendu, dans le même ordre. Le mettre après le garde ci-dessous
+     casserait l'application dès qu'on ouvre puis ferme une fiche. */
+  const detail = useExerciceDetail(visible && exercice !== undefined ? exercice.id : undefined);
+
   if (!exercice) return null;
 
-  const id = identifiantYoutube(exercice.videoUrl ?? null);
-  const nom = exercice.nomFr ?? exercice.nom;
+  /* Tant que la fiche n'est pas arrivée, on affiche ce qu'on a déjà : le nom,
+     le format, la zone. Les blocs manquants se remplissent ensuite, sans
+     écran d'attente — il n'y a rien à attendre pour la moitié du contenu. */
+  const complet: Exercice = detail.data ?? exercice;
+
+  const id = identifiantYoutube(complet.videoUrl ?? null);
+  const nom = complet.nomFr ?? complet.nom;
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onFermer}>
       <Pressable style={s.fond} onPress={onFermer}>
         <Pressable style={s.feuille} onPress={(e) => e.stopPropagation()}>
           <Texte style={s.titre}>{nom}</Texte>
-          {exercice.nomFr !== null && exercice.nomFr !== undefined && (
-            <Discret style={{ fontSize: T.petit, marginTop: -6 }}>{exercice.nom}</Discret>
+          {complet.nomFr !== null && complet.nomFr !== undefined && (
+            <Discret style={{ fontSize: T.petit, marginTop: -6 }}>{complet.nom}</Discret>
           )}
 
           <ScrollView style={{ marginTop: E.m }} contentContainerStyle={{ gap: E.m }}>
@@ -78,28 +94,28 @@ export function ModaleExercice({
             )}
 
             <View style={s.infos}>
-              {exercice.partieCorps !== null && exercice.partieCorps !== undefined && (
-                <Ligne cle="Zone" valeur={exercice.partieCorps} />
+              {complet.partieCorps !== null && complet.partieCorps !== undefined && (
+                <Ligne cle="Zone" valeur={complet.partieCorps} />
               )}
-              {exercice.muscleCible !== null && exercice.muscleCible !== undefined && (
-                <Ligne cle="Muscle ciblé" valeur={exercice.muscleCible} />
+              {complet.muscleCible !== null && complet.muscleCible !== undefined && (
+                <Ligne cle="Muscle ciblé" valeur={complet.muscleCible} />
               )}
-              {exercice.musclesSecondaires !== null && exercice.musclesSecondaires !== undefined && (
-                <Ligne cle="Aussi sollicités" valeur={exercice.musclesSecondaires} />
+              {complet.musclesSecondaires !== null && complet.musclesSecondaires !== undefined && (
+                <Ligne cle="Aussi sollicités" valeur={complet.musclesSecondaires} />
               )}
-              {exercice.equipement !== null && exercice.equipement !== undefined && (
-                <Ligne cle="Matériel" valeur={exercice.equipement} />
+              {complet.equipement !== null && complet.equipement !== undefined && (
+                <Ligne cle="Matériel" valeur={complet.equipement} />
               )}
-              {exercice.formatPrescrit !== null && (
-                <Ligne cle="Format prescrit" valeur={exercice.formatPrescrit} />
+              {complet.formatPrescrit !== null && (
+                <Ligne cle="Format prescrit" valeur={complet.formatPrescrit} />
               )}
             </View>
 
-            {exercice.instructions !== null && exercice.instructions !== undefined
-              && exercice.instructions !== '' && (
+            {complet.instructions !== null && complet.instructions !== undefined
+              && complet.instructions !== '' && (
               <View>
                 <Discret style={s.section}>Exécution</Discret>
-                <Texte style={{ fontSize: T.normal, lineHeight: 21 }}>{exercice.instructions}</Texte>
+                <Texte style={{ fontSize: T.normal, lineHeight: 21 }}>{complet.instructions}</Texte>
               </View>
             )}
           </ScrollView>

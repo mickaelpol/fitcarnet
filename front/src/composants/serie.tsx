@@ -87,7 +87,14 @@ export function LigneSerie({
         </View>
       )}
 
-      <Pressable onPress={onSupprimer} style={s.sup}>
+      {/* Le libellé n'est pas décoratif : un lecteur d'écran annonce « × »
+          comme « signe multiplication », ou ne dit rien. La case à cocher
+          voisine en a un depuis le début ; celui-ci manquait. */}
+      <Pressable
+        onPress={onSupprimer}
+        style={s.sup}
+        accessibilityLabel={`Supprimer la série ${index + 1}`}
+      >
         <Discret style={{ fontSize: T.grand }}>×</Discret>
       </Pressable>
     </View>

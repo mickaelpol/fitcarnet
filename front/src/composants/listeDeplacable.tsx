@@ -48,10 +48,24 @@ export function ListeDeplacable<T>({
           <Discret style={{ fontSize: T.grand, color: isActive ? C.vif : C.discret }}>⠿</Discret>
         </Pressable>
         <View>
-          <Pressable onPress={() => deplacer(index, -1)} style={s.fleche} hitSlop={6}>
+          {/* 30 × 22 px plus 6 de marge de touche : 42 × 34, sous les 44 que
+              `TOUCHE` impose au reste de l'application. On élargit la MARGE et
+              non le bouton — la flèche reste discrète, la cible fait 44.
+              Et « ▲ » seul n'est annoncé par aucun lecteur d'écran. */}
+          <Pressable
+            onPress={() => deplacer(index, -1)}
+            style={s.fleche}
+            hitSlop={{ top: 11, bottom: 11, left: 7, right: 7 }}
+            accessibilityLabel="Monter d’une place"
+          >
             <Discret style={{ fontSize: T.petit }}>▲</Discret>
           </Pressable>
-          <Pressable onPress={() => deplacer(index, 1)} style={s.fleche} hitSlop={6}>
+          <Pressable
+            onPress={() => deplacer(index, 1)}
+            style={s.fleche}
+            hitSlop={{ top: 11, bottom: 11, left: 7, right: 7 }}
+            accessibilityLabel="Descendre d’une place"
+          >
             <Discret style={{ fontSize: T.petit }}>▼</Discret>
           </Pressable>
         </View>

@@ -28,6 +28,17 @@ services:
             - { name: api_platform.doctrine.orm.query_extension.collection, priority: 100 }
             - { name: api_platform.doctrine.orm.query_extension.item, priority: 100 }
 
+    # Une séance est lue en un seul objet : elle doit être chargée en une seule
+    # requête. Sans ça, sérialiser ses collections paresseuses en déclenchait
+    # près de deux cents par écran. Voir App\Doctrine\ChargementComplet.
+    #
+    # Priorité plus basse que les garde-fous ci-dessus : ils posent le WHERE,
+    # celui-ci se contente d'ajouter des jointures par-dessus.
+    App\Doctrine\ChargementComplet:
+        tags:
+            - { name: api_platform.doctrine.orm.query_extension.collection, priority: 50 }
+            - { name: api_platform.doctrine.orm.query_extension.item, priority: 50 }
+
     # Grocy : la base d'aliments de l'administrateur.
     # Les identifiants viennent de l'environnement, jamais du dépôt.
     App\Service\FrigoGrocy:

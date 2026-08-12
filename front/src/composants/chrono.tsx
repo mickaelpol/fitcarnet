@@ -113,7 +113,13 @@ export function ChronoRepos({ relance, onCalculateur }: {
         <Texte style={{ color: C.fond, fontFamily: P.fort }}>{court ? 'Stop' : 'Go'}</Texte>
       </Pressable>
 
-      <Pressable onPress={agir(remettreChrono)} style={s.reset}>
+      {/* « ↺ » seul n'est annoncé par aucun lecteur d'écran. Le bouton « Go »
+          voisin, lui, porte son texte : il n'avait rien à ajouter. */}
+      <Pressable
+        onPress={agir(remettreChrono)}
+        style={s.reset}
+        accessibilityLabel="Remettre le chronomètre à zéro"
+      >
         <Texte style={{ color: C.attenue, fontSize: T.moyen }}>↺</Texte>
       </Pressable>
 
@@ -195,7 +201,10 @@ const s = StyleSheet.create({
   },
   presets: { flexDirection: 'row', gap: 5, flexGrow: 1, flexBasis: '100%' },
   preset: {
-    flex: 1, minHeight: 36, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
+    /* 36 px auparavant, sous les 44 que le reste de l'application s'impose.
+       Ce sont des boutons qu'on vise entre deux séries, la main moite et sans
+       regarder : c'est le pire endroit pour une cible trop petite. */
+    flex: 1, minHeight: TOUCHE, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
     backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center',
   },
   presetActif: { borderColor: C.vif },

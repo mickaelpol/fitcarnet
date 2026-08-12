@@ -107,3 +107,68 @@ describe('l\'échelle elle-même', () => {
     }
   });
 });
+
+/**
+ * CE QUI SE LIT VRAIMENT, ET PAS SEULEMENT CE QUI EST JOLI SUR UN ÉCRAN NEUF.
+ *
+ * Ce bloc existe parce que le défaut a vécu longtemps sans être vu :
+ * `C.discret` affichait les unités — « kg », « rép » — à 2,51:1 sur
+ * `surface2`, soit la moitié du minimum lisible. Personne ne l'avait
+ * remarqué : sur un bon écran, dans une pièce sombre, ça passe. Dans une salle
+ * au néon ou dehors, non.
+ *
+ * Une couleur trop pâle ne casse rien, ne lève aucune erreur et ne se voit pas
+ * en relecture. Sans un test qui la mesure, elle revient — au premier
+ * ajustement esthétique, et sans que personne l'ait décidé.
+ */
+describe('la palette reste lisible', () => {
+  /* Luminance relative, formule WCAG 2.1. */
+  const luminance = (hex: string): number => {
+    const canal = (v: number): number => {
+      const c = v / 255;
+
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const n = hex.replace('#', '');
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
+
+    return 0.2126 * canal(r!) + 0.7152 * canal(g!) + 0.0722 * canal(b!);
+  };
+
+  const contraste = (a: string, b: string): number => {
+    const [x, y] = [luminance(a), luminance(b)];
+
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+
+  /** Les trois fonds sur lesquels du texte peut se poser. */
+  const FONDS = { fond: C.fond, surface: C.surface, surface2: C.surface2 };
+
+  /** Les couleurs qui servent à ÉCRIRE. `ligne` en est absente : c'est un
+      trait, pas du texte, et lui imposer 4,5:1 en ferait une barre noire. */
+  const ENCRES = {
+    encre: C.encre, attenue: C.attenue, discret: C.discret,
+    vif: C.vif, ok: C.ok, erreur: C.erreur,
+  };
+
+  it('tout texte atteint 4,5:1 sur chacun des trois fonds', () => {
+    const faibles: string[] = [];
+    for (const [nomEncre, encre] of Object.entries(ENCRES)) {
+      for (const [nomFond, fond] of Object.entries(FONDS)) {
+        const r = contraste(encre, fond);
+        if (r < 4.5) faibles.push(`C.${nomEncre} sur C.${nomFond} : ${r.toFixed(2)}:1`);
+      }
+    }
+    assert.deepEqual(faibles, [],
+      `Sous le seuil de lisibilité (4,5:1) :\n${faibles.join('\n')}`);
+  });
+
+  it('les deux niveaux de mise en retrait restent distincts', () => {
+    /* Sinon on corrige un défaut de lisibilité en en créant un de hiérarchie :
+       deux gris au même contraste ne disent plus lequel compte le moins. */
+    const ecart = contraste(C.attenue, C.fond) / contraste(C.discret, C.fond);
+    assert.ok(ecart >= 1.3,
+      `attenue et discret sont trop proches (rapport ${ecart.toFixed(2)}) : `
+      + 'la hiérarchie visuelle disparaît');
+  });
+});

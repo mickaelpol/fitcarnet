@@ -1,6 +1,7 @@
 import { BarlowCondensed_600SemiBold, BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed';
 import { Inter_400Regular, Inter_600SemiBold, useFonts } from '@expo-google-fonts/inter';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -8,6 +9,7 @@ import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { chargerJeton, surSessionFinie } from '@/api/client';
+import { PERSISTANCE, oublierLeCacheDisque } from '@/api/persistance';
 import { useConnecte } from '@/api/session';
 import { Chargement } from '@/composants/base';
 import { EnTete } from '@/composants/enTete';
@@ -78,6 +80,11 @@ export default function Racine() {
   useEffect(() => {
     surSessionFinie(() => {
       client.clear();
+      /* `clear()` ne vide que la MÉMOIRE. Depuis que le cache est écrit sur le
+         disque, l'oublier là aussi n'est plus une élégance : sans cette ligne,
+         les séances et le frigo du compte précédent resteraient sur le
+         téléphone et s'afficheraient à la connexion suivante. */
+      void oublierLeCacheDisque();
       routeur.replace('/connexion');
     });
 
@@ -100,7 +107,10 @@ export default function Racine() {
 
   return (
     <Enveloppe style={{ flex: 1 }}>
-    <QueryClientProvider client={client}>
+    {/* Le cache est relu depuis le disque avant le premier rendu : au
+        démarrage à froid, les écrans s'affichent avec ce qu'on savait hier
+        pendant que les requêtes repartent en arrière-plan. */}
+    <PersistQueryClientProvider client={client} persistOptions={PERSISTANCE}>
       <SafeAreaProvider>
         <StatusBar style="light" />
         <Stack
@@ -132,7 +142,7 @@ export default function Racine() {
           />
         </Stack>
       </SafeAreaProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
     </Enveloppe>
   );
 }
