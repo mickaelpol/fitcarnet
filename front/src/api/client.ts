@@ -164,6 +164,15 @@ interface Options {
 }
 
 /**
+ * L'adresse que cette application interroge, telle qu'elle a ete figee.
+ *
+ * Exportee pour etre AFFICHEE. Sur un telephone, rien ne permet autrement de
+ * savoir si l'APK installe parle au NAS ou a une adresse de developpement :
+ * dans les deux cas on voit « impossible de charger ».
+ */
+export const adresseApi = (): string => BASE;
+
+/**
  * Appel à l'API. Les erreurs remontent sous forme d'ErreurApi avec le
  * message renvoyé par le serveur, jamais un « [object Object] ».
  *
@@ -208,11 +217,32 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
     if (j) entetes.Authorization = `Bearer ${j}`;
   }
 
-  const reponse = await fetch(BASE + chemin, {
-    method: methode,
-    headers: entetes,
-    body: corps === undefined ? undefined : JSON.stringify(corps),
-  });
+  /* UNE PANNE RESEAU DOIT DIRE QUELLE ADRESSE A ECHOUE.
+   *
+   * `fetch` leve « Network request failed » — six mots qui ne disent ni le
+   * serveur, ni la cause, ni quoi faire. On a cherche une soiree une erreur
+   * qui venait simplement d'un APK construit avec l'adresse du poste de
+   * developpement : le message etait le meme que pour un telephone hors
+   * ligne. Nommer l'adresse aurait suffi.
+   *
+   * On ne relance pas ici : react-query reessaie deja deux fois. On traduit,
+   * c'est tout. */
+  let reponse: Response;
+  try {
+    reponse = await fetch(BASE + chemin, {
+      method: methode,
+      headers: entetes,
+      body: corps === undefined ? undefined : JSON.stringify(corps),
+    });
+  } catch {
+    return {
+      statut: 0,
+      ok: false,
+      donnees: null,
+      message: `Serveur injoignable : ${BASE}. Vérifie ta connexion — `
+        + `et que cette adresse est bien celle attendue.`,
+    };
+  }
 
   if (reponse.status === 204) {
     return { statut: 204, ok: true, donnees: null, message: '' };

@@ -17,41 +17,54 @@ export interface Sonnerie {
 }
 
 /* eslint-disable @typescript-eslint/no-require-imports */
+/**
+ * LES CINQ FICHIERS SONT AUSSI DES RESSOURCES ANDROID.
+ *
+ * `app.json` les déclare dans le greffon `expo-notifications`, qui les copie
+ * dans `res/raw` de l'APK. Android exige alors des noms de ressource en
+ * `[a-z0-9_]` — **pas de tiret, pas de majuscule**. L'ancienne sonnerie
+ * « trois-coups » aurait fait échouer la compilation native, avec un message
+ * parlant de ressource invalide et pas du tiret.
+ *
+ * Les clés servent donc trois fois : le nom du fichier, la ressource Android,
+ * et l'identifiant du canal de notification. Une seule chaîne, trois usages,
+ * aucune table de correspondance à tenir à jour.
+ */
 export const SONNERIES: Sonnerie[] = [
   {
-    cle: 'buzzer',
-    libelle: 'Buzzer',
-    description: 'six bips stridents — perce par-dessus la musique',
-    source: require('../../assets/sons/buzzer.mp3'),
+    cle: 'bois',
+    libelle: 'Bois',
+    description: 'trois lames de marimba qui montent — chaud et bref',
+    source: require('../../assets/sons/bois.wav'),
   },
   {
-    cle: 'montante',
-    libelle: 'Montante',
-    description: 'arpège ascendant — présent sans crisper',
-    source: require('../../assets/sons/montante.mp3'),
+    cle: 'rappel',
+    libelle: 'Rappel',
+    description: 'trois groupes de deux notes — pour la salle, par-dessus la musique',
+    source: require('../../assets/sons/rappel.wav'),
+  },
+  {
+    cle: 'harpe',
+    libelle: 'Harpe',
+    description: 'cinq notes pincées ascendantes — présente sans presser',
+    source: require('../../assets/sons/harpe.wav'),
   },
   {
     cle: 'cloche',
     libelle: 'Cloche',
-    description: 'un coup, longue résonance',
-    source: require('../../assets/sons/cloche.mp3'),
+    description: 'un coup, longue résonance — le plus calme',
+    source: require('../../assets/sons/cloche.wav'),
   },
   {
-    cle: 'trois-coups',
-    libelle: 'Trois coups',
-    description: 'bref et grave — le plus discret',
-    source: require('../../assets/sons/trois-coups.mp3'),
-  },
-  {
-    cle: 'douce',
-    libelle: 'Douce',
-    description: 'trois notes rondes — peut se perdre en salle',
-    source: require('../../assets/sons/douce.mp3'),
+    cle: 'gong',
+    libelle: 'Gong',
+    description: 'grave et long — ne dérange personne autour',
+    source: require('../../assets/sons/gong.wav'),
   },
 ];
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-export const SONNERIE_DEFAUT = 'buzzer';
+export const SONNERIE_DEFAUT = 'bois';
 
 const CLE = 'fitcarnet.sonnerie';
 

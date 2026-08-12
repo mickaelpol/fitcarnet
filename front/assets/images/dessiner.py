@@ -15,7 +15,17 @@ LIP     = (0xe0, 0x90, 0x6a)
 LEG     = (0x5e, 0xc0, 0x80)
 LIGNE   = (0x2f, 0x34, 0x3d)
 
-POLICE = "node_modules/@expo-google-fonts/barlow-condensed/BarlowCondensed_700Bold.ttf"
+# ITALIQUE, ET C'EST UN CHOIX.
+#
+# Le « f » droit de Barlow Condensed Bold est un rectangle a crochet coupe
+# droit — c'est-a-dire, trait pour trait, le « f » de Facebook. Sur une icone
+# ronde et doree, la ressemblance saute aux yeux et raconte quelque chose qui
+# n'a rien a voir avec le projet.
+#
+# L'inclinaison suffit a la supprimer, et elle ajoute ce que l'icone n'avait
+# pas : du mouvement. C'est la meme famille, donc la meme parente avec les
+# chiffres de l'application.
+POLICE = "node_modules/@expo-google-fonts/barlow-condensed/BarlowCondensed_700Bold_Italic.ttf"
 
 # L'anneau des quatre macros : c'est le code couleur de toute l'application,
 # et le seul motif qui la resume. Il se lit encore a 48 px, ce qu'aucun
@@ -64,7 +74,18 @@ def icone(taille, marge_sure=0.0, fond=True, rayon=None):
 
 
 # ---- icone carree (iOS, web, magasins) : pas de masque, pas de marge
-icone(1024, marge_sure=0.0, rayon=0).save("assets/images/icone.png")
+# ANGLES ARRONDIS, MEME LA OU UN MASQUE EXISTE DEJA.
+#
+# iOS applique son propre masque et se moque de ce qu'on dessine ; Android en
+# applique un autre sur l'icone adaptative. Mais cette image sert AUSSI
+# ailleurs — la page de telechargement, un magasin, un raccourci de bureau —
+# et partout la, elle s'affiche telle quelle. Un carre a angles vifs y a
+# l'air d'un fichier oublie plutot que d'une icone.
+#
+# 22 % du cote : le rayon des icones d'iOS depuis longtemps, et celui vers
+# lequel Android converge. En dessous ca ne se voit pas, au-dessus la lettre
+# se sent a l'etroit.
+icone(1024, marge_sure=0.0, rayon=int(1024 * 0.22)).save("assets/images/icone.png")
 
 # ---- icone adaptative Android : le premier plan est rogne par le lanceur.
 # Android garantit seulement le disque central des deux tiers ; on garde donc

@@ -3,6 +3,7 @@
 import './silenceExpoGo';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { chargerSonnerie, SONNERIES } from './sonnerie';
 
 /**
  * Alarme de fin de repos portée par le SYSTÈME, pas par l'application.
@@ -30,8 +31,29 @@ import { Platform } from 'react-native';
    changés ensuite — seuls le nom et la description le peuvent. Corriger les
    réglages impose donc d'en créer un nouveau. L'ancien est supprimé pour ne
    pas laisser deux entrées dans les paramètres du téléphone. */
-const CANAL = 'repos2';
-const CANAL_PERIME = 'repos';
+/* UN CANAL PAR SONNERIE, ET C'EST ANDROID QUI L'IMPOSE.
+ *
+ * Android FIGE un canal a sa creation : ni le son, ni l'importance, ni la
+ * vibration ne peuvent etre changes ensuite — seuls le nom et la description
+ * le peuvent, et encore. Un canal unique dont on changerait le son au gre du
+ * reglage est donc impossible : le premier son choisi resterait pour toujours,
+ * et le reglage mentirait en silence.
+ *
+ * On cree donc les cinq d'avance, un par sonnerie, et on choisit le CANAL au
+ * moment de programmer l'alarme. Cinq entrees apparaissent dans les
+ * parametres de notification du telephone — c'est le prix, et il est visible
+ * plutot que mensonger.
+ *
+ * LE SUFFIXE DE VERSION FAIT PARTIE DU NOM. Corriger un reglage d'un canal
+ * existant est impossible : il faut en creer un nouveau. Passer de `_1` a
+ * `_2` est la seule facon, et l'ancien se supprime pour ne pas laisser deux
+ * entrees dans les parametres. */
+const VERSION_CANAUX = '1';
+const canalDe = (sonnerie: string): string => `repos_${sonnerie}_${VERSION_CANAUX}`;
+
+/* Les canaux d'avant les sonneries natives. Supprimes au demarrage : ils
+   jouaient le son de notification du telephone, pas celui de l'application. */
+const CANAUX_PERIMES = ['repos', 'repos2'];
 const VIBRATION = [0, 300, 120, 300, 120, 300, 120, 500];
 
 /* Ce gestionnaire n'est appelé que si la notification arrive alors que
@@ -77,20 +99,29 @@ async function preparer(): Promise<boolean> {
   if (Platform.OS === 'web') { etat = 'indisponible'; return false; }
 
   if (Platform.OS === 'android') {
-    await Notifications.deleteNotificationChannelAsync(CANAL_PERIME).catch(() => undefined);
+    for (const perime of CANAUX_PERIMES) {
+      await Notifications.deleteNotificationChannelAsync(perime).catch(() => undefined);
+    }
 
-    /* `sound` n'est PAS renseigné, et c'est délibéré : ce champ attend le nom
-       d'un fichier placé dans les ressources natives de l'application. Y mettre
-       « default » ferait chercher un fichier de ce nom, introuvable — canal
-       muet. Absent, Android retient le son de notification du téléphone. */
-    await Notifications.setNotificationChannelAsync(CANAL, {
-      name: 'Fin de repos',
-      importance: Notifications.AndroidImportance.HIGH,
-      enableVibrate: true,
-      vibrationPattern: VIBRATION,
-    });
-    /* Contrôlé sur l'appareil : le canal ressort en `sound: "default"`,
-       `importance: 6`, `vibre: true`. */
+    /* `sound` PORTE LE NOM DU FICHIER, EXTENSION COMPRISE.
+     *
+     * Ce champ attend une ressource presente dans `res/raw` de l'APK — celles
+     * que le greffon `expo-notifications` y copie depuis `app.json`. Avant, il
+     * etait laisse vide : Android retombait alors sur le son de notification
+     * du telephone, et la sonnerie choisie dans les reglages n'existait qu'au
+     * premier plan. C'est exactement le defaut qu'on corrige ici.
+     *
+     * Un nom qui ne correspond a aucune ressource ne donne PAS d'erreur : le
+     * canal devient muet. D'ou l'unique source de verite qu'est `SONNERIES`. */
+    for (const sonnerie of SONNERIES) {
+      await Notifications.setNotificationChannelAsync(canalDe(sonnerie.cle), {
+        name: `Fin de repos — ${sonnerie.libelle}`,
+        importance: Notifications.AndroidImportance.HIGH,
+        enableVibrate: true,
+        vibrationPattern: VIBRATION,
+        sound: `${sonnerie.cle}.wav`,
+      });
+    }
   }
 
   const actuel = await Notifications.getPermissionsAsync();
@@ -133,18 +164,25 @@ export async function programmerAlarme(secondes: number): Promise<string | null>
   if (secondes <= 0) return null;
   if (!await prete()) return null;
 
+  /* La sonnerie choisie decide du CANAL, pas du contenu de la notification :
+     sur Android c'est le canal qui porte le son. Lue ici et pas gardee, pour
+     qu'un changement de reglage prenne effet au repos suivant. */
+  const sonnerie = await chargerSonnerie();
+
   try {
     return await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Repos terminé',
         body: 'Série suivante.',
-        sound: 'default',
+        /* Renseigne pour iOS, qui porte le son sur la notification et non sur
+           un canal. Sur Android, ce champ est ignore au profit du canal. */
+        sound: `${sonnerie}.wav`,
         vibrate: VIBRATION,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: Math.max(1, Math.round(secondes)),
-        channelId: CANAL,
+        channelId: canalDe(sonnerie),
       },
     });
   } catch {

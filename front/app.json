@@ -40,7 +40,13 @@
         {
           "icon": "./assets/images/notification.png",
           "color": "#e3b23c",
-          "sounds": []
+          "sounds": [
+            "./assets/sons/bois.wav",
+            "./assets/sons/rappel.wav",
+            "./assets/sons/harpe.wav",
+            "./assets/sons/cloche.wav",
+            "./assets/sons/gong.wav"
+          ]
         }
       ],
       "expo-updates",

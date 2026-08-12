@@ -2,6 +2,7 @@ import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
+import { adresseApi } from '@/api/client';
 import { Bouton, Carte, Discret, Texte } from './base';
 import { C, E, P, R, T } from '@/theme';
 
@@ -72,6 +73,13 @@ export function EtatMaj() {
     <Carte style={{ gap: E.xs }}>
       <Texte style={{ fontFamily: P.fort }}>Version de l’application</Texte>
 
+      {/* L'ADRESSE DU SERVEUR, EN PREMIER.
+          Elle est figée dans l'APK au moment du build, par le profil EAS
+          utilisé. Un APK construit avec le profil `local` parle à
+          `192.168.1.118` — injoignable hors du réseau de la maison — et
+          l'application affiche exactement la même erreur que si le téléphone
+          était hors ligne. Une ligne ici tranche en deux secondes. */}
+      <Ligne nom="Serveur" valeur={adresseApi()} />
       <Ligne nom="Application" valeur={Updates.createdAt === null ? 'installée' : 'mise à jour'} />
       <Ligne nom="Version d’exécution" valeur={Updates.runtimeVersion ?? '—'} />
       <Ligne nom="Canal" valeur={Updates.channel ?? 'aucun'} />
