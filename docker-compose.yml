@@ -68,6 +68,24 @@ services:
       target: prod                     # passe a "dev" pour le rechargement a chaud
     container_name: fitcarnet-app
     restart: unless-stopped
+    # POUR JOINDRE GROCY SANS SORTIR DU NAS.
+    #
+    # Grocy tourne dans une autre pile, sur un autre reseau Docker, et publie
+    # son port 9283 sur l'hote. `GROCY_URL` pointait vers l'adresse PUBLIQUE :
+    # chaque appel sortait du NAS, resolvait un nom DNS public, refaisait une
+    # poignee de main TLS et retraversait le proxy inverse — pour atteindre une
+    # application qui tourne sur la meme machine. Mesure : 850 ms par appel, et
+    # cinq appels a chaque ouverture du frigo.
+    #
+    # Par la porte interieure : 26 ms. Trente-trois fois moins.
+    #
+    # `host-gateway` PLUTOT QUE L'ADRESSE DE LA PASSERELLE EN DUR. Docker
+    # attribue 172.29.0.1 a la creation du reseau ; ecrire ce nombre dans le
+    # `.env` marcherait aujourd'hui et casserait le jour ou la pile serait
+    # recreee sur un autre sous-reseau — sans que rien n'explique pourquoi le
+    # frigo est devenu vide. `compose.dev.yml` utilise deja cette forme.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       fitcarnet-db:
         condition: service_healthy
