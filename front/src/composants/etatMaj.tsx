@@ -59,13 +59,14 @@ export function EtatMaj() {
   /**
    * LE SERVEUR RÉPOND-IL ?
    *
-   * `/api` est publique — c'est la racine d'API Platform — donc cette
-   * vérification ne dépend ni d'un jeton valide ni d'une session ouverte.
-   * Elle distingue les deux erreurs qu'on confondait : « je n'arrive pas à
-   * joindre le serveur » et « le serveur me refuse ».
+   * `/api/etat` existe pour cette seule question, et ne rend rien d'autre
+   * qu'un `{ok:true}`. On interrogeait la racine `/api` — qui devait donc
+   * rester publique, et qui liste toutes les ressources de l'application.
+   * Une pastille verte ne vaut pas la carte complète de l'API offerte au
+   * premier venu.
    *
-   * Une adresse injoignable ET affichée juste au-dessus, c'est un diagnostic
-   * complet en une ligne : on voit QUELLE adresse ne répond pas.
+   * Sans jeton : la question est « le serveur est-il là », pas « ai-je le
+   * droit ». Les deux erreurs qu'on confondait sont enfin séparées.
    */
   const verifierServeur = useCallback(() => {
     setServeur('inconnu');
@@ -74,7 +75,7 @@ export function EtatMaj() {
        savoir si le serveur est là, pas attendre qu'il se réveille. */
     const minuteur = setTimeout(() => arret.abort(), 5000);
 
-    fetch(adresseApi(), { signal: arret.signal, headers: { Accept: 'application/json' } })
+    fetch(`${adresseApi()}/etat`, { signal: arret.signal, headers: { Accept: 'application/json' } })
       .then((r) => setServeur(r.status >= 500 ? 'injoignable' : 'joignable'))
       .catch(() => setServeur('injoignable'))
       .finally(() => clearTimeout(minuteur));

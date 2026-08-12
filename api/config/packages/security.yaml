@@ -52,6 +52,20 @@ security:
             pattern: ^/api/invitation/
             security: false
 
+        # LA PASTILLE VERTE OU ROUGE DE L'ECRAN COMPTE, ET RIEN D'AUTRE.
+        #
+        # Hors pare-feu pour une raison precise : un jeton perime traine dans
+        # l'en-tete Authorization des qu'une session a expire, et le pare-feu
+        # `api` repondrait 401 avant d'atteindre le controleur. La pastille
+        # dirait alors « hors ligne » sur un serveur en parfaite sante — le
+        # contraire de ce qu'on lui demande.
+        #
+        # Voir `EtatController` : cette route ne rend rien qu'on ne puisse
+        # offrir au premier venu.
+        etat:
+            pattern: ^/api/etat$
+            security: false
+
         api:
             pattern: ^/api
             stateless: true
@@ -72,8 +86,19 @@ security:
         - { path: ^/api/deconnexion, roles: PUBLIC_ACCESS }
         # Au singulier, avec la barre finale. Voir le pare-feu `invitation`.
         - { path: ^/api/invitation/, roles: PUBLIC_ACCESS }
-        - { path: ^/api/docs, roles: PUBLIC_ACCESS }
-        - { path: ^/api$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/etat$, roles: PUBLIC_ACCESS }
+        # LA DOCUMENTATION N'EST PAS PUBLIQUE, ET LA RACINE NON PLUS.
+        #
+        # Les deux etaient ouvertes a tous. `/api/docs` sert la description
+        # complete de l'API — chaque ressource, chaque champ, chaque verbe —
+        # et `/api` en liste les points d'entree. Aucune donnee ne fuyait, mais
+        # n'importe qui obtenait la carte de l'application en une requete, ce
+        # qui est exactement ce dont on a besoin pour en chercher les portes.
+        #
+        # La documentation reste utile a celui qui developpe : elle passe donc
+        # a ROLE_ADMIN plutot que d'etre supprimee.
+        - { path: ^/api/docs, roles: ROLE_ADMIN }
+        - { path: ^/api$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:

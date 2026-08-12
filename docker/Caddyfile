@@ -31,14 +31,18 @@
 		root * /app/public
 		file_server
 	}
-	handle /_profiler* {
-		root * /app/public
-		php_server
-	}
-	handle /_wdt* {
-		root * /app/public
-		php_server
-	}
+	# LE PROFILEUR N'EST PAS ROUTE EN PRODUCTION.
+	#
+	# Il l'etait, « au cas ou ». Le paquet n'est pas installe en prod —
+	# `composer install --no-dev` l'ecarte — donc ces adresses tombaient sur
+	# une erreur Symfony plutot que sur le profileur. Mais router vers un
+	# outil qui expose requetes SQL, variables d'environnement et contenu des
+	# sessions est une porte qu'on laisse en place en pariant qu'elle reste
+	# verrouillee. Le pari se perd le jour ou quelqu'un installe les
+	# dependances de developpement sur le NAS pour deboguer, et l'oublie.
+	#
+	# En developpement, `compose.dev.yml` sert l'application autrement et le
+	# profileur y reste accessible.
 
 	# ---------- l'APK Android, et ce qui dit sa version ----------
 	#
