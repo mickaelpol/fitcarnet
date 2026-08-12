@@ -36,6 +36,27 @@ SELECT 'avant' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibr
                           AND kcal_100 NOT BETWEEN 300 AND 400) AS grains_hors_bande
 FROM   aliment WHERE cree_par IS NULL;
 
+-- LES `LIKE '%...%'` DE CE FICHIER ONT ETE ANCRES, ET VOICI POURQUOI.
+--
+-- `WHERE fitcarnet_normaliser(nom) LIKE '%amandes%'` attrape « Purée
+-- d'amandes », qui est la cible — et « Lait d'amandes », qui ne l'est pas.
+-- La ligne du lait recevait donc 631 kcal et 52,5 g de lipides au lieu de 24
+-- et 1,2 : une erreur de facteur 26, dans le catalogue COMMUN, celui que
+-- personne ne peut rattraper compte par compte.
+--
+-- Et comme `entrypoint-prod.sh` rejoue toutes les migrations a CHAQUE
+-- demarrage du conteneur, une correction faite a la main par
+-- l'administrateur etait silencieusement annulee au redemarrage suivant. Une
+-- valeur fausse qui revient toute seule est pire qu'une valeur fausse.
+--
+-- ATTENTION EN AJOUTANT UNE LIGNE : `fitcarnet_normaliser` abaisse la casse
+-- et retire les accents, RIEN D'AUTRE. Ni les apostrophes, ni les espaces.
+-- « Purée d'amandes » devient « puree d'amandes », apostrophe comprise — et
+-- une apostrophe dans un litteral SQL se double.
+--
+-- On compare desormais le nom normalise ENTIER. Si un aliment ne porte pas
+-- exactement ce nom, il n'est pas touche — c'est le bon defaut : ne rien
+-- faire vaut mieux que corriger le mauvais aliment.
 -- Amande, émondée, sans sel ajouté
 UPDATE aliment SET
     categorie      = 'ole',
@@ -45,7 +66,8 @@ UPDATE aliment SET
     lip_100        = 52.5,
     fibres_100     = 10.4,
     ratio          = 1
-WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%amandes%';
+WHERE cree_par IS NULL
+  AND fitcarnet_normaliser(nom) IN ('puree d''amandes', 'amandes', 'amande');
 -- Brocoli, cru
 UPDATE aliment SET
     categorie      = 'leg',
@@ -55,7 +77,8 @@ UPDATE aliment SET
     lip_100        = 0.4,
     fibres_100     = 2.6,
     ratio          = 1
-WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%brocoli%';
+WHERE cree_par IS NULL
+  AND fitcarnet_normaliser(nom) IN ('brocoli', 'brocolis');
 -- Quinoa, cru
 UPDATE aliment SET
     categorie      = 'fec',
@@ -65,7 +88,8 @@ UPDATE aliment SET
     lip_100        = 6.1,
     fibres_100     = 6.8,
     ratio          = 2.75
-WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%quinoa%';
+WHERE cree_par IS NULL
+  AND fitcarnet_normaliser(nom) IN ('quinoa');
 -- Riz blanc, cru
 UPDATE aliment SET
     categorie      = 'fec',
@@ -75,7 +99,8 @@ UPDATE aliment SET
     lip_100        = 1.58,
     fibres_100     = 3.2,
     ratio          = 2.26
-WHERE cree_par IS NULL AND fitcarnet_normaliser(nom) LIKE '%riz%' AND fitcarnet_normaliser(nom) LIKE '%basmati%';
+WHERE cree_par IS NULL
+  AND fitcarnet_normaliser(nom) IN ('riz basmati');
 
 SELECT 'apres' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
        count(*) FILTER (WHERE categorie = 'fec' AND ratio > 1.3

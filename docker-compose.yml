@@ -40,9 +40,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # utile pour tes outils d'admin ; retire-le si tu n'en as pas besoin
-    ports:
-      - "5433:5432"
+    # PAS DE `ports:` ICI, ET C'EST DELIBERE.
+    #
+    # La base etait publiee sur `5433` du NAS « pour les outils d'admin ». Le
+    # NAS est joignable depuis Internet — c'est ce qui fait marcher
+    # l'application —, donc la base l'etait aussi. Qui atteint ce port n'a
+    # plus aucun controle applicatif a franchir : ni pare-feu Symfony, ni
+    # filtre de proprietaire. Il lit tous les carnets, toutes les empreintes
+    # de mots de passe et de jetons. La seule barriere etait `DB_PASSWORD`,
+    # sans limitation de tentatives.
+    #
+    # `fitcarnet-app` la joint par le reseau interne de la stack, qui ne sort
+    # pas du NAS. Pour une session psql d'administration :
+    #
+    #     docker exec -it fitcarnet-db psql -U fitcarnet -d fitcarnet
+    #
+    # Pour un outil graphique depuis ton poste, un tunnel SSH plutot qu'un
+    # port ouvert :
+    #
+    #     ssh -L 5433:127.0.0.1:5433 root@nas   (apres avoir remis ce bloc)
 
   # FrankenPHP : un seul service pour l'API Symfony ET le front React
   fitcarnet-app:

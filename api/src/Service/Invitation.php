@@ -81,7 +81,82 @@ final class Invitation
 
         return '' !== $e
             && \mb_strlen($e) <= 180
-            && false !== \filter_var($e, \FILTER_VALIDATE_EMAIL);
+            && false !== \filter_var($e, \FILTER_VALIDATE_EMAIL)
+            && !self::domaineImpossible($e);
+    }
+
+    /**
+     * Le domaine peut-il, en principe, recevoir du courrier ?
+     *
+     * `filter_var` verifie la FORME. Il accepte donc `jean@gmial.com`,
+     * `jean@localhost`, `jean@exemple.invalid` — toutes syntaxiquement
+     * parfaites, aucune joignable. Une invitation envoyee la n'arrive nulle
+     * part, et personne ne l'apprend : l'admin croit avoir invite, la personne
+     * n'a rien recu, et les deux attendent.
+     *
+     * ON REJETTE CE QU'ON SAIT IMPOSSIBLE, PAS CE QU'ON SOUPCONNE.
+     *
+     *  - un domaine sans point ne peut pas exister sur Internet ;
+     *  - les domaines reserves par la norme (RFC 2606 et RFC 6761) ne
+     *    recoivent jamais de courrier, par definition.
+     *
+     * On ne fait PAS de resolution DNS ici : une panne de reseau, un serveur
+     * DNS lent ou un domaine en cours de propagation refuseraient une adresse
+     * parfaitement valable, et cette fonction doit rester testable sans
+     * reseau. La verification DNS existe — voir `domaineAccepteDuCourrier` —
+     * mais elle CONSEILLE, elle ne bloque pas.
+     */
+    private static function domaineImpossible(string $email): bool
+    {
+        $domaine = \mb_strtolower(\substr(\strrchr($email, '@') ?: '', 1));
+
+        if ('' === $domaine || !\str_contains($domaine, '.')) {
+            return true;
+        }
+
+        // RFC 2606 et RFC 6761 : reserves, jamais routables.
+        foreach (['.test', '.example', '.invalid', '.localhost', '.local'] as $suffixe) {
+            if (\str_ends_with($domaine, $suffixe)) {
+                return true;
+            }
+        }
+
+        return \in_array($domaine, ['example.com', 'example.net', 'example.org'], true);
+    }
+
+    /**
+     * Ce domaine declare-t-il un serveur de courrier ?
+     *
+     * TOUCHE AU RESEAU, DONC NE BLOQUE JAMAIS. Un DNS lent, une coupure, un
+     * domaine achete il y a dix minutes : chacun ferait refuser une adresse
+     * juste. On s'en sert pour AVERTIR l'administrateur — « es-tu sur de
+     * gmial.com ? » — pas pour l'empecher d'inviter.
+     *
+     * Un enregistrement A suffit : la norme autorise a livrer du courrier a
+     * l'adresse du domaine quand aucun MX n'est declare.
+     *
+     * @return bool|null `null` quand on n'a pas pu savoir
+     */
+    public static function domaineAccepteDuCourrier(string $email, int $secondes = 3): ?bool
+    {
+        $domaine = \mb_strtolower(\substr(\strrchr(self::adresseNormalisee($email), '@') ?: '', 1));
+        if ('' === $domaine) {
+            return false;
+        }
+
+        $avant = \ini_get('default_socket_timeout');
+        \ini_set('default_socket_timeout', (string) $secondes);
+        try {
+            if (\checkdnsrr($domaine, 'MX')) {
+                return true;
+            }
+
+            return \checkdnsrr($domaine, 'A') ? true : false;
+        } catch (\Throwable) {
+            return null;
+        } finally {
+            \ini_set('default_socket_timeout', (string) $avant);
+        }
     }
 
     /**

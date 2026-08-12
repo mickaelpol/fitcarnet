@@ -166,8 +166,32 @@ final class PlansController extends AbstractController
                     ]);
                 }
             } else {
+                /* CHAQUE ALIMENT EST TRAITE POUR LUI-MEME, ET UN ECHEC EST
+                 * RAPPORTE — PAS AVALE.
+                 *
+                 * Cette boucle etait nue : ni transaction, ni rattrapage. Une
+                 * exception au quatrieme aliment sur douze — aliment supprime
+                 * entre-temps, table `emplacement` vide, verrou — laissait
+                 * trois quantites deduites, neuf intactes, le plan deja marque
+                 * cuisine, et un 500 qui ne disait pas lesquelles. Impossible
+                 * de rejouer (409 « deja cuisine »), impossible de savoir quoi
+                 * corriger a la main.
+                 *
+                 * On ne met pas TOUTE la boucle dans une transaction : le plan
+                 * est deja marque cuisine et flushe, et il l'est reellement.
+                 * Annuler neuf deductions reussies parce que la dixieme echoue
+                 * ne rendrait service a personne. On deduit ce qu'on peut, et
+                 * on NOMME ce qu'on n'a pas pu — exactement ce que fait deja
+                 * la branche Grocy avec sa liste d'`ignores`.
+                 *
+                 * `definirStock` est atomique de son cote : une ligne est
+                 * ecrite entierement ou pas du tout. */
                 foreach ($nouvellesQuantites as $idAliment => $quantite) {
-                    $this->base->definirStock($utilisateur, $idAliment, $quantite);
+                    try {
+                        $this->base->definirStock($utilisateur, $idAliment, $quantite);
+                    } catch (\Throwable $e) {
+                        $echecs[$idAliment] = $e->getMessage();
+                    }
                 }
             }
         }

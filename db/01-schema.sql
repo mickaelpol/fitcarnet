@@ -33,6 +33,22 @@ CREATE EXTENSION IF NOT EXISTS unaccent;
 -- ---------------------------------------------------------------------
 --  Utilisateurs
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+--  Normalisation des noms
+--
+--  Posee ici parce que les migrations de `db/manuel/` s'en servent, et que
+--  `INSTALLATION.md` invite a en rejouer une seule sur une base neuve. Elle
+--  vivait uniquement dans la migration 16 : rejouer la 19 seule echouait
+--  alors sur « function fitcarnet_normaliser(text) does not exist ».
+--
+--  Elle abaisse la casse et retire les accents. RIEN D'AUTRE — ni les
+--  apostrophes, ni les espaces.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fitcarnet_normaliser(t text) RETURNS text AS $$
+    SELECT lower(translate(t, 'àâäéèêëïîôöùûüçÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ', 'aaaeeeeiioouuucAAAEEEEIIOOUUUC'));
+$$ LANGUAGE sql IMMUTABLE;
+
 CREATE TABLE utilisateur (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     -- CITEXT évité : Doctrine ne connaît pas ce type. L'unicité insensible
@@ -451,3 +467,35 @@ CREATE INDEX plan_repas_par_compte ON plan_repas (utilisateur_id, cree_le DESC);
 -- les plans déjà cuisinés ne sont jamais dans cette réponse, et ce sont eux
 -- qui s'accumulent avec le temps.
 CREATE INDEX plan_repas_prevus ON plan_repas (utilisateur_id) WHERE cuisine_le IS NULL;
+
+-- ---------------------------------------------------------------------
+--  Invitations
+--
+--  L'administrateur saisit une adresse, l'application rend un lien, la
+--  personne choisit elle-meme son nom et son mot de passe. Le jeton n'est
+--  jamais stocke : seule son empreinte SHA-256 l'est.
+--
+--  Voir `db/manuel/24-invitations.sql`, qui pose la meme table sur une base
+--  existante. Ce fichier-ci decrit la base d'AUJOURD'HUI : il manquait cette
+--  table, et un environnement de developpement monte a neuf repondait donc
+--  500 sur `/api/invitations`.
+-- ---------------------------------------------------------------------
+CREATE TABLE invitation (
+    id              BIGSERIAL PRIMARY KEY,
+    email           TEXT        NOT NULL,
+    jeton_empreinte CHAR(64)    NOT NULL UNIQUE,
+    invite_par      UUID        REFERENCES utilisateur(id) ON DELETE SET NULL,
+    cree_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expire_le       TIMESTAMPTZ NOT NULL,
+    accepte_le      TIMESTAMPTZ,
+    utilisateur_id  UUID        REFERENCES utilisateur(id) ON DELETE SET NULL
+);
+
+-- Index PARTIEL : une seule invitation VIVANTE par adresse. Une adresse deja
+-- invitee et acceptee peut etre reinvitee ; deux liens valides en meme temps
+-- pour la meme personne sont une confusion pure.
+CREATE UNIQUE INDEX invitation_en_attente
+    ON invitation (lower(email))
+    WHERE accepte_le IS NULL;
+
+CREATE INDEX invitation_par_date ON invitation (cree_le DESC);

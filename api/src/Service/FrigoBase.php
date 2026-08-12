@@ -102,19 +102,32 @@ final readonly class FrigoBase
         // renvoyait sous « Sans emplacement » au moment precis ou l'on veut
         // savoir ou le remettre apres l'avoir rachete.
 
-        // la contrainte porte sur (utilisateur, aliment, emplacement) :
-        // deplacer un aliment d'un emplacement a l'autre effacerait l'ancien
-        $this->cnx->executeStatement(
-            'DELETE FROM stock
-             WHERE utilisateur_id = :u AND aliment_id = :a AND emplacement_id <> :e',
-            ['u' => $utilisateur->getId(), 'a' => $idAliment, 'e' => $emplacement]);
+        // DEUX ECRITURES, UNE SEULE TRANSACTION.
+        //
+        // Le DELETE puis l'INSERT etaient nus. Entre les deux, la ligne de
+        // stock N'EXISTE PLUS : une coupure a cet instant — redemarrage du
+        // conteneur au moment d'un deploiement, timeout PHP — ne laissait pas
+        // une quantite fausse, elle faisait DISPARAITRE le stock et son
+        // emplacement. 800 g au congelateur perdus sans une trace, alors qu'on
+        // corrigeait simplement une quantite.
+        //
+        // La transaction rend les deux indissociables : ou l'aliment change
+        // d'emplacement avec sa nouvelle quantite, ou rien ne bouge.
+        $this->cnx->transactional(function () use ($utilisateur, $idAliment, $quantite, $emplacement): void {
+            // la contrainte porte sur (utilisateur, aliment, emplacement) :
+            // deplacer un aliment d'un emplacement a l'autre effacerait l'ancien
+            $this->cnx->executeStatement(
+                'DELETE FROM stock
+                 WHERE utilisateur_id = :u AND aliment_id = :a AND emplacement_id <> :e',
+                ['u' => $utilisateur->getId(), 'a' => $idAliment, 'e' => $emplacement]);
 
-        $this->cnx->executeStatement(
-            'INSERT INTO stock (utilisateur_id, aliment_id, emplacement_id, quantite, maj_le)
-             VALUES (:u, :a, :e, :q, now())
-             ON CONFLICT (utilisateur_id, aliment_id, emplacement_id) DO UPDATE
-                SET quantite = EXCLUDED.quantite, maj_le = now()',
-            ['u' => $utilisateur->getId(), 'a' => $idAliment,
-             'e' => $emplacement, 'q' => $quantite]);
+            $this->cnx->executeStatement(
+                'INSERT INTO stock (utilisateur_id, aliment_id, emplacement_id, quantite, maj_le)
+                 VALUES (:u, :a, :e, :q, now())
+                 ON CONFLICT (utilisateur_id, aliment_id, emplacement_id) DO UPDATE
+                    SET quantite = EXCLUDED.quantite, maj_le = now()',
+                ['u' => $utilisateur->getId(), 'a' => $idAliment,
+                 'e' => $emplacement, 'q' => $quantite]);
+        });
     }
 }

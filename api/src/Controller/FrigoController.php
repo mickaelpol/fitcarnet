@@ -9,6 +9,7 @@ use App\Entity\Utilisateur;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
+use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -41,6 +42,7 @@ final class FrigoController extends AbstractController
         private readonly Frigo $frigo,
         private readonly FrigoBase $base,
         private readonly FrigoGrocy $grocy,
+        private readonly Connection $cnx,
     ) {
     }
 
@@ -90,6 +92,33 @@ final class FrigoController extends AbstractController
     }
 
     /** Fixe la quantite d'un aliment. Reserve aux comptes lisant la base. */
+    /**
+     * CET ALIMENT EST-IL LE MIEN, OU CELUI DE TOUT LE MONDE ?
+     *
+     * `alimentId` vient du CORPS DE LA REQUETE. On ne verifiait que `> 0` :
+     * la seule barriere restante etait la cle etrangere, qui accepte
+     * n'importe quel aliment existant — y compris l'aliment PRIVE d'un autre
+     * compte.
+     *
+     * Ce n'etait pas une fuite : `FrigoBase::lire` filtre a la lecture, la
+     * victime ne voit jamais cette ligne. C'etait pire a sa facon — un blocage
+     * qu'elle ne peut pas defaire. Bob pose 1 g de stock sur l'aliment prive
+     * d'Alice ; Alice essaie de supprimer son aliment et recoit « il est
+     * encore dans un frigo, mets sa quantite a zero » — une quantite qui
+     * n'est pas dans son frigo a elle. Son aliment devient indelebile.
+     *
+     * Effet secondaire supprime au passage : la difference entre 200 et 500
+     * permettait d'enumerer les identifiants d'aliments existants.
+     */
+    private function alimentAccessible(Utilisateur $utilisateur, int $idAliment): bool
+    {
+        return false !== $this->cnx->fetchOne(
+            'SELECT 1 FROM aliment
+              WHERE id = :a AND (cree_par IS NULL OR cree_par = :u)',
+            ['a' => $idAliment, 'u' => $utilisateur->getId()],
+        );
+    }
+
     #[Route('/mon-frigo/stock', methods: ['POST'])]
     public function definirStock(Request $requete): JsonResponse
     {
@@ -110,6 +139,12 @@ final class FrigoController extends AbstractController
         }
         if ($quantite < 0) {
             return $this->json(['erreur' => 'Une quantité ne peut pas être négative.'], 422);
+        }
+        /* MEME REPONSE POUR « n'existe pas » ET « ne t'appartient pas ».
+           Distinguer les deux dirait a un inconnu quels identifiants
+           existent. */
+        if (!$this->alimentAccessible($utilisateur, $idAliment)) {
+            return $this->json(['erreur' => 'Cet aliment n’existe pas dans ton catalogue.'], 404);
         }
 
         $this->base->definirStock(

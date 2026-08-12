@@ -93,6 +93,26 @@ final class InvitationTest extends TestCase
         self::assertFalse(Invitation::adresseValide(\str_repeat('a', 175) . '@exemple.fr'));
     }
 
+    public function testLesDomainesQuiNePeuventPasRecevoirSontRefuses(): void
+    {
+        /* `filter_var` accepte ces quatre adresses : elles sont
+           syntaxiquement parfaites. Aucune ne peut recevoir de courrier —
+           les trois dernieres sont RESERVEES par la norme, precisement pour
+           ne jamais exister. Une invitation envoyee la n'arrive nulle part,
+           et personne ne l'apprend. */
+        self::assertFalse(Invitation::adresseValide('jean@localhost'));
+        self::assertFalse(Invitation::adresseValide('jean@exemple.invalid'));
+        self::assertFalse(Invitation::adresseValide('jean@monsite.test'));
+        self::assertFalse(Invitation::adresseValide('jean@example.com'));
+        self::assertFalse(Invitation::adresseValide('jean@nas.local'));
+    }
+
+    public function testUnDomaineSansPointNePeutPasExister(): void
+    {
+        self::assertFalse(Invitation::adresseValide('jean@intranet'));
+        self::assertFalse(Invitation::adresseValide('jean@nas'));
+    }
+
     public function testUneAdresseOrdinairePasse(): void
     {
         self::assertTrue(Invitation::adresseValide('jean.dupont+sport@exemple.fr'));
@@ -173,6 +193,19 @@ final class InvitationTest extends TestCase
         self::assertFalse(Invitation::nomAcceptable('     '));
         self::assertFalse(Invitation::nomAcceptable(\str_repeat('a', 81)));
         self::assertTrue(Invitation::nomAcceptable(' Mickaël '));
+    }
+
+    public function testLaVerificationDNSNeBloqueJamais(): void
+    {
+        /* Elle CONSEILLE. Un DNS lent, une coupure, un domaine achete il y a
+           dix minutes : chacun ferait refuser une adresse juste. Les trois
+           reponses possibles sont `true`, `false` et `null` — et `null` veut
+           dire « je n'ai pas pu savoir », ce qui n'est pas « non ». */
+        $reponse = Invitation::domaineAccepteDuCourrier('jean@exemple-qui-nexiste-pas-du-tout-42.fr', 1);
+        self::assertContains($reponse, [true, false, null]);
+
+        /* Une adresse sans domaine ne demande aucune resolution. */
+        self::assertFalse(Invitation::domaineAccepteDuCourrier('pasdarobase'));
     }
 
     // ---------------------------------------------------------------- lien

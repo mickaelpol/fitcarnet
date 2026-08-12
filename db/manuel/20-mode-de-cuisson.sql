@@ -63,9 +63,22 @@ CREATE TABLE IF NOT EXISTS mode_cuisson (
 CREATE UNIQUE INDEX IF NOT EXISTS mode_cuisson_libelle
   ON mode_cuisson (lower(libelle));
 
--- Le socle. Volontairement court : on ajoute a la demande, on ne devine pas
--- les habitudes de gens qu'on ne connait pas.
-INSERT INTO mode_cuisson (libelle, ordre) VALUES
+-- LE SOCLE N'EST POSE QUE SUR UNE TABLE VIDE, ET C'EST UNE CORRECTION.
+--
+-- `ON CONFLICT DO NOTHING` ne conflit que sur le libelle EXACT. Or l'ecran
+-- d'administration permet de renommer et de supprimer des modes — et ce
+-- fichier est rejoue a CHAQUE demarrage du conteneur.
+--
+-- Renommer « Poele » en « Poele a feu vif » faisait donc revenir « Poele » au
+-- redemarrage : deux fournees pour la meme casserole, exactement ce que
+-- l'en-tete de ce fichier dit vouloir eviter. Et supprimer un mode emportait
+-- les habitudes qui le visaient (ON DELETE CASCADE) avant de le faire
+-- revenir vide au redemarrage suivant.
+--
+-- Un socle sert a demarrer, pas a imposer. Une fois qu'un seul mode existe,
+-- la table appartient a l'administrateur.
+INSERT INTO mode_cuisson (libelle, ordre)
+SELECT * FROM (VALUES
   ('Vapeur',            10),
   ('Eau bouillante',    20),
   ('Poêle',             30),
@@ -74,7 +87,8 @@ INSERT INTO mode_cuisson (libelle, ordre) VALUES
   ('Four 220 °C',       60),
   ('Air fryer 180 °C',  70),
   ('Air fryer 200 °C',  80)
-ON CONFLICT DO NOTHING;
+) AS socle(libelle, ordre)
+WHERE NOT EXISTS (SELECT 1 FROM mode_cuisson);
 
 -- Si une version precedente de ce fichier a ete jouee, ses colonnes sur
 -- l'aliment n'ont plus lieu d'etre. Aucune donnee utile ne s'y trouve : elles

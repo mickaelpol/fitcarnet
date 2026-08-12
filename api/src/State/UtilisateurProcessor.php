@@ -7,26 +7,116 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Utilisateur;
+use Doctrine\DBAL\Connection;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
-/** Hache le mot de passe en clair avant persistance et ne le conserve jamais. */
+/**
+ * CE QUI SE PASSE QUAND ON CHANGE SON MOT DE PASSE OU SON ADRESSE.
+ *
+ * Trois gestes, et les deux derniers manquaient.
+ *
+ * 1. HACHER le mot de passe en clair, et ne jamais le conserver.
+ *
+ * 2. EXIGER LE MOT DE PASSE ACTUEL. Sans ca, un jeton vole pendant une heure
+ *    — appareil partage, journal de proxy — suffisait a prendre le compte
+ *    definitivement : un `PATCH` posait une nouvelle adresse ET un nouveau
+ *    mot de passe, et le proprietaire ne pouvait plus se connecter avec les
+ *    siens, puisque l'adresse avait change.
+ *
+ *    L'administrateur en est dispense quand il agit sur QUELQU'UN D'AUTRE :
+ *    il ne connait pas le mot de passe des autres, et c'est precisement son
+ *    role de pouvoir depanner. Sur son PROPRE compte, la regle s'applique.
+ *
+ * 3. REVOQUER LES SESSIONS. Changer son mot de passe parce qu'on soupconne un
+ *    vol ne coupait rien : le jeton de rafraichissement vole continuait de
+ *    produire des jetons d'acces neufs pendant un an, en se prolongeant a
+ *    chaque usage. Un mot de passe change doit fermer les portes ouvertes —
+ *    c'est la seule raison pour laquelle on le change en urgence.
+ *
+ *    Toutes les sessions tombent, y compris celle qui vient de faire le
+ *    changement. C'est voulu : se reconnecter une fois est le prix, et c'est
+ *    la preuve que le nouveau mot de passe fonctionne.
+ */
 final readonly class UtilisateurProcessor implements ProcessorInterface
 {
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
         private UserPasswordHasherInterface $hasher,
+        private Security $securite,
+        private Connection $cnx,
     ) {
     }
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
-        if ($data instanceof Utilisateur && null !== $data->getMotDePasseClair()) {
-            $data->setPassword($this->hasher->hashPassword($data, $data->getMotDePasseClair()));
-            $data->setMotDePasseClair(null);
+        if (!$data instanceof Utilisateur) {
+            return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
         }
 
-        return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        /* `previous_data` est l'objet tel qu'il etait AVANT la requete. Absent
+           a la creation — c'est ainsi qu'on distingue les deux cas sans se
+           fier au nom de l'operation. */
+        $precedent = $context['previous_data'] ?? null;
+        $creation = !$precedent instanceof Utilisateur;
+
+        $changeMotDePasse = null !== $data->getMotDePasseClair();
+        $changeAdresse = !$creation && $precedent->getEmail() !== $data->getEmail();
+
+        if (!$creation && ($changeMotDePasse || $changeAdresse)) {
+            $this->verifierLIdentite($precedent, $data->getMotDePasseActuel());
+        }
+
+        if ($changeMotDePasse) {
+            $data->setPassword($this->hasher->hashPassword($data, (string) $data->getMotDePasseClair()));
+        }
+        $data->setMotDePasseClair(null);
+        $data->setMotDePasseActuel(null);
+
+        $resultat = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+
+        if ($changeMotDePasse && !$creation) {
+            /* APRES la persistance, jamais avant : revoquer les sessions d'un
+               changement qui echouerait ensuite deconnecterait quelqu'un pour
+               rien. */
+            $this->cnx->executeStatement(
+                'DELETE FROM jeton_rafraichissement WHERE utilisateur_id = :u',
+                ['u' => $data->getId()],
+            );
+        }
+
+        return $resultat;
+    }
+
+    /**
+     * Le demandeur est-il en droit de faire ce changement ?
+     *
+     * ON COMPARE AVEC L'ANCIEN HACHAGE, celui de `$precedent` — l'objet tel
+     * qu'il etait avant la requete. Comparer avec `$data`, deja modifie par
+     * la deserialisation, validerait le nouveau mot de passe contre lui-meme.
+     */
+    private function verifierLIdentite(Utilisateur $precedent, ?string $motDePasseActuel): void
+    {
+        $moi = $this->securite->getUser();
+
+        if ($this->securite->isGranted('ROLE_ADMIN')
+            && $moi instanceof Utilisateur
+            && !$moi->getId()->equals($precedent->getId())) {
+            return;
+        }
+
+        if (null === $motDePasseActuel || '' === $motDePasseActuel) {
+            throw new UnprocessableEntityHttpException(
+                'Indique ton mot de passe actuel pour changer ton mot de passe ou ton adresse.'
+            );
+        }
+
+        if (!$this->hasher->isPasswordValid($precedent, $motDePasseActuel)) {
+            throw new AccessDeniedException('Mot de passe actuel incorrect.');
+        }
     }
 }

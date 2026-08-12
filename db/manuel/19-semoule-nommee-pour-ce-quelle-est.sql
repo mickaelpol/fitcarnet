@@ -48,11 +48,34 @@ SELECT 'avant' AS quand, nom, kcal_100, gluc_100, fibres_100, ratio
 -- Ne renomme QUE la ligne commune, et seulement si elle porte encore le nom
 -- qu'on ne peut pas justifier. Un aliment cree par un utilisateur lui
 -- appartient, meme s'il porte le meme nom.
+-- LE RENOMMAGE PEUT VIOLER L'UNICITE, ET LE CONTENEUR NE DEMARRE PLUS.
+--
+-- `aliment_nom_commun_unique` interdit deux aliments communs de meme nom. Si
+-- « Semoule de ble dur » existe deja — l'administrateur l'a saisie depuis
+-- Ciqual —, cet UPDATE echoue. Or `entrypoint-prod.sh` rejoue TOUTES les
+-- migrations a chaque demarrage, avec `ON_ERROR_STOP=1` : la production
+-- s'arrete au redemarrage suivant, sur une migration jouee avec succes des
+-- dizaines de fois auparavant.
+--
+-- Meme cause si deux lignes communes correspondent : elles seraient renommees
+-- vers le meme nom, dans le meme UPDATE.
+--
+-- Les deux gardes ci-dessous rendent l'operation sure ET rejouable : on ne
+-- renomme que s'il n'existe aucune ligne portant deja ce nom, et on n'en
+-- renomme qu'UNE.
 UPDATE aliment
    SET nom = 'Semoule de blé dur'
- WHERE cree_par IS NULL
-   AND fitcarnet_normaliser(nom) LIKE '%semoule%'
-   AND fitcarnet_normaliser(nom) LIKE '%complet%';
+ WHERE id = (
+       SELECT id FROM aliment
+        WHERE cree_par IS NULL
+          AND fitcarnet_normaliser(nom) LIKE '%semoule%'
+          AND fitcarnet_normaliser(nom) LIKE '%complet%'
+        ORDER BY id
+        LIMIT 1)
+   AND NOT EXISTS (
+       SELECT 1 FROM aliment
+        WHERE cree_par IS NULL
+          AND fitcarnet_normaliser(nom) = fitcarnet_normaliser('Semoule de blé dur'));
 
 SELECT 'apres' AS quand, nom, kcal_100, gluc_100, fibres_100, ratio
   FROM aliment

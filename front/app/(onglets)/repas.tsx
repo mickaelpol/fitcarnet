@@ -167,8 +167,23 @@ const vers = (a: AlimentDisponible): Aliment => ({
   kcal100: a.kcal100, prot100: a.prot100, gluc100: a.gluc100, lip100: a.lip100,
   /* Les fibres ne servent au calcul que si la cible les comprend — voir
      `glucidesTotaux`. Elles sont toujours transmises : c'est la cible qui
-     décide de s'en servir, pas l'aliment. */
-  fibres100: a.fibres100 ?? 0,
+     décide de s'en servir, pas l'aliment.
+
+     ON NE REMPLACE PLUS « INCONNU » PAR « ZÉRO », et ça compte.
+
+     Le `?? 0` d'avant détruisait ici une distinction que toute la chaîne
+     préserve — la base la stocke en `NULL`, l'API la transmet, deux
+     migrations existent pour ça. Le solveur voyait « ce pain n'a pas de
+     fibres » là où la vérité est « on ne sait pas ».
+
+     Sur une cible en glucides TOTAUX, l'écart est réel : un pain complet à
+     42 g de glucides et 7 g de fibres inconnues fait servir 143 g au lieu de
+     122 — 17 % de féculent en trop, quatre fois par jour, sans un mot.
+
+     `undefined` traverse le solveur sans rien changer au calcul (il fait
+     `?? 0` de son côté) mais reste LISIBLE : c'est ce qui permet à l'écran
+     de prévenir. Voir `sansFibresConnues`. */
+  fibres100: a.fibres100 ?? undefined,
   ratio: a.ratio,
 });
 
@@ -328,6 +343,33 @@ export default function Calculateur() {
      calculent parfaitement — et font peser trois fois trop. On le dit AVANT
      de composer, pas après avoir mangé. */
   const anomalies = useMemo(() => verifierCatalogue(stock), [stock]);
+
+  /* LES FIBRES INCONNUES, QUAND LA CIBLE LES COMPTE.
+   *
+   * Une cible en glucides TOTAUX additionne glucides et fibres. Un aliment
+   * dont les fibres sont inconnues est alors compté comme s'il n'en avait
+   * aucune — et le solveur en sert davantage pour atteindre le chiffre :
+   * un pain complet à 42 g de glucides et 7 g de fibres inconnues fait
+   * peser 143 g au lieu de 122. Dix-sept pour cent de féculent en trop,
+   * quatre fois par jour.
+   *
+   * On ne corrige pas à la place de l'utilisateur — inventer 7 g de fibres
+   * serait pire que de les ignorer. On NOMME les aliments concernés, une
+   * fois, et seulement quand la cible rend le problème réel. */
+  const cibleEnGlucidesTotaux = (cibles.data ?? []).some((c) => c.glucidesTotaux === true);
+
+  const sansFibresConnues = useMemo(() => {
+    if (!cibleEnGlucidesTotaux) return [];
+
+    return (frigo.data?.aliments ?? [])
+      .filter((a) => a.fibres100 === null || a.fibres100 === undefined)
+      /* Les fibres d'une huile ou d'un blanc de poulet sont nulles, pas
+         inconnues : les signaler noierait les vrais cas. On ne parle que de
+         ce qui en contient forcément. */
+      .filter((a) => a.categorie === 'fec' || a.categorie === 'leg'
+        || a.categorie === 'fruit' || a.categorie === 'ole')
+      .map((a) => a.nom);
+  }, [frigo.data, cibleEnGlucidesTotaux]);
 
   const cibleDe = (repas: Repas) => (cibles.data ?? []).find((c) => c.repas === repas);
 
@@ -1154,6 +1196,32 @@ const dateCourte = (iso: string | null | undefined): string => {
                 l'onglet suivant. */}
             <Bouton variante="contour" onPress={() => router.push('/frigo')}>
               Corriger dans mon frigo →
+            </Bouton>
+          </Carte>
+        )}
+
+        {/* Voir `sansFibresConnues` : le solveur compte « inconnu » comme
+            zéro, donc il sert davantage de féculent pour atteindre la cible.
+            On ne le corrige pas à sa place — inventer une valeur serait pire
+            — mais on ne le laisse pas non plus silencieux. */}
+        {sansFibresConnues.length > 0 && (
+          <Carte style={{ gap: E.s, borderColor: C.vifBord, backgroundColor: C.vifFond }}>
+            <Texte style={{ fontFamily: P.fort }}>
+              Fibres inconnues sur {sansFibresConnues.length} aliment
+              {sansFibresConnues.length > 1 ? 's' : ''}
+            </Texte>
+            <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
+              Ta cible compte les glucides TOTAUX — fibres comprises. Un aliment
+              dont les fibres sont inconnues est compté comme s’il n’en avait
+              aucune, et le calculateur en sert davantage pour atteindre le
+              chiffre. Sur un pain complet, l’écart atteint 17 %.
+            </Discret>
+            <Discret style={{ fontSize: T.petit }}>
+              {sansFibresConnues.slice(0, 8).join(', ')}
+              {sansFibresConnues.length > 8 ? `, et ${sansFibresConnues.length - 8} autre(s)` : ''}
+            </Discret>
+            <Bouton variante="contour" onPress={() => router.push('/frigo')}>
+              Renseigner dans mon frigo →
             </Bouton>
           </Carte>
         )}

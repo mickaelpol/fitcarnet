@@ -58,6 +58,20 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['utilisateur:ecrire'])]
     private ?string $motDePasseClair = null;
 
+    /**
+     * LE MOT DE PASSE ACTUEL, EXIGE POUR CHANGER LE SIEN OU SON ADRESSE.
+     *
+     * Sans lui, un jeton vole pendant une heure suffisait a prendre le compte
+     * pour toujours : `PATCH /api/utilisateurs/<id>` avec une nouvelle adresse
+     * et un nouveau mot de passe, et le proprietaire legitime ne pouvait plus
+     * se connecter — meme avec ses identifiants d'origine, puisque l'adresse
+     * avait change.
+     *
+     * Ce champ n'est jamais persiste et n'est jamais rendu.
+     */
+    #[Groups(['utilisateur:ecrire'])]
+    private ?string $motDePasseActuel = null;
+
     #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank]
     #[Groups(['utilisateur:lire', 'utilisateur:ecrire'])]
@@ -72,8 +86,26 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['utilisateur:lire'])]
     private string $sourceFrigo = 'base';
 
+    /**
+     * ACTIVER OU DESACTIVER NE PASSE PAS PAR CETTE RESSOURCE.
+     *
+     * `actif` etait dans `utilisateur:ecrire`, et le `Patch` est autorise a
+     * `object == user`. N'importe quel compte pouvait donc s'envoyer
+     * `PATCH /api/utilisateurs/<son id> {"actif": false}` — et se verrouiller
+     * dehors sans retour possible : la requete suivante est refusee par
+     * `CompteActif`, y compris celle qui reactiverait.
+     *
+     * Pire : un administrateur pouvait desactiver LE DERNIER administrateur
+     * actif par la meme route. `ComptesController` refuse soigneusement ces
+     * deux gestes (voir `ProtectionDuCompte`) ; API Platform les autorisait a
+     * cote, sans aucune de ces regles. Deux portes vers le meme etat, une
+     * seule gardee.
+     *
+     * En lecture seulement, desormais. `POST /api/comptes/{id}/actif` est le
+     * seul chemin, et il est reserve a ROLE_ADMIN.
+     */
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => true])]
-    #[Groups(['utilisateur:lire', 'utilisateur:ecrire'])]
+    #[Groups(['utilisateur:lire'])]
     private bool $actif = true;
 
     #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
@@ -97,6 +129,9 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     public function getMotDePasseClair(): ?string { return $this->motDePasseClair; }
     public function setMotDePasseClair(?string $c): self { $this->motDePasseClair = $c; return $this; }
 
+    public function getMotDePasseActuel(): ?string { return $this->motDePasseActuel; }
+    public function setMotDePasseActuel(?string $c): self { $this->motDePasseActuel = $c; return $this; }
+
     public function getNom(): string { return $this->nom; }
     public function setNom(string $nom): self { $this->nom = $nom; return $this; }
 
@@ -118,5 +153,9 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     public function getCreeLe(): \DateTimeImmutable { return $this->creeLe; }
 
     public function getUserIdentifier(): string { return $this->email; }
-    public function eraseCredentials(): void { $this->motDePasseClair = null; }
+    public function eraseCredentials(): void
+    {
+        $this->motDePasseClair = null;
+        $this->motDePasseActuel = null;
+    }
 }

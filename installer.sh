@@ -115,7 +115,7 @@ ok "Base prête"
 
 # le schéma n'est joué qu'à la création du volume : on vérifie qu'il est là
 nb_tables=$(sql "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
-(( nb_tables >= 16 )) || echec "Seulement $nb_tables tables, il en faut au moins 16. Le schéma n'a pas été appliqué — relance avec --repartir-de-zero."
+(( nb_tables >= 17 )) || echec "Seulement $nb_tables tables, il en faut au moins 17. Le schéma n'a pas été appliqué — relance avec --repartir-de-zero."
 ok "$nb_tables tables"
 
 nb_aliments=$(sql "SELECT count(*) FROM aliment;")
