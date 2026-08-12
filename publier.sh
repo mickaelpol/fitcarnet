@@ -217,7 +217,23 @@ print('\n'.join(f'{c}={v}' for c, v in env.items()))")
     esac
     info "adresse imposee aux telephones : $URL_PROD"
 
-    ( cd front && env $ENV_PROD $EAS update --branch production --message "$MESSAGE" ) \
+    # `--clear-cache` N'EST PAS DU CONFORT.
+    #
+    # Metro garde le resultat de chaque fichier transforme, et les variables
+    # `EXPO_PUBLIC_*` sont REMPLACEES DANS LE CODE au moment de cette
+    # transformation. Un fichier deja transforme avec l'adresse du WSL ressort
+    # tel quel, meme si l'environnement a change — et la mise a jour publiee
+    # renvoie les telephones sur `192.168.1.118` alors que la commande a
+    # affiche la bonne adresse deux lignes plus haut.
+    #
+    # Le meme piege a coute une heure sur un preset Babel deja correct :
+    # quatre fois la meme erreur, aux memes numeros de ligne, parce que rien
+    # n'etait recalcule. `publier-android.sh` s'en protege depuis ce jour-la.
+    # Ici, je l'avais oublie.
+    #
+    # Une minute de plus par publication. C'est le prix pour que ce qu'on lit
+    # soit ce que le paquet contient.
+    ( cd front && env $ENV_PROD $EAS update --branch production --clear-cache --message "$MESSAGE" ) \
         || echec "\`eas update\` a échoué. Le code est poussé et le NAS l'aura :
    seuls les téléphones sont en retard. Relance :
      cd front && $EAS update --branch production --message \"$MESSAGE\""
