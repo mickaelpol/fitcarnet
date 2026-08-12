@@ -126,7 +126,15 @@ export function useMajExercice() {
   return useMutation({
     mutationFn: (e: { id: number } & Partial<Exercice>) =>
       api<Exercice>(`/exercices/${e.id}`, { methode: 'PATCH', corps: e }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['exercices'] }),
+    onSuccess: (_reponse, envoye) => {
+      void qc.invalidateQueries({ queryKey: ['exercices'] });
+      /* ET LA FICHE, pas seulement la liste. Depuis que les textes longs ne
+         voyagent plus avec la collection, ils vivent dans une entrée de cache
+         distincte : sans cette ligne, on corrigerait une instruction, la liste
+         se rafraîchirait, et rouvrir la fiche afficherait l'ancienne version
+         pendant trente minutes — le temps du `staleTime` du référentiel. */
+      void qc.invalidateQueries({ queryKey: ['exercice', envoye.id] });
+    },
   });
 }
 

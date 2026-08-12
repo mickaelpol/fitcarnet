@@ -142,12 +142,16 @@ class Exercice
     #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $muscleCible = null;
 
+    /* MODIFIABLES DEPUIS L'ECRAN D'ADMINISTRATION, comme les quatre autres.
+       Ces deux-la etaient en lecture seule : le catalogue importe arrivait en
+       anglais et rien ne permettait de le corriger — ni de renseigner un
+       exercice ajoute a la main, qui naissait sans aucune de ces donnees. */
     #[ORM\Column(name: 'muscles_secondaires', type: Types::TEXT, nullable: true)]
-    #[Groups(['exercice:detail'])]
+    #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $musclesSecondaires = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['exercice:detail'])]
+    #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $instructions = null;
 
     /** 'perso' = tes exercices · 'import' = catalogue commun */

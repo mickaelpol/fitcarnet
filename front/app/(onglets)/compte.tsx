@@ -65,8 +65,8 @@ export default function Compte() {
       {data?.roles?.includes('ROLE_ADMIN') === true && (
         <>
           <Discret style={[s.etiquette, { marginTop: E.l }]}>Administration</Discret>
-          <Bouton variante="contour" onPress={() => router.push('/admin-videos')}>
-            Vidéos des exercices
+          <Bouton variante="contour" onPress={() => router.push('/admin-exercices')}>
+            Gestion des exercices
           </Bouton>
           <Bouton variante="contour" onPress={() => router.push('/admin-fusion')}>
             Fusionner des exercices

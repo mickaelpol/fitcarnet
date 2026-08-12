@@ -129,7 +129,7 @@ export default function Racine() {
           <Stack.Screen name="modele/[id]" options={{ title: 'Modèle' }} />
           <Stack.Screen name="objectifs" options={{ title: 'Mes objectifs' }} />
           <Stack.Screen name="reglages" options={{ title: 'Réglages de l’app' }} />
-          <Stack.Screen name="admin-videos" options={{ title: 'Vidéos des exercices' }} />
+          <Stack.Screen name="admin-exercices" options={{ title: 'Gestion des exercices' }} />
           <Stack.Screen name="admin-fusion" options={{ title: 'Fusionner des exercices' }} />
           <Stack.Screen name="admin-cuissons" options={{ title: 'Façons de cuire' }} />
           <Stack.Screen name="admin-utilisateurs" options={{ title: 'Inviter quelqu’un' }} />

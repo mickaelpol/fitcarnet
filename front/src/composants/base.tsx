@@ -78,15 +78,24 @@ interface ChampProps {
   motDePasse?: boolean;
   etiquette?: string;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Texte long, sur plusieurs lignes.
+   *
+   * Change aussi la capitalisation automatique : `autoCapitalize="none"`
+   * convient à une adresse ou à un identifiant, pas à un mode d'exécution
+   * qu'on écrit en phrases. Sans ça, chaque phrase commencerait en minuscule.
+   */
+  multiligne?: boolean;
 }
 
 export function Champ({
   valeur, onChange, placeholder, unite, numerique, motDePasse, etiquette, style,
+  multiligne,
 }: ChampProps) {
   return (
     <View style={[s.champBloc, style]}>
       {etiquette !== undefined && <Text style={s.etiquette}>{etiquette}</Text>}
-      <View style={s.champCadre}>
+      <View style={[s.champCadre, multiligne === true && s.champCadreLong]}>
         <TextInput
           value={valeur}
           onChangeText={onChange}
@@ -94,8 +103,9 @@ export function Champ({
           placeholderTextColor={C.discret}
           keyboardType={numerique ? 'decimal-pad' : 'default'}
           secureTextEntry={motDePasse}
-          autoCapitalize="none"
-          style={[s.champ, numerique && s.champNombre]}
+          autoCapitalize={multiligne === true ? 'sentences' : 'none'}
+          multiline={multiligne}
+          style={[s.champ, numerique && s.champNombre, multiligne === true && s.champLong]}
         />
         {unite !== undefined && <Text style={s.unite}>{unite}</Text>}
       </View>
@@ -160,7 +170,11 @@ const s = StyleSheet.create({
     backgroundColor: C.surface2, borderColor: C.ligne, borderWidth: 1,
     borderRadius: R.s, paddingHorizontal: E.m, minHeight: TOUCHE + 2,
   },
+  champCadreLong: { alignItems: 'flex-start', minHeight: 140 },
   champ: { flex: 1, color: C.encre, fontFamily: P.texte, fontSize: T.moyen, paddingVertical: E.s },
+  /* `textAlignVertical` pour Android : sans lui, le texte d'un champ
+     multiligne se centre verticalement au lieu de commencer en haut. */
+  champLong: { minHeight: 120, textAlignVertical: 'top', lineHeight: 21 },
   champNombre: { fontFamily: P.fort, fontSize: T.grand },
   unite: { color: C.discret, fontFamily: P.texte, fontSize: T.normal, marginLeft: E.xs },
 
