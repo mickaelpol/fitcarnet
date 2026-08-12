@@ -259,9 +259,18 @@ export function composer(
     if (aliment === undefined) continue;
 
     imposes[role] = aliment;
-    /* Sans `unite`, la quantité s'entend dans l'état de référence de
-       l'aliment : cuit pour un légume, une huile, un fruit. C'est ce qu'on
-       SERT. Le poids à peser en découle, il n'est jamais saisi ici. */
+    /* SANS `unite`, LA QUANTITÉ S'ENTEND CRUE — c'est-à-dire À PESER.
+       200 g de légume, ce sont 200 g sur la balance avant cuisson ; ce qui
+       arrive dans l'assiette en découle par le rendement de l'aliment, et
+       l'écran affiche les deux colonnes côte à côte.
+
+       CE COMMENTAIRE DISAIT L'INVERSE — « cuit pour un légume, c'est ce
+       qu'on SERT » — et contredisait `Fixe.unite` dans `types.ts`, qui pose
+       'cru' par défaut « comme tout le reste de l'application ». Le code,
+       lui, n'a jamais converti : `versReference` rend la quantité telle
+       quelle quand `unite` est absent. C'était donc le commentaire qui
+       mentait, pas le calcul. Deux commentaires contradictoires sur la même
+       question, c'est une décision qu'on reprend à zéro à chaque relecture. */
     fixes.push({ aliment, grammes: grammes * portions });
   }
 

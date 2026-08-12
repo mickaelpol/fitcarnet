@@ -110,7 +110,7 @@ export default function MonFrigo() {
      laisse voir : filtrer puis envoyer perdrait les lignes déjà saisies. */
   const ecarts = useMemo(() => ecartsInventaire(tous, saisies), [tous, saisies]);
 
-  const enStock = tous.filter((a) => a.stock > 0).length;
+  const enStock = useMemo(() => tous.filter((a) => a.stock > 0).length, [tous]);
   const comptes = Object.values(vus).filter(Boolean).length;
 
   /* Les macros sont données pour 100 g. Une autre unité ne pose problème que
@@ -124,10 +124,39 @@ export default function MonFrigo() {
     [tous],
   );
 
+  /* MEMOISE, PARCE QUE C'ETAIT ECRIT DANS LE JSX.
+     Ce filtrage porte sur les ~500 aliments du catalogue. Pose directement
+     dans les attributs de `ChoixDansListe`, il se rejouait a chaque rendu de
+     l'ecran — modale fermee comprise, donc a chaque caractere tape dans la
+     recherche. Meme motif que dans les ecrans de seance et de modele. */
+  const modelesPossibles = useMemo(() => [
+    { id: 0, nom: 'Créer de zéro', detail: 'aucune valeur préremplie' },
+    ...(catalogue.data ?? [])
+      // On écarte ce qu'on possède déjà, par le nom. Le catalogue mêle les
+      // aliments de référence et les siens ; proposer les siens ferait créer
+      // un doublon, que l'unicité par propriétaire refuse.
+      .filter((a) => !dejaChezMoi.has(a.nom.trim().toLowerCase()))
+      .map((a) => ({
+        id: a.id,
+        nom: a.nom,
+        detail: `${nb(a.kcal100)} kcal · ${nb(a.prot100)} P · ${nb(a.gluc100)} G`
+          + ` · ${nb(a.lip100)} L`,
+        couleur: couleurRole(a.categorie),
+      })),
+  ], [catalogue.data, dejaChezMoi]);
+
   const entrerInventaire = () => {
     envoyer.reset();
-    setSaisies(stocksInitiaux(tous));
-    setVus({});
+    /* ON NE REPART DE ZERO QUE S'IL N'Y A RIEN EN COURS.
+       Avant, revenir sur cet onglet rappelait `stocksInitiaux` : un inventaire
+       de trente articles disparaissait parce qu'on etait alle verifier une
+       quantite dans l'onglet Stock. Rien ne prevenait, et rien ne permettait
+       de le recuperer. Repartir de zero reste possible — c'est le bouton
+       « Reinitialiser », en bas, et c'est un geste qu'on decide. */
+    if (Object.keys(saisies).length === 0) {
+      setSaisies(stocksInitiaux(tous));
+      setVus({});
+    }
     setOuvert(null);
     setMode('inventaire');
   };
@@ -332,7 +361,14 @@ export default function MonFrigo() {
             </Bouton>
             <Bouton
               onPress={() => envoyer.mutate(ecarts, {
-                onSuccess: (r) => { if (r.echecs.length === 0) setMode('stock'); },
+                onSuccess: (r) => {
+                  if (r.echecs.length !== 0) return;
+                  /* Envoyee et appliquee : la garder ferait rouvrir
+                     l'inventaire sur des chiffres deja consommes. */
+                  setSaisies({});
+                  setVus({});
+                  setMode('stock');
+                },
               })}
               desactive={ecarts.length === 0 || envoyer.isPending}
               style={{ flex: 1.6 }}
@@ -467,21 +503,7 @@ export default function MonFrigo() {
       <ChoixDansListe
         visible={choixModele}
         titre="Partir d'un aliment de référence"
-        elements={[
-          { id: 0, nom: 'Créer de zéro', detail: 'aucune valeur préremplie' },
-          ...(catalogue.data ?? [])
-            // On écarte ce qu'on possède déjà, par le nom. Le catalogue mêle
-            // les aliments de référence et les siens ; proposer les siens
-            // ferait créer un doublon, que l'unicité par propriétaire refuse.
-            .filter((a) => !dejaChezMoi.has(a.nom.trim().toLowerCase()))
-            .map((a) => ({
-              id: a.id,
-              nom: a.nom,
-              detail: `${nb(a.kcal100)} kcal · ${nb(a.prot100)} P · ${nb(a.gluc100)} G`
-                + ` · ${nb(a.lip100)} L`,
-              couleur: couleurRole(a.categorie),
-            })),
-        ]}
+        elements={modelesPossibles}
         onFermer={() => setChoixModele(false)}
         onChoisir={(id) => {
           // « Créer de zéro » porte l'identifiant 0, qu'aucun aliment n'a
@@ -690,7 +712,8 @@ const s = StyleSheet.create({
     backgroundColor: C.surface2,
   },
   segment: {
-    flex: 1, minHeight: TOUCHE - 8, borderRadius: R.s - 2,
+    // 36 px auparavant, sous les 44 que le theme impose.
+    flex: 1, minHeight: TOUCHE, borderRadius: R.s - 2,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: E.xs,
   },
   segmentActif: { backgroundColor: C.vif },
@@ -717,7 +740,9 @@ const s = StyleSheet.create({
   carteInv: { flexDirection: 'row', alignItems: 'center', gap: E.s, padding: E.s },
   carteVue: { opacity: 0.66 },
   barre: { textDecorationLine: 'line-through' },
-  case_: { padding: 6 },
+  // 6 px de marge autour d'un carre de 22 donnaient 34 px de cible ; 11 en
+  // donnent 44, sans changer le carre lui-meme.
+  case_: { padding: 11 },
   carre: {
     width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, borderColor: C.ligne,
     alignItems: 'center', justifyContent: 'center',

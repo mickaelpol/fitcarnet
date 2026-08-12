@@ -78,6 +78,31 @@ const imposePour = (repas: Repas, cle: Role): number | undefined =>
  * restait que 500. Sortie du composant, elle se résout maintenant en une
  * seule passe pour la journée — voir `resoudreLaJournee`.
  */
+/**
+ * La quantité tapée, ou `null` si elle est inutilisable.
+ *
+ * UN SEUL ENDROIT DÉCIDE CE QU'EST UNE SAISIE VALABLE, et l'écran s'en sert
+ * pour le dire. Avant, la règle vivait dans le calcul et nulle part ailleurs :
+ * taper « 12O » avec un O, ou « -50 », faisait entrer l'aliment avec 0 g. Il
+ * restait affiché dans la liste, le résultat était calculé sans lui, et rien
+ * n'indiquait que le chiffre avait été jeté.
+ *
+ * `null` distingue « rien tapé » de « tapé mais illisible » : le premier est
+ * normal, le second mérite un message.
+ */
+export const grammesSaisis = (brut?: string): number | null => {
+  const saisi = (brut ?? '').trim();
+  if (saisi === '') return null;
+
+  const g = Number(saisi.replace(',', '.'));
+
+  return Number.isFinite(g) && g >= 0 ? g : null;
+};
+
+/** Une saisie non vide que le calcul ne saura pas utiliser. */
+export const saisieIllisible = (brut?: string): boolean =>
+  (brut ?? '').trim() !== '' && grammesSaisis(brut) === null;
+
 const demandePour = (
   repas: Repas,
   compose: Compose,
@@ -91,11 +116,9 @@ const demandePour = (
      et n'apparaît pas dans le résultat. On le pose donc à zéro tant que
      l'utilisateur n'a pas tapé son chiffre. */
   for (const aliment of compose.ajouts) {
-    const saisi = (compose.restes[String(aliment.id)]?.grammes ?? '').trim();
-    const g = Number(saisi.replace(',', '.'));
     fixes.push({
       aliment,
-      grammes: saisi !== '' && Number.isFinite(g) && g >= 0 ? g : 0,
+      grammes: grammesSaisis(compose.restes[String(aliment.id)]?.grammes) ?? 0,
       unite: compose.restes[String(aliment.id)]?.unite ?? 'cru',
     });
   }
@@ -1043,6 +1066,8 @@ const dateCourte = (iso: string | null | undefined): string => {
                               ...p, [cle]: Math.max(1, (p[cle] ?? 1) - 1),
                             }))}
                             style={s.persBouton}
+                            hitSlop={{ top: 3, bottom: 3, left: 5, right: 5 }}
+                            accessibilityLabel="Une personne de moins"
                           >
                             <Texte style={s.signe}>−</Texte>
                           </Pressable>
@@ -1052,6 +1077,8 @@ const dateCourte = (iso: string | null | undefined): string => {
                               ...p, [cle]: Math.min(12, (p[cle] ?? 1) + 1),
                             }))}
                             style={s.persBouton}
+                            hitSlop={{ top: 3, bottom: 3, left: 5, right: 5 }}
+                            accessibilityLabel="Une personne de plus"
                           >
                             <Texte style={s.signe}>+</Texte>
                           </Pressable>
@@ -1973,6 +2000,14 @@ function CarteRepas({
                     placeholder="quantité"
                     unite="g" numerique style={{ width: 112 }}
                   />
+                  {/* Une saisie jetée en silence est pire qu'une saisie
+                      refusée : on la voit encore à l'écran et on croit
+                      qu'elle compte. */}
+                  {saisieIllisible(reste?.grammes) && (
+                    <Discret style={{ color: C.erreur, fontSize: T.minuscule, flexBasis: '100%' }}>
+                      Quantité illisible — cet aliment compte pour 0 g.
+                    </Discret>
+                  )}
                   <Pressable
                     onPress={() => onReste(String(a.id), {
                       grammes: reste?.grammes ?? '',
@@ -2110,6 +2145,9 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   pers: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  /* 34 x 38 px auparavant, sous les 44 que le theme impose. On elargit
+     la MARGE de touche plus bas plutot que le bouton : la rangee de
+     convives reste compacte, la cible fait 44. */
   persBouton: {
     width: 34, minHeight: TOUCHE - 6, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
     alignItems: 'center', justifyContent: 'center',

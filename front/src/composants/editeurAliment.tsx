@@ -434,7 +434,8 @@ const s = StyleSheet.create({
   },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   categorie: {
-    paddingHorizontal: E.m, minHeight: 38, borderRadius: R.s, borderWidth: 1,
+    // 38 px auparavant, sous les 44 que `TOUCHE` impose au reste de l'app.
+    paddingHorizontal: E.m, minHeight: TOUCHE, borderRadius: R.s, borderWidth: 1,
     borderColor: C.ligne, backgroundColor: C.surface2,
     alignItems: 'center', justifyContent: 'center',
   },
