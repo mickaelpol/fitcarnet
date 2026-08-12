@@ -68,24 +68,31 @@ services:
       target: prod                     # passe a "dev" pour le rechargement a chaud
     container_name: fitcarnet-app
     restart: unless-stopped
-    # POUR JOINDRE GROCY SANS SORTIR DU NAS.
+    # PAS DE `extra_hosts` ICI, ET C'EST UN CONSTAT, PAS UN OUBLI.
     #
-    # Grocy tourne dans une autre pile, sur un autre reseau Docker, et publie
-    # son port 9283 sur l'hote. `GROCY_URL` pointait vers l'adresse PUBLIQUE :
-    # chaque appel sortait du NAS, resolvait un nom DNS public, refaisait une
-    # poignee de main TLS et retraversait le proxy inverse — pour atteindre une
-    # application qui tourne sur la meme machine. Mesure : 850 ms par appel, et
-    # cinq appels a chaque ouverture du frigo.
+    # Grocy tourne sur le meme NAS, dans une autre pile. `GROCY_URL` pointe
+    # vers son adresse PUBLIQUE : chaque appel sort du NAS, resout un nom DNS
+    # public, refait une poignee de main TLS et retraverse le proxy inverse —
+    # pour atteindre une application situee a quelques centimetres. Cinq appels
+    # a chaque ouverture du frigo.
     #
-    # Par la porte interieure : 26 ms. Trente-trois fois moins.
+    # On a essaye de raccourcir ce chemin, le 12 aout 2026 :
     #
-    # `host-gateway` PLUTOT QUE L'ADRESSE DE LA PASSERELLE EN DUR. Docker
-    # attribue 172.29.0.1 a la creation du reseau ; ecrire ce nombre dans le
-    # `.env` marcherait aujourd'hui et casserait le jour ou la pile serait
-    # recreee sur un autre sous-reseau — sans que rien n'explique pourquoi le
-    # frigo est devenu vide. `compose.dev.yml` utilise deja cette forme.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    #   - `host.docker.internal:host-gateway` : le nom se resout bien, mais
+    #     vers 172.17.0.1 — la passerelle du reseau `bridge` PAR DEFAUT, que ce
+    #     conteneur-ci ne route pas. Injoignable.
+    #   - brancher ce conteneur sur `grocy_default` et appeler `http://grocy` :
+    #     plus lent que l'adresse publique.
+    #   - passer par la passerelle du reseau, `172.29.0.1:9283` : 26 ms sur une
+    #     serie, 1,3 s sur la suivante.
+    #
+    # LA MESURE ELLE-MEME N'ETAIT PAS FIABLE : le meme appel sur le meme chemin
+    # a donne 0,026 s puis 1,301 s a une demi-heure d'ecart. Un facteur 50 de
+    # bruit, pour un gain espere bien plus petit. Rien n'a donc ete change.
+    #
+    # A REPRENDRE UN JOUR OU LE NAS EST AU REPOS : dix mesures alternees des
+    # deux chemins, `uptime` releve en meme temps. Pas trois mesures dans une
+    # fenetre favorable — c'est ainsi qu'on conclut a l'envers.
     depends_on:
       fitcarnet-db:
         condition: service_healthy

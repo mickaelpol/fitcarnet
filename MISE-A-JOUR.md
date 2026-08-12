@@ -37,21 +37,64 @@ jour JavaScript ne livre pas de code natif, et du JavaScript qui appelle un
 module absent fait planter l'application au démarrage — sur tous les
 téléphones, sans possibilité d'y pousser le correctif.
 
-1. ```bash
+1. **Le site et l'API d'abord**, sans toucher aux téléphones :
+   ```bash
+   ./publier.sh "ce qui change" --sans-mobile
+   ```
+   Sans cette étape, tes changements d'API resteraient sur ton disque pendant
+   toute la construction de l'APK. `--sans-mobile` est obligatoire : sans lui
+   le script refuse, et il a raison.
+
+2. **Déploie et vérifie que le serveur tient**, sur le NAS :
+   ```bash
+   /volume1/docker/fitcarnet/deployer-nas.sh
+   docker logs fitcarnet-app --tail 30
+   ```
+   Avant, pas après : une construction EAS coûte vingt minutes et incrémente
+   le `versionCode` de façon irréversible. Autant savoir que le serveur
+   répond avant de les dépenser.
+
+3. ```bash
    ./publier-android.sh --notes "ce qui change"
    ```
-   Environ 10 minutes. Il lance les tests, vérifie les greffons, assemble le
-   JavaScript en local, puis incrémente les numéros et construit l'APK.
+   Environ 10 minutes, plus la file d'attente. Il lance les tests, vérifie les
+   greffons, assemble le JavaScript en local, puis incrémente les numéros et
+   construit l'APK.
 
-2. Télécharger l'APK depuis la page qu'EAS affiche, le renommer
+4. Télécharger l'APK depuis la page qu'EAS affiche, le renommer
    **`fitcarnet.apk`**, et le déposer sur le NAS dans
    `/volume1/docker/fitcarnet/telecharger/`.
 
-3. ```bash
+5. ```bash
    git add front/app.json telecharger/version.json
    git commit -m "version 1.0.X (Y)"
    git push
    ```
+
+### Si la construction échoue sans que tu aies rien fait de mal
+
+Regarde **où** elle échoue. Si le journal EAS s'arrête sur :
+
+```
+Downloading https://services.gradle.org/distributions/gradle-X.Y.Z-bin.zip
+java.net.SocketException  /  HTTP response code: 503
+```
+
+alors **aucune ligne de fitcarnet n'a été lue**. Gradle — l'outil de
+compilation — n'a pas pu être téléchargé sur les machines d'Expo. Ce fichier
+est en réalité hébergé chez GitHub, qui refuse parfois de le servir aux
+adresses des serveurs de build.
+
+Ne cherche pas dans ton code : relance, espacé d'une heure. C'est arrivé
+quatre fois de suite le 12 août avant de passer tout seul.
+
+### Ce que ça coûte à ceux qui utilisent l'application
+
+Un nouvel APK doit être **réinstallé à la main** par chacun — tu distribues
+hors Play Store, il n'y a pas de mise à jour automatique. C'est la seule
+forme de mise à jour qui demande une action à tes utilisateurs. Une raison de
+plus de grouper les changements natifs plutôt que d'en publier au fil de
+l'eau.
 
 **L'APK d'abord, le push ensuite.** Le `version.json` annonce aux téléphones
 qu'une version existe : s'il arrive avant le fichier, ils vont sur une adresse
