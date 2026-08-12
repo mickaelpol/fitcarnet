@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
 import { adresseApi } from '@/api/client';
+import { useMoi } from '@/api/hooks';
 import { Bouton, Carte, Discret, Texte } from './base';
 import { C, E, P, R, T } from '@/theme';
 
@@ -41,6 +42,19 @@ export function EtatMaj() {
   const [message, setMessage] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
   const [serveur, setServeur] = useState<EtatServeur>('inconnu');
+
+  /* CE PANNEAU DIT DEUX CHOSES À DEUX PUBLICS.
+   *
+   * À tout le monde : « ça marche » ou « ça ne marche pas », et la version.
+   * C'est ce dont on a besoin avant d'écrire à quelqu'un pour signaler une
+   * panne.
+   *
+   * À l'administrateur seul : l'adresse exacte, le canal, l'identifiant du
+   * paquet, les boutons. Ce sont des outils de diagnostic — pour qui ne les
+   * comprend pas, ce ne sont que quatre lignes inquiétantes, et un bouton
+   * « chercher une mise à jour » qui donne envie d'appuyer quand rien ne va,
+   * sans que ça règle jamais rien. */
+  const admin = useMoi().data?.roles?.includes('ROLE_ADMIN') === true;
 
   /**
    * LE SERVEUR RÉPOND-IL ?
@@ -124,16 +138,24 @@ export function EtatMaj() {
           était hors ligne. Une ligne ici tranche en deux secondes. */}
       <View style={s.ligne}>
         <Discret style={{ flex: 1 }}>Serveur</Discret>
+        {/* UNE PASTILLE, PARCE QU'UN ÉTAT SE LIT D'UN COUP D'ŒIL OU NE SE LIT
+            PAS. Le mot reste à côté : une couleur seule ne dit rien à qui ne
+            distingue pas le vert du rouge. */}
+        <View style={[s.pastille, {
+          backgroundColor: serveur === 'joignable' ? C.ok
+            : serveur === 'injoignable' ? C.erreur : C.discret,
+        }]} />
         <Texte style={[s.valeur, {
           color: serveur === 'joignable' ? C.ok
             : serveur === 'injoignable' ? C.erreur : C.attenue,
         }]}>
-          {serveur === 'joignable' ? 'joignable'
-            : serveur === 'injoignable' ? 'INJOIGNABLE' : 'vérification…'}
+          {serveur === 'joignable' ? 'en ligne'
+            : serveur === 'injoignable' ? 'hors ligne' : 'vérification…'}
         </Texte>
       </View>
-      <Texte style={s.adresse} numberOfLines={2}>{adresseApi()}</Texte>
-      {avecMaj && (
+
+      {admin && <Texte style={s.adresse} numberOfLines={2}>{adresseApi()}</Texte>}
+      {avecMaj && admin && (
         <>
           <Ligne nom="Application" valeur={Updates.createdAt === null ? 'installée' : 'mise à jour'} />
           <Ligne nom="Version d’exécution" valeur={Updates.runtimeVersion ?? '—'} />
@@ -155,24 +177,32 @@ export function EtatMaj() {
           )}
         </>
       )}
-      {!avecMaj && (
+      {!avecMaj && admin && (
         <Discret style={{ fontSize: T.petit }}>
           Version web : le code vient du serveur à chaque chargement, il n’y a
           rien à mettre à jour ici.
         </Discret>
       )}
 
-      <Bouton variante="contour" onPress={verifierServeur}>
-        Retester le serveur
-      </Bouton>
+      {/* La version, pour tout le monde : c'est le seul chiffre utile quand on
+          signale un problème à quelqu'un. */}
+      {!admin && (
+        <Ligne nom="Version" valeur={Updates.runtimeVersion ?? 'web'} />
+      )}
 
-      {avecMaj && (
+      {admin && (
+        <Bouton variante="contour" onPress={verifierServeur}>
+          Retester le serveur
+        </Bouton>
+      )}
+
+      {avecMaj && admin && (
         <Bouton variante="contour" onPress={chercher} desactive={occupe}>
           {occupe ? 'Patiente…' : 'Chercher une mise à jour'}
         </Bouton>
       )}
 
-      {message !== null && (
+      {message !== null && admin && (
         <Discret style={s.message}>{message}</Discret>
       )}
     </Carte>
@@ -189,6 +219,7 @@ const Ligne = ({ nom, valeur }: { nom: string; valeur: string }) => (
 const s = StyleSheet.create({
   ligne: { flexDirection: 'row', alignItems: 'center', gap: E.s },
   valeur: { fontSize: T.petit, color: C.attenue },
+  pastille: { width: 9, height: 9, borderRadius: 5 },
   adresse: {
     fontSize: T.petit, color: C.attenue,
     backgroundColor: C.fond, borderRadius: R.s, padding: E.xs,

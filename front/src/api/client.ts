@@ -75,11 +75,35 @@ export async function chargerJeton(): Promise<string | null> {
   return jeton;
 }
 
+/* ------------------------------------------------- qui écoute la session */
+
+/**
+ * ON PRÉVIENT QUAND LE JETON CHANGE.
+ *
+ * Le portier de `app/_layout.tsx` doit renvoyer vers la connexion À L'INSTANT
+ * où la session tombe, et laisser entrer à l'instant où elle s'ouvre. Sans ce
+ * signal, il faudrait interroger le coffre en boucle, ou attendre le prochain
+ * changement d'écran — c'est-à-dire laisser un écran protégé affiché après
+ * une déconnexion.
+ */
+const abonnesJeton = new Set<(connecte: boolean) => void>();
+
+export function abonnerJeton(f: (connecte: boolean) => void): () => void {
+  abonnesJeton.add(f);
+
+  return () => { abonnesJeton.delete(f); };
+}
+
+const prevenirJeton = (): void => {
+  for (const f of abonnesJeton) f(jeton !== null && jeton !== '');
+};
+
 export async function definirJeton(valeur: string | null): Promise<void> {
   jeton = valeur;
   jetonsCharges = true;
   if (valeur === null) await coffre.effacer(CLE_JETON);
   else await coffre.ecrire(CLE_JETON, valeur);
+  prevenirJeton();
 }
 
 export async function definirRafraichissement(valeur: string | null): Promise<void> {

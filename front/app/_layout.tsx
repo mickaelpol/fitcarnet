@@ -1,13 +1,14 @@
 import { BarlowCondensed_600SemiBold, BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed';
 import { Inter_400Regular, Inter_600SemiBold, useFonts } from '@expo-google-fonts/inter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { chargerJeton, surSessionFinie } from '@/api/client';
+import { useConnecte } from '@/api/session';
 import { Chargement } from '@/composants/base';
 import { EnTete } from '@/composants/enTete';
 import { C } from '@/theme';
@@ -34,8 +35,38 @@ export default function Racine() {
   });
   const [pret, setPret] = useState(false);
   const routeur = useRouter();
+  const segments = useSegments();
+  const connecte = useConnecte();
 
   useEffect(() => { void chargerJeton().then(() => setPret(true)); }, []);
+
+  /* --------------------------------------------------------- le portier
+   *
+   * TOUTE L'APPLICATION EXIGE UN COMPTE. Deux exceptions, et deux seulement :
+   * l'écran de connexion, et l'acceptation d'une invitation — qu'on ouvre
+   * précisément quand on n'a pas encore de compte.
+   *
+   * POURQUOI ÇA MANQUAIT, ET POURQUOI ÇA NE SE VOYAIT PAS.
+   *
+   * Sur un téléphone, on n'atteint un écran qu'en naviguant, et toute
+   * navigation partait de l'aiguillage de `index.tsx`, qui vérifiait. Dans un
+   * navigateur, on TAPE une adresse : `/frigo` s'ouvrait sans passer par nulle
+   * part. L'API refusait bien les données — chaque requête est authentifiée —
+   * mais l'écran s'affichait, vide et couvert d'erreurs rouges. Ce n'était pas
+   * une fuite de données ; c'était une porte qui a l'air ouverte.
+   *
+   * `connecte === null` VEUT DIRE « JE NE SAIS PAS ENCORE ». Le traiter comme
+   * un refus renverrait tout le monde vers la connexion à chaque démarrage, le
+   * temps de lire le coffre — y compris ceux qui sont connectés. */
+  const ouverteATous = segments[0] === 'connexion'
+    || segments[0] === 'invitation'
+    /* La racine : c'est `index.tsx` qui aiguille, et il sait déjà le faire. */
+    || segments[0] === undefined;
+
+  useEffect(() => {
+    if (connecte === null || ouverteATous) return;
+    if (!connecte) routeur.replace('/connexion');
+  }, [connecte, ouverteATous, routeur]);
 
   /* Quand le renouvellement échoue — jeton révoqué, échéance dépassée — la
      session est finie pour de bon : on ramène à la connexion plutôt que de
@@ -53,7 +84,12 @@ export default function Racine() {
     return () => { surSessionFinie(null); };
   }, [routeur]);
 
-  if (!polices || !pret) {
+  /* ON N'AFFICHE RIEN PLUTÔT QU'UN ÉCRAN QU'ON VA QUITTER.
+   *
+   * La redirection ci-dessus prend un cycle de rendu. Sans cette garde,
+   * l'écran protégé s'affiche pendant ce cycle — assez pour être vu, et pour
+   * lancer ses requêtes. */
+  if (!polices || !pret || (connecte === false && !ouverteATous)) {
     return <View style={{ flex: 1, backgroundColor: C.fond }}><Chargement /></View>;
   }
 
