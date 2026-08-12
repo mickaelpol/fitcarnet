@@ -46,10 +46,35 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/**
+ * CE QUE LE SYSTÈME NOUS LAISSE FAIRE, ET QUI DOIT SE VOIR.
+ *
+ * Sans permission de notifier, tout ce module échoue en silence : le chrono
+ * tourne, on quitte l'application, et rien ne sonne jamais. C'était le cas.
+ * Personne ne peut deviner que la cause est une autorisation refusée un jour,
+ * dans une boîte de dialogue oubliée depuis.
+ *
+ * On retient donc l'état, et l'écran le dit — au moment où ça compte,
+ * c'est-à-dire quand un repos est en cours.
+ */
+export type EtatAlarme =
+  /** pas encore demandé : aucun chrono n'a été lancé depuis le démarrage */
+  | 'inconnu'
+  /** le système sonnera, application fermée */
+  | 'prete'
+  /** l'utilisateur a refusé les notifications : rien ne sonnera hors de l'app */
+  | 'refusee'
+  /** le web : pas de notification programmée, et ce n'est pas un problème */
+  | 'indisponible';
+
+let etat: EtatAlarme = 'inconnu';
+
+export const etatAlarme = (): EtatAlarme => etat;
+
 let preparation: Promise<boolean> | null = null;
 
 async function preparer(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+  if (Platform.OS === 'web') { etat = 'indisponible'; return false; }
 
   if (Platform.OS === 'android') {
     await Notifications.deleteNotificationChannelAsync(CANAL_PERIME).catch(() => undefined);
@@ -69,11 +94,32 @@ async function preparer(): Promise<boolean> {
   }
 
   const actuel = await Notifications.getPermissionsAsync();
-  if (actuel.granted) return true;
+  if (actuel.granted) { etat = 'prete'; return true; }
 
+  /* Android 13 et suivants demandent l'autorisation à l'exécution. Refusée,
+     elle n'est plus jamais redemandée par le système : il faut passer par les
+     paramètres du téléphone. D'où `ouvrirReglagesDuTelephone`. */
   const demande = await Notifications.requestPermissionsAsync();
+  etat = demande.granted ? 'prete' : 'refusee';
 
   return demande.granted;
+}
+
+/**
+ * Ouvre la fiche de l'application dans les paramètres Android.
+ *
+ * Une fois la permission refusée, `requestPermissionsAsync` ne montre plus
+ * rien : redemander poliment ne sert à rien, le système a décidé. Le seul
+ * chemin restant passe par les paramètres — autant y emmener directement
+ * plutôt que d'expliquer où cliquer.
+ */
+export async function ouvrirReglagesDuTelephone(): Promise<void> {
+  const { Linking } = await import('react-native');
+  await Linking.openSettings().catch(() => undefined);
+  /* On oublie l'état retenu : au retour, le prochain chrono redemandera au
+     système plutôt que de répéter un refus qui vient peut-être d'être levé. */
+  preparation = null;
+  etat = 'inconnu';
 }
 
 /** La permission n'est demandée qu'une fois, au premier chrono lancé. */

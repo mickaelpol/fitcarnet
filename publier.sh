@@ -181,7 +181,38 @@ print('oui' if (d.get('updates') or {}).get('url') else 'non')")
         || echec "\`eas update\` a échoué. Le code est poussé et le NAS l'aura :
    seuls les téléphones sont en retard. Relance :
      cd front && $EAS update --branch production --message \"$MESSAGE\""
-    ok "publié sur le canal production"
+    ok "publié sur la branche production"
+
+    # LE CANAL DOIT POINTER SUR LA BRANCHE, ET RIEN NE LE VÉRIFIE AILLEURS.
+    #
+    # `eas update` publie sur une BRANCHE. L'application, elle, interroge un
+    # CANAL. Les deux sont reliés par une association qu'on crée une fois — et
+    # qui peut ne pas exister. Dans ce cas la publication réussit, le canal
+    # répond « rien de neuf », et l'application se tait. Aucune erreur nulle
+    # part, des deux côtés.
+    #
+    # On a passé une soirée dessus. Trois secondes de vérification ici valent
+    # mieux qu'une deuxième.
+    if ( cd front && $EAS channel:view production --non-interactive 2>/dev/null ) \
+        | grep -q 'No branches are pointed to this channel'; then
+        echec "Le canal « production » ne pointe sur AUCUNE branche.
+
+   La mise à jour est publiée, mais aucun téléphone ne la verra : ils
+   interrogent le canal, qui ne renvoie vers rien. Une fois pour toutes :
+
+     cd front && eas channel:edit production --branch production"
+    fi
+    ok "canal production relié à sa branche"
+
+    # `eas update` EXPORTE DANS `dist/` AVANT D'ENVOYER, et il y laisse tout :
+    # les bundles Android et iOS, `metadata.json`, `assetmap.json` et une
+    # soixantaine d'`assets/`. Rien de tout ça ne sert au NAS, qui ne publie
+    # que le build web — mais au commit suivant, `git add -A` les emporterait.
+    #
+    # On remet donc `front/dist` dans l'état qu'on vient de commiter.
+    git checkout -- front/dist 2>/dev/null || true
+    git clean -fdq front/dist 2>/dev/null || true
+    ok "front/dist remis au propre"
 fi
 
 printf '\n%s──  Publié%s\n\n' "$VERT" "$RAZ"

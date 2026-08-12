@@ -50,6 +50,12 @@ const poser = async (secondes: number) => {
   const id = await programmerAlarme(secondes);
   alarme = id;
   alarmePosee = id !== null;
+  /* ON PRÉVIENT LES ABONNÉS APRÈS COUP, et ce n'est pas cosmétique.
+     Poser une alarme est asynchrone : au moment où `demarrerChrono` rend la
+     main, on ne sait pas encore si le système l'acceptera. Sans ce second
+     signal, l'écran ne saurait jamais qu'elle a été refusée — il afficherait
+     un décompte en promettant implicitement qu'il sonnera. */
+  changer();
 };
 
 export const dureeChrono = (): number => duree;

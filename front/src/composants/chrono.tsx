@@ -1,5 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { etatAlarme, ouvrirReglagesDuTelephone } from './alarmeRepos';
 import { Chiffre, Discret, Texte } from './base';
 import { useEcranEveille } from './ecranEveille';
 import {
@@ -29,6 +31,12 @@ export function ChronoRepos({ relance, onCalculateur }: {
   relance?: number;
   onCalculateur?: () => void;
 }) {
+  /* LA BARRE EST COLLÉE EN BAS DE L'ÉCRAN, DONC SOUS LES BOUTONS D'ANDROID.
+     Le remplissage fixe suffisait sur un téléphone à navigation gestuelle et
+     recouvrait « Stop » sur un téléphone à trois boutons — un bouton visible
+     et intouchable, ce qui est pire qu'un bouton absent. `insets.bottom` rend
+     la hauteur réellement occupée par la barre système, quelle qu'elle soit. */
+  const insets = useSafeAreaInsets();
   const [, redessiner] = useReducer((n: number) => n + 1, 0);
   const [reste, setReste] = useState(resteChrono);
   const premierRendu = useRef(true);
@@ -90,8 +98,10 @@ export function ChronoRepos({ relance, onCalculateur }: {
   const fini = reste === 0;
   const agir = (f: () => void) => () => { f(); setReste(resteChrono()); };
 
+  const sansAlarme = court && etatAlarme() === 'refusee';
+
   return (
-    <View style={s.barre}>
+    <View style={[s.barre, { paddingBottom: E.m + insets.bottom }]}>
       <Chiffre taille={N.grand} couleur={fini ? C.erreur : court ? C.vif : C.encre}>
         {mmss(reste)}
       </Chiffre>
@@ -110,6 +120,21 @@ export function ChronoRepos({ relance, onCalculateur }: {
       {onCalculateur !== undefined && (
         <Pressable onPress={onCalculateur} style={s.calc} accessibilityLabel="Calculateur de RM">
           <Texte style={{ color: C.vif, fontSize: T.normal, fontFamily: P.fort }}>⚖ RM</Texte>
+        </Pressable>
+      )}
+
+      {/* ON LE DIT PENDANT LE REPOS, PAS DANS UN ÉCRAN DE RÉGLAGES.
+          Sans permission de notifier, rien ne sonne dès qu'on quitte
+          l'application : le décompte continue à l'écran et le signal
+          n'arrive jamais. La panne est invisible — on croit avoir oublié de
+          regarder. C'est ici, sous le chrono qui tourne, que l'information
+          sert. */}
+      {sansAlarme && (
+        <Pressable onPress={() => { void ouvrirReglagesDuTelephone(); }} style={s.alerte}>
+          <Discret style={{ color: C.vif, fontSize: T.petit }}>
+            Aucune alarme hors de l’application : les notifications sont
+            refusées. Appuie pour les autoriser.
+          </Discret>
         </Pressable>
       )}
 
@@ -163,6 +188,10 @@ const s = StyleSheet.create({
     minWidth: 56, minHeight: TOUCHE, borderRadius: R.s, borderWidth: 1,
     borderColor: C.vifBord, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: E.s,
+  },
+  alerte: {
+    flexBasis: '100%', borderRadius: R.s, borderWidth: 1, borderColor: C.vifBord,
+    backgroundColor: C.vifFond, padding: E.s,
   },
   presets: { flexDirection: 'row', gap: 5, flexGrow: 1, flexBasis: '100%' },
   preset: {

@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useDeconnexion, useMoi } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Texte } from '@/composants/base';
 import { BandeauMaj } from '@/composants/bandeauMaj';
+import { EtatMaj } from '@/composants/etatMaj';
 import { C, E, P, T } from '@/theme';
 
 export default function Compte() {
@@ -43,6 +44,12 @@ export default function Compte() {
           Compte est l'endroit où l'on va quand on s'occupe de
           l'application elle-même. */}
       <BandeauMaj url={process.env.EXPO_PUBLIC_MAJ_URL} />
+
+      {/* Ce que le bandeau ne dit pas : ce qui tourne AUJOURD'HUI. Le bandeau
+          ne parle que d'un APK à installer ; les mises à jour JavaScript, elles,
+          arrivent sans un mot — et quand elles n'arrivent pas, rien ne le dit
+          non plus. Ce panneau donne les numéros et un bouton. */}
+      <EtatMaj />
 
       {data?.roles?.includes('ROLE_ADMIN') === true && (
         <>
