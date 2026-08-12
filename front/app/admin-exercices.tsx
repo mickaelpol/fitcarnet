@@ -44,6 +44,22 @@ const CHAMPS = [
 type CleModifiable = (typeof CHAMPS)[number]['cle'];
 type Brouillon = Record<CleModifiable, string>;
 
+/**
+ * Les deux champs qui ne sont pas du texte libre, et qui changent le
+ * COMPORTEMENT de l'exercice — pas seulement son affichage.
+ *
+ * `modeDefaut` décide de ce qu'on saisit pendant une séance : des charges, un
+ * temps sous tension, ou un chronomètre. `groupes` décide dans quelles séances
+ * l'exercice est proposé.
+ */
+const MODES = [
+  { cle: 'charge', libelle: 'Charge' },
+  { cle: 'iso', libelle: 'Isométrie' },
+  { cle: 'chrono', libelle: 'Chrono' },
+] as const;
+
+const GROUPES = ['Push', 'Pull', 'Legs'] as const;
+
 type Filtre = 'a_completer' | 'sans_video' | 'sans_nom_fr' | 'perso' | 'tous';
 
 const FILTRES: { cle: Filtre; libelle: string }[] = [
@@ -71,6 +87,8 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
   const detail = useExerciceDetail(exercice.id);
   const maj = useMajExercice();
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
+  const [mode, setMode] = useState<string | null>(null);
+  const [groupes, setGroupes] = useState<string[] | null>(null);
 
   const complet = detail.data;
 
@@ -80,12 +98,16 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
   useEffect(() => {
     if (complet === undefined) {
       setBrouillon(null);
+      setMode(null);
+      setGroupes(null);
 
       return;
     }
     setBrouillon(Object.fromEntries(
       CHAMPS.map((c) => [c.cle, complet[c.cle] ?? '']),
     ) as Brouillon);
+    setMode(complet.modeDefaut);
+    setGroupes(complet.groupes);
   }, [complet]);
 
   const modifies = useMemo(() => {
@@ -93,6 +115,22 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
 
     return CHAMPS.filter((c) => brouillon[c.cle].trim() !== (complet[c.cle] ?? ''));
   }, [brouillon, complet]);
+
+  const modeChange = complet !== undefined && mode !== null && mode !== complet.modeDefaut;
+  /* Comparaison par chaîne : `groupes` est toujours rangé dans l'ordre de
+     GROUPES (voir `basculer`), donc deux sélections identiques donnent deux
+     chaînes identiques. Sans cet ordre canonique, cocher Push puis Pull et
+     l'inverse passeraient pour deux états différents. */
+  const groupesChanges = complet !== undefined && groupes !== null
+    && groupes.join(',') !== complet.groupes.join(',');
+
+  const nbModifs = modifies.length + (modeChange ? 1 : 0) + (groupesChanges ? 1 : 0);
+
+  const basculer = (g: string) => {
+    if (groupes === null) return;
+    const suite = groupes.includes(g) ? groupes.filter((x) => x !== g) : [...groupes, g];
+    setGroupes(GROUPES.filter((t) => suite.includes(t)));
+  };
 
   const video = (brouillon?.videoUrl ?? '').trim();
   const videoValide = video === '' || identifiantYoutube(video) !== null;
@@ -108,6 +146,8 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
       const v = brouillon[c.cle].trim();
       (corps as Record<string, string | null>)[c.cle] = v === '' ? null : v;
     }
+    if (modeChange && mode !== null) corps.modeDefaut = mode as Exercice['modeDefaut'];
+    if (groupesChanges && groupes !== null) corps.groupes = groupes;
 
     maj.mutate({ id: exercice.id, ...corps }, { onSuccess: onFermer });
   };
@@ -148,6 +188,57 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
                 />
               ))}
 
+              {/* CES DEUX-LA NE CHANGENT PAS L'AFFICHAGE, ILS CHANGENT CE QUE
+                  L'APPLICATION FAIT. D'où la séparation visuelle. */}
+              <View style={{ gap: E.xs, marginTop: E.s }}>
+                <Discret style={s.etiquetteChoix}>Ce qu’on saisit pendant la séance</Discret>
+                <View style={s.puces}>
+                  {MODES.map((m) => (
+                    <Pressable
+                      key={m.cle}
+                      onPress={() => setMode(m.cle)}
+                      style={[s.puce, mode === m.cle && s.puceActive]}
+                      accessibilityLabel={`Mode ${m.libelle}`}
+                    >
+                      <Discret style={mode === m.cle
+                        ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
+                        : { fontSize: T.petit }}
+                      >
+                        {m.libelle}
+                      </Discret>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ gap: E.xs }}>
+                <Discret style={s.etiquetteChoix}>Séances où le proposer</Discret>
+                <View style={s.puces}>
+                  {GROUPES.map((g) => (
+                    <Pressable
+                      key={g}
+                      onPress={() => basculer(g)}
+                      style={[s.puce, groupes?.includes(g) === true && s.puceActive]}
+                      accessibilityLabel={`Groupe ${g}`}
+                    >
+                      <Discret style={groupes?.includes(g) === true
+                        ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
+                        : { fontSize: T.petit }}
+                      >
+                        {g}
+                      </Discret>
+                    </Pressable>
+                  ))}
+                </View>
+                {/* Ce n'est pas une erreur, c'est un choix — et il n'est pas
+                    devinable depuis l'écran, donc on l'écrit. */}
+                {groupes !== null && groupes.length === 0 && (
+                  <Discret style={{ fontSize: T.petit }}>
+                    Aucun groupe : cet exercice est proposé dans toutes les séances.
+                  </Discret>
+                )}
+              </View>
+
               {!videoValide && (
                 <Discret style={{ color: C.erreur, fontSize: T.petit }}>
                   Ce lien n’est pas reconnu comme une vidéo YouTube.
@@ -164,12 +255,10 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
           <View style={{ flexDirection: 'row', gap: E.s, marginTop: E.s }}>
             <Bouton
               onPress={enregistrer}
-              desactive={modifies.length === 0 || !videoValide || maj.isPending}
+              desactive={nbModifs === 0 || !videoValide || maj.isPending}
               style={{ flex: 1 }}
             >
-              {modifies.length === 0
-                ? 'Aucune modification'
-                : `Enregistrer (${modifies.length})`}
+              {nbModifs === 0 ? 'Aucune modification' : `Enregistrer (${nbModifs})`}
             </Bouton>
             <Bouton variante="contour" onPress={onFermer}>Fermer</Bouton>
           </View>
@@ -357,4 +446,14 @@ const s = StyleSheet.create({
   titreEditeur: {
     fontFamily: P.titre, fontSize: T.titre, letterSpacing: 0.8, textTransform: 'uppercase',
   },
+  etiquetteChoix: {
+    fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase',
+  },
+  puces: { flexDirection: 'row', gap: 5 },
+  puce: {
+    flex: 1, minHeight: TOUCHE, borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
+    backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  puceActive: { backgroundColor: C.vif, borderColor: C.vif },
 });
