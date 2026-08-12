@@ -69,3 +69,17 @@ sauvegardes/
 /pgdata/
 /.deploiement-en-cours/
 /deploiement.log
+
+# ---------- le secret de developpement ----------
+# `api/.env.dev` portait un APP_SECRET d'apparence reelle, et il etait suivi
+# par git : le `.gitignore` ignorait `.env`, `.env.local` et `.env.*.local`,
+# mais pas celui-la.
+#
+# Aucun effet en production — le conteneur surcharge tout par son
+# environnement. Le risque est la REPRISE : quelqu'un qui deploierait un jour
+# avec APP_ENV=dev, ou qui recyclerait ce fichier ailleurs, heriterait d'un
+# secret publie.
+#
+# `.env.test`, lui, RESTE suivi : son secret est ostensiblement faux et les
+# tests en ont besoin sur un clone neuf.
+/api/.env.dev

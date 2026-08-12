@@ -1,0 +1,24 @@
+framework:
+    # LA LANGUE DE L'APPLICATION, ET DONC CELLE DE SES REFUS.
+    #
+    # Tout ce que fitcarnet ecrit est en francais — sauf les messages que
+    # Symfony fabrique lui-meme. « Too many failed login attempts », « This
+    # value should not be blank » : ils arrivaient tels quels jusqu'a l'ecran,
+    # au milieu d'une interface entierement francaise.
+    #
+    # Ces catalogues existent depuis toujours dans le vendor. Il manquait
+    # seulement le composant qui les lit — `symfony/translation` — et cette
+    # ligne pour lui dire quelle langue choisir.
+    default_locale: fr
+
+    translator:
+        default_path: '%kernel.project_dir%/translations'
+        fallbacks:
+            # LE FRANCAIS D'ABORD, L'ANGLAIS ENSUITE, ET C'EST VOULU.
+            #
+            # Un message qui n'existerait pas en francais vaut mieux en
+            # anglais qu'affiche sous sa forme technique — `security.login.
+            # too_many_attempts` au milieu d'une phrase ne veut rien dire pour
+            # personne.
+            - fr
+            - en
