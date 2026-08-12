@@ -54,11 +54,25 @@ final readonly class FrigoGrocy
                 "Grocy n'est pas configuré : renseigne GROCY_URL et GROCY_API_KEY.");
         }
 
-        $produits = $this->appeler('/objects/products');
-        $stocks = $this->appeler('/stock');
-        $emplacements = $this->appeler('/objects/locations');
-        $unites = $this->appeler('/objects/quantity_units');
-        $conversions = $this->appeler('/objects/quantity_unit_conversions_resolved');
+        /* LES CINQ APPELS PARTENT ENSEMBLE, ET C'EST TOUT LE SUJET.
+           Ecrits l'un sous l'autre avec `appeler()`, ils s'attendaient : la
+           methode lit la reponse immediatement, donc chaque requete ne partait
+           qu'une fois la precedente revenue. Cinq allers-retours mis bout a
+           bout — mesures a 6,25 s en production sur cet ecran.
+           Aucun ne depend d'un autre : rien ne justifiait la file d'attente. */
+        $reponses = $this->appelerEnsemble([
+            'produits' => '/objects/products',
+            'stocks' => '/stock',
+            'emplacements' => '/objects/locations',
+            'unites' => '/objects/quantity_units',
+            'conversions' => '/objects/quantity_unit_conversions_resolved',
+        ]);
+
+        $produits = $reponses['produits'];
+        $stocks = $reponses['stocks'];
+        $emplacements = $reponses['emplacements'];
+        $unites = $reponses['unites'];
+        $conversions = $reponses['conversions'];
 
         $parUnite = [];
         $idGramme = null;
@@ -479,6 +493,52 @@ final readonly class FrigoGrocy
         $champs = $produit['userfields'] ?? null;
 
         return \is_array($champs) ? $champs : [];
+    }
+
+    /**
+     * PLUSIEURS LECTURES D'UN COUP, SANS QU'ELLES SE FASSENT LA QUEUE.
+     *
+     * `request()` ne bloque pas : elle rend une reponse dont le transfert n'a
+     * pas encore eu lieu. C'est en lisant la premiere que le client fait aussi
+     * avancer les autres. On lance donc tout, puis on lit — le temps total
+     * devient celui de la requete la plus lente, au lieu de leur somme.
+     *
+     * C'est exactement ce que fait deja `inventorier()` pour ses ecritures.
+     *
+     * ON GARDE LE CHEMIN JUSQU'AU MESSAGE D'ERREUR : « Grocy est injoignable »
+     * sans dire sur quoi obligerait a deviner lequel des cinq a lache.
+     *
+     * @param array<string, string> $chemins  nom de sortie => chemin d'API
+     *
+     * @return array<string, array<mixed>>
+     */
+    private function appelerEnsemble(array $chemins): array
+    {
+        $entetes = ['headers' => [
+            'GROCY-API-KEY' => $this->cle,
+            'Accept' => 'application/json',
+        ]];
+
+        $enCours = [];
+        foreach ($chemins as $nom => $chemin) {
+            $enCours[$nom] = $this->http->request(
+                'GET', \rtrim($this->url, '/') . '/api' . $chemin, $entetes);
+        }
+
+        $resultats = [];
+        foreach ($enCours as $nom => $reponse) {
+            try {
+                $contenu = $reponse->getContent();
+                $resultats[$nom] = '' === $contenu
+                    ? []
+                    : (array) \json_decode($contenu, true, 512, \JSON_THROW_ON_ERROR);
+            } catch (ExceptionInterface | \JsonException $e) {
+                throw new \RuntimeException(\sprintf(
+                    'Grocy est injoignable sur %s : %s', $chemins[$nom], $e->getMessage()), 0, $e);
+            }
+        }
+
+        return $resultats;
     }
 
     private function appeler(string $chemin, string $methode = 'GET', ?array $corps = null): array
