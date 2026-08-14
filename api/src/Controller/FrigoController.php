@@ -9,6 +9,7 @@ use App\Entity\Utilisateur;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
+use App\Service\InventaireLots;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,17 +32,27 @@ final class FrigoController extends AbstractController
     /**
      * Plafond d'un envoi d'inventaire.
      *
-     * Grocy repond en 1,5 s par appel et le client HTTP en mene 6 de front :
-     * 60 lignes tiennent en une quinzaine de secondes, sous les 30 s de PHP.
-     * Au-dela, l'ecran doit envoyer en deux fois plutot que de mourir a
-     * mi-parcours en laissant un stock a moitie corrige.
+     * CE CHIFFRE NE PROTEGE PLUS D'UNE MINUTERIE, ET SON ANCIENNE
+     * JUSTIFICATION ETAIT FAUSSE. Elle disait : « Grocy repond en 1,5 s par
+     * appel et le client HTTP en mene 6 de front, donc 60 lignes tiennent sous
+     * les 30 s de PHP ». Le calcul etait juste, l'hypothese dessous ne l'etait
+     * pas : Grocy tourne avec CINQ ouvriers PHP et une base SQLite qui
+     * n'accepte qu'un ecrivain. Il n'en menait jamais 6 de front. Personne
+     * n'avait mesure — et le 14 aout 2026 l'envoi est mort a mi-parcours.
+     *
+     * Depuis, l'application est faite en tache de fond : la duree n'est plus
+     * une contrainte. Ce plafond ne sert donc qu'a une chose, refuser
+     * l'absurde — un client qui poste dix mille lignes remplirait la table
+     * avant qu'on s'en apercoive. Il est large exprès : il ne doit jamais
+     * gener un inventaire reel.
      */
-    private const INVENTAIRE_MAX = 60;
+    private const INVENTAIRE_MAX = 500;
 
     public function __construct(
         private readonly Frigo $frigo,
         private readonly FrigoBase $base,
         private readonly FrigoGrocy $grocy,
+        private readonly InventaireLots $lots,
         private readonly Connection $cnx,
     ) {
     }
@@ -243,8 +254,77 @@ final class FrigoController extends AbstractController
     }
 
     /**
-     * Applique un inventaire : le poids reellement compte remplace le
-     * theorique, pour les seules lignes envoyees.
+     * Pose la quantite d'UN produit Grocy, tout de suite.
+     *
+     * POURQUOI CE CHEMIN N'EST PAS CELUI DE L'INVENTAIRE.
+     *
+     * Les deux passaient par la meme route, et c'est ce qui a produit le
+     * message le plus trompeur de l'application : un inventaire qui echouait
+     * affichait « L'aliment a bien ete cree, mais sa quantite n'a pas pu etre
+     * posee » — a quelqu'un qui n'avait rien cree. Le texte etait ecrit pour
+     * la creation, la route servait aussi a autre chose.
+     *
+     * Ils n'ont d'ailleurs pas les memes contraintes. UN appel Grocy prend une
+     * a deux secondes : ca tient sans probleme dans une requete, et repondre
+     * tout de suite est ici la bonne reponse — l'utilisateur regarde la fiche
+     * qu'il vient de remplir. Passer par la file lui vaudrait un « en cours »
+     * pour une seconde d'attente, et un 409 s'il cree un aliment pendant qu'un
+     * inventaire tourne.
+     *
+     * Cote Grocy, poser une quantite EST un inventaire : on declare le poids
+     * present, Grocy en deduit l'ecart. C'est exactement ce qu'on veut a la
+     * creation — le produit passe de « inconnu » a « j'en ai tant ».
+     */
+    #[Route('/mon-frigo/quantite', methods: ['POST'])]
+    public function definirQuantiteGrocy(Request $requete): JsonResponse
+    {
+        if ('grocy' !== $this->frigo->source($this->utilisateur())) {
+            return $this->json([
+                'erreur' => 'Tes quantités se modifient dans la base, pas ici.',
+            ], 409);
+        }
+
+        $donnees = (array) \json_decode($requete->getContent(), true);
+        $reference = (string) ($donnees['reference'] ?? '');
+        $quantite = (float) ($donnees['quantite'] ?? -1);
+
+        if (!\str_starts_with($reference, 'grocy:')) {
+            return $this->json(['erreur' => 'Référence inattendue : ' . $reference], 422);
+        }
+
+        $idProduit = (int) \substr($reference, \strlen('grocy:'));
+        if ($idProduit <= 0 || $quantite < 0) {
+            return $this->json(['erreur' => 'Ligne invalide : ' . $reference], 422);
+        }
+
+        try {
+            $motif = $this->grocy->inventorierUn($idProduit, $quantite);
+        } catch (\RuntimeException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 502);
+        }
+
+        if (null !== $motif) {
+            return $this->json(['erreur' => $motif], 502);
+        }
+
+        return $this->json(['ok' => true]);
+    }
+
+    /**
+     * DEPOSE un inventaire. Ne l'applique pas.
+     *
+     * CETTE REQUETE NE TOUCHE PLUS A GROCY, ET C'EST TOUT LE CORRECTIF.
+     *
+     * Avant, elle poussait les lignes elle-meme. Le 14 aout 2026, PHP s'est
+     * arrete a 30 s au milieu d'un inventaire de quarante lignes pendant que
+     * Grocy continuait a appliquer ce qu'il avait deja recu : frigo a moitie
+     * corrige, et personne pour le dire. Une requete HTTP a une duree
+     * maximale ; un inventaire n'en a pas. Les faire coincider etait une
+     * erreur de conception, pas un reglage a ajuster.
+     *
+     * La requete valide, ecrit une ligne, et rend la main. `fitcarnet-taches`
+     * applique — une ligne apres l'autre, sans minuterie. L'ecran suit
+     * l'avancement sur /mon-frigo/inventaire/dernier.
      *
      * L'ecran n'envoie que les ecarts, et seulement au clic. Une ligne absente
      * n'est pas un zero : elle n'a pas ete comptee, et son stock ne bouge pas.
@@ -265,12 +345,16 @@ final class FrigoController extends AbstractController
         if (\count($lignes) > self::INVENTAIRE_MAX) {
             return $this->json([
                 'erreur' => \sprintf(
-                    'Inventaire trop gros : %d lignes pour %d au maximum. Envoie-le en deux fois.',
+                    'Inventaire trop gros : %d lignes pour %d au maximum.',
                     \count($lignes), self::INVENTAIRE_MAX),
             ], 422);
         }
 
-        $quantites = [];
+        /* ON DEDOUBLONNE PAR REFERENCE. Deux lignes sur le meme produit
+           feraient partir deux corrections : la seconde annoncerait la
+           quantite que la premiere vient de poser, et Grocy la refuserait.
+           Un tableau associatif dit cette regle une fois pour toutes. */
+        $parReference = [];
         foreach ($lignes as $ligne) {
             $ligne = (array) $ligne;
             $reference = (string) ($ligne['reference'] ?? '');
@@ -281,38 +365,42 @@ final class FrigoController extends AbstractController
                 ], 422);
             }
 
-            $idAliment = (int) \substr($reference, \strlen($prefixe));
+            $identifiant = (int) \substr($reference, \strlen($prefixe));
             $quantite = (float) ($ligne['quantite'] ?? -1);
 
-            if ($idAliment <= 0 || $quantite < 0) {
+            if ($identifiant <= 0 || $quantite < 0) {
                 return $this->json(['erreur' => 'Ligne invalide : ' . $reference], 422);
             }
 
-            $quantites[$idAliment] = $quantite;
+            $parReference[$reference] = ['reference' => $reference, 'quantite' => $quantite];
         }
 
-        if ('grocy' === $source) {
-            try {
-                $echecs = $this->grocy->inventorier($quantites);
-            } catch (\RuntimeException $e) {
-                return $this->json(['erreur' => $e->getMessage()], 502);
-            }
-        } else {
-            $echecs = [];
-            foreach ($quantites as $idAliment => $quantite) {
-                $this->base->definirStock($utilisateur, $idAliment, $quantite);
-            }
-        }
-
-        $detail = [];
-        foreach ($echecs as $idAliment => $motif) {
-            $detail[] = ['reference' => $prefixe . $idAliment, 'motif' => $motif];
+        try {
+            $id = $this->lots->deposer($utilisateur, $source, \array_values($parReference));
+        } catch (\RuntimeException $e) {
+            // 409 et non 422 : la demande est valide, c'est le moment qui ne
+            // l'est pas. Un inventaire tourne deja pour ce compte.
+            return $this->json(['erreur' => $e->getMessage()], 409);
         }
 
         return $this->json([
-            'corriges' => \count($quantites) - \count($echecs),
-            'echecs' => $detail,
-        ]);
+            'id' => $id,
+            'total' => \count($parReference),
+        ], 202);
+    }
+
+    /**
+     * Ou en est le dernier inventaire de ce compte.
+     *
+     * INTERROGEABLE APRES COUP, ET PAS SEULEMENT PENDANT. L'ecran peut avoir
+     * ete ferme, le telephone verrouille, l'application redemarree : le
+     * resultat doit rester lisible quand on revient. C'est la difference entre
+     * un envoi dont on connait le sort et un envoi dont on l'a rate.
+     */
+    #[Route('/mon-frigo/inventaire/dernier', methods: ['GET'])]
+    public function dernierInventaire(): JsonResponse
+    {
+        return $this->json($this->lots->dernier($this->utilisateur()) ?? ['statut' => 'aucun']);
     }
 
     private static function nombreOuNull(mixed $valeur): ?float

@@ -138,6 +138,111 @@ services:
       - /volume1/docker/fitcarnet/telecharger:/telecharger:ro
       - fitcarnet_caddy_data:/data
       - fitcarnet_caddy_config:/config
+    # AJOUTE POUR QUE `fitcarnet-taches` SACHE QUAND DEMARRER, et utile en soi.
+    #
+    # Le point d'entree fait tout le rituel — composer install, cles JWT,
+    # db/manuel/, chauffe du cache — AVANT le `exec` qui lance FrankenPHP. Le
+    # port qui ecoute est donc la preuve que ce rituel est fini : c'est
+    # exactement la garantie dont le conteneur de taches a besoin avant de
+    # toucher a la base.
+    #
+    # `fsockopen` et pas `curl` : cette image n'embarque pas curl, elle a php.
+    # On ne demande rien de plus qu'une connexion — une reponse 401 ou 404
+    # prouverait tout aussi bien que l'application repond, et dependre d'une
+    # route precise ferait dependre le demarrage d'un detail de routage.
+    healthcheck:
+      # Le delai de 2 s est explicite : sans lui, `fsockopen` attendrait
+      # `default_socket_timeout`, soit 60 s — six fois le `timeout` ci-dessous.
+      # Docker tuerait la sonde avant qu'elle ne conclue, a chaque fois.
+      test: ["CMD-SHELL", "php -r '$$e=0;$$m=\"\";exit(@fsockopen(\"127.0.0.1\", 80, $$e, $$m, 2) ? 0 : 1);'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      # Large : au premier demarrage apres un changement de composer.lock, le
+      # point d'entree installe les dependances avant d'ouvrir le port.
+      start_period: 180s
+
+  # ---------------------------------------------------------------------
+  #  Les travaux qui ne tiennent pas dans une requete HTTP.
+  #
+  #  AUJOURD'HUI, UN SEUL : appliquer un inventaire.
+  #
+  #  Il vivait dans la requete. Le 14 aout 2026, PHP s'est arrete a 30 s au
+  #  milieu d'un inventaire de quarante lignes pendant que Grocy continuait
+  #  d'appliquer ce qu'il avait deja recu : le frigo est reste a moitie
+  #  corrige, et rien ne le disait. Grocy tourne avec CINQ ouvriers PHP et une
+  #  base SQLite mono-ecrivain — les corrections font la queue quoi qu'on
+  #  fasse. Une minute de travail ne rentre pas dans une requete, et l'y forcer
+  #  ne la raccourcit pas : ca rend seulement son echec illisible.
+  #
+  #  MEME BLOC `build` QUE CI-DESSUS, ET C'EST VOULU. Docker reconnait un
+  #  contexte et une cible identiques : la seconde construction ne refait rien,
+  #  elle retrouve ses couches en cache. Passer par `image:` supposerait que
+  #  l'image soit deja construite et etiquetee au moment ou Portainer monte la
+  #  pile — une dependance implicite qui casse le jour ou on deploie autrement.
+  #
+  #  PAS DE `ports:`, PAS DE VOLUME `front/` NI `telecharger/` : ce conteneur
+  #  ne repond a personne. Il lit la file, il pousse vers Grocy.
+  # ---------------------------------------------------------------------
+  fitcarnet-taches:
+    build:
+      context: /volume1/docker/fitcarnet/docker
+      dockerfile: Dockerfile
+      target: prod
+    # PAS DE `container_name` ICI, ET C'EST LA CONDITION DU `replicas` DESSOUS :
+    # un nom fixe ne peut designer qu'un conteneur. Docker les nommera
+    # `fitcarnet-taches-1` et `fitcarnet-taches-2`.
+    restart: unless-stopped
+    deploy:
+      # DEUX, ET LE CHIFFRE SE DEMONTRE — IL N'EST PAS PRUDENTIEL.
+      #
+      # Un lot « base » ecrit dans PostgreSQL en local : une cinquantaine
+      # d'UPDATE, de l'ordre de 200 ms. Un lot « grocy » parle a Grocy par HTTP :
+      # une a deux secondes PAR LIGNE, soit une minute pour quarante lignes.
+      # Trois cents fois plus lent.
+      #
+      # Avec un seul travailleur, l'utilisateur qui depose 200 ms de travail
+      # juste apres un inventaire Grocy attend une minute. Ce n'est pas une
+      # question de charge — ca arrive au deuxieme utilisateur.
+      #
+      # IL NE PEUT Y AVOIR QU'UN SEUL LOT LENT A LA FOIS : `GROCY_URL` designe
+      # une instance unique, un seul compte porte `source_frigo = 'grocy'`, et
+      # un index unique partiel n'autorise qu'un lot actif par compte. Un
+      # travailleur absorbe donc le lot lent, l'autre ecoule tous les rapides.
+      #
+      # LA REGLE, SI ELLE CHANGE : autant de travailleurs que de comptes
+      # « grocy », plus un. Passer un second compte sur Grocy sans monter ce
+      # chiffre ramenerait exactement le probleme qu'on corrige ici.
+      replicas: 2
+    depends_on:
+      # `service_healthy`, pas `service_started` : le point d'entree de
+      # `fitcarnet-app` est le seul a jouer `db/manuel/` et `composer install`.
+      # Demarrer avant lui, c'est chercher une table qui n'existe pas encore
+      # dans un vendor/ a moitie ecrit.
+      fitcarnet-app:
+        condition: service_healthy
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET:?definis APP_SECRET dans les variables de la stack}
+      GROCY_URL: ${GROCY_URL:-}
+      GROCY_API_KEY: ${GROCY_API_KEY:-}
+      DATABASE_URL: "postgresql://fitcarnet:${DB_PASSWORD}@fitcarnet-db:5432/fitcarnet?serverVersion=16&charset=utf8"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?definis JWT_PASSPHRASE dans les variables de la stack}
+      DEFAULT_URI: "https://carnet.mickael-pol.fr"
+      OFF_USER_AGENT: "fitcarnet/1.0 (contact@mickael-pol.fr)"
+      TZ: Europe/Paris
+    volumes:
+      - /volume1/docker/fitcarnet/api:/app
+      - /volume1/docker/fitcarnet/db:/app/db:ro
+    # ON COURT-CIRCUITE `entrypoint-prod`, ET IL LE FAUT.
+    #
+    # Il installe les dependances, joue les migrations et chauffe le cache —
+    # sur le MEME /app monte que `fitcarnet-app`. Deux processus faisant cela
+    # en meme temps sur les memes fichiers, c'est une corruption qu'on ne
+    # saura pas reproduire a la demande. `fitcarnet-app` prepare, les
+    # travailleurs se contentent de travailler.
+    entrypoint: ["php"]
+    command: ["bin/console", "app:inventaire:traiter", "--boucle"]
 
 volumes:
   fitcarnet_caddy_data:

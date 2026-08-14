@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { Habitudes, ModeCuisson, PlanEnregistre } from '@/calcul/cuisson';
 import {
   api, definirJeton, definirRafraichissement, lireRafraichissement, membres,
@@ -17,6 +17,29 @@ export function useConnexion() {
 
   return useMutation({
     mutationFn: async (identifiants: { email: string; motDePasse: string }) => {
+      /* ON REPART DE RIEN, AVANT MÊME DE DEMANDER LE JETON.
+       *
+       * `invalidateQueries()` était ici, et c'était faux. Il marque les
+       * données comme périmées mais LES LAISSE À L'ÉCRAN pendant qu'il les
+       * recharge : se connecter n'effaçait donc rien. Tant que le cache ne
+       * vivait qu'en mémoire, fermer l'application suffisait à le nettoyer.
+       * Depuis qu'il est écrit sur le disque, les données du compte précédent
+       * survivent au redémarrage — et la personne qui se connecte ensuite voit
+       * le nom, les séances et le frigo de celle d'avant, jusqu'à ce que
+       * chaque requête ait fini de se corriger. Sur un réseau lent, ça dure.
+       *
+       * Une connexion est le DÉBUT d'une session. Rien de ce qui précède ne
+       * lui appartient : on ne rafraîchit pas, on efface.
+       *
+       * AVANT L'APPEL, ET PAS DANS `onSuccess` : entre la réponse du serveur
+       * et le nettoyage il y aurait une fenêtre, courte mais réelle, où le
+       * nouveau jeton cohabite avec les données de l'ancien compte. Le faire
+       * d'abord supprime la fenêtre plutôt que de la raccourcir. Une connexion
+       * qui échoue laisse alors un cache vide — sans conséquence, on est sur
+       * l'écran de connexion. */
+      qc.clear();
+      await oublierLeCacheDisque();
+
       const r = await api<{ token: string; jetonRafraichissement?: string }>('/connexion', {
         methode: 'POST', corps: identifiants, sansJeton: true,
       });
@@ -27,7 +50,6 @@ export function useConnexion() {
 
       return r;
     },
-    onSuccess: () => qc.invalidateQueries(),
   });
 }
 
@@ -63,12 +85,30 @@ export function useDeconnexion() {
   };
 }
 
+/**
+ * Le compte connecté.
+ *
+ * ON LE DEMANDE À UNE ROUTE QUI NE PEUT RENDRE QUE LUI. C'était :
+ *
+ *     membres(await api<{ member: Utilisateur[] }>('/utilisateurs'))[0]
+ *
+ * avec, en commentaire, « la collection est filtrée sur le compte courant ».
+ * Elle ne l'est pas. Pour un administrateur elle rend TOUT LE MONDE, et `[0]`
+ * prend le premier de la liste — sans ordre garanti. Le 14 août 2026, un
+ * second compte est apparu avec un identifiant qui précédait celui de
+ * l'administrateur : l'application lui a affiché le nom et les droits de
+ * quelqu'un d'autre, et lui a fermé ses propres écrans d'administration. Pour
+ * tous les autres comptes, cette même collection répond 403 : leur onglet
+ * Compte n'a jamais pu s'afficher.
+ *
+ * On demandait « qui suis-je » à une route qui répond « qui existe ». La
+ * bonne réponse dépendait alors du nombre de comptes et de l'ordre des
+ * lignes — deux choses étrangères à la question.
+ */
 export const useMoi = () =>
   useQuery({
     queryKey: ['moi'],
-    // /utilisateurs renvoie une COLLECTION filtrée sur le compte courant :
-    // on en extrait l'unique membre, sinon « data.roles » est indéfini
-    queryFn: async () => membres(await api<{ member: Utilisateur[] }>('/utilisateurs'))[0],
+    queryFn: () => api<Utilisateur>('/moi'),
     retry: false,
   });
 
@@ -318,18 +358,111 @@ export function useSupprimerAliment() {
 }
 
 /**
- * Applique un inventaire. Une seule requête, en fin de saisie, avec les
- * seules lignes dont le poids réel diffère du théorique.
+ * Pose la quantité d'un seul produit Grocy, tout de suite.
+ *
+ * SÉPARÉE DE `useEnvoyerInventaire`, ET C'EST LE POINT.
+ *
+ * Les deux partageaient une mutation. Un inventaire qui échouait déclenchait
+ * donc la bannière écrite pour la création — « L'aliment a bien été créé, mais
+ * sa quantité n'a pas pu être posée » — chez quelqu'un qui n'avait rien créé.
+ * Deux gestes, deux mutations : chaque message ne peut plus parler que de son
+ * propre geste.
+ */
+export function useDefinirQuantiteGrocy() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ligne: { reference: string; quantite: number }) =>
+      api<{ ok: true }>('/mon-frigo/quantite', { methode: 'POST', corps: ligne }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
+  });
+}
+
+export type EchecInventaire = { reference: string; motif: string };
+
+/** Ce que le serveur dit du dernier inventaire de ce compte. */
+export type SuiviInventaire = {
+  id?: number;
+  statut: 'aucun' | 'en_attente' | 'en_cours' | 'termine' | 'echoue';
+  total?: number;
+  traites?: number;
+  echecs?: EchecInventaire[];
+  finiLe?: string | null;
+};
+
+/**
+ * DÉPOSE un inventaire. Ne l'applique pas.
+ *
+ * L'envoi était synchrone : l'écran attendait pendant que le serveur poussait
+ * les lignes vers Grocy une à une. Le 14 août 2026, PHP s'est arrêté à 30 s au
+ * milieu d'un inventaire de quarante lignes — Grocy avait déjà appliqué une
+ * partie, et rien ne le disait. Depuis, la requête ne fait que déposer : elle
+ * répond en quelques dizaines de millisecondes.
+ *
+ * Ce qu'on suit ensuite, c'est `useSuiviInventaire`, pas cette mutation. Son
+ * `isSuccess` ne veut plus dire « c'est fait », il veut dire « c'est parti ».
  */
 export function useEnvoyerInventaire() {
   const qc = useQueryClient();
 
   return useMutation({
     mutationFn: (lignes: { reference: string; quantite: number }[]) =>
-      api<{ corriges: number; echecs: { reference: string; motif: string }[] }>(
+      api<{ id: number; total: number }>(
         '/mon-frigo/inventaire', { methode: 'POST', corps: { lignes } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
+    /* On réveille le suivi tout de suite : sans ça l'écran attendrait le
+       prochain battement pour montrer que quelque chose se passe. */
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventaire-suivi'] }),
   });
+}
+
+/**
+ * Où en est le dernier inventaire.
+ *
+ * INTERROGÉ EN PERMANENCE, PAS SEULEMENT APRÈS UN ENVOI. On peut avoir fermé
+ * l'application, verrouillé le téléphone, changé d'onglet : au retour, le
+ * résultat doit être là. C'est toute la différence entre un envoi dont on
+ * connaît le sort et un envoi dont on l'a manqué.
+ *
+ * Le battement s'arrête de lui-même dès que le lot est fini — inutile de
+ * réveiller le réseau toutes les deux secondes pour relire un résultat qui ne
+ * bougera plus.
+ */
+export function useSuiviInventaire(actif = true) {
+  const qc = useQueryClient();
+  const dernierStatut = useRef<string | null>(null);
+
+  const suivi = useQuery({
+    queryKey: ['inventaire-suivi'],
+    queryFn: () => api<SuiviInventaire>('/mon-frigo/inventaire/dernier'),
+    enabled: actif,
+    refetchInterval: (requete) => {
+      const s = requete.state.data?.statut;
+
+      return s === 'en_attente' || s === 'en_cours' ? 2000 : false;
+    },
+    /* Ce chiffre bouge sous nos pieds : le garder en cache entre deux écrans
+       ferait afficher un avancement périmé le temps d'un aller-retour. */
+    staleTime: 0,
+    gcTime: 60_000,
+  });
+
+  /* LE FRIGO N'EST RELU QU'AU PASSAGE À « TERMINÉ », UNE SEULE FOIS.
+     Le relire à chaque battement ajouterait une lecture Grocy de plusieurs
+     secondes toutes les deux secondes — sur le serveur même qui est en train
+     d'appliquer l'inventaire. C'est exactement la file d'attente qu'on vient
+     de supprimer. */
+  const statut = suivi.data?.statut ?? null;
+  useEffect(() => {
+    const avant = dernierStatut.current;
+    dernierStatut.current = statut;
+
+    if (avant === null || avant === statut) return;
+    if (statut === 'termine' || statut === 'echoue') {
+      void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
+    }
+  }, [statut, qc]);
+
+  return suivi;
 }
 
 export const useStock = () =>

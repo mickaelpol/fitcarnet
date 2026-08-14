@@ -6,6 +6,7 @@ namespace App\Service;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -32,6 +33,26 @@ final readonly class FrigoGrocy
      * On le rapporte donc a part, sans jamais ecarter l'aliment du frigo.
      */
     private const CHAMPS_SOUHAITES = ['fibres100'];
+
+    /**
+     * Grocy refuse un inventaire qui annonce la quantite DEJA en stock.
+     *
+     * Ce n'est pas une erreur de notre cote, c'est un « c'etait deja fait ».
+     * On le reconnait au texte parce que Grocy ne donne rien d'autre : meme
+     * code 400 que pour un produit inexistant, meme forme de reponse. Le
+     * message vient de `StockService::InventoryProduct` — verifie dans le
+     * conteneur, pas suppose :
+     *
+     *     if ($newAmount == $productDetails->stock_amount + $containerWeight)
+     *         throw new \Exception('The new amount cannot equal the current stock amount');
+     *
+     * SI UNE MONTEE DE VERSION DE GROCY CHANGE CE TEXTE, la consequence est
+     * douce et visible : ces lignes redeviennent des echecs affiches. Pas de
+     * perte de donnee, juste un message a corriger ici. C'est pour ca qu'on
+     * ne garde que le fragment stable de la phrase, sans « The new amount »
+     * ni ponctuation.
+     */
+    private const DEJA_A_JOUR = 'cannot equal the current stock amount';
 
     public function __construct(
         private HttpClientInterface $http,
@@ -407,44 +428,34 @@ final readonly class FrigoGrocy
     }
 
     /**
-     * Les champs personnalises d'un produit, tels que /objects/products les
-     * renvoie deja.
+     * Corrige le stock reel d'UN produit.
      *
-     * Ils etaient auparavant relus un par un sur /userfields/products/{id} :
-     * un appel HTTP par produit, soit 62 appels a 1,5 s pour 59 produits, bien
-     * au-dela des 30 s de PHP. Grocy les inclut dans la liste, il suffit de les
-     * y prendre.
+     * UN SEUL PRODUIT PAR APPEL, ET C'EST TOUT L'INTERET DE CETTE SIGNATURE.
      *
-     * @param array<string, mixed> $produit
+     * La version precedente prenait un tableau et lancait tous les POST
+     * ensemble, en croyant paralleliser. Grocy tourne avec CINQ ouvriers PHP
+     * et une base SQLite, qui n'accepte qu'un ecrivain a la fois : rien
+     * n'etait parallelise, tout faisait la queue derriere un verrou. Le
+     * 14 aout 2026, PHP s'est arrete a 30 s au milieu d'un inventaire de
+     * quarante lignes — et Grocy a continue d'appliquer ce qu'il avait deja
+     * recu. Le frigo est reste a moitie corrige, sans que rien ne le dise.
      *
-     * @return array<string, mixed>
+     * Une methode qui ne sait traiter qu'une ligne ne peut plus faire ca. La
+     * duree totale et l'enchainement regardent l'appelant — en l'occurrence
+     * `AppliqueInventaire`, qui tourne HORS d'une requete HTTP et n'a donc
+     * aucune minuterie au-dessus de la tete.
+     *
+     * @return string|null le motif de l'echec, ou null si la ligne est passee
      */
-    /**
-     * Corrige le stock reel de plusieurs produits d'un coup.
-     *
-     * Les appels partent EN PARALLELE : le client HTTP de Symfony ne declenche
-     * la requete qu'a la lecture de la reponse. Enchainer 60 appels a 1,5 s en
-     * sequentiel depasserait les 30 s de PHP, comme la lecture du frigo le
-     * faisait avant correction.
-     *
-     * Un echec n'arrete pas les autres : mieux vaut corriger 58 produits et
-     * nommer les 2 qui ont echoue que de tout annuler apres un inventaire fait
-     * a la main.
-     *
-     * @param array<int, float> $quantites id de produit => nouvelle quantite
-     *
-     * @return array<int, string> id de produit => motif de l'echec
-     */
-    public function inventorier(array $quantites): array
+    public function inventorierUn(int $idProduit, float $quantite): ?string
     {
         if (!$this->estConfigure()) {
             throw new \RuntimeException(
                 "Grocy n'est pas configuré : renseigne GROCY_URL et GROCY_API_KEY.");
         }
 
-        $enCours = [];
-        foreach ($quantites as $idProduit => $quantite) {
-            $enCours[$idProduit] = $this->http->request(
+        try {
+            $this->http->request(
                 'POST',
                 \rtrim($this->url, '/') . '/api/stock/products/' . $idProduit . '/inventory',
                 [
@@ -454,19 +465,61 @@ final readonly class FrigoGrocy
                     ],
                     'json' => ['new_amount' => $quantite],
                 ],
-            );
-        }
+            )->getContent();   // leve sur 4xx et 5xx
+        } catch (ExceptionInterface $e) {
+            /* ON LIT LE CORPS DE LA REPONSE, PAS LE MESSAGE DE L'EXCEPTION.
+             *
+             * Symfony redige le sien : « HTTP 400 returned for "..." ». Il
+             * essaie bien d'y glisser l'erreur du serveur, mais en cherchant
+             * des cles precises — `error`, `message`, `detail`, `title`. Grocy
+             * repond `error_message`, qui n'en fait pas partie. Se fier au
+             * message reviendrait donc a chercher un texte qui n'y est jamais.
+             *
+             * Le corps, lui, contient toujours ce que Grocy a voulu dire. */
+            $corps = self::corpsDe($e);
 
-        $echecs = [];
-        foreach ($enCours as $idProduit => $reponse) {
-            try {
-                $reponse->getContent();   // leve sur 4xx et 5xx
-            } catch (ExceptionInterface $e) {
-                $echecs[$idProduit] = $e->getMessage();
+            /* « DEJA A JOUR » N'EST PAS UN ECHEC, ET LE DIRE COUTE CHER.
+             *
+             * L'ecran n'envoie que les ecarts, mais sa vision du stock peut
+             * dater — c'est exactement l'etat ou l'on se trouve apres un envoi
+             * interrompu. Afficher ces lignes en rouge pousse a renvoyer
+             * l'inventaire, et renvoyer est precisement le geste qui a
+             * fabrique le desordre qu'on repare ici. */
+            if (\str_contains($corps, self::DEJA_A_JOUR)
+                || \str_contains($e->getMessage(), self::DEJA_A_JOUR)) {
+                return null;
             }
+
+            /* LE MOTIF PORTE LE TEXTE DE GROCY. Sans lui, l'ecran affichait
+               « HTTP 400 returned for https://... » — un code et une adresse,
+               rien sur ce qui a ete refuse ni pourquoi. */
+            return '' === $corps ? $e->getMessage() : $e->getMessage() . ' — ' . $corps;
         }
 
-        return $echecs;
+        return null;
+    }
+
+    /**
+     * Le corps de la reponse en erreur, court et sans exploser.
+     *
+     * Tronque a 200 caracteres : une erreur 500 de Grocy renvoie une page de
+     * trace complete — trois kilo-octets vus le 14 aout 2026 — qui remplirait
+     * la colonne `echecs` et l'ecran par-dessus le marche.
+     */
+    private static function corpsDe(ExceptionInterface $e): string
+    {
+        if (!$e instanceof HttpExceptionInterface) {
+            return '';   // panne reseau : il n'y a pas eu de reponse
+        }
+
+        try {
+            // `false` : ne relance pas l'exception qu'on est en train de traiter
+            $corps = \trim($e->getResponse()->getContent(false));
+        } catch (\Throwable) {
+            return '';
+        }
+
+        return \mb_strlen($corps) > 200 ? \mb_substr($corps, 0, 200) . '…' : $corps;
     }
 
     /**
@@ -490,6 +543,19 @@ final readonly class FrigoGrocy
         };
     }
 
+    /**
+     * Les champs personnalises d'un produit, tels que /objects/products les
+     * renvoie deja.
+     *
+     * Ils etaient auparavant relus un par un sur /userfields/products/{id} :
+     * un appel HTTP par produit, soit 62 appels a 1,5 s pour 59 produits, bien
+     * au-dela des 30 s de PHP. Grocy les inclut dans la liste, il suffit de les
+     * y prendre.
+     *
+     * @param array<string, mixed> $produit
+     *
+     * @return array<string, mixed>
+     */
     private static function champsDe(array $produit): array
     {
         $champs = $produit['userfields'] ?? null;

@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  useAliments, useCreerAliment, useDefinirStock, useEnregistrerAliment,
-  useEnvoyerInventaire, useFrigoIncomplets, useMajAliment, useMonFrigo,
-  useSupprimerAliment,
+  useAliments, useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
+  useEnregistrerAliment, useEnvoyerInventaire, useFrigoIncomplets, useMajAliment,
+  useMonFrigo, useSuiviInventaire, useSupprimerAliment,
 } from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import {
@@ -61,7 +61,9 @@ export default function MonFrigo() {
   const frigo = useMonFrigo();
   const definir = useDefinirStock();
   const enregistrer = useEnregistrerAliment();
+  const poserQuantite = useDefinirQuantiteGrocy();
   const envoyer = useEnvoyerInventaire();
+  const suivi = useSuiviInventaire();
   const catalogue = useAliments();
   const creer = useCreerAliment();
   const majAliment = useMajAliment();
@@ -112,6 +114,29 @@ export default function MonFrigo() {
 
   const enStock = useMemo(() => tous.filter((a) => a.stock > 0).length, [tous]);
   const comptes = Object.values(vus).filter(Boolean).length;
+
+  /* L'ÉTAT DE L'INVENTAIRE VIENT DU SERVEUR, PAS DE LA MUTATION.
+     `envoyer.isSuccess` ne dit plus que « le dépôt est passé » : le travail
+     se fait ailleurs, dans le conteneur des tâches, et peut durer une minute.
+     Seul `suivi` sait où il en est — y compris si on a fermé l'application
+     entre-temps. */
+  const enCoursDEnvoi =
+    suivi.data?.statut === 'en_attente' || suivi.data?.statut === 'en_cours';
+  const echecsInventaire = suivi.data?.echecs ?? [];
+
+  /* LE RÉSULTAT S'EFFACE AU BOUT D'UN QUART D'HEURE, ET IL LE FAUT.
+     Le serveur garde le dernier lot trente jours : sans cette borne, « 12
+     corrections appliquées » resterait affiché des semaines après, et une
+     bannière permanente ne se lit plus. Un quart d'heure couvre le cas réel —
+     on envoie, on va faire autre chose, on revient voir. */
+  const inventaireFini = useMemo(() => {
+    const s = suivi.data?.statut;
+    if (s !== 'termine' && s !== 'echoue') return false;
+
+    const fini = Date.parse(suivi.data?.finiLe ?? '');
+
+    return Number.isFinite(fini) && Date.now() - fini < 15 * 60 * 1000;
+  }, [suivi.data?.statut, suivi.data?.finiLe]);
 
   /* Les macros sont données pour 100 g. Une autre unité ne pose problème que
      si son poids est inconnu : le kilogramme et la pièce se convertissent dès
@@ -222,13 +247,54 @@ export default function MonFrigo() {
         {/* La création se fait en deux temps : l'aliment, puis sa quantité.
             Si le second échoue, le premier est déjà passé — le taire laisserait
             croire que rien n'a été fait, et l'utilisateur recréerait un
-            doublon. On nomme donc précisément ce qui a marché. */}
-        {(definir.isError || envoyer.isError) && (
+            doublon. On nomme donc précisément ce qui a marché.
+
+            CE MESSAGE NE PARLE QUE DE LA CRÉATION, et il a fallu une panne
+            pour s'en assurer. Il écoutait aussi `envoyer`, la mutation de
+            l'inventaire complet : le 14 août 2026, un inventaire de quarante
+            lignes a échoué et l'écran a répondu « L'aliment a bien été créé »
+            à quelqu'un qui n'avait rien créé. Une bannière qui affirme un fait
+            doit dépendre du seul geste qui produit ce fait. */}
+        {(definir.isError || poserQuantite.isError) && (
           <View style={s.alerte}>
             <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 17 }}>
               L'aliment a bien été créé, mais sa quantité n'a pas pu être posée :
-              {' '}{(definir.error ?? envoyer.error)?.message}.
+              {' '}{(definir.error ?? poserQuantite.error)?.message}.
               {' '}Renseigne-la depuis l'inventaire.
+            </Discret>
+          </View>
+        )}
+
+        {/* L'INVENTAIRE, PENDANT ET APRÈS — ICI ET NULLE PART AILLEURS.
+            Dans l'en-tête et non dans le pied du mode inventaire : l'envoi
+            continue quand on quitte l'écran, et le résultat doit se voir au
+            retour, quel que soit le mode où l'on revient. Le chiffre vient du
+            serveur, pas d'un compteur local : il survit à la fermeture de
+            l'application. */}
+        {enCoursDEnvoi && (
+          <View style={s.alerte}>
+            <Discret style={{ color: C.discret, fontSize: T.petit, lineHeight: 17 }}>
+              Inventaire en cours — {suivi.data?.traites ?? 0} / {suivi.data?.total ?? 0}
+              {' '}ligne(s). Tu peux quitter l'écran, ça continue tout seul.
+            </Discret>
+          </View>
+        )}
+
+        {inventaireFini && (
+          <View style={s.alerte}>
+            <Discret
+              style={{
+                color: echecsInventaire.length > 0 ? C.erreur : C.ok,
+                fontSize: T.petit,
+                lineHeight: 17,
+              }}
+            >
+              {echecsInventaire.length === 0
+                ? `Inventaire appliqué : ${suivi.data?.traites ?? 0} correction(s).`
+                : `Inventaire appliqué : `
+                  + `${(suivi.data?.traites ?? 0) - echecsInventaire.length} correction(s), `
+                  + `${echecsInventaire.length} refusée(s) — `
+                  + echecsInventaire.map((e) => e.motif).join(' · ')}
             </Discret>
           </View>
         )}
@@ -345,12 +411,7 @@ export default function MonFrigo() {
               {envoyer.error.message}
             </Discret>
           )}
-          {envoyer.isSuccess && envoyer.data.echecs.length > 0 && (
-            <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 17 }}>
-              {envoyer.data.corriges} corrigé(s), {envoyer.data.echecs.length} en échec :
-              {' '}{envoyer.data.echecs.map((e) => e.motif).join(' · ')}
-            </Discret>
-          )}
+
           <View style={{ flexDirection: 'row', gap: E.s }}>
             <Bouton
               variante="contour"
@@ -361,23 +422,30 @@ export default function MonFrigo() {
             </Bouton>
             <Bouton
               onPress={() => envoyer.mutate(ecarts, {
-                onSuccess: (r) => {
-                  if (r.echecs.length !== 0) return;
-                  /* Envoyee et appliquee : la garder ferait rouvrir
-                     l'inventaire sur des chiffres deja consommes. */
+                /* DÉPOSÉ, PAS APPLIQUÉ — et on vide quand même la saisie.
+                   Le serveur tient désormais la liste : la garder ici ferait
+                   rouvrir l'inventaire sur des chiffres déjà partis, et c'est
+                   ce renvoi-là qui a mis le frigo en désordre le 14 août. Ce
+                   qui reste à surveiller s'affiche au-dessus. */
+                onSuccess: () => {
                   setSaisies({});
                   setVus({});
                   setMode('stock');
                 },
               })}
-              desactive={ecarts.length === 0 || envoyer.isPending}
+              /* Un seul inventaire à la fois. Le serveur le refuse aussi — un
+                 index unique en base —, mais un bouton grisé explique mieux
+                 qu'un message d'erreur après coup. */
+              desactive={ecarts.length === 0 || envoyer.isPending || enCoursDEnvoi}
               style={{ flex: 1.6 }}
             >
-              {envoyer.isPending
-                ? 'Envoi…'
-                : ecarts.length === 0
-                  ? 'Aucun écart à envoyer'
-                  : `Enregistrer ${ecarts.length} correction${ecarts.length > 1 ? 's' : ''}`}
+              {enCoursDEnvoi
+                ? 'Inventaire en cours…'
+                : envoyer.isPending
+                  ? 'Envoi…'
+                  : ecarts.length === 0
+                    ? 'Aucun écart à envoyer'
+                    : `Enregistrer ${ecarts.length} correction${ecarts.length > 1 ? 's' : ''}`}
             </Bouton>
           </View>
         </View>
@@ -388,7 +456,7 @@ export default function MonFrigo() {
         visible={surGrocy && (nouveau !== null || edite !== null)}
         titre={nouveau !== null ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment')}
         aliment={nouveau ?? (edite !== null ? versSaisie(edite) : undefined)}
-        enCours={enregistrer.isPending || envoyer.isPending}
+        enCours={enregistrer.isPending || poserQuantite.isPending}
         erreur={enregistrer.error?.message ?? null}
         /* Le nom ne se saisit qu'à la création : ensuite Grocy en est maître,
            et le changer ici ferait diverger les deux outils. */
@@ -433,10 +501,10 @@ export default function MonFrigo() {
                  On l'envoie même à zéro. C'est cet appel qui crée la ligne de
                  stock, donc qui rattache le produit à un emplacement — sans
                  lui il resterait sous « Sans emplacement », tout en bas. */
-              envoyer.mutate([{
+              poserQuantite.mutate({
                 reference: rendu.reference,
                 quantite: Number.isNaN(q) ? 0 : q,
-              }]);
+              });
             },
           });
         }}

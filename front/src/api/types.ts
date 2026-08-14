@@ -142,7 +142,12 @@ export interface Modele {
 }
 
 export interface Utilisateur {
-  '@id': string;
+  /* FACULTATIF, ET C'EST LA VÉRITÉ. `@id` est fabriqué par API Platform : la
+     collection `/utilisateurs` le porte, `/moi` non — c'est un contrôleur
+     ordinaire qui sérialise l'entité. Aucun écran ne lit ce champ sur un
+     utilisateur ; le déclarer obligatoire n'aurait rien protégé, seulement
+     obligé à en inventer un. */
+  '@id'?: string;
   id: string;
   email: string;
   nom: string;

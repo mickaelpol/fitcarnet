@@ -184,9 +184,16 @@ $(tail -40 "$JOURNAL")"
 #
 # On l'a decouvert sur un Caddyfile corrige qui ne prenait pas : le conteneur
 # affichait « Up 13 minutes » apres un deploiement qui venait de reussir.
-dire "redemarrage de fitcarnet-app"
+# `fitcarnet-taches` EST DANS LA LISTE, ET C'EST ENCORE PLUS VRAI POUR LUI.
+#
+# L'application est un serveur : chaque requete repart d'un code relu. Le
+# conteneur des taches est UN SEUL processus PHP qui tourne pendant des
+# semaines — il a charge ses classes au demarrage et ne les relira jamais.
+# Sans ce redemarrage, il appliquerait les inventaires avec le code d'il y a
+# trois deploiements, sans que rien ne le signale.
+dire "redemarrage de fitcarnet-app et fitcarnet-taches"
 $COMPOSE --env-file "$DOSSIER/.env" -f "$DOSSIER/docker-compose.yml" \
-    restart fitcarnet-app >>"$JOURNAL" 2>&1 \
+    restart fitcarnet-app fitcarnet-taches >>"$JOURNAL" 2>&1 \
     || echec "le redémarrage a échoué. Les 40 dernières lignes :
 $(tail -40 "$JOURNAL")"
 
