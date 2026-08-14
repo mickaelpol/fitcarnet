@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "version": "1.0.10",
+  "versionCode": 12,
+  "version": "1.0.11",
   "url": "https://carnet.mickael-pol.fr/telecharger/fitcarnet.apk",
-  "notes": "Sonneries, invitations, comptes"
+  "notes": "démarrage plus rapide, cache hors ligne, lisibilité"
 }

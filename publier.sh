@@ -107,6 +107,52 @@ if [[ -n "$NATIF" ]] && (( ! SANS_MOBILE )); then
                           ./publier.sh \"$MESSAGE\" --sans-mobile"
 fi
 
+# ------------------------------------------- le numéro dit-il la même chose ?
+#
+# LE NUMÉRO DE VERSION VIT DANS DEUX FICHIERS, ET C'EST LE PROBLÈME.
+#
+#   front/app.json             ce que l'APK embarque, donc `runtimeVersion`
+#   telecharger/version.json   ce que la page de téléchargement annonce
+#
+# `publier-android.sh` écrit les deux ensemble. Rien ne les tenait ensuite.
+# Le 12 août 2026, `version.json` est revenu tout seul à « 1.0.10 / 11 » deux
+# heures après un APK « 1.0.11 / 12 » : un `fitsync`, où Windows gagne
+# toujours, l'a réécrit avec une copie périmée, et le `git add -A` d'ici l'a
+# commité sans un mot. Pendant deux jours, la page de téléchargement a annoncé
+# un numéro et des notes qui n'étaient pas ceux de l'APK qu'elle servait.
+#
+# On ne peut pas fusionner les deux fichiers : l'un est lu par Expo à la
+# construction, l'autre par l'application au démarrage. À défaut d'une source
+# unique, on exige qu'elles ne se contredisent pas — la panne devient bruyante
+# et immédiate au lieu d'être silencieuse et découverte deux jours plus tard.
+DESACCORD=$(python3 - <<'PY'
+import json
+
+app = json.load(open('front/app.json', encoding='utf-8'))['expo']
+pub = json.load(open('telecharger/version.json', encoding='utf-8'))
+
+attendu = (app.get('version'), app.get('android', {}).get('versionCode'))
+annonce = (pub.get('version'), pub.get('versionCode'))
+
+print('' if attendu == annonce else
+      f"app.json dit {attendu[0]} (build {attendu[1]}), "
+      f"telecharger/version.json dit {annonce[0]} (build {annonce[1]})")
+PY
+)
+
+if [[ -n "$DESACCORD" ]]; then
+    echec "Les deux fichiers de version se contredisent.
+
+   $DESACCORD
+
+   Le bon numéro est celui de front/app.json : c'est lui qui a servi à
+   construire l'APK, et c'est lui que les téléphones comparent.
+
+   Pour réaligner telecharger/version.json sur le dernier APK publié :
+       git log --oneline -5 -- telecharger/version.json
+       git checkout <le commit « version X.Y.Z » qui va bien> -- telecharger/version.json"
+fi
+
 # ------------------------------------------------------------- 1. tests
 
 titre "Tests du front"

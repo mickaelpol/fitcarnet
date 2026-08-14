@@ -45,15 +45,29 @@ export function EtatMaj() {
 
   /* CE PANNEAU DIT DEUX CHOSES À DEUX PUBLICS.
    *
-   * À tout le monde : « ça marche » ou « ça ne marche pas », et la version.
-   * C'est ce dont on a besoin avant d'écrire à quelqu'un pour signaler une
-   * panne.
+   * À tout le monde : « ça marche » ou « ça ne marche pas », la version, et
+   * le bouton de mise à jour. C'est ce dont on a besoin avant d'écrire à
+   * quelqu'un pour signaler une panne — et, souvent, ce qui évite d'avoir à
+   * écrire.
    *
    * À l'administrateur seul : l'adresse exacte, le canal, l'identifiant du
-   * paquet, les boutons. Ce sont des outils de diagnostic — pour qui ne les
-   * comprend pas, ce ne sont que quatre lignes inquiétantes, et un bouton
-   * « chercher une mise à jour » qui donne envie d'appuyer quand rien ne va,
-   * sans que ça règle jamais rien. */
+   * paquet. Des outils de diagnostic ; pour qui ne les comprend pas, quatre
+   * lignes inquiétantes.
+   *
+   * « CHERCHER UNE MISE À JOUR » A CHANGÉ DE CÔTÉ LE 14 AOÛT 2026.
+   *
+   * Il était rangé avec les diagnostics, au motif qu'il « donne envie
+   * d'appuyer quand rien ne va, sans jamais rien régler ». C'est l'inverse :
+   * c'est le SEUL recours de quelqu'un dont l'application n'a pas reçu un
+   * correctif. Les mises à jour descendent bien toutes seules — au démarrage
+   * suivant, à condition de fermer vraiment l'application, ce que personne ne
+   * fait et que personne ne devine.
+   *
+   * Ce jour-là, une panne affichait à l'administrateur l'identité d'un autre
+   * compte. Sur son téléphone il lisait donc ROLE_USER, et le bouton qui lui
+   * aurait apporté le correctif était caché par le bug qu'il corrigeait. Une
+   * porte de secours fermée par ce dont elle protège n'est pas une porte de
+   * secours. */
   const admin = useMoi().data?.roles?.includes('ROLE_ADMIN') === true;
 
   /**
@@ -197,13 +211,17 @@ export function EtatMaj() {
         </Bouton>
       )}
 
-      {avecMaj && admin && (
+      {/* POUR TOUT LE MONDE. Voir le commentaire en tête du composant. */}
+      {avecMaj && (
         <Bouton variante="contour" onPress={chercher} desactive={occupe}>
           {occupe ? 'Patiente…' : 'Chercher une mise à jour'}
         </Bouton>
       )}
 
-      {message !== null && admin && (
+      {/* Le message est la réponse du bouton : le réserver à l'administrateur
+          rendrait le bouton muet pour les autres — on appuie, rien ne bouge,
+          et « déjà à jour » ne se distingue plus de « ça n'a pas marché ». */}
+      {message !== null && (
         <Discret style={s.message}>{message}</Discret>
       )}
     </Carte>
