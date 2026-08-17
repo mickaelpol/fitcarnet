@@ -1,4 +1,11 @@
 import type { Aliment } from '@/solveur/types';
+/* SOUS UN AUTRE NOM, PARCE QUE `Repas` EST DÉJÀ PRIS ICI.
+   Dans ce fichier, `Repas` désigne le CONTENU d'un repas — ses aliments, ses
+   convives. Dans `composer`, c'est le CRÉNEAU : 'R1' à 'R4'. Deux notions,
+   deux noms ; les confondre compilait sans broncher et donnait un champ qui
+   acceptait un objet là où on attend « R1 ». `composer` n'importe pas ce
+   fichier, il n'y a donc pas de cycle. */
+import type { Repas as MomentDuRepas } from '@/solveur/composer';
 
 /**
  * LES FOURNÉES DU BATCH COOKING.
@@ -262,7 +269,7 @@ export function repartition(repas: readonly Repas[], choisi: Cuissons): Boite[] 
  */
 export interface PlanEnregistre {
   /** version de la forme, pour qu'une évolution ne rende pas l'ancien illisible */
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   courses: { nom: string; categorie: string; grammes: number }[];
   fournees: {
     libelle: string;
@@ -271,6 +278,21 @@ export interface PlanEnregistre {
   boites: {
     /** « Aujourd'hui · Midi », déjà mis en toutes lettres */
     titre: string;
+    /**
+     * LE MOMENT DE REPAS, EN CODE. Absent des plans version 1 et 2.
+     *
+     * `titre` est un libellé d'affichage : « Aujourd'hui · Matin ». Il se lit,
+     * il ne se relit pas — en tirer « R1 » demanderait d'inverser une table de
+     * traduction, et un jour où l'on renomme « 16 h » en « collation », tous
+     * les plans déjà enregistrés perdraient silencieusement le lien.
+     *
+     * Ce champ sert à rattacher la boîte à ses compléments alimentaires. Les
+     * compléments ne sont PAS figés dans le plan : ce sont des consignes
+     * courantes, et en rouvrant un plan de dimanche on veut savoir ce qu'on
+     * prend AUJOURD'HUI, pas ce qu'on prenait alors. Le plan n'a donc qu'à
+     * dire de quel repas il s'agit.
+     */
+    repas?: MomentDuRepas;
     convives: number;
     cuits: LigneEnregistree[];
     crus: LigneEnregistree[];
@@ -327,7 +349,7 @@ export function figerLePlan(
   });
 
   return {
-    version: 2,
+    version: 3,
     consomme: consommationDuPlan(repas),
     courses: courses.map((c) => ({
       nom: c.aliment.nom, categorie: c.aliment.categorie, grammes: c.grammes,
@@ -340,6 +362,9 @@ export function figerLePlan(
     })),
     boites: boites.map((b) => ({
       titre: nomDeLaBoite(b.cle),
+      /* « 2|R3 » — le rang du jour, puis le repas. Le rang ne veut plus rien
+         dire dans trois jours ; le repas, si. On ne garde que lui. */
+      repas: b.cle.split('|')[1] as MomentDuRepas,
       convives: b.convives,
       cuits: b.cuits.map(ligne),
       crus: b.crus.map(ligne),

@@ -351,6 +351,15 @@ describe('Un plan enregistré se relit sans rien recalculer', () => {
     assert.equal(fige().boites[0]!.titre, 'Aujourd\'hui · Midi');
   });
 
+  it('garde AUSSI le repas en code, pas seulement en toutes lettres', () => {
+    /* Le titre se lit, il ne se relit pas. Rattacher une boîte à ses
+       compléments alimentaires demande « R2 », et l'obtenir en inversant la
+       table des libellés casserait silencieusement le jour où l'on renomme
+       « 16 h » en « collation ». Le jour, lui, reste hors du code : il ne
+       veut plus rien dire trois jours après. */
+    assert.equal(fige().boites[0]!.repas, 'R2');
+  });
+
   it('ce qui ne se cuit pas reste distinct de ce qui sort d\'une fournée', () => {
     const b = fige().boites[0]!;
     assert.deepEqual(b.cuits.map((x) => x.nom), ['Riz']);
@@ -635,10 +644,14 @@ describe('estCuisine', () => {
 });
 
 describe('l\'instantané sait ce qu\'il prend au frigo', () => {
-  it('figerLePlan écrit « consomme » et annonce la version 2', () => {
+  it('figerLePlan écrit « consomme » et annonce la version 3', () => {
+    /* VERSION 3 DEPUIS LES COMPLÉMENTS : les boîtes portent désormais leur
+       repas en code. Les plans version 1 et 2 restent lisibles — le champ est
+       facultatif, et une boîte qui ne l'a pas n'affiche pas de complément
+       plutôt que d'aller le deviner. */
     const plan = [repas('0|R2', { aliment: RIZ, aCuire: 100 })];
     const fige = figerLePlan([], [], [], (c) => c, plan);
-    assert.equal(fige.version, 2);
+    assert.equal(fige.version, 3);
     assert.deepEqual(fige.consomme, [{ reference: RIZ.id, nom: 'Riz', grammes: 100 }]);
   });
 

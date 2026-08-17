@@ -6,8 +6,8 @@ import {
 } from './client';
 import { oublierLeCacheDisque } from './persistance';
 import type {
-  Aliment, Cible, Emplacement, Exercice, LigneStock, Modele, MonFrigo,
-  Seance, Serie, Utilisateur,
+  Aliment, Cible, Complement, Emplacement, Exercice, LigneStock, Modele,
+  MonFrigo, Seance, Serie, Utilisateur,
 } from './types';
 
 /* ---------- authentification ---------- */
@@ -694,6 +694,54 @@ export function useEnregistrerCible() {
             { methode: 'PATCH', corps: cibleEnEcriture(c) })
         : api<Cible>('/cibles', { methode: 'POST', corps: cibleEnEcriture(c) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cibles'] }),
+  });
+}
+
+/* ---------- compléments alimentaires ---------- */
+
+/**
+ * Les consignes de compléments du compte, tous repas confondus.
+ *
+ * UNE SEULE REQUÊTE POUR LES QUATRE REPAS, et l'écran trie ensuite. Personne
+ * n'a trente compléments : quatre requêtes filtrées coûteraient quatre
+ * allers-retours pour ramener, au total, six lignes.
+ */
+export const useComplements = () =>
+  useQuery({
+    queryKey: ['complements'],
+    queryFn: async () => membres(await api<{ member: Complement[] }>('/complements')),
+    /* Une consigne change quelques fois par an. La relire à chaque affichage
+       de l'écran repas serait payer un aller-retour pour une réponse qu'on
+       connaît déjà. */
+    ...REFERENTIEL,
+  });
+
+/**
+ * `quantite` PART EN CHAÎNE, comme les macros d'une cible.
+ *
+ * C'est un DECIMAL côté API : envoyer un nombre fait répondre « The type of
+ * the "quantite" attribute must be "string", "integer" given ». La règle est
+ * écrite deux fois dans ce fichier parce qu'elle a été oubliée deux fois.
+ */
+export function useEnregistrerComplement() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (c: { nom: string; quantite: number; unite: string; repas: string }) =>
+      api<Complement>('/complements', {
+        methode: 'POST',
+        corps: { ...c, quantite: String(c.quantite) },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['complements'] }),
+  });
+}
+
+export function useSupprimerComplement() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => api<null>(`/complements/${id}`, { methode: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['complements'] }),
   });
 }
 

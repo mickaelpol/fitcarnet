@@ -1,5 +1,6 @@
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { adresseApi } from '@/api/client';
 import { useExerciceDetail } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
 import { Bouton, Discret, Texte } from './base';
@@ -21,6 +22,56 @@ export function identifiantYoutube(url: string | null): string | null {
 
 const lecteur = (id: string) =>
   `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`;
+
+/**
+ * L'ORIGINE SOUS LAQUELLE LA VIDÉO EST DEMANDÉE, SUR MOBILE.
+ *
+ * YouTube identifie qui l'intègre par l'en-tête `Referer`. Une page sans
+ * origine n'en envoie aucun, et le lecteur refuse : « Erreur 153, erreur de
+ * configuration du lecteur vidéo », sur fond gris.
+ *
+ * On reprend l'origine du serveur de l'application — la même que celle du
+ * site web, où la vidéo se lit sans problème. Ce n'est pas une valeur choisie
+ * au hasard : c'est celle dont on SAIT qu'elle marche, puisqu'elle marche
+ * déjà.
+ */
+const origineDeLApp = (): string => {
+  try {
+    return new URL(adresseApi()).origin;
+  } catch {
+    // `adresseApi()` peut être relative sur le web ; on n'y passe jamais ici,
+    // mais une exception dans un rendu vaudrait un écran blanc.
+    return 'https://carnet.mickael-pol.fr';
+  }
+};
+
+/**
+ * La page minimale qui porte le lecteur, pour la WebView.
+ *
+ * POURQUOI UNE PAGE PLUTÔT QUE L'URL DIRECTE.
+ *
+ * La WebView chargeait `https://www.youtube.com/embed/…` comme document
+ * principal. Il n'y avait alors PAS de page qui intègre : YouTube ne recevait
+ * aucun `Referer`, ne pouvait identifier personne, et rendait l'erreur 153.
+ * Le navigateur, lui, n'avait jamais ce problème — sa page vient du site, avec
+ * une origine.
+ *
+ * `baseUrl` donne cette origine à la WebView : le document est alors traité
+ * comme venant de là, et l'`iframe` porte enfin un `Referer`. `referrerpolicy`
+ * s'assure qu'il n'est pas raboté en chemin.
+ *
+ * L'identifiant est sûr par construction : `identifiantYoutube` ne rend que
+ * onze caractères de `[\w-]`. Rien d'autre n'est interpolé ici.
+ */
+const pageLecteur = (id: string) => `<!doctype html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background:transparent;overflow:hidden">
+<iframe src="${lecteur(id)}"
+        style="border:0;width:100%;height:100%;display:block;position:absolute;inset:0"
+        referrerpolicy="strict-origin"
+        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen></iframe>
+</body></html>`;
 
 /**
  * Fiche d'un exercice : la vidéo de démonstration, et ce qu'il travaille.
@@ -78,10 +129,18 @@ export function ModaleExercice({
                   />
                 ) : (
                   <WebView
-                    source={{ uri: lecteur(id) }}
+                    source={{ html: pageLecteur(id), baseUrl: origineDeLApp() }}
+                    /* Le document vient d'un `html` et non d'une URL : sans
+                       cette liste, la WebView peut refuser de charger
+                       l'iframe vers youtube.com. */
+                    originWhitelist={['*']}
                     style={{ flex: 1, backgroundColor: 'transparent' }}
                     allowsFullscreenVideo
                     javaScriptEnabled
+                    domStorageEnabled
+                    /* Sans ça, iOS ouvre la vidéo en plein écran dès la
+                       lecture, hors de la fiche. */
+                    allowsInlineMediaPlayback
                   />
                 )}
               </View>

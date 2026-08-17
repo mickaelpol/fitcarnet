@@ -141,6 +141,22 @@ export interface Modele {
   exercices: ModeleExercice[];
 }
 
+/**
+ * Une consigne de complément, rattachée à un moment de repas.
+ *
+ * Ce n'est pas une prise : l'objet ne dit pas « pris ce matin », il dit
+ * « avec le repas du matin, 5 g de créatine ». Il vaut tous les jours.
+ */
+export interface Complement {
+  '@id'?: string;
+  id: number;
+  nom: string;
+  /* En chaîne : c'est un DECIMAL côté API, et il refuse un nombre. */
+  quantite: string;
+  unite: string;
+  repas: 'R1' | 'R2' | 'R3' | 'R4';
+}
+
 export interface Utilisateur {
   /* FACULTATIF, ET C'EST LA VÉRITÉ. `@id` est fabriqué par API Platform : la
      collection `/utilisateurs` le porte, `/moi` non — c'est un contrôleur

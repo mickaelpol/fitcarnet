@@ -10,6 +10,9 @@ import type { PlanRepas } from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
+import {
+  DetailComplements, LigneComplements, RappelComplements,
+} from '@/composants/complements';
 import { Confirmer } from '@/composants/confirmer';
 import { Calendrier, libelleCourt, libelleDuJour } from '@/composants/calendrier';
 import { Etapes } from '@/composants/etapes';
@@ -749,6 +752,20 @@ const dateCourte = (iso: string | null | undefined): string => {
                   </Texte>
                 </View>
               ))}
+
+              {/* LES COMPLÉMENTS NE SONT PAS FIGÉS DANS LE PLAN, ET C'EST
+                  DÉLIBÉRÉ. Le reste de cet écran est un instantané : les
+                  quantités du dimanche, relues le jeudi. Les compléments,
+                  eux, sont une consigne COURANTE — en rouvrant ce plan on
+                  veut savoir ce qu'on prend aujourd'hui, pas ce qu'on prenait
+                  quand on l'a enregistré. On les relit donc à chaque
+                  affichage, et changer sa routine met à jour les plans déjà
+                  faits.
+
+                  `b.repas` manque aux plans enregistrés avant que ce champ
+                  existe (versions 1 et 2). Ces boîtes-là n'affichent rien,
+                  plutôt que d'aller deviner le repas en relisant leur titre. */}
+              {b.repas !== undefined && <LigneComplements repas={b.repas} />}
             </Pliant>
           ))}
         </ScrollView>
@@ -1419,6 +1436,13 @@ const dateCourte = (iso: string | null | undefined): string => {
                   ))}
                 </>
               )}
+
+              {/* Les compléments de CE repas, dans la boîte qui le prépare.
+                  C'est l'endroit le plus juste : un complément ne se cuit
+                  pas et ne se range pas dans une boîte cinq jours à
+                  l'avance — il s'avale au moment de manger, comme le skyr
+                  au-dessus. */}
+              <LigneComplements repas={b.cle.split('|')[1] as Repas} />
             </Pliant>
           ))}
         </ScrollView>
@@ -1837,12 +1861,21 @@ function CarteRepas({
                 : `, soit ${nb((fibres * 2) / portions)} kcal hors cible`}
             </Discret>
           )}
+
+          {/* CE QUI S'AJOUTE À CE REPAS ET QUI NE SE PÈSE PAS.
+              Les compléments n'entrent pas dans le calcul — leurs macros sont
+              nulles et leur dose est fixe, le solveur n'a rien à en faire —
+              mais ils font partie du repas. Ici un rappel d'une ligne ; le
+              détail est plus bas, là où l'on prépare vraiment l'assiette. */}
+          <RappelComplements repas={repas} />
         </View>
         <Discret>{ouvert ? '▲' : '▼'}</Discret>
       </Pressable>
 
       {ouvert && (
         <View style={{ gap: E.s }}>
+          <DetailComplements repas={repas} />
+
           {/* « à peser » et non « à cuire » : la colonne vaut aussi pour les
               amandes et le skyr, qui ne cuisent pas. C'est ce qu'on met sur
               la balance, cuisson ou pas. Et « servi » plutôt que « cuit »,

@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useDeconnexion, useMoi } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { BandeauMaj } from '@/composants/bandeauMaj';
+import { MesComplements } from '@/composants/complements';
 import { EtatMaj } from '@/composants/etatMaj';
 import { C, E, P, T } from '@/theme';
 
@@ -44,6 +45,12 @@ export default function Compte() {
       <Bouton variante="contour" onPress={() => router.push('/objectifs')}>
         Mes objectifs par repas
       </Bouton>
+
+      {/* JUSTE SOUS LES OBJECTIFS, ET C'EST LEUR PLACE.
+          Un complément se rattache à un moment de repas, exactement comme une
+          cible macro, et les deux se règlent dans la même séance : on s'assoit
+          une fois pour dire ce qu'on vise et ce qu'on prend. */}
+      <MesComplements />
 
       <Bouton variante="contour" onPress={() => router.push('/reglages')}>
         Réglages de l’app
