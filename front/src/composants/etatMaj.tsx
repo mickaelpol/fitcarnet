@@ -4,7 +4,8 @@ import { Platform, StyleSheet, View } from 'react-native';
 
 import { adresseApi } from '@/api/client';
 import { useMoi } from '@/api/hooks';
-import { Bouton, Carte, Discret, Texte } from './base';
+import { Bouton, Discret, Texte } from './base';
+import { Pliant } from './pliant';
 import { C, E, P, R, T } from '@/theme';
 
 /**
@@ -39,6 +40,12 @@ import { C, E, P, R, T } from '@/theme';
 type EtatServeur = 'inconnu' | 'joignable' | 'injoignable';
 
 export function EtatMaj() {
+  /* REPLIÉ PAR DÉFAUT, ET LE RÉSUMÉ PORTE L'ESSENTIEL.
+     Ce panneau sert quelques fois par an. Déplié en permanence, il occupait
+     le bas de l'onglet Compte tous les jours pour une information qu'on ne
+     lit qu'un jour de panne. Le titre plié dit déjà les deux choses utiles :
+     la version qui tourne, et si le serveur répond. */
+  const [deplie, setDeplie] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
   const [serveur, setServeur] = useState<EtatServeur>('inconnu');
@@ -142,9 +149,24 @@ export function EtatMaj() {
   };
 
   return (
-    <Carte style={{ gap: E.xs }}>
-      <Texte style={{ fontFamily: P.fort }}>Version de l’application</Texte>
+    <Pliant
+      titre="Version de l’application"
+      apparence="bouton"
+      /* Ce qu'on vient chercher ici : quelle version tourne, et est-ce que le
+         serveur répond. Les deux tiennent sur une ligne — inutile d'ouvrir.
 
+         `?? 'web'` NE SUFFISAIT PAS, et ça se voyait à l'écran : sur le web,
+         `Updates.runtimeVersion` ne vaut pas `null` mais la CHAÎNE VIDE. `??`
+         ne rattrape que `null` et `undefined` — le résumé s'affichait donc
+         « · serveur en ligne », un point médian tout seul en tête de ligne,
+         sans rien avant. Le classique du `??` employé là où il fallait
+         constater qu'une valeur est vide. */
+      resume={`${Updates.runtimeVersion || 'web'}  ·  ${
+        serveur === 'joignable' ? 'serveur en ligne'
+          : serveur === 'injoignable' ? 'serveur hors ligne' : 'vérification…'}`}
+      ouvert={deplie}
+      onBascule={() => setDeplie(!deplie)}
+    >
       {/* L'ADRESSE DU SERVEUR, EN PREMIER.
           Elle est figée dans l'APK au moment du build, par le profil EAS
           utilisé. Un APK construit avec le profil `local` parle à
@@ -173,7 +195,10 @@ export function EtatMaj() {
       {avecMaj && admin && (
         <>
           <Ligne nom="Application" valeur={Updates.createdAt === null ? 'installée' : 'mise à jour'} />
-          <Ligne nom="Version d’exécution" valeur={Updates.runtimeVersion ?? '—'} />
+          {/* `||` et non `??` : voir le résumé plus haut. Une chaîne vide est
+              une absence, et `??` ne la voit pas. Ici la conséquence était
+              plus discrète — un tiret manquant — mais c'est la même faute. */}
+          <Ligne nom="Version d’exécution" valeur={Updates.runtimeVersion || '—'} />
           <Ligne nom="Canal" valeur={Updates.channel ?? 'aucun'} />
           <Ligne
             nom="Paquet JavaScript"
@@ -199,11 +224,12 @@ export function EtatMaj() {
         </Discret>
       )}
 
-      {/* La version, pour tout le monde : c'est le seul chiffre utile quand on
-          signale un problème à quelqu'un. */}
-      {!admin && (
-        <Ligne nom="Version" valeur={Updates.runtimeVersion ?? 'web'} />
-      )}
+      {/* LA VERSION A QUITTÉ LE CORPS POUR LE RÉSUMÉ.
+          Elle y était pour les comptes non-administrateurs, parce que c'est le
+          seul chiffre utile quand on signale un problème. Depuis que l'encart
+          se plie, le résumé la porte — pour tout le monde, et sans avoir à
+          ouvrir. La répéter ici ferait deux fois le même nombre à l'écran, et
+          un jour deux nombres différents. */}
 
       {admin && (
         <Bouton variante="contour" onPress={verifierServeur}>
@@ -224,7 +250,7 @@ export function EtatMaj() {
       {message !== null && (
         <Discret style={s.message}>{message}</Discret>
       )}
-    </Carte>
+    </Pliant>
   );
 }
 

@@ -66,11 +66,45 @@ const origineDeLApp = (): string => {
 const pageLecteur = (id: string) => `<!doctype html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="margin:0;padding:0;background:transparent;overflow:hidden">
-<iframe src="${lecteur(id)}"
+<iframe id="v" src="${lecteur(id)}"
         style="border:0;width:100%;height:100%;display:block;position:absolute;inset:0"
         referrerpolicy="strict-origin"
         allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
         allowfullscreen></iframe>
+<script>
+/* AU RETOUR DU PLEIN ÉCRAN, ON FORCE UN REDESSIN.
+ *
+ * Sur Android, sortir du plein écran laissait le petit lecteur NOIR. La
+ * WebView détache la surface vidéo pour la donner à sa vue plein écran, et ne
+ * la remet pas en place au retour : la vidéo tourne toujours — le son
+ * continue — mais plus rien ne s'affiche.
+ *
+ * ON NE REMONTE SURTOUT PAS L'IFRAME. Un \`display:none\` suivi d'un
+ * \`block\`, ou une réécriture de \`src\`, remettrait la vidéo au début. Ce
+ * qu'on veut, c'est précisément qu'elle CONTINUE là où elle en était.
+ *
+ * \`translateZ(0)\` puis retrait force le navigateur à composer une nouvelle
+ * couche graphique sans toucher au document : il repeint, la surface se
+ * rattache, la lecture n'est pas interrompue. Le retrait attend deux frames —
+ * dans la même, les deux écritures seraient regroupées et le navigateur ne
+ * verrait aucun changement à appliquer.
+ */
+(function () {
+  var v = document.getElementById('v');
+  function reveiller() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    v.style.transform = 'translateZ(0)';
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { v.style.transform = ''; });
+    });
+  }
+  document.addEventListener('fullscreenchange', reveiller);
+  /* La WebView système d'Android reste sur le préfixe WebKit : sans cette
+     seconde ligne, l'événement n'arrive jamais et le correctif ne fait rien
+     du tout — silencieusement, ce qui est le pire des cas. */
+  document.addEventListener('webkitfullscreenchange', reveiller);
+})();
+</script>
 </body></html>`;
 
 /**
@@ -136,6 +170,14 @@ export function ModaleExercice({
                     originWhitelist={['*']}
                     style={{ flex: 1, backgroundColor: 'transparent' }}
                     allowsFullscreenVideo
+                    /* COMPOSITION MATÉRIELLE, IMPOSÉE.
+                       Second volet du correctif de l'écran noir : par défaut
+                       la WebView laisse Android choisir, et le passage en
+                       plein écran puis le retour la laissent volontiers sur
+                       une couche logicielle qui ne réaffiche plus la vidéo.
+                       Le script de la page force le redessin, celle-ci fait
+                       qu'il y ait quelque chose à redessiner. */
+                    androidLayerType="hardware"
                     javaScriptEnabled
                     domStorageEnabled
                     /* Sans ça, iOS ouvre la vidéo en plein écran dès la

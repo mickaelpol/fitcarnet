@@ -5,7 +5,8 @@ import {
 } from '@/api/hooks';
 import type { Complement } from '@/api/types';
 import { NOM_REPAS, REPAS, type Repas } from '@/solveur/composer';
-import { Bouton, Carte, Champ, Discret, Texte } from './base';
+import { Bouton, Champ, Discret, Texte } from './base';
+import { Pliant } from './pliant';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 /**
@@ -140,6 +141,11 @@ export function LigneComplements({ repas }: { repas: Repas }) {
  * gestes de plus pour rien.
  */
 export function MesComplements() {
+  /* REPLIÉ PAR DÉFAUT. On règle sa routine une fois, puis on n'y revient
+     presque jamais — mais l'onglet Compte, lui, s'ouvre tous les jours. Le
+     résumé dit combien il y en a et à quels moments : de quoi vérifier d'un
+     coup d'œil sans déplier. */
+  const [deplie, setDeplie] = useState(false);
   const complements = useComplements();
   const enregistrer = useEnregistrerComplement();
   const supprimer = useSupprimerComplement();
@@ -169,18 +175,28 @@ export function MesComplements() {
     [complements.data],
   );
 
+  /* « 3 compléments · matin, soir » — le nombre ET les moments. Le nombre
+     seul ne dirait pas si celui du soir a été oublié, ce qui est justement la
+     question qu'on se pose en passant devant. */
+  const total = (complements.data ?? []).length;
+  const resume = total === 0
+    ? 'aucun pour l\'instant'
+    : `${total} complément${total > 1 ? 's' : ''}`
+      + `  ·  ${parRepas.map((g) => NOM_REPAS[g.repas].toLowerCase()).join(', ')}`;
+
   return (
-    <Carte style={{ gap: E.s }}>
-      <Texte style={{ fontFamily: P.fort }}>Compléments alimentaires</Texte>
+    <Pliant
+      titre="Compléments alimentaires"
+      apparence="bouton"
+      resume={resume}
+      ouvert={deplie}
+      onBascule={() => setDeplie(!deplie)}
+    >
       <Discret style={{ fontSize: T.petit, lineHeight: 17 }}>
         Ce qui s'avale : créatine, magnésium, vitamine D. Ce qui se mange —
         une whey, un gainer — reste un aliment du frigo, pour que le
         calculateur en tienne compte.
       </Discret>
-
-      {parRepas.length === 0 && !ouvert && (
-        <Discret style={{ fontSize: T.petit }}>Aucun complément pour l'instant.</Discret>
-      )}
 
       {parRepas.map(({ repas: r, liste }) => (
         <View key={r} style={{ gap: E.xs }}>
@@ -304,7 +320,7 @@ export function MesComplements() {
           </View>
         </View>
       )}
-    </Carte>
+    </Pliant>
   );
 }
 
