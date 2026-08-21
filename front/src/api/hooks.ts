@@ -5,6 +5,9 @@ import {
   api, definirJeton, definirRafraichissement, lireRafraichissement, membres,
 } from './client';
 import { oublierLeCacheDisque } from './persistance';
+import {
+  prevenirFinInventaire, preparerLesNotifications,
+} from '@/composants/notifications';
 import type {
   Aliment, Cible, Complement, Emplacement, Exercice, LigneStock, Modele,
   MonFrigo, Seance, Serie, Utilisateur,
@@ -406,9 +409,20 @@ export function useEnvoyerInventaire() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (lignes: { reference: string; quantite: number }[]) =>
-      api<{ id: number; total: number }>(
-        '/mon-frigo/inventaire', { methode: 'POST', corps: { lignes } }),
+    mutationFn: async (lignes: { reference: string; quantite: number }[]) => {
+      /* LA PERMISSION SE DEMANDE ICI, ET NULLE PART AILLEURS.
+         Juste après « Enregistrer 23 corrections » : la question du système
+         arrive alors qu'on vient de lancer quelque chose qui va durer, et
+         elle a un sens évident. Demandée au démarrage de l'application, elle
+         se refuse par réflexe — et Android ne la repose jamais.
+
+         On n'attend pas la réponse pour envoyer : `void`. Le dépôt de
+         l'inventaire ne doit pas dépendre d'une boîte de dialogue. */
+      void preparerLesNotifications();
+
+      return api<{ id: number; total: number }>(
+        '/mon-frigo/inventaire', { methode: 'POST', corps: { lignes } });
+    },
     /* On réveille le suivi tout de suite : sans ça l'écran attendrait le
        prochain battement pour montrer que quelque chose se passe. */
     onSuccess: () => qc.invalidateQueries({ queryKey: ['inventaire-suivi'] }),
@@ -440,6 +454,15 @@ export function useSuiviInventaire(actif = true) {
 
       return s === 'en_attente' || s === 'en_cours' ? 2000 : false;
     },
+    /* SANS CETTE LIGNE, LA NOTIFICATION NE PARTIRAIT JAMAIS.
+       React Query suspend ses rafraîchissements périodiques dès que la fenêtre
+       perd le focus — donc au moment précis où l'on quitte l'écran, c'est-à-dire
+       le seul moment où prévenir a un intérêt. On n'apprendrait la fin de
+       l'inventaire qu'en revenant, ce que la bannière fait déjà.
+
+       Le coût est borné : une requête toutes les deux secondes, et seulement
+       tant qu'un lot tourne. Le battement s'arrête de lui-même à « terminé ». */
+    refetchIntervalInBackground: true,
     /* Ce chiffre bouge sous nos pieds : le garder en cache entre deux écrans
        ferait afficher un avancement périmé le temps d'un aller-retour. */
     staleTime: 0,
@@ -452,15 +475,26 @@ export function useSuiviInventaire(actif = true) {
      d'appliquer l'inventaire. C'est exactement la file d'attente qu'on vient
      de supprimer. */
   const statut = suivi.data?.statut ?? null;
+  const traites = suivi.data?.traites ?? 0;
+  const nbEchecs = suivi.data?.echecs?.length ?? 0;
+
   useEffect(() => {
     const avant = dernierStatut.current;
     dernierStatut.current = statut;
 
+    /* `avant === null` : PREMIER PASSAGE, on ne sait pas d'où l'on vient.
+       Sans cette garde, ouvrir le frigo trois jours après un inventaire
+       déclencherait une notification pour un travail fini depuis longtemps. */
     if (avant === null || avant === statut) return;
+
     if (statut === 'termine' || statut === 'echoue') {
       void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
+      /* Ne notifie que si l'application n'est pas au premier plan — la règle
+         vit dans `prevenirFinInventaire`, pas ici, pour qu'elle reste vraie
+         partout où on l'appellera un jour. */
+      void prevenirFinInventaire(traites - nbEchecs, nbEchecs);
     }
-  }, [statut, qc]);
+  }, [statut, traites, nbEchecs, qc]);
 
   return suivi;
 }
