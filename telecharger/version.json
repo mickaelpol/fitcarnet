@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "version": "1.0.11",
+  "versionCode": 13,
+  "version": "1.0.12",
   "url": "https://carnet.mickael-pol.fr/telecharger/fitcarnet.apk",
-  "notes": "démarrage plus rapide, cache hors ligne, lisibilité"
+  "notes": "recherche d'exercices par groupe musculaire"
 }
