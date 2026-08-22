@@ -243,6 +243,25 @@ services:
     # travailleurs se contentent de travailler.
     entrypoint: ["php"]
     command: ["bin/console", "app:inventaire:traiter", "--boucle"]
+    # PAS DE SONDE DE SANTE SUR CE CONTENEUR, ET IL FAUT LE DIRE EXPLICITEMENT.
+    #
+    # L'image en porte une, heritee de FrankenPHP : elle verifie qu'un serveur
+    # web repond. Ce conteneur-ci ne lance pas de serveur, il lance
+    # `php bin/console` — il n'y a aucun port a sonder. Les deux travailleurs
+    # etaient donc marques `unhealthy` en permanence, alors qu'ils tournaient
+    # parfaitement.
+    #
+    # Rien n'en dependait, ils continuaient de travailler. Le cout est
+    # ailleurs : un `docker ps` qui affiche « unhealthy » en temps normal
+    # n'apprend plus rien le jour ou quelque chose casse vraiment. Un
+    # indicateur qui crie toujours ne signale plus rien.
+    #
+    # Ecrire une sonde qui verifie que le travailleur travaille serait
+    # possible — regarder `vu_le` en base — mais ce serait inventer un besoin :
+    # personne ne redemarre ce conteneur automatiquement, et un lot abandonne
+    # est deja repris tout seul au bout de deux minutes.
+    healthcheck:
+      disable: true
 
 volumes:
   fitcarnet_caddy_data:
