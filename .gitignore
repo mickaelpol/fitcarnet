@@ -83,3 +83,17 @@ sauvegardes/
 # `.env.test`, lui, RESTE suivi : son secret est ostensiblement faux et les
 # tests en ont besoin sur un clone neuf.
 /api/.env.dev
+
+# ---------------------------------------------------------------------
+#  LES SOURCES DONT ON A DEJA TIRE CE QU'IL FALLAIT
+#
+#  `pictogrammes-muscles.zip` contenait dix-sept SVG de pictogrammes
+#  musculaires. Ils sont dans `front/src/muscles/` — reduits a leurs 159
+#  traces distincts, soit 45 Ko au lieu de 419, avec leur licence a cote.
+#
+#  Le garder ici ferait deux copies de la meme chose, dont une que personne ne
+#  relira jamais, et que `git add -A` commiterait au premier `publier.sh`.
+#
+#  On l'ignore plutot que de compter sur quelqu'un pour penser a l'effacer.
+# ---------------------------------------------------------------------
+/pictogrammes-muscles.zip

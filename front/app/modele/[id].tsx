@@ -62,6 +62,10 @@ export default function DetailModele() {
       .map((e) => ({
         id: e.id, nom: e.nomFr ?? e.nom, detail: e.formatPrescrit ?? '',
         couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
+        /* Voir l'écran de séance : c'est ce champ qui fait apparaître les
+           vignettes de muscles. `?? null` pour que les exercices sans muscle
+           renseigné restent atteignables sous « Autre ». */
+        muscle: e.muscleCible ?? null,
       })),
     [exercices.data, modele?.type],
   );

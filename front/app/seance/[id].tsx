@@ -79,6 +79,11 @@ export default function DetailSeance() {
       .map((e) => ({
         id: e.id, nom: e.nom, detail: e.formatPrescrit ?? '',
         couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
+        /* Le muscle visé, tel que la base l'écrit. Sa présence suffit à faire
+           apparaître la rangée de vignettes dans le sélecteur — un aliment,
+           lui, n'en porte pas. `?? null` et non `undefined` : un exercice sans
+           muscle renseigné doit rester filtrable sous « Autre ». */
+        muscle: e.muscleCible ?? null,
       })),
     [exercices.data, seance?.type],
   );

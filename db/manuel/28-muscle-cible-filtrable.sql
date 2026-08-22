@@ -1,0 +1,43 @@
+-- =====================================================================
+--  fitcarnet — rendre `muscle_cible` interrogeable
+--
+--  CE QUE CE FICHIER NE FAIT PAS : traduire les muscles en francais.
+--
+--  La colonne contient le vocabulaire du catalogue importe — `pectorals`,
+--  `lats`, `delts`, `quads`. C'est laid a lire, et c'est tres bien : ces
+--  valeurs viennent de la source, et les traduire ici les ferait diverger au
+--  prochain import. La traduction est un probleme d'AFFICHAGE, et elle vit
+--  dans `FiltreMuscle` cote applicatif — un seul endroit, relu d'un coup
+--  d'oeil.
+--
+--  UNE SEULE VALEUR EST CORRIGEE, ET C'EST UNE FAUTE DE SAISIE.
+--
+--      pectorals   156 exercices
+--      pectoraux     1 exercice     <-- saisi a la main, en francais
+--
+--  Un doublon a une ligne. Le laisser obligerait le filtre a connaitre les
+--  deux orthographes pour toujours, et la prochaine saisie manuelle en
+--  ajouterait une troisieme. On repare la donnee plutot que d'apprendre au
+--  code a vivre avec.
+--
+--  Idempotent.
+-- =====================================================================
+
+UPDATE exercice SET muscle_cible = 'pectorals' WHERE muscle_cible = 'pectoraux';
+
+-- PAS D'INDEX SUR CETTE COLONNE, ET C'EST UN CHOIX MESURE.
+--
+-- J'en avais pose un ici, pour un filtre serveur `?muscle=pectoraux`. Puis
+-- j'ai mesure ce que couterait de faire voyager le muscle avec la liste :
+-- 33 Ko pour 1338 exercices, soit 5 % du poids qu'on avait justement retire
+-- du catalogue. L'application charge deja tout le catalogue d'un coup et le
+-- garde une demi-heure : elle peut filtrer elle-meme, instantanement et hors
+-- ligne.
+--
+-- Le filtre serveur a donc ete supprime, et l'index avec lui. Un index que
+-- personne n'interroge n'est pas neutre : il ralentit chaque ecriture, et il
+-- raconte a qui lit le schema une intention qui n'existe plus.
+--
+-- Le jour ou le catalogue depassera ce qu'un telephone peut tenir, il faudra
+-- refaire le chemin inverse. Ce sera alors une decision prise sur une mesure,
+-- comme celle-ci.

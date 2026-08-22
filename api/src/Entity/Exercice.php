@@ -139,7 +139,26 @@ class Exercice
     private ?string $equipement = null;
 
     #[ORM\Column(name: 'muscle_cible', type: Types::TEXT, nullable: true)]
-    #[Groups(['exercice:detail', 'exercice:ecrire'])]
+    /**
+     * DANS LA LISTE, ET PAS SEULEMENT DANS LA FICHE.
+     *
+     * Il etait passe en `exercice:detail` avec `instructions` et les textes
+     * longs, pour alleger le catalogue de 640 Ko. Le filtre par groupe
+     * musculaire l'a fait revenir, et la mesure justifie l'exception :
+     * 1338 exercices x une quinzaine de caracteres = 33 Ko, soit 5 % de ce
+     * qu'on avait retire.
+     *
+     * CE QUE CES 33 Ko ACHETENT. L'application charge deja tout le catalogue
+     * d'un coup et le garde une demi-heure. Avec ce champ, choisir un muscle
+     * filtre INSTANTANEMENT, sans reseau, y compris dans une salle sans
+     * couverture. Sans lui, il faudrait un aller-retour a chaque appui sur une
+     * vignette — pour une reponse que le telephone avait deja.
+     *
+     * `musclesSecondaires` RESTE DANS LA FICHE, lui. Filtrer sur le muscle
+     * secondaire noierait « Triceps » sous tous les developpes couches, ou
+     * ils ne sont que sollicites. On filtre sur ce que l'exercice VISE.
+     */
+    #[Groups(['exercice:lire', 'exercice:detail', 'exercice:ecrire'])]
     private ?string $muscleCible = null;
 
     /* MODIFIABLES DEPUIS L'ECRAN D'ADMINISTRATION, comme les quatre autres.

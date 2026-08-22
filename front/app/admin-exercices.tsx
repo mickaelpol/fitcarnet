@@ -5,7 +5,9 @@ import {
 import { useExerciceDetail, useExercices, useMajExercice, useMoi } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
+import { ChoixMuscle } from '@/composants/choixMuscle';
 import { identifiantYoutube, ModaleExercice } from '@/composants/modaleExercice';
+import { groupeDeLaValeur, libelleDuMuscle, valeurPourGroupe } from '@/muscles/groupes';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 /**
@@ -34,7 +36,14 @@ const CHAMPS = [
   { cle: 'nomFr', etiquette: 'Nom français' },
   { cle: 'videoUrl', etiquette: 'Lien YouTube' },
   { cle: 'partieCorps', etiquette: 'Zone' },
-  { cle: 'muscleCible', etiquette: 'Muscle ciblé' },
+  /* `muscleCible` N'EST PLUS ICI, ET C'EST UNE CORRECTION.
+     C'était un champ de texte libre. Or le filtre par vignette compare la
+     valeur EXACTEMENT à celle du catalogue — `pectorals`, pas « Pectoraux ».
+     Taper le mot en français, ou au pluriel, ou en abrégé, faisait tomber
+     l'exercice dans « Autre » sans le moindre message : on l'aurait cherché
+     dans les pectoraux pendant longtemps. Il se choisit désormais sur les
+     mêmes vignettes que le filtre — ce qu'on peut désigner est exactement ce
+     qu'on peut retrouver. */
   { cle: 'musclesSecondaires', etiquette: 'Aussi sollicités' },
   { cle: 'equipement', etiquette: 'Matériel' },
   { cle: 'formatPrescrit', etiquette: 'Format prescrit' },
@@ -60,10 +69,11 @@ const MODES = [
 
 const GROUPES = ['Push', 'Pull', 'Legs'] as const;
 
-type Filtre = 'a_completer' | 'sans_video' | 'sans_nom_fr' | 'perso' | 'tous';
+type Filtre = 'a_completer' | 'sans_muscle' | 'sans_video' | 'sans_nom_fr' | 'perso' | 'tous';
 
 const FILTRES: { cle: Filtre; libelle: string }[] = [
   { cle: 'a_completer', libelle: 'À compléter' },
+  { cle: 'sans_muscle', libelle: 'Sans muscle' },
   { cle: 'sans_video', libelle: 'Sans vidéo' },
   { cle: 'sans_nom_fr', libelle: 'À traduire' },
   { cle: 'perso', libelle: 'Les miens' },
@@ -89,6 +99,9 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
   const [mode, setMode] = useState<string | null>(null);
   const [groupes, setGroupes] = useState<string[] | null>(null);
+  /* `null` avant l'arrivée de la fiche, comme les autres. Ensuite, la clé de
+     vignette — ou `null` si le muscle actuel n'en a aucune. */
+  const [muscle, setMuscle] = useState<string | null>(null);
 
   const complet = detail.data;
 
@@ -108,6 +121,7 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
     ) as Brouillon);
     setMode(complet.modeDefaut);
     setGroupes(complet.groupes);
+    setMuscle(groupeDeLaValeur(complet.muscleCible));
   }, [complet]);
 
   const modifies = useMemo(() => {
@@ -124,7 +138,15 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
   const groupesChanges = complet !== undefined && groupes !== null
     && groupes.join(',') !== complet.groupes.join(',');
 
-  const nbModifs = modifies.length + (modeChange ? 1 : 0) + (groupesChanges ? 1 : 0);
+  /* ON COMPARE DES VIGNETTES, PAS DES VALEURS DE BASE. Un exercice sur
+     `upper back` relève de « Dos » ; le rattacher à « Dos » écrirait `lats`,
+     et une comparaison sur la valeur crierait au changement alors que rien ne
+     bouge pour l'utilisateur. */
+  const muscleChange = complet !== undefined
+    && muscle !== groupeDeLaValeur(complet.muscleCible);
+
+  const nbModifs = modifies.length + (modeChange ? 1 : 0)
+    + (groupesChanges ? 1 : 0) + (muscleChange ? 1 : 0);
 
   const basculer = (g: string) => {
     if (groupes === null) return;
@@ -148,6 +170,9 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
     }
     if (modeChange && mode !== null) corps.modeDefaut = mode as Exercice['modeDefaut'];
     if (groupesChanges && groupes !== null) corps.groupes = groupes;
+    /* `null` quand aucune vignette n'est retenue : l'exercice rejoint alors
+       « Autre », qui est exactement ce que veut dire un muscle non renseigné. */
+    if (muscleChange) corps.muscleCible = muscle === null ? null : valeurPourGroupe(muscle);
 
     maj.mutate({ id: exercice.id, ...corps }, { onSuccess: onFermer });
   };
@@ -239,6 +264,20 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
                 )}
               </View>
 
+              {/* LES MÊMES VIGNETTES QUE LE FILTRE, ET C'EST TOUT L'INTÉRÊT.
+                  Ce qu'on peut désigner ici est exactement ce qu'on pourra
+                  retrouver là-bas. Un champ de texte libre laissait les deux
+                  vocabulaires diverger sans que rien ne le signale. */}
+              <View style={{ gap: E.xs }}>
+                <Discret style={s.etiquetteChoix}>Muscle ciblé</Discret>
+                <ChoixMuscle choisi={muscle} onChoisir={setMuscle} />
+                {muscle === null && (
+                  <Discret style={{ fontSize: T.petit }}>
+                    Aucun muscle : cet exercice ne sortira que sous « Autre ».
+                  </Discret>
+                )}
+              </View>
+
               {!videoValide && (
                 <Discret style={{ color: C.erreur, fontSize: T.petit }}>
                   Ce lien n’est pas reconnu comme une vidéo YouTube.
@@ -284,11 +323,22 @@ export default function AdminExercices() {
 
     return (exercices.data ?? [])
       .filter((e) => {
-        /* `partieCorps` sert de témoin : c'est le seul des champs de la fiche
-           qui voyage encore avec la liste. Un exercice qui n'en a pas n'a rien
-           d'autre non plus — c'est vrai des 20 exercices personnels comme de
-           toute entrée incomplète du catalogue. */
-        if (filtre === 'a_completer') return !e.partieCorps;
+        /* « À COMPLÉTER » A CHANGÉ DE TÉMOIN, ET LA RAISON EST NEUVE.
+         *
+         * Il ne regardait que `partieCorps`, choisi parce que c'était alors le
+         * seul champ de la fiche à voyager avec la liste. Le muscle y est
+         * revenu depuis, et il pèse plus lourd : c'est LUI qui décide sous
+         * quelle vignette un exercice se retrouve quand on en cherche un.
+         *
+         * Un exercice avec une zone mais sans muscle passait donc pour
+         * complet, et restait introuvable au filtre — la pire des deux
+         * absences, celle qui se croit réglée. On regarde maintenant les deux. */
+        if (filtre === 'a_completer') return !e.partieCorps || !e.muscleCible;
+        /* SÉPARÉ DE « À compléter », parce que ce n'est pas le même travail.
+           Compléter une fiche, c'est saisir plusieurs champs ; rattacher un
+           muscle, c'est un appui sur une vignette. Les mélanger ferait remonter
+           un exercice presque parfait au milieu de coquilles vides. */
+        if (filtre === 'sans_muscle') return !e.muscleCible;
         if (filtre === 'sans_video') return !e.videoUrl;
         if (filtre === 'sans_nom_fr') return !e.nomFr;
         if (filtre === 'perso') return e.source === 'perso';
@@ -310,7 +360,11 @@ export default function AdminExercices() {
   const total = tous.length;
   const avecVideo = tous.filter((e) => Boolean(e.videoUrl)).length;
   const traduits = tous.filter((e) => Boolean(e.nomFr)).length;
-  const renseignes = tous.filter((e) => Boolean(e.partieCorps)).length;
+  /* LA JAUGE COMPTE LA MÊME CHOSE QUE LE FILTRE « À compléter ».
+     Elle ne regardait que la zone : elle annonçait donc « 1319/1338 renseignés »
+     pendant que le filtre, lui, en listait davantage. Deux chiffres pour une
+     seule question, dont un faux — et c'est celui qu'on lit en premier. */
+  const renseignes = tous.filter((e) => Boolean(e.partieCorps) && Boolean(e.muscleCible)).length;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.fond }}>
@@ -362,10 +416,17 @@ export default function AdminExercices() {
                 <Texte style={{ fontFamily: P.fort }} numberOfLines={1}>
                   {item.nomFr ?? item.nom}
                 </Texte>
+                {/* LE MUSCLE EST AFFICHÉ ICI, PAS SEULEMENT DANS LA FICHE.
+                    C'est lui qui décide sous quelle vignette l'exercice se
+                    retrouve quand on en cherche un. Un exercice qui n'en a pas
+                    ne sort que sous « Autre » — autant le voir dans la liste
+                    plutôt qu'en ouvrant les fiches une par une. */}
                 <Discret style={{ fontSize: T.petit }} numberOfLines={1}>
                   {item.source === 'perso' ? '★ ' : ''}
                   {item.nomFr !== null && item.nomFr !== undefined ? `${item.nom} · ` : ''}
-                  {item.partieCorps ?? 'à compléter'}
+                  {item.partieCorps ?? 'zone à compléter'}
+                  {' · '}
+                  {libelleDuMuscle(item.muscleCible) ?? 'muscle à compléter'}
                 </Discret>
               </Pressable>
 
