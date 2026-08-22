@@ -273,7 +273,49 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
   }
 
   const texte = await reponse.text();
-  const donnees: unknown = texte ? JSON.parse(texte) : null;
+
+  /* TOUTE RÉPONSE N'EST PAS DU JSON, ET LE SUPPOSER A FAIT PLANTER L'APP.
+   *
+   * Cette ligne était `JSON.parse(texte)`, nue. Le 21 août 2026, après
+   * l'installation d'un APK pendant que le NAS redéployait, l'application est
+   * revenue au premier plan, a interrogé l'API, et a reçu une page d'erreur
+   * HTML de Caddy. L'utilisateur a lu :
+   *
+   *     JSON Parse error: Unexpected character: <
+   *
+   * Le message ne dit rien de ce qu'il faut faire, et il remonte tel quel
+   * depuis les entrailles du moteur JavaScript. Or ce cas n'a rien
+   * d'exceptionnel : un conteneur qui redémarre, un proxy inverse qui répond à
+   * la place du serveur, un portail Wi-Fi captif qui intercepte la requête —
+   * tous rendent du HTML avec les meilleures intentions.
+   *
+   * ON NE DEVINE PAS, ON CONSTATE. Un corps illisible est un fait, pas une
+   * exception : il devient une réponse en erreur comme une autre, avec un
+   * message qui dit quoi faire. Le reste de l'application le traite déjà.
+   */
+  let donnees: unknown = null;
+  let illisible = false;
+  if (texte !== '') {
+    try {
+      donnees = JSON.parse(texte);
+    } catch {
+      illisible = true;
+    }
+  }
+
+  if (illisible) {
+    return {
+      statut: reponse.status,
+      ok: false,
+      donnees: null,
+      /* LE CAS LE PLUS FRÉQUENT EST TEMPORAIRE, on le dit en premier. Un
+         serveur qui redémarre répond en quelques secondes ; conseiller de
+         réessayer coûte un geste et règle la plupart des cas. Le code HTTP
+         suit, pour les fois où ça ne suffit pas. */
+      message: `Le serveur a répondu autre chose que des données (HTTP ${reponse.status}). `
+        + 'Il redémarre peut-être — réessaie dans quelques secondes.',
+    };
+  }
 
   if (reponse.ok) {
     return { statut: reponse.status, ok: true, donnees: donnees as T, message: '' };
