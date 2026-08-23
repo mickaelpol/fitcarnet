@@ -90,6 +90,28 @@ const FILTRES: { cle: Filtre; libelle: string }[] = [
   { cle: 'tous', libelle: 'Tous' },
 ];
 
+/**
+ * UN EXERCICE PERSO N'A RIEN À TRADUIRE.
+ *
+ * Le nom français vit dans `nomFr`, et le catalogue importé a son nom anglais
+ * dans `nom` : traduire, c'est remplir le second à partir du premier. Mais un
+ * exercice que tu as créé toi-même s'appelle déjà « Fente bulgare » — dans
+ * `nom`. Pour le faire passer au vert, il fallait retaper le même mot dans un
+ * second champ : deux endroits pour un seul nom, et le second se périmerait
+ * au premier renommage.
+ *
+ * ILS SONT DONC TRADUITS D'OFFICE, et surtout ils ne comptent NI dans les
+ * traduits NI dans le reste à traduire : la question ne se pose pas pour eux.
+ * Sans ça le compteur ne pourrait jamais atteindre son total, et un compteur
+ * qui n'arrive jamais au bout n'apprend plus rien.
+ *
+ * CETTE FONCTION EST LA SEULE DÉFINITION. La pastille, le filtre et le
+ * compteur s'en servent tous les trois : ils ne peuvent plus se contredire,
+ * ce qui est exactement ce qui vient d'arriver — un « FR » gris sur une fiche
+ * où le nom semblait renseigné.
+ */
+const aTraduire = (e: Exercice): boolean => e.source !== 'perso' && !e.nomFr;
+
 const sansAccent = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -437,7 +459,7 @@ export default function AdminExercices() {
            un exercice presque parfait au milieu de coquilles vides. */
         if (filtre === 'sans_muscle') return !e.muscleCible;
         if (filtre === 'sans_video') return !e.videoUrl;
-        if (filtre === 'sans_nom_fr') return !e.nomFr;
+        if (filtre === 'sans_nom_fr') return aTraduire(e);
         if (filtre === 'perso') return e.source === 'perso';
 
         return true;
@@ -456,7 +478,12 @@ export default function AdminExercices() {
   const tous = exercices.data ?? [];
   const total = tous.length;
   const avecVideo = tous.filter((e) => Boolean(e.videoUrl)).length;
-  const traduits = tous.filter((e) => Boolean(e.nomFr)).length;
+  /* On ne compte QUE les importés, numérateur comme dénominateur : « 2/1275 »
+     répond à la question qu'on se pose vraiment — « combien en reste-t-il ? »
+     — là où « 2 traduits » sur un total qui comprend tes propres exercices
+     n'était comparable à rien. */
+  const importes = tous.filter((e) => e.source !== 'perso');
+  const traduits = importes.filter((e) => Boolean(e.nomFr)).length;
   /* LA JAUGE COMPTE LA MÊME CHOSE QUE LE FILTRE « À compléter ».
      Elle ne regardait que la zone : elle annonçait donc « 1319/1338 renseignés »
      pendant que le filtre, lui, en listait davantage. Deux chiffres pour une
@@ -467,7 +494,9 @@ export default function AdminExercices() {
     <View style={{ flex: 1, backgroundColor: C.fond }}>
       <View style={s.tete}>
         <Discret style={{ fontSize: T.normal }}>
-          {renseignes}/{total} renseignés · {traduits} traduits · {avecVideo} vidéos
+          {renseignes}/{total} renseignés{' · '}
+          {traduits}/{importes.length} traduits{' · '}
+          {avecVideo} vidéos
         </Discret>
         <View style={s.jauge}>
           <View style={[s.jaugeRemplie, { width: `${Math.round((renseignes / total) * 100)}%` }]} />
@@ -530,7 +559,9 @@ export default function AdminExercices() {
               {/* Deux pastilles, pas une colonne de cases : ce qui manque se
                   voit d'un coup d'œil sans lire. */}
               <View style={s.pastilles}>
-                <Discret style={{ fontSize: T.petit, color: item.nomFr ? C.ok : C.discret }}>
+                <Discret style={{
+                  fontSize: T.petit, color: aTraduire(item) ? C.discret : C.ok,
+                }}>
                   FR
                 </Discret>
                 <Discret style={{ fontSize: T.petit, color: item.videoUrl ? C.ok : C.discret }}>
