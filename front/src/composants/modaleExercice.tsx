@@ -5,7 +5,7 @@ import { useExerciceDetail } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
 import { Bouton, Discret, Texte } from './base';
 import { libelleDuMuscle } from '@/muscles/groupes';
-import { enFrancais, libelle, SECONDAIRES, ZONES } from '@/muscles/vocabulaire';
+import { enFrancais, libelle, MATERIELS, SECONDAIRES, ZONES } from '@/muscles/vocabulaire';
 import { C, E, P, R, T } from '@/theme';
 
 /** Extrait l'identifiant d'une URL YouTube, quelle qu'en soit la forme. */
@@ -223,7 +223,7 @@ export function ModaleExercice({
                 />
               )}
               {complet.equipement !== null && complet.equipement !== undefined && (
-                <Ligne cle="Matériel" valeur={complet.equipement} />
+                <Ligne cle="Matériel" valeur={libelle(MATERIELS, complet.equipement)} />
               )}
               {complet.formatPrescrit !== null && (
                 <Ligne cle="Format prescrit" valeur={complet.formatPrescrit} />

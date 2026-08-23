@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  assembler, casesPour, decouper, enFrancais, libelle, normaliser, SECONDAIRES, ZONES,
+  assembler, casesPour, decouper, enFrancais, libelle, MATERIELS, normaliser,
+  SECONDAIRES, ZONES,
 } from './vocabulaire';
 
 /**
@@ -53,6 +54,8 @@ describe('vocabulaire', () => {
 
   it('traduit pour l’écran, et laisse voir ce qu’il ne traduit pas', () => {
     assert.equal(libelle(ZONES, 'upper legs'), 'Cuisses');
+    assert.equal(libelle(MATERIELS, 'body weight'), 'Poids du corps');
+    assert.equal(libelle(MATERIELS, 'ez barbell'), 'Barre EZ');
     assert.equal(libelle(SECONDAIRES, 'hip flexors'), 'Fléchisseurs de hanche');
     assert.equal(libelle(ZONES, 'zone inventée'), 'zone inventée');
     assert.equal(enFrancais(SECONDAIRES, 'shoulders, triceps'), 'Épaules · Triceps');
@@ -63,7 +66,7 @@ describe('vocabulaire', () => {
     /* Une écriture rangée sous deux termes rendrait `termeDe` dépendante de
        l'ordre du tableau : le même exercice cocherait une case différente
        selon qu'on a réordonné la liste ou non. */
-    for (const table of [ZONES, SECONDAIRES]) {
+    for (const table of [ZONES, SECONDAIRES, MATERIELS]) {
       const mots = table.flatMap((t) => [t.cle, ...(t.aussi ?? [])]);
       assert.equal(new Set(mots).size, mots.length);
     }

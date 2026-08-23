@@ -55,6 +55,60 @@ export const ZONES: readonly Terme[] = [
 ];
 
 /**
+ * LE MATÉRIEL — `equipement`.
+ *
+ * CES VINGT-HUIT VALEURS SONT MESURÉES, PAS DEVINÉES. Comptées en base le
+ * 23 août 2026 : 1318 exercices importés, 1318 avec un matériel renseigné,
+ * zéro vide, et la somme des vingt-huit lignes fait exactement 1318 — donc
+ * aucune n'en porte deux. Une case à cocher unique, comme la zone.
+ *
+ * IL N'Y AVAIT RIEN À IMPORTER. J'allais écrire un script pour aller
+ * rechercher ce champ chez la source ; il est déjà là, complet. Le seul
+ * problème était qu'il s'affichait en anglais. Deux jours de travail évités
+ * par une requête de dix secondes.
+ *
+ * L'ORDRE EST CELUI DE LA FRÉQUENCE mesurée : `body weight` (324),
+ * `dumbbell` (294), `cable` (157), `barbell` (153) couvrent déjà les
+ * trois quarts du catalogue.
+ *
+ * DEUX LIBELLÉS DONT JE NE SUIS PAS SÛR, et je préfère le dire que de les
+ * faire passer pour acquis : `sled machine` (15 exercices) désigne chez la
+ * source les presses et hack squats, pas le traîneau qu'on pousse ; et
+ * `hammer` (1 seul exercice) peut aussi bien vouloir dire « masse » que
+ * « machine Hammer Strength ». Corrige la ligne si tu sais.
+ */
+export const MATERIELS: readonly Terme[] = [
+  { cle: 'body weight', label: 'Poids du corps' },
+  { cle: 'dumbbell', label: 'Haltères' },
+  { cle: 'cable', label: 'Poulie' },
+  { cle: 'barbell', label: 'Barre' },
+  { cle: 'leverage machine', label: 'Machine à levier' },
+  { cle: 'band', label: 'Élastique' },
+  { cle: 'smith machine', label: 'Smith machine' },
+  { cle: 'kettlebell', label: 'Kettlebell' },
+  { cle: 'weighted', label: 'Lesté' },
+  { cle: 'stability ball', label: 'Swiss ball' },
+  { cle: 'ez barbell', label: 'Barre EZ' },
+  { cle: 'assisted', label: 'Assisté' },
+  { cle: 'sled machine', label: 'Presse (traîneau)' },
+  { cle: 'medicine ball', label: 'Médecine-ball' },
+  { cle: 'rope', label: 'Corde' },
+  { cle: 'roller', label: 'Rouleau' },
+  { cle: 'resistance band', label: 'Bande de résistance' },
+  { cle: 'bosu ball', label: 'Bosu' },
+  { cle: 'olympic barbell', label: 'Barre olympique' },
+  { cle: 'wheel roller', label: 'Roue abdominale' },
+  { cle: 'tire', label: 'Pneu' },
+  { cle: 'stepmill machine', label: 'Machine à escalier' },
+  { cle: 'trap bar', label: 'Barre hexagonale' },
+  { cle: 'skierg machine', label: 'SkiErg' },
+  { cle: 'stationary bike', label: "Vélo d'appartement" },
+  { cle: 'elliptical machine', label: 'Vélo elliptique' },
+  { cle: 'upper body ergometer', label: 'Ergomètre bras' },
+  { cle: 'hammer', label: 'Marteau' },
+];
+
+/**
  * LES MUSCLES SECONDAIRES — `muscles_secondaires`.
  *
  * CELLE-CI EST BIEN MULTIPLE : 985 exercices sur 1338 en portent plusieurs,

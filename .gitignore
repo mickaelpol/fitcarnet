@@ -97,3 +97,16 @@ sauvegardes/
 #  On l'ignore plutot que de compter sur quelqu'un pour penser a l'effacer.
 # ---------------------------------------------------------------------
 /pictogrammes-muscles.zip
+
+# ---------------------------------------------------------------------
+#  LES EXTRACTIONS DE TRAVAIL
+#
+#  `noms-exercices.txt` est un vidage des noms du catalogue, produit pour
+#  preparer les traductions francaises. Il n'est la que le temps du travail,
+#  et il est reproductible en une commande — le commiter figerait une copie
+#  qui se perimerait au premier exercice ajoute.
+#
+#  Meme raison que le zip ci-dessus : `publier.sh` fait `git add -A`, donc ce
+#  qui traine a la racine part dans le commit sans que personne ne le decide.
+# ---------------------------------------------------------------------
+/noms-exercices.txt

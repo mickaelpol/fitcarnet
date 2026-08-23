@@ -9,7 +9,7 @@ import {
   prevenirFinInventaire, preparerLesNotifications,
 } from '@/composants/notifications';
 import type {
-  Aliment, Cible, Complement, Emplacement, Exercice, LigneStock, Modele,
+  Aliment, Cible, Complement, Emplacement, Exercice, Modele,
   MonFrigo, Seance, Serie, Utilisateur,
 } from './types';
 
@@ -190,10 +190,22 @@ export function useFusionExercices() {
       api<{ message: string; seancesModifiees: number; modelesModifies: number }>(
         '/exercices/fusion', { methode: 'POST', corps: ids },
       ),
-    onSuccess: () => {
+    onSuccess: (_reponse, ids) => {
       qc.invalidateQueries({ queryKey: ['exercices'] });
       qc.invalidateQueries({ queryKey: ['seances'] });
       qc.invalidateQueries({ queryKey: ['modeles'] });
+      /* LA FICHE D'UNE SÉANCE, PAS SEULEMENT LA LISTE. Une fusion réécrit
+         l'exercice pointé par chaque bloc : la fiche ouverte ensuite
+         montrerait l'ancien pendant trente minutes. `['seance']` attrape
+         toutes les fiches d'un coup — la clé complète est `['seance', id]`,
+         et React Query compare par préfixe. */
+      qc.invalidateQueries({ queryKey: ['seance'] });
+      /* L'ANCIEN EXERCICE N'EXISTE PLUS : on RETIRE sa fiche au lieu de
+         l'invalider. Invalider veut dire « redemande-la » — or elle rendrait
+         404. Le nouveau, lui, a pu absorber une vidéo ou un nom français : on
+         le redemande vraiment. */
+      qc.removeQueries({ queryKey: ['exercice', ids.ancienId] });
+      qc.invalidateQueries({ queryKey: ['exercice', ids.nouveauId] });
     },
   });
 }
@@ -499,11 +511,11 @@ export function useSuiviInventaire(actif = true) {
   return suivi;
 }
 
-export const useStock = () =>
-  useQuery({
-    queryKey: ['stock'],
-    queryFn: async () => membres(await api<{ member: LigneStock[] }>('/stocks?itemsPerPage=500')),
-  });
+/* `useStock` A ÉTÉ SUPPRIMÉ. Il lisait `/stocks`, n'était appelé par aucun
+   écran, et surtout aucune mutation n'invalidait sa clé `['stock']` : le
+   premier écran qui s'en serait servi aurait affiché un stock figé sans que
+   rien ne le signale. Le frigo passe par `useMonFrigo`, que toutes les
+   écritures invalident. */
 
 /**
  * Les façons de cuire, partagées par TOUS les comptes.
@@ -1004,7 +1016,15 @@ export function useSupprimerSeance() {
 
   return useMutation({
     mutationFn: (id: number) => api<void>(`/seances/${id}`, { methode: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['seances'] }),
+    onSuccess: (_reponse, id) => {
+      qc.invalidateQueries({ queryKey: ['seances'] });
+      /* ON RETIRE, ON N'INVALIDE PAS. La fiche de cette séance restait en
+         cache vingt-quatre heures. Y revenir — un lien, un retour arrière —
+         affichait une séance supprimée, complète et crédible. L'invalider
+         serait pire encore : elle serait redemandée, et le 404 s'afficherait
+         comme une panne alors que c'est le résultat attendu. */
+      qc.removeQueries({ queryKey: ['seance', id] });
+    },
   });
 }
 

@@ -7,10 +7,11 @@ import type { Exercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixMuscle } from '@/composants/choixMuscle';
 import { ChoixPuces } from '@/composants/choixPuces';
+import { Confirmer } from '@/composants/confirmer';
 import { identifiantYoutube, ModaleExercice } from '@/composants/modaleExercice';
 import { groupeDeLaValeur, libelleDuMuscle, valeurPourGroupe } from '@/muscles/groupes';
 import {
-  assembler, casesPour, libelle, normaliser, SECONDAIRES, ZONES,
+  assembler, casesPour, libelle, MATERIELS, normaliser, SECONDAIRES, ZONES,
 } from '@/muscles/vocabulaire';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
@@ -46,7 +47,9 @@ const CHAMPS = [
      en porte la trace : `traps` ET `trapezius`, `deltoids` ET « épaules »,
      `lats` ET `latissimus dorsi` — quarante-deux mots pour une vingtaine de
      muscles. Ils se choisissent maintenant dans une liste, en français, plus
-     bas dans l'éditeur. */
+     bas dans l'éditeur. Le matériel les a rejoints : il est renseigné sur
+     les 1318 exercices importés, en anglais, avec vingt-huit valeurs
+     exactes — rien à saisir, tout à traduire. */
   /* `muscleCible` N'EST PLUS ICI, ET C'EST UNE CORRECTION.
      C'était un champ de texte libre. Or le filtre par vignette compare la
      valeur EXACTEMENT à celle du catalogue — `pectorals`, pas « Pectoraux ».
@@ -55,7 +58,6 @@ const CHAMPS = [
      dans les pectoraux pendant longtemps. Il se choisit désormais sur les
      mêmes vignettes que le filtre — ce qu'on peut désigner est exactement ce
      qu'on peut retrouver. */
-  { cle: 'equipement', etiquette: 'Matériel' },
   { cle: 'formatPrescrit', etiquette: 'Format prescrit' },
   { cle: 'instructions', etiquette: 'Exécution', long: true },
 ] as const;
@@ -150,6 +152,9 @@ function Editeur({
      moins. */
   const [zone, setZone] = useState<string[] | null>(null);
   const [secondaires, setSecondaires] = useState<string[] | null>(null);
+  const [materiel, setMateriel] = useState<string[] | null>(null);
+  /* La demande d'abandon, quand on ferme sur une saisie non enregistrée. */
+  const [abandon, setAbandon] = useState(false);
 
   const complet = detail.data;
 
@@ -163,6 +168,7 @@ function Editeur({
       setGroupes(null);
       setZone(null);
       setSecondaires(null);
+      setMateriel(null);
 
       return;
     }
@@ -179,6 +185,7 @@ function Editeur({
        d'ouvrir, et la réécrirait au premier enregistrement venu. */
     setZone(normaliser(ZONES, complet.partieCorps));
     setSecondaires(normaliser(SECONDAIRES, complet.musclesSecondaires));
+    setMateriel(normaliser(MATERIELS, complet.equipement));
   }, [complet]);
 
   const modifies = useMemo(() => {
@@ -212,14 +219,38 @@ function Editeur({
   const secondairesChanges = complet !== undefined && secondaires !== null
     && assembler(secondaires) !== assembler(normaliser(SECONDAIRES, complet.musclesSecondaires));
 
+  const materielChange = complet !== undefined && materiel !== null
+    && assembler(materiel) !== assembler(normaliser(MATERIELS, complet.equipement));
+
   const nbModifs = modifies.length + (modeChange ? 1 : 0)
     + (groupesChanges ? 1 : 0) + (muscleChange ? 1 : 0)
-    + (zoneChange ? 1 : 0) + (secondairesChanges ? 1 : 0);
+    + (zoneChange ? 1 : 0) + (secondairesChanges ? 1 : 0) + (materielChange ? 1 : 0);
 
   const basculer = (g: string) => {
     if (groupes === null) return;
     const suite = groupes.includes(g) ? groupes.filter((x) => x !== g) : [...groupes, g];
     setGroupes(GROUPES.filter((t) => suite.includes(t)));
+  };
+
+  /**
+   * FERMER EN TAPANT À CÔTÉ — MAIS PAS EN EMPORTANT UNE SAISIE.
+   *
+   * Toutes les autres modales de l'application se ferment déjà au tap sur le
+   * fond ; celle-ci était la seule à obliger à viser « Fermer ». Elle est
+   * aussi la seule à porter un brouillon de huit champs, et un tap à côté est
+   * un geste qu'on fait SANS Y PENSER — c'est même tout son intérêt.
+   *
+   * D'où la nuance : rien de modifié, on ferme sans rien demander ; une
+   * modification en cours, on demande. Fermer en silence sur six corrections
+   * saisies serait exactement le genre de perte qu'on ne comprend qu'après.
+   *
+   * Le bouton « Fermer » reste, et il passe par le même chemin : deux façons
+   * de fermer qui se comporteraient différemment, c'est une règle de plus à
+   * retenir pour rien.
+   */
+  const tenterFermer = () => {
+    if (nbModifs > 0) { setAbandon(true); return; }
+    onFermer();
   };
 
   const video = (brouillon?.videoUrl ?? '').trim();
@@ -245,6 +276,7 @@ function Editeur({
        dire « rien » finissent toujours par ne plus se ressembler — un filtre
        qui teste l'une laisserait passer l'autre. */
     if (zoneChange && zone !== null) corps.partieCorps = zone[0] ?? null;
+    if (materielChange && materiel !== null) corps.equipement = materiel[0] ?? null;
     if (secondairesChanges && secondaires !== null) {
       corps.musclesSecondaires = secondaires.length === 0 ? null : assembler(secondaires);
     }
@@ -253,161 +285,191 @@ function Editeur({
   };
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onFermer}>
+    <Modal visible animationType="slide" transparent onRequestClose={tenterFermer}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={s.fond}
+        style={{ flex: 1 }}
       >
-        <View style={s.feuille}>
-          <Texte style={s.titreEditeur} numberOfLines={2}>{exercice.nom}</Texte>
-          <Discret style={{ fontSize: T.petit }}>
-            {exercice.source === 'perso' ? '★ exercice personnel' : 'catalogue importé'}
-          </Discret>
+        {/* le fond ferme au tap ; la feuille l'absorbe pour ne pas se fermer
+            quand on tape à l'intérieur */}
+        <Pressable style={s.fond} onPress={tenterFermer}>
+          <Pressable style={s.feuille} onPress={(e) => e.stopPropagation()}>
+            <Texte style={s.titreEditeur} numberOfLines={2}>{exercice.nom}</Texte>
+            <Discret style={{ fontSize: T.petit }}>
+              {exercice.source === 'perso' ? '★ exercice personnel' : 'catalogue importé'}
+            </Discret>
 
-          {detail.isLoading || brouillon === null ? (
-            <View style={{ paddingVertical: E.xl }}><Chargement /></View>
-          ) : detail.isError ? (
-            <Erreur
-              message={detail.error.message}
-              onReessayer={() => void detail.refetch()}
-            />
-          ) : (
-            <ScrollView
-              style={{ marginTop: E.m }}
-              contentContainerStyle={{ gap: E.s, paddingBottom: E.m }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {CHAMPS.map((c) => (
-                <Champ
-                  key={c.cle}
-                  etiquette={c.etiquette}
-                  valeur={brouillon[c.cle]}
-                  onChange={(v) => setBrouillon({ ...brouillon, [c.cle]: v })}
-                  placeholder={c.cle === 'nomFr' ? exercice.nom : undefined}
-                  multiligne={'long' in c ? c.long : undefined}
-                />
-              ))}
+            {detail.isLoading || brouillon === null ? (
+              <View style={{ paddingVertical: E.xl }}><Chargement /></View>
+            ) : detail.isError ? (
+              <Erreur
+                message={detail.error.message}
+                onReessayer={() => void detail.refetch()}
+              />
+            ) : (
+              <ScrollView
+                style={{ marginTop: E.m }}
+                contentContainerStyle={{ gap: E.s, paddingBottom: E.m }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {CHAMPS.map((c) => (
+                  <Champ
+                    key={c.cle}
+                    etiquette={c.etiquette}
+                    valeur={brouillon[c.cle]}
+                    onChange={(v) => setBrouillon({ ...brouillon, [c.cle]: v })}
+                    placeholder={c.cle === 'nomFr' ? exercice.nom : undefined}
+                    multiligne={'long' in c ? c.long : undefined}
+                  />
+                ))}
 
-              {/* CES DEUX-LA NE CHANGENT PAS L'AFFICHAGE, ILS CHANGENT CE QUE
-                  L'APPLICATION FAIT. D'où la séparation visuelle. */}
-              <View style={{ gap: E.xs, marginTop: E.s }}>
-                <Discret style={s.etiquetteChoix}>Ce qu’on saisit pendant la séance</Discret>
-                <View style={s.puces}>
-                  {MODES.map((m) => (
-                    <Pressable
-                      key={m.cle}
-                      onPress={() => setMode(m.cle)}
-                      style={[s.puce, mode === m.cle && s.puceActive]}
-                      accessibilityLabel={`Mode ${m.libelle}`}
-                    >
-                      <Discret style={mode === m.cle
-                        ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
-                        : { fontSize: T.petit }}
+                {/* CES DEUX-LA NE CHANGENT PAS L'AFFICHAGE, ILS CHANGENT CE QUE
+                    L'APPLICATION FAIT. D'où la séparation visuelle. */}
+                <View style={{ gap: E.xs, marginTop: E.s }}>
+                  <Discret style={s.etiquetteChoix}>Ce qu’on saisit pendant la séance</Discret>
+                  <View style={s.puces}>
+                    {MODES.map((m) => (
+                      <Pressable
+                        key={m.cle}
+                        onPress={() => setMode(m.cle)}
+                        style={[s.puce, mode === m.cle && s.puceActive]}
+                        accessibilityLabel={`Mode ${m.libelle}`}
                       >
-                        {m.libelle}
-                      </Discret>
-                    </Pressable>
-                  ))}
+                        <Discret style={mode === m.cle
+                          ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
+                          : { fontSize: T.petit }}
+                        >
+                          {m.libelle}
+                        </Discret>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
-              </View>
 
-              <View style={{ gap: E.xs }}>
-                <Discret style={s.etiquetteChoix}>Séances où le proposer</Discret>
-                <View style={s.puces}>
-                  {GROUPES.map((g) => (
-                    <Pressable
-                      key={g}
-                      onPress={() => basculer(g)}
-                      style={[s.puce, groupes?.includes(g) === true && s.puceActive]}
-                      accessibilityLabel={`Groupe ${g}`}
-                    >
-                      <Discret style={groupes?.includes(g) === true
-                        ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
-                        : { fontSize: T.petit }}
+                <View style={{ gap: E.xs }}>
+                  <Discret style={s.etiquetteChoix}>Séances où le proposer</Discret>
+                  <View style={s.puces}>
+                    {GROUPES.map((g) => (
+                      <Pressable
+                        key={g}
+                        onPress={() => basculer(g)}
+                        style={[s.puce, groupes?.includes(g) === true && s.puceActive]}
+                        accessibilityLabel={`Groupe ${g}`}
                       >
-                        {g}
-                      </Discret>
-                    </Pressable>
-                  ))}
+                        <Discret style={groupes?.includes(g) === true
+                          ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
+                          : { fontSize: T.petit }}
+                        >
+                          {g}
+                        </Discret>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {/* Ce n'est pas une erreur, c'est un choix — et il n'est pas
+                      devinable depuis l'écran, donc on l'écrit. */}
+                  {groupes !== null && groupes.length === 0 && (
+                    <Discret style={{ fontSize: T.petit }}>
+                      Aucun groupe : cet exercice est proposé dans toutes les séances.
+                    </Discret>
+                  )}
                 </View>
-                {/* Ce n'est pas une erreur, c'est un choix — et il n'est pas
-                    devinable depuis l'écran, donc on l'écrit. */}
-                {groupes !== null && groupes.length === 0 && (
-                  <Discret style={{ fontSize: T.petit }}>
-                    Aucun groupe : cet exercice est proposé dans toutes les séances.
-                  </Discret>
-                )}
-              </View>
 
-              {/* UN SEUL CHOIX, PARCE QUE LA DONNÉE N'EN A JAMAIS EU DEUX.
-                  Aucun des 1338 exercices ne porte de virgule dans sa zone.
-                  Proposer d'en cocher plusieurs inventerait une possibilité
-                  que rien, ensuite, ne sait lire : la fiche l'afficherait, et
-                  aucun autre écran n'en tiendrait compte. */}
+                {/* UN SEUL CHOIX, PARCE QUE LA DONNÉE N'EN A JAMAIS EU DEUX.
+                    Aucun des 1338 exercices ne porte de virgule dans sa zone.
+                    Proposer d'en cocher plusieurs inventerait une possibilité
+                    que rien, ensuite, ne sait lire : la fiche l'afficherait, et
+                    aucun autre écran n'en tiendrait compte. */}
+                <View style={{ gap: E.xs }}>
+                  <Discret style={s.etiquetteChoix}>Zone</Discret>
+                  <ChoixPuces
+                    options={casesPour(zones, zone ?? [])}
+                    choisis={zone ?? []}
+                    onChanger={setZone}
+                    etiquettePour={(l) => `Zone ${l}`}
+                  />
+                </View>
+
+                {/* LES MÊMES VIGNETTES QUE LE FILTRE, ET C'EST TOUT L'INTÉRÊT.
+                    Ce qu'on peut désigner ici est exactement ce qu'on pourra
+                    retrouver là-bas. Un champ de texte libre laissait les deux
+                    vocabulaires diverger sans que rien ne le signale. */}
+                <View style={{ gap: E.xs }}>
+                  <Discret style={s.etiquetteChoix}>Muscle ciblé</Discret>
+                  <ChoixMuscle choisi={muscle} onChoisir={setMuscle} />
+                  {muscle === null && (
+                    <Discret style={{ fontSize: T.petit }}>
+                      Aucun muscle : cet exercice ne sortira que sous « Autre ».
+                    </Discret>
+                  )}
+                </View>
+
+                {/* UN SEUL MATÉRIEL, ET C'EST MESURÉ : la somme des vingt-huit
+                  valeurs distinctes fait exactement 1318, le nombre
+                  d'exercices importés. Aucun n'en porte donc deux. */}
               <View style={{ gap: E.xs }}>
-                <Discret style={s.etiquetteChoix}>Zone</Discret>
+                <Discret style={s.etiquetteChoix}>Matériel</Discret>
                 <ChoixPuces
-                  options={casesPour(zones, zone ?? [])}
-                  choisis={zone ?? []}
-                  onChanger={setZone}
-                  etiquettePour={(l) => `Zone ${l}`}
+                  options={casesPour(MATERIELS, materiel ?? [])}
+                  choisis={materiel ?? []}
+                  onChanger={setMateriel}
+                  etiquettePour={(l) => `Matériel ${l}`}
                 />
-              </View>
-
-              {/* LES MÊMES VIGNETTES QUE LE FILTRE, ET C'EST TOUT L'INTÉRÊT.
-                  Ce qu'on peut désigner ici est exactement ce qu'on pourra
-                  retrouver là-bas. Un champ de texte libre laissait les deux
-                  vocabulaires diverger sans que rien ne le signale. */}
-              <View style={{ gap: E.xs }}>
-                <Discret style={s.etiquetteChoix}>Muscle ciblé</Discret>
-                <ChoixMuscle choisi={muscle} onChoisir={setMuscle} />
-                {muscle === null && (
-                  <Discret style={{ fontSize: T.petit }}>
-                    Aucun muscle : cet exercice ne sortira que sous « Autre ».
-                  </Discret>
-                )}
               </View>
 
               {/* CELUI-CI EST BIEN MULTIPLE : 985 exercices sur 1338 portent
-                  plusieurs muscles secondaires. Il ne sert à aucun filtre —
-                  chercher « triceps » sur le secondaire remonterait tous les
-                  développés couchés, où ils ne sont que sollicités. Il se lit
-                  sur la fiche, pour savoir ce qu'on aura courbaturé. */}
-              <View style={{ gap: E.xs }}>
-                <Discret style={s.etiquetteChoix}>Aussi sollicités</Discret>
-                <ChoixPuces
-                  multiple
-                  options={casesPour(SECONDAIRES, secondaires ?? [])}
-                  choisis={secondaires ?? []}
-                  onChanger={setSecondaires}
-                  etiquettePour={(l) => `Aussi sollicité : ${l}`}
-                />
-              </View>
+                    plusieurs muscles secondaires. Il ne sert à aucun filtre —
+                    chercher « triceps » sur le secondaire remonterait tous les
+                    développés couchés, où ils ne sont que sollicités. Il se lit
+                    sur la fiche, pour savoir ce qu'on aura courbaturé. */}
+                <View style={{ gap: E.xs }}>
+                  <Discret style={s.etiquetteChoix}>Aussi sollicités</Discret>
+                  <ChoixPuces
+                    multiple
+                    options={casesPour(SECONDAIRES, secondaires ?? [])}
+                    choisis={secondaires ?? []}
+                    onChanger={setSecondaires}
+                    etiquettePour={(l) => `Aussi sollicité : ${l}`}
+                  />
+                </View>
 
-              {!videoValide && (
-                <Discret style={{ color: C.erreur, fontSize: T.petit }}>
-                  Ce lien n’est pas reconnu comme une vidéo YouTube.
-                </Discret>
-              )}
-              {maj.isError && (
-                <Discret style={{ color: C.erreur, fontSize: T.petit }}>
-                  {maj.error.message}
-                </Discret>
-              )}
-            </ScrollView>
-          )}
+                {!videoValide && (
+                  <Discret style={{ color: C.erreur, fontSize: T.petit }}>
+                    Ce lien n’est pas reconnu comme une vidéo YouTube.
+                  </Discret>
+                )}
+                {maj.isError && (
+                  <Discret style={{ color: C.erreur, fontSize: T.petit }}>
+                    {maj.error.message}
+                  </Discret>
+                )}
+              </ScrollView>
+            )}
 
-          <View style={{ flexDirection: 'row', gap: E.s, marginTop: E.s }}>
-            <Bouton
-              onPress={enregistrer}
-              desactive={nbModifs === 0 || !videoValide || maj.isPending}
-              style={{ flex: 1 }}
-            >
-              {nbModifs === 0 ? 'Aucune modification' : `Enregistrer (${nbModifs})`}
-            </Bouton>
-            <Bouton variante="contour" onPress={onFermer}>Fermer</Bouton>
-          </View>
-        </View>
+            <View style={{ flexDirection: 'row', gap: E.s, marginTop: E.s }}>
+              <Bouton
+                onPress={enregistrer}
+                desactive={nbModifs === 0 || !videoValide || maj.isPending}
+                style={{ flex: 1 }}
+              >
+                {nbModifs === 0 ? 'Aucune modification' : `Enregistrer (${nbModifs})`}
+              </Bouton>
+              <Bouton variante="contour" onPress={tenterFermer}>Fermer</Bouton>
+            </View>
+
+            {/* IMBRIQUÉE DANS LA MODALE, pas posée à côté. Deux modales sœurs
+                s'empilent dans un ordre que la plateforme décide seule ; ici
+                la question ne se pose pas. */}
+            <Confirmer
+              visible={abandon}
+              titre="Abandonner les modifications ?"
+              message={`${nbModifs} modification${nbModifs > 1 ? 's' : ''} non `
+                + `enregistrée${nbModifs > 1 ? 's' : ''} sur cet exercice.`}
+              libelle="Abandonner"
+              onConfirmer={() => { setAbandon(false); onFermer(); }}
+              onAnnuler={() => setAbandon(false)}
+            />
+          </Pressable>
+        </Pressable>
       </KeyboardAvoidingView>
     </Modal>
   );
