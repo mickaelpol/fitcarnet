@@ -40,6 +40,8 @@
     "src/api/adresse.ts",
     "src/api/adresse.test.ts",
     "src/theme/index.ts",
-    "src/theme/charte.test.ts"
+    "src/theme/charte.test.ts",
+    "src/muscles/vocabulaire.ts",
+    "src/muscles/vocabulaire.test.ts"
   ]
 }

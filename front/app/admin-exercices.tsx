@@ -6,8 +6,12 @@ import { useExerciceDetail, useExercices, useMajExercice, useMoi } from '@/api/h
 import type { Exercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixMuscle } from '@/composants/choixMuscle';
+import { ChoixPuces } from '@/composants/choixPuces';
 import { identifiantYoutube, ModaleExercice } from '@/composants/modaleExercice';
 import { groupeDeLaValeur, libelleDuMuscle, valeurPourGroupe } from '@/muscles/groupes';
+import {
+  assembler, casesPour, libelle, normaliser, SECONDAIRES, ZONES,
+} from '@/muscles/vocabulaire';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 /**
@@ -35,7 +39,14 @@ import { C, E, P, R, T, TOUCHE } from '@/theme';
 const CHAMPS = [
   { cle: 'nomFr', etiquette: 'Nom français' },
   { cle: 'videoUrl', etiquette: 'Lien YouTube' },
-  { cle: 'partieCorps', etiquette: 'Zone' },
+  /* `partieCorps` ET `musclesSecondaires` N'Y SONT PLUS NON PLUS, POUR LA
+     MÊME RAISON QUE `muscleCible` ci-dessous : c'étaient des champs de texte
+     libre sur un vocabulaire qu'il fallait connaître par cœur — `upper legs`,
+     `hip flexors` — et que personne ne peut retaper deux fois pareil. La base
+     en porte la trace : `traps` ET `trapezius`, `deltoids` ET « épaules »,
+     `lats` ET `latissimus dorsi` — quarante-deux mots pour une vingtaine de
+     muscles. Ils se choisissent maintenant dans une liste, en français, plus
+     bas dans l'éditeur. */
   /* `muscleCible` N'EST PLUS ICI, ET C'EST UNE CORRECTION.
      C'était un champ de texte libre. Or le filtre par vignette compare la
      valeur EXACTEMENT à celle du catalogue — `pectorals`, pas « Pectoraux ».
@@ -44,7 +55,6 @@ const CHAMPS = [
      dans les pectoraux pendant longtemps. Il se choisit désormais sur les
      mêmes vignettes que le filtre — ce qu'on peut désigner est exactement ce
      qu'on peut retrouver. */
-  { cle: 'musclesSecondaires', etiquette: 'Aussi sollicités' },
   { cle: 'equipement', etiquette: 'Matériel' },
   { cle: 'formatPrescrit', etiquette: 'Format prescrit' },
   { cle: 'instructions', etiquette: 'Exécution', long: true },
@@ -93,7 +103,17 @@ const sansAccent = (s: string) =>
  * muscles, ni le matériel. Les éditer à partir de la liste écrirait donc du
  * vide par-dessus des données existantes — silencieusement.
  */
-function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => void }) {
+function Editeur({
+  exercice, zones, onFermer,
+}: {
+  exercice: Exercice;
+  /* LES ZONES PROPOSÉES VIENNENT DU CATALOGUE, PAS D'UNE LISTE ÉCRITE ICI.
+     L'écran a déjà les 1338 exercices en mémoire ; il en tire les zones qui
+     existent VRAIMENT. Une liste en dur proposerait un jour une zone que plus
+     personne n'utilise, et tairait celle que quelqu'un vient d'ajouter. */
+  zones: readonly { cle: string; label: string }[];
+  onFermer: () => void;
+}) {
   const detail = useExerciceDetail(exercice.id);
   const maj = useMajExercice();
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
@@ -102,6 +122,12 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
   /* `null` avant l'arrivée de la fiche, comme les autres. Ensuite, la clé de
      vignette — ou `null` si le muscle actuel n'en a aucune. */
   const [muscle, setMuscle] = useState<string | null>(null);
+  /* La zone telle qu'elle est écrite en base — `upper legs`, pas « Cuisses ».
+     Un tableau d'un élément au plus : `ChoixPuces` parle la même langue en
+     simple et en multiple, et un cas particulier de moins est un bug de
+     moins. */
+  const [zone, setZone] = useState<string[] | null>(null);
+  const [secondaires, setSecondaires] = useState<string[] | null>(null);
 
   const complet = detail.data;
 
@@ -113,6 +139,8 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
       setBrouillon(null);
       setMode(null);
       setGroupes(null);
+      setZone(null);
+      setSecondaires(null);
 
       return;
     }
@@ -122,6 +150,13 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
     setMode(complet.modeDefaut);
     setGroupes(complet.groupes);
     setMuscle(groupeDeLaValeur(complet.muscleCible));
+    /* ON PART DE LA FORME NORMALISÉE, ET C'EST CE QUI ÉVITE LES FAUX
+       CHANGEMENTS. Un exercice portant `traps, trapezius` ne coche qu'une
+       case ; si l'on comparait ensuite à la chaîne d'origine, l'éditeur
+       annoncerait une modification sur une fiche qu'on vient seulement
+       d'ouvrir, et la réécrirait au premier enregistrement venu. */
+    setZone(normaliser(ZONES, complet.partieCorps));
+    setSecondaires(normaliser(SECONDAIRES, complet.musclesSecondaires));
   }, [complet]);
 
   const modifies = useMemo(() => {
@@ -145,8 +180,19 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
   const muscleChange = complet !== undefined
     && muscle !== groupeDeLaValeur(complet.muscleCible);
 
+  /* COMPARÉS À LEUR FORME NORMALISÉE, PAS À LA CHAÎNE D'ORIGINE. `traps,
+     trapezius` et `trapezius` cochent la même case : les deux doivent compter
+     pour « rien n'a bougé », sinon l'éditeur annonce une modification sur une
+     fiche qu'on vient d'ouvrir et la réécrit pour rien. */
+  const zoneChange = complet !== undefined && zone !== null
+    && assembler(zone) !== assembler(normaliser(ZONES, complet.partieCorps));
+
+  const secondairesChanges = complet !== undefined && secondaires !== null
+    && assembler(secondaires) !== assembler(normaliser(SECONDAIRES, complet.musclesSecondaires));
+
   const nbModifs = modifies.length + (modeChange ? 1 : 0)
-    + (groupesChanges ? 1 : 0) + (muscleChange ? 1 : 0);
+    + (groupesChanges ? 1 : 0) + (muscleChange ? 1 : 0)
+    + (zoneChange ? 1 : 0) + (secondairesChanges ? 1 : 0);
 
   const basculer = (g: string) => {
     if (groupes === null) return;
@@ -173,6 +219,13 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
     /* `null` quand aucune vignette n'est retenue : l'exercice rejoint alors
        « Autre », qui est exactement ce que veut dire un muscle non renseigné. */
     if (muscleChange) corps.muscleCible = muscle === null ? null : valeurPourGroupe(muscle);
+    /* Rien de coché s'écrit `null`, jamais une chaîne vide : deux façons de
+       dire « rien » finissent toujours par ne plus se ressembler — un filtre
+       qui teste l'une laisserait passer l'autre. */
+    if (zoneChange && zone !== null) corps.partieCorps = zone[0] ?? null;
+    if (secondairesChanges && secondaires !== null) {
+      corps.musclesSecondaires = secondaires.length === 0 ? null : assembler(secondaires);
+    }
 
     maj.mutate({ id: exercice.id, ...corps }, { onSuccess: onFermer });
   };
@@ -264,6 +317,21 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
                 )}
               </View>
 
+              {/* UN SEUL CHOIX, PARCE QUE LA DONNÉE N'EN A JAMAIS EU DEUX.
+                  Aucun des 1338 exercices ne porte de virgule dans sa zone.
+                  Proposer d'en cocher plusieurs inventerait une possibilité
+                  que rien, ensuite, ne sait lire : la fiche l'afficherait, et
+                  aucun autre écran n'en tiendrait compte. */}
+              <View style={{ gap: E.xs }}>
+                <Discret style={s.etiquetteChoix}>Zone</Discret>
+                <ChoixPuces
+                  options={casesPour(zones, zone ?? [])}
+                  choisis={zone ?? []}
+                  onChanger={setZone}
+                  etiquettePour={(l) => `Zone ${l}`}
+                />
+              </View>
+
               {/* LES MÊMES VIGNETTES QUE LE FILTRE, ET C'EST TOUT L'INTÉRÊT.
                   Ce qu'on peut désigner ici est exactement ce qu'on pourra
                   retrouver là-bas. Un champ de texte libre laissait les deux
@@ -276,6 +344,22 @@ function Editeur({ exercice, onFermer }: { exercice: Exercice; onFermer: () => v
                     Aucun muscle : cet exercice ne sortira que sous « Autre ».
                   </Discret>
                 )}
+              </View>
+
+              {/* CELUI-CI EST BIEN MULTIPLE : 985 exercices sur 1338 portent
+                  plusieurs muscles secondaires. Il ne sert à aucun filtre —
+                  chercher « triceps » sur le secondaire remonterait tous les
+                  développés couchés, où ils ne sont que sollicités. Il se lit
+                  sur la fiche, pour savoir ce qu'on aura courbaturé. */}
+              <View style={{ gap: E.xs }}>
+                <Discret style={s.etiquetteChoix}>Aussi sollicités</Discret>
+                <ChoixPuces
+                  multiple
+                  options={casesPour(SECONDAIRES, secondaires ?? [])}
+                  choisis={secondaires ?? []}
+                  onChanger={setSecondaires}
+                  etiquettePour={(l) => `Aussi sollicité : ${l}`}
+                />
               </View>
 
               {!videoValide && (
@@ -317,6 +401,19 @@ export default function AdminExercices() {
   const [recherche, setRecherche] = useState('');
   const [edite, setEdite] = useState<Exercice | undefined>(undefined);
   const [apercu, setApercu] = useState<Exercice | undefined>(undefined);
+
+  /* LES ZONES QU'ON PROPOSE SONT CELLES QUI EXISTENT DÉJÀ.
+     Le catalogue est en mémoire ; on lui demande. Une liste écrite à la main
+     finirait par proposer une zone que plus rien n'utilise et par taire celle
+     qu'on vient d'ajouter — et personne ne s'en apercevrait, puisque les deux
+     échouent en silence. `ZONES` ne sert qu'à traduire ; ce qu'il ne traduit
+     pas s'affiche en anglais, ce qui se voit et se corrige. */
+  const zonesProposees = useMemo(() => {
+    const presentes = (exercices.data ?? []).map((e) => e.partieCorps ?? '').join(',');
+    const cles = normaliser(ZONES, presentes);
+
+    return casesPour(ZONES.filter((t) => cles.includes(t.cle)), cles);
+  }, [exercices.data]);
 
   const liste = useMemo(() => {
     const q = sansAccent(recherche.trim());
@@ -424,7 +521,7 @@ export default function AdminExercices() {
                 <Discret style={{ fontSize: T.petit }} numberOfLines={1}>
                   {item.source === 'perso' ? '★ ' : ''}
                   {item.nomFr !== null && item.nomFr !== undefined ? `${item.nom} · ` : ''}
-                  {item.partieCorps ?? 'zone à compléter'}
+                  {item.partieCorps ? libelle(ZONES, item.partieCorps) : 'zone à compléter'}
                   {' · '}
                   {libelleDuMuscle(item.muscleCible) ?? 'muscle à compléter'}
                 </Discret>
@@ -462,6 +559,7 @@ export default function AdminExercices() {
              l'autre. */
           key={edite.id}
           exercice={edite}
+          zones={zonesProposees}
           onFermer={() => setEdite(undefined)}
         />
       )}

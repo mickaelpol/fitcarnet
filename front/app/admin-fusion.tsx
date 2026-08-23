@@ -5,6 +5,7 @@ import type { Exercice } from '@/api/types';
 import { Bouton, Carte, Chargement, Discret, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
+import { libelle, ZONES } from '@/muscles/vocabulaire';
 import { C, E, P, R, T } from '@/theme';
 
 /** Distance de Levenshtein, pour proposer les correspondances probables. */
@@ -67,7 +68,8 @@ export default function AdminFusion() {
   const elements = (exercices.data ?? []).map((e) => ({
     id: e.id,
     nom: e.nomFr ?? e.nom,
-    detail: `${e.source === 'perso' ? '★ tes exercices · ' : ''}${e.partieCorps ?? ''}`,
+    detail: `${e.source === 'perso' ? '★ tes exercices · ' : ''}`
+      + `${e.partieCorps ? libelle(ZONES, e.partieCorps) : ''}`,
     couleur: e.source === 'perso' ? C.vif : C.ligne,
   }));
 
@@ -118,7 +120,8 @@ export default function AdminFusion() {
         </Pressable>
         {nouveau && (
           <Discret style={{ fontSize: T.petit }}>
-            {nouveau.nom}{nouveau.partieCorps !== null ? ` · ${nouveau.partieCorps}` : ''}
+            {nouveau.nom}
+            {nouveau.partieCorps !== null ? ` · ${libelle(ZONES, nouveau.partieCorps)}` : ''}
           </Discret>
         )}
       </Carte>

@@ -4,6 +4,8 @@ import { adresseApi } from '@/api/client';
 import { useExerciceDetail } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
 import { Bouton, Discret, Texte } from './base';
+import { libelleDuMuscle } from '@/muscles/groupes';
+import { enFrancais, libelle, SECONDAIRES, ZONES } from '@/muscles/vocabulaire';
 import { C, E, P, R, T } from '@/theme';
 
 /** Extrait l'identifiant d'une URL YouTube, quelle qu'en soit la forme. */
@@ -195,14 +197,30 @@ export function ModaleExercice({
             )}
 
             <View style={s.infos}>
+              {/* TRADUIT ICI, PAS EN BASE.
+                  La base garde le vocabulaire du catalogue importé — `upper
+                  legs`, `hip flexors` — pour qu'un prochain import n'ait pas à
+                  se battre avec nos libellés. Le français ne vit que du côté
+                  de l'écran, et un mot qu'on n'a pas traduit s'affiche tel
+                  quel : on le voit, donc on peut le corriger.
+
+                  Le muscle ciblé passe par `libelleDuMuscle`, qui parle des
+                  vignettes du filtre : la fiche et le filtre nomment ainsi la
+                  même chose du même mot. */}
               {complet.partieCorps !== null && complet.partieCorps !== undefined && (
-                <Ligne cle="Zone" valeur={complet.partieCorps} />
+                <Ligne cle="Zone" valeur={libelle(ZONES, complet.partieCorps)} />
               )}
               {complet.muscleCible !== null && complet.muscleCible !== undefined && (
-                <Ligne cle="Muscle ciblé" valeur={complet.muscleCible} />
+                <Ligne
+                  cle="Muscle ciblé"
+                  valeur={libelleDuMuscle(complet.muscleCible) ?? complet.muscleCible}
+                />
               )}
               {complet.musclesSecondaires !== null && complet.musclesSecondaires !== undefined && (
-                <Ligne cle="Aussi sollicités" valeur={complet.musclesSecondaires} />
+                <Ligne
+                  cle="Aussi sollicités"
+                  valeur={enFrancais(SECONDAIRES, complet.musclesSecondaires)}
+                />
               )}
               {complet.equipement !== null && complet.equipement !== undefined && (
                 <Ligne cle="Matériel" valeur={complet.equipement} />
