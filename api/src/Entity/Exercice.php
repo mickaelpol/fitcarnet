@@ -67,19 +67,31 @@ use Symfony\Component\Validator\Constraints as Assert;
     // restent en tête, y compris si la collection est paginée.
     order: ['source' => 'DESC', 'nom' => 'ASC'],
     paginationItemsPerPage: 1500,
-    // UN CATALOGUE QUI CHANGE QUELQUES FOIS PAR AN N'A PAS A ETRE REFABRIQUE
-    // A CHAQUE APPEL.
+    // PLUS AUCUN EN-TETE DE CACHE SUR CE CATALOGUE, ET C'EST UNE CORRECTION.
     //
-    // Il n'y avait aucun en-tete de cache : chaque requete rehydratait 1338
-    // entites et les reserialisait entierement, pour un contenu identique a
-    // celui de la veille.
+    // Il portait `max_age: 3600`. Consequence : apres qu'un administrateur
+    // ajoutait une video ou un nom francais, le navigateur — et OkHttp sur
+    // Android — servait pendant UNE HEURE la reponse d'avant, sans jamais
+    // redemander. Cote front, React Query invalidait correctement son cache
+    // et relancait la requete : elle n'atteignait simplement pas le serveur.
+    // La modification etait en base, la fiche l'affichait, la liste montrait
+    // l'ancienne version, et rien nulle part ne le disait.
     //
-    // `shared_max_age` ne servira toutefois PAS a grand-chose ici tant que
-    // `Authorization` figure dans le `vary` global : un cache partage ne
-    // mutualise rien entre deux utilisateurs porteurs de jetons differents.
-    // Le gain reel est cote client et navigateur — c'est deja l'essentiel,
-    // mais autant le savoir plutot que d'attendre un miracle cote serveur.
-    cacheHeaders: ['max_age' => 3600, 'shared_max_age' => 86400],
+    // DEUX CACHES SUR LA MEME DONNEE, DONT UN QUE PERSONNE NE PEUT VIDER.
+    // React Query garde deja le catalogue trente minutes, et la mutation
+    // sait le purger — c'est meme la seule raison pour laquelle un ecran se
+    // met a jour apres un enregistrement. Le cache HTTP, lui, n'ecoute
+    // personne : ni le serveur qui vient d'ecrire, ni l'ecran qui vient de
+    // modifier. Entre deux caches, on garde celui qu'on peut invalider.
+    //
+    // `shared_max_age` part avec, et il ne manquera a personne :
+    // `Authorization` figure dans le `vary` global, donc aucun cache partage
+    // ne mutualisait quoi que ce soit entre deux porteurs de jetons
+    // differents. Il ne rapportait rien — sauf a laisser croire le contraire.
+    //
+    // CE QUE CA COUTE : une requete de plus toutes les trente minutes par
+    // appareil, la ou React Query redemande. C'est le prix d'un ecran qui
+    // dit la verite.
 )]
 #[ApiFilter(SearchFilter::class, properties: [
     'nom' => 'ipartial', 'nomFr' => 'ipartial',
