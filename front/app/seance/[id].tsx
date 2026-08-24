@@ -77,7 +77,13 @@ export default function DetailSeance() {
       .filter((e) => seance === null || seance.type === null
         || e.groupes.length === 0 || e.groupes.includes(seance.type))
       .map((e) => ({
-        id: e.id, nom: e.nom, detail: e.formatPrescrit ?? '',
+        /* `nomFr ?? nom`, ET C'ETAIT LE SEUL ENDROIT A NE PAS LE FAIRE.
+           L'ecran de modele, la fiche, les blocs d'une seance et l'ecran de
+           fusion affichaient tous le nom francais ; ce selecteur-ci, non. Il
+           montrait « barbell incline bench press » la ou tout le reste de
+           l'application dit « Developpe incline a la barre » — et on cherchait
+           l'exercice sous un nom que plus personne n'employait ailleurs. */
+        id: e.id, nom: e.nomFr ?? e.nom, detail: e.formatPrescrit ?? '',
         couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
         /* Le muscle visé, tel que la base l'écrit. Sa présence suffit à faire
            apparaître la rangée de vignettes dans le sélecteur — un aliment,
