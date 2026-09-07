@@ -181,6 +181,36 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 
 ---
 
+## Où en est le chantier
+
+Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
+
+| Lot | État | Détail |
+|---|---|---|
+| **0 — garde-fous** | ✅ | `CLAUDE.md`, PHPStan niveau 5, `ModeleExposeTest`, `verifier-schema.sh`, `verifier-migrations.sh`, glob des tests, 2 hooks |
+| **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
+| **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
+| **3 — sécurité et isolation** | ⬜ ~5 h | É1, C3, É8, M-01 à M-03 — **le prochain** |
+| **4 — base reproductible** | ⬜ ~4 h | C2 : `verifier-schema.sh` signale toujours **280 lignes** d'écart |
+| **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
+| **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
+| **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
+| **8 — le reste** | ⬜ | ~37 constats faibles |
+
+Tests au 7 septembre : **362 front · 102 API · 422 assertions · 8 erreurs PHPStan**
+(aucune sur les fichiers corrigés).
+
+Deux points laissés ouverts volontairement :
+- **É14** n'a reçu qu'un volet sur trois. Le premier suffit à rouvrir la session ; les deux
+  ceintures de sécurité (`compte.tsx`, `_layout.tsx`) attendent une bibliothèque de test de
+  composants, que le projet n'a pas.
+- **La table des paliers du disque RM** (`disqueRM.tsx`) diffère de celle du calculateur.
+  Décision d'affichage à trancher : à 40 %, la formule annonce 45 répétitions alors que
+  `REPS_MAX_POUR_1RM` vaut 15.
+
+Une refonte vers l'architecture hexagonale est un objectif assumé, **non commencée**. Voir la
+section « Skills » de `CLAUDE.md` : elle ne doit jamais se mélanger à une correction de bug.
+
 ## Plan de correction proposé
 
 ### Lot 0 — Les garde-fous qui empêchent la récidive  · ~3 h · **à faire en premier**

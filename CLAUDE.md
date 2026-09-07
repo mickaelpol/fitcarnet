@@ -111,9 +111,12 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   pas une affirmation.
 - Les commentaires de ce projet racontent **la panne réelle et sa date**. Continuer ainsi : c'est ce
   qui rend les divergences repérables des mois plus tard.
-- Une seule arborescence fait foi : `~/perso/fitcarnet` sous WSL2. Y accéder depuis Windows par
-  `\\wsl.localhost\Ubuntu\home\micka\perso\fitcarnet`. Ne pas recréer de copie locale Windows :
-  deux copies désynchronisées ont déjà produit un renommage propagé à deux appelants sur trois.
+- **Une seule arborescence, et une seule : `~/perso/fitcarnet` sous WSL2**, poussée sur Gitea.
+  Le projet se travaille en terminal, avec Claude Code. **Claude Cowork n'est pas utilisable
+  ici** : il refuse les chemins `\\wsl.localhost\...`, et la parade — un clone Windows
+  synchronisé — est précisément ce qui a coûté le bug de septembre 2026, un renommage de
+  méthode propagé à deux appelants sur trois. Ne jamais recréer de copie : ni sous Windows,
+  ni ailleurs. Ce qui doit circuler passe par git.
 
 ## Skills : laquelle, quand
 
