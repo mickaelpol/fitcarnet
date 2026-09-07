@@ -115,6 +115,38 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   `\\wsl.localhost\Ubuntu\home\micka\perso\fitcarnet`. Ne pas recréer de copie locale Windows :
   deux copies désynchronisées ont déjà produit un renommage propagé à deux appelants sur trois.
 
+## Skills : laquelle, quand
+
+Le projet charge beaucoup de skills. Celles qui n'ont aucun usage ici sont déjà
+coupées dans `.claude/settings.json` (`skillOverrides`) — inutile de les rallumer
+sans raison. Pour le reste, l'aiguillage :
+
+| Travail | Skill à prendre |
+|---|---|
+| Corriger un bug, ajouter un comportement | **`superpowers:test-driven-development`**, sans exception |
+| Cadrer une demande vague ou vaste | **`superpowers:brainstorming`** (celle de `superpowers`, pas `symfony:`) |
+| API Platform : ressource, filtre, processeur, sérialisation | **`symfony:api-platform-*`** — elles ciblent la v4, celle du projet |
+| Doctrine : relations, migrations, transactions, N+1 | **`symfony:doctrine-*`** |
+| Tests API | **`symfony:tdd-with-phpunit`** (le projet est en PHPUnit, pas Pest) |
+| Écran, navigation, EAS update | **`expo-router`**, **`eas-update`**, **`expo-data-fetching`** |
+| Index, plan de requête, VACUUM | **`postgres`** |
+| Déployer, publier, restaurer | **rien d'automatique** : lire `DEPLOIEMENT.md` et `MISE-A-JOUR.md` |
+
+**Hexagonal / DDD.** Les skills `symfony-hexagonal-architecture`,
+`symfony-domain-modeling`, `symfony-ports-adapters` et `symfony-cqrs-handlers`
+sont installées parce qu'une migration vers l'architecture hexagonale est un
+objectif assumé. **Elle n'a pas commencé** : `api/src` suit toujours la structure
+Symfony classique (`Controller`, `Service`, `Entity`, `Repository`, `State`).
+Ne pas appliquer les patrons hexagonaux à du code existant sans une décision
+explicite — et ne jamais mélanger cette refonte avec une correction de bug dans
+le même commit.
+
+**graphify** dessine une carte, il ne remplace pas `grep`. Il est bon pour la vue
+d'ensemble (communautés, nœuds pivots, liens inattendus entre documents) et
+mauvais pour retrouver un symbole précis. Surtout : **son graphe se périme à
+chaque commit**. Le reconstruire (`/graphify . --update`) avant de s'y fier, ou
+ne pas s'en servir.
+
 ## Audit
 
 `docs/audit-2026-09/` — 84 constats classés, avec scénarios reproduits et plan de correction en lots.

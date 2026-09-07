@@ -19,5 +19,32 @@
         ]
       }
     ]
+  },
+  "skillOverrides": {
+    "eas-hosting": "off",
+    "eas-observe": "off",
+    "eas-simulator": "off",
+    "eas-update-insights": "off",
+    "eas-workflows": "off",
+    "expo-app-clip": "off",
+    "expo-brownfield": "off",
+    "expo-design-system": "off",
+    "expo-dom": "off",
+    "expo-module": "off",
+    "expo-native-ui": "off",
+    "expo-skill-feedback": "off",
+    "expo-web-to-native": "off",
+    "symfony-api-response": "off",
+    "symfony-doctrine-persistence": "off",
+    "symfony-messenger-async": "off",
+    "symfony-security-voters": "off",
+    "symfony-testing": "off",
+    "symfony-validation": "off",
+    "symfony:brainstorming": "off",
+    "symfony:e2e-panther-playwright": "off",
+    "symfony:executing-plans": "off",
+    "symfony:tdd-with-pest": "off",
+    "symfony:twig-components": "off",
+    "symfony:writing-plans": "off"
   }
 }
