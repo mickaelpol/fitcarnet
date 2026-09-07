@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { adresseDeLApi, type Emplacement } from './adresse';
+import { renouvelerJeton, type DepotJetons } from './renouvellement';
 import { uneSeuleFois } from './uneSeuleFois';
 
 /**
@@ -141,34 +142,19 @@ async function terminerSession(): Promise<void> {
 
 /* --------------------------------------------------- renouvellement */
 
+/* La décision vit dans `renouvellement.ts`, sans dépendance à React Native,
+   donc éprouvée. Ce fichier ne fournit plus que le coffre et le réseau réels :
+   le seul endroit où la session morte pouvait revenir est désormais couvert
+   par huit tests. */
+const depotJetons: DepotJetons = {
+  lireRafraichissement,
+  definirJeton,
+  definirRafraichissement,
+  terminerSession,
+};
+
 async function renouveler(): Promise<boolean> {
-  const cle = await lireRafraichissement();
-  if (cle === null) return false;
-
-  const reponse = await fetch(`${BASE}/jeton/rafraichir`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ jetonRafraichissement: cle }),
-  });
-
-  /* Un refus est définitif : le jeton de rafraîchissement a été révoqué, ou
-     il a passé son échéance. Une panne réseau, elle, lève une exception et
-     ne passe pas par ici — on ne déconnecte personne pour une coupure. */
-  if (!reponse.ok) {
-    if (reponse.status === 401) await terminerSession();
-
-    return false;
-  }
-
-  const donnees = await reponse.json() as { token?: string; jetonRafraichissement?: string };
-  if (typeof donnees.token !== 'string') return false;
-
-  await definirJeton(donnees.token);
-  if (typeof donnees.jetonRafraichissement === 'string') {
-    await definirRafraichissement(donnees.jetonRafraichissement);
-  }
-
-  return true;
+  return renouvelerJeton(BASE, depotJetons, (url, options) => fetch(url, options));
 }
 
 /* Une panne de réseau lève une exception : on la ramène à « pas renouvelé »
