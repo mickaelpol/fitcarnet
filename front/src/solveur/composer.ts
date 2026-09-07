@@ -725,6 +725,17 @@ export function resoudreLaPeriode(
   demandes: readonly DemandeDatee[],
   stockDe: (a: Aliment) => number,
   candidats: Aliment[],
+  /**
+   * Ignorer les restes déclarés — réservé à la passe « frigo plein ».
+   *
+   * Un plafond décrit LE FRIGO, pas le plan. `listeDeCourses` résout une
+   * seconde fois avec un stock infini pour savoir ce que le plan réclame
+   * idéalement ; le plafond y survivait et devenait le seul frein, si bien que
+   * déclarer « il me reste 80 g de riz » faisait SOUS-ACHETER — jusqu'à 542 g
+   * sur un seul aliment. Décrire son frigo plus finement ne rend pas la
+   * nourriture moins nécessaire.
+   */
+  ignorerPlafonds = false,
 ): Map<string, AuMieux> {
   const consomme = new Map<Aliment['id'], number>();
   const sorties = new Map<string, AuMieux>();
@@ -747,7 +758,7 @@ export function resoudreLaPeriode(
        aliment du même rôle, le message « le reste est porté par X » — existe
        déjà pour le stock. On ne réécrit pas ce mécanisme, on lui donne un
        stock plus bas le temps d'un repas. */
-    const dispo = d.plafonds === undefined
+    const dispo = d.plafonds === undefined || ignorerPlafonds
       ? restant
       : (a: Aliment): number => Math.min(
         restant(a),
@@ -794,7 +805,9 @@ export function listeDeCourses(
   const ALaCarte = (): number => Number.POSITIVE_INFINITY;
   const voulu = new Map<Aliment['id'], { aliment: Aliment; grammes: number }>();
 
-  for (const sortie of resoudreLaPeriode(demandes, ALaCarte, candidats).values()) {
+  /* `true` : la passe « frigo plein » ignore aussi les restes déclarés. Sans
+     ça le plafond restait le seul frein d'un calcul censé n'en avoir aucun. */
+  for (const sortie of resoudreLaPeriode(demandes, ALaCarte, candidats, true).values()) {
     for (const q of sortie.resultat.quantites) {
       const deja = voulu.get(q.aliment.id);
       if (deja === undefined) {

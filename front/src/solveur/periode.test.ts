@@ -296,4 +296,67 @@ describe('Le rang du jour n\'a pas besoin d\'être 0, 1, 2…', () => {
       [...sorties.keys()].sort(),
       [...REPAS.map((r) => cleDuRepas(5, r)), ...REPAS.map((r) => cleDuRepas(8, r))].sort());
   });
+
+  /**
+   * DÉCLARER UN RESTE NE DOIT PAS RÉTRÉCIR LA LISTE DE COURSES.
+   *
+   * « Il me reste 80 g de riz » décrit le frigo. Ça ne change pas ce que le
+   * plan RÉCLAME — donc pas ce qu'il faut acheter pour le tenir. Le plafond
+   * survivait pourtant à la passe « frigo plein » de `listeDeCourses`, où il
+   * devenait le seul frein : décrire la même réalité de deux façons donnait
+   * deux listes différentes, et la seconde faisait SOUS-ACHETER. Ça ne se voit
+   * qu'au supermarché, multiplié par le nombre de repas de la semaine.
+   */
+  describe('un reste déclaré et la liste de courses', () => {
+    const avecPlafonds = (
+      demandes: DemandeDatee[],
+      plafonds: Record<string, number>,
+    ): DemandeDatee[] => demandes.map((d) => ({ ...d, plafonds }));
+
+    it('déclarer un reste ne réduit pas ce qu\'il faut acheter', () => {
+      const frigo = frigoAleatoire(31);
+      const demandes = jours(frigo, 2);
+      const premier = frigo.aliments[0];
+      assert.ok(premier !== undefined);
+
+      const sans = listeDeCourses(demandes, frigo.stockDe, frigo.aliments);
+      const avec = listeDeCourses(
+        avecPlafonds(demandes, { [String(premier.id)]: 80 }),
+        frigo.stockDe, frigo.aliments);
+
+      const grammesDe = (
+        liste: { aliment: Aliment; grammes: number }[], id: Aliment['id'],
+      ): number => liste.find((l) => l.aliment.id === id)?.grammes ?? 0;
+
+      for (const a of frigo.aliments) {
+        assert.ok(grammesDe(avec, a.id) >= grammesDe(sans, a.id),
+          `${a.nom} : ${grammesDe(avec, a.id)} g à acheter en déclarant un reste, `
+            + `contre ${grammesDe(sans, a.id)} g sans — un reste ne rend pas la `
+            + 'nourriture moins nécessaire');
+      }
+    });
+
+    it('un plafond n\'empêche pas la liste de suffire au plan idéal', () => {
+      /* Le même invariant que plus haut, mais avec un reste déclaré : après
+         les courses, le plan que l'on VOULAIT doit passer. */
+      const frigo = frigoAleatoire(37);
+      const plafonnees = avecPlafonds(jours(frigo, 2), Object.fromEntries(
+        frigo.aliments.map((a) => [String(a.id), 50])));
+      const courses = listeDeCourses(plafonnees, frigo.stockDe, frigo.aliments);
+
+      const apresCourses = (a: Aliment): number =>
+        frigo.stockDe(a) + (courses.find((c) => c.aliment.id === a.id)?.grammes ?? 0);
+
+      const ideal = totalReclame(
+        resoudreLaPeriode(jours(frigo, 2), () => Number.POSITIVE_INFINITY, frigo.aliments));
+
+      for (const [id, voulu] of ideal) {
+        const aliment = frigo.aliments.find((a) => a.id === id);
+        if (aliment === undefined) continue;
+        assert.ok(apresCourses(aliment) >= voulu - 1,
+          `${aliment.nom} : ${voulu.toFixed(0)} g voulus, `
+            + `${apresCourses(aliment).toFixed(0)} g après courses`);
+      }
+    });
+  });
 });
