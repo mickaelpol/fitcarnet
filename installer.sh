@@ -164,12 +164,25 @@ if [[ -z "$migrations" ]]; then
     info "aucune migration à jouer"
 else
     for fichier in $migrations; do
-        if dc exec -T db psql -U "$UTILISATEUR" -d "$BASE" -q < "$fichier" >/dev/null 2>&1; then
+        # ON_ERROR_STOP, ET L'ERREUR AFFICHÉE PLUTÔT QUE JETÉE.
+        #
+        # Sans lui, psql poursuit après une erreur et sort 0 : cette boucle
+        # affichait « ✓ » sur un fichier à moitié appliqué. C'est ainsi que
+        # « ✓ 25-garde-fous.sql » s'est affiché alors que la migration échouait
+        # à sa PREMIÈRE instruction, laissant les six garde-fous absents — et
+        # personne pour le dire, puisque 2>&1 partait dans /dev/null.
+        #
+        # entrypoint-prod.sh le fait correctement depuis le début ; l'écart
+        # entre les deux chemins d'installation était le vrai défaut.
+        if erreur=$(dc exec -T db psql -U "$UTILISATEUR" -d "$BASE" \
+                       -v ON_ERROR_STOP=1 -q < "$fichier" 2>&1); then
             ok "$(basename "$fichier")"
         else
             # ces scripts sont idempotents : un échec signale un vrai souci
+            printf '%s\n' "$erreur" | tail -10 >&2
             echec "$(basename "$fichier") a échoué. Rejoue-le seul pour voir l'erreur :
-   docker compose -f $COMPOSE exec -T db psql -U $UTILISATEUR -d $BASE < $fichier"
+   docker compose -f $COMPOSE exec -T db psql -U $UTILISATEUR -d $BASE \\
+     -v ON_ERROR_STOP=1 < $fichier"
         fi
     done
 fi
