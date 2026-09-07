@@ -150,12 +150,16 @@ class PlanRepas implements ProprieteUtilisateur
      * On ne choisit pas la date a laquelle on a cuisine : c'est maintenant, ou
      * ce n'est pas. Un setteur ouvert laisserait ecrire une date passee — donc
      * antidater une deduction de stock qui, elle, vient d'avoir lieu.
+     *
+     * ELLE REND LA DATE POSEE, plutot que `$this`. L'appelant la met dans sa
+     * reponse, et la relire par `getCuisineLe()` juste apres l'obligeait a
+     * traiter un `null` que le geste vient d'exclure — l'analyse statique, qui
+     * retient le controle « deja cuisine » fait plus haut, le tenait meme pour
+     * certain. Rendre la date supprime la question au lieu de la faire taire.
      */
-    public function marquerCuisine(): self
+    public function marquerCuisine(): \DateTimeImmutable
     {
-        $this->cuisineLe = new \DateTimeImmutable();
-
-        return $this;
+        return $this->cuisineLe = new \DateTimeImmutable();
     }
 
     /** @return array<string, mixed> */

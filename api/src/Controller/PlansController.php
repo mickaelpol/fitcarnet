@@ -7,9 +7,9 @@ namespace App\Controller;
 use App\Entity\PlanRepas;
 use App\Entity\Utilisateur;
 use App\Service\DeductionDuPlan;
+use App\Service\DeductionGrocy;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
-use App\Service\FrigoGrocy;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -72,7 +72,7 @@ final class PlansController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly Frigo $frigo,
         private readonly FrigoBase $base,
-        private readonly FrigoGrocy $grocy,
+        private readonly DeductionGrocy $deductionGrocy,
     ) {
     }
 
@@ -145,20 +145,24 @@ final class PlansController extends AbstractController
            et on corrige a la main. Aucun double comptage.
 
            Les deux pannes sont possibles ; on choisit celle qui se voit. */
-        $plan->marquerCuisine();
+        $cuisineLe = $plan->marquerCuisine()->format(\DATE_ATOM);
         $this->em->flush();
 
         $echecs = [];
         if ([] !== $nouvellesQuantites) {
             if ('grocy' === $this->frigo->source($utilisateur)) {
                 try {
-                    $echecs = $this->grocy->inventorier($nouvellesQuantites);
+                    /* UNE LIGNE A LA FOIS. La boucle vit dans DeductionGrocy,
+                       ou elle s'eprouve sans noyau ni base : c'est ici meme
+                       qu'un appel groupe survivant a sa propre suppression a
+                       rendu un 500 muet sans qu'aucun test ne le voie. */
+                    $echecs = $this->deductionGrocy->appliquer($nouvellesQuantites);
                 } catch (\RuntimeException $e) {
                     /* Le plan reste cuisine — il l'est. On rend la liste de ce
                        qu'il faut retirer soi-meme plutot qu'une erreur seche
                        qui laisserait croire que rien n'a eu lieu. */
                     return $this->json([
-                        'cuisineLe' => $plan->getCuisineLe()?->format(\DATE_ATOM),
+                        'cuisineLe' => $cuisineLe,
                         'deduits' => 0,
                         'ignores' => \array_map(
                             static fn (array $l) => ['nom' => $l['nom'], 'motif' => $e->getMessage()],
@@ -201,7 +205,7 @@ final class PlansController extends AbstractController
         }
 
         return $this->json([
-            'cuisineLe' => $plan->getCuisineLe()?->format(\DATE_ATOM),
+            'cuisineLe' => $cuisineLe,
             'deduits' => \count($nouvellesQuantites) - \count($echecs),
             'ignores' => $ignores,
         ]);
