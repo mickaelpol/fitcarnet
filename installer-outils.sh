@@ -97,8 +97,25 @@ titre "superpowers-symfony — 44 skills Symfony 7.4 / API Platform v4"
 # À refaire si le marketplace est rafraîchi (`claude plugin marketplace update`).
 MANIFESTE="$HOME/.claude/plugins/marketplaces/superpowers-symfony/.claude-plugin/marketplace.json"
 
-if [[ -f "$MANIFESTE" ]] && ! grep -q '"source": "./"' "$MANIFESTE"; then
-    python3 - "$MANIFESTE" <<'PY'
+if ! command -v claude >/dev/null 2>&1; then
+    jaune "  Claude Code n'est pas installé — étape ignorée."
+    jaune "  Installe-le (https://claude.com/claude-code) puis relance ce script."
+else
+    # Le marketplace, lui, se clone très bien en HTTPS. On le fait ICI plutôt que
+    # d'attendre le premier démarrage de Claude Code : sinon il faudrait lancer
+    # ce script DEUX fois, une avant et une après, pour que la correction du
+    # manifeste ait un fichier à corriger. La commande est idempotente.
+    if [[ ! -f "$MANIFESTE" ]]; then
+        claude plugin marketplace add dev-toolings/superpowers-symfony >/dev/null 2>&1 \
+          && vert "  ✓ marketplace cloné" \
+          || jaune "  ⚠ le clone du marketplace a échoué — réseau ?"
+    fi
+
+    if [[ -f "$MANIFESTE" ]]; then
+        if grep -q '"source": "./"' "$MANIFESTE"; then
+            vert "  ✓ manifeste déjà corrigé"
+        else
+            python3 - "$MANIFESTE" <<'PY'
 import json, sys, pathlib
 p = pathlib.Path(sys.argv[1])
 d = json.loads(p.read_text())
@@ -107,13 +124,21 @@ for plug in d.get('plugins', []):
         plug['source'] = './'
 p.write_text(json.dumps(d, indent=2) + "\n")
 PY
-    vert "  ✓ manifeste corrigé (source locale au lieu du clone SSH)"
-elif [[ -f "$MANIFESTE" ]]; then
-    vert "  ✓ manifeste déjà corrigé"
-else
-    jaune "  le marketplace n'est pas encore cloné."
-    jaune "  Démarre Claude Code une première fois dans ce dossier : il lira"
-    jaune "  extraKnownMarketplaces et le clonera. Relance ensuite ce script."
+            vert "  ✓ manifeste corrigé (source locale au lieu du clone SSH)"
+        fi
+
+        # Et on installe dans la foulée, tant que le manifeste est bon.
+        if claude plugin list 2>/dev/null | grep -q 'superpowers-symfony'; then
+            vert "  ✓ plugin déjà installé"
+        else
+            claude plugin install superpowers-symfony@superpowers-symfony >/dev/null 2>&1 \
+              && vert "  ✓ plugin installé (44 skills Symfony)" \
+              || rouge "  ✗ installation refusée — relance ce script, ou vois NOUVELLE-MACHINE.md"
+        fi
+    else
+        rouge "  ✗ marketplace absent : superpowers-symfony ne sera pas disponible."
+        rouge "    Réessaie : claude plugin marketplace add dev-toolings/superpowers-symfony"
+    fi
 fi
 
 # ------------------------------------------------------------------ contrôle

@@ -26,6 +26,7 @@ tourne de toute façon en conteneur.
 | **Docker** | 28.3 | la base et l'API tournent en conteneur ; rien n'est installé sur l'hôte |
 | **Node** | 22.20 (nvm conseillé) | le front Expo, et `intelephense` |
 | **git** | — | et une clé SSH autorisée sur le Gitea |
+| **Claude Code** | 2.1 | l'outillage du dépôt est fait pour lui ([installation](https://claude.com/claude-code)) |
 | **jq** | 1.6 | les hooks de vérification l'utilisent (`apt install jq`) |
 | **uv** | 0.12 | installe graphify proprement (`curl -LsSf https://astral.sh/uv/install.sh \| sh`) |
 | **PHP** | 8.4 | **facultatif sur l'hôte** — voir l'encadré |
@@ -69,13 +70,28 @@ Cinq variables à renseigner. Les trois premières sont obligatoires — le
 ```
 
 Il vérifie les prérequis, installe **graphify** (avec son support SQL) et
-**intelephense**, applique le contournement du manifeste de
-`superpowers-symfony`, puis contrôle ce qui est en place. Il ne touche ni à la
-base, ni aux conteneurs.
+**intelephense**, puis **installe `superpowers-symfony` de bout en bout** :
+clone du marketplace, correction de son manifeste, installation du plugin. Il
+ne touche ni à la base, ni aux conteneurs.
 
-**Puis redémarre Claude Code dans ce dossier.** C'est ce démarrage qui installe
-les cinq plugins déclarés dans `.claude/settings.json` — Expo, php-lsp,
-context7, superpowers, superpowers-symfony — et charge les skills du projet.
+Chaque ligne doit être verte. Si l'une est rouge, elle dit quoi faire.
+
+**Puis démarre Claude Code dans ce dossier.** C'est ce démarrage qui installe
+les quatre plugins officiels déclarés dans `.claude/settings.json` — Expo,
+php-lsp, context7, superpowers — et charge les skills du projet.
+
+> **Pourquoi le script installe `superpowers-symfony` lui-même, et pas Claude
+> Code.** Le manifeste de ce marketplace déclare son ancien nom d'organisation,
+> ce qui fait tenter à Claude Code un clone SSH refusé sans clé GitHub. Le
+> script clone le marketplace en HTTPS — qui marche — corrige la source, puis
+> installe. Sans lui, il faudrait lancer le script, démarrer Claude Code, voir
+> l'échec, relancer le script, et redémarrer : quatre étapes au lieu de deux.
+
+**Vérifie ensuite dans Claude Code** que les cinq plugins sont là :
+
+```
+claude plugin list        # expo, php-lsp, context7, superpowers, superpowers-symfony
+```
 
 Le dépôt porte déjà, sans rien à faire : `CLAUDE.md` et les sept règles du
 projet, les hooks de vérification, les `skillOverrides` (28 skills inutiles
@@ -130,12 +146,15 @@ le constat C2 de l'audit, corrigé au lot 4. Voir
 
 ## Les pièges, et pourquoi ils reviendront
 
-**`superpowers-symfony` ne s'installe pas seul.** Son manifeste déclare la source
+**`superpowers-symfony` ne s'installe pas seul**, et c'est pour ça que
+`installer-outils.sh` s'en charge entièrement. Son manifeste déclare la source
 `MakFly/superpowers-symfony` — l'ancien nom de l'organisation, qui redirige
 aujourd'hui vers `dev-toolings/`. Claude Code tente alors un clone SSH, refusé
-sur toute machine sans clé GitHub autorisée. `installer-outils.sh` corrige la
-source pour qu'elle pointe sur le dépôt déjà cloné localement. **À relancer après
-un `claude plugin marketplace update`**, qui écrase la correction.
+sur toute machine sans clé GitHub autorisée.
+
+**Relancer `./installer-outils.sh` après un `claude plugin marketplace update`** :
+la mise à jour réécrit le manifeste et efface la correction. Le symptôme est net
+— `claude plugin list` ne montre plus que quatre plugins.
 
 **Les `skillOverrides` ne prennent effet qu'au redémarrage suivant.** Normal :
 Claude Code lit la configuration au lancement.
@@ -156,8 +175,9 @@ le projet se travaille en terminal, avec Claude Code.
 - [ ] Docker, Node 22, git + clé SSH Gitea, jq, uv
 - [ ] `git clone` sous WSL2 ou Linux — **jamais** dans `C:\`
 - [ ] `.env` créé depuis `.env.exemple`, trois secrets renseignés
-- [ ] `./installer-outils.sh`
-- [ ] **Claude Code redémarré dans le dossier** ← l'oubli le plus fréquent
+- [ ] `./installer-outils.sh` — **toutes les lignes vertes**
+- [ ] **Claude Code démarré dans le dossier** ← l'oubli le plus fréquent
+- [ ] `claude plugin list` montre bien les **cinq** plugins
 - [ ] `./installer.sh`
 - [ ] `cd front && npm install`
 - [ ] Les quatre vérifications ci-dessus au vert

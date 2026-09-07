@@ -66,7 +66,8 @@ qui couvre les prérequis, l'outillage et l'application, dans l'ordre.
 git clone ssh://git@gitea.mickael-pol.fr:2222/mickael/fitcarnet.git
 cd fitcarnet
 cp .env.exemple .env        # DB_PASSWORD, APP_SECRET, JWT_PASSPHRASE
-./installer-outils.sh       # outillage de développement
+./installer-outils.sh       # graphify, intelephense, superpowers-symfony
+#  ← démarrer Claude Code ici : il installe les plugins officiels déclarés
 ./installer.sh              # base, migrations, compte, catalogue
 cd front && npm install
 ```
