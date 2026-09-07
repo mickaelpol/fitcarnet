@@ -22,7 +22,15 @@ export const REPS_MAX_POUR_1RM = 15;
 export const epley = (poids: number, reps: number): number =>
   poids * (1 + 0.0333 * reps);
 
-/** Le 1RM d'un ensemble de séries : la meilleure série courte. */
+/**
+ * Le 1RM d'un ensemble de séries : la meilleure série courte.
+ *
+ * Une répétition unique est prise telle quelle, comme dans
+ * `estimerDepuisEssai` : le maximum EST la charge soulevée, par définition, et
+ * Epley y ajouterait 3,3 % inventés. La garde n'existait que sur l'un des deux
+ * chemins — la carte d'exercice annonçait 103,3 kg là où le calculateur
+ * affichait 100 kg, pour la même série.
+ */
 export function rmDesSeries(series: Serie[]): number | null {
   let meilleur: number | null = null;
 
@@ -30,7 +38,7 @@ export function rmDesSeries(series: Serie[]): number | null {
     if (s.reps === null || s.poids === null) continue;
     if (s.reps < 1 || s.reps > REPS_MAX_POUR_1RM || s.poids <= 0) continue;
 
-    const rm = epley(s.poids, s.reps);
+    const rm = s.reps === 1 ? s.poids : epley(s.poids, s.reps);
     if (meilleur === null || rm > meilleur) meilleur = rm;
   }
 

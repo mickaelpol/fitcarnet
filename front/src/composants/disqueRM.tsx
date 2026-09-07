@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { repsAu } from '@/calcul/performance';
 import { Chiffre, Discret, Texte } from './base';
 import { C, E, N, P, R, T } from '@/theme';
 
@@ -37,10 +38,15 @@ const SIGNE: Record<Tendance, string> = {
   hausse: '▲', stable: '=', baisse: '▼', inconnue: '',
 };
 
-/** Répétitions théoriquement possibles à ce pourcentage du 1RM (Epley inversé). */
-const repsAu = (pourcent: number): number =>
-  Math.max(1, Math.round((100 / pourcent - 1) / 0.0333));
+/* `repsAu` vient de `calcul/performance.ts` : elle y était recopiée, sans la
+   garde des 100 %. Une formule métier ne s'écrit qu'à un endroit.
 
+   La table de paliers, elle, reste locale et VOLONTAIREMENT différente de
+   celle du calculateur : ce disque montre les charges de travail (90 à 40 %),
+   le calculateur montre l'échelle complète depuis le maximum (100 à 50 %).
+   À vérifier tout de même : à 40 %, `repsAu` annonce 45 répétitions alors que
+   `REPS_MAX_POUR_1RM` vaut 15 — la prédiction sort de la zone où la formule
+   veut dire quelque chose. */
 const PALIERS = [90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40];
 
 export function DisqueRM({

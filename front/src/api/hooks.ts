@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Habitudes, ModeCuisson, PlanEnregistre } from '@/calcul/cuisson';
+/* Les réductions d'historique vivent dans `calcul/`, éprouvées : la formule
+   d'Epley était recopiée ici DEUX fois, dont une sans son plafond, et l'écran
+   de séance comparait les deux. */
+import { historiqueParExercice, recordsAnterieurs } from '@/calcul/historiqueSeances';
 import {
   api, definirJeton, definirRafraichissement, lireRafraichissement, membres,
 } from './client';
@@ -813,24 +817,9 @@ export function useRecordsAnterieurs(dateExclue?: string) {
      Le cout ne se voit pas aujourd'hui ; il grandit avec l'anciennete du
      compte, ce qui est la pire forme de lenteur — celle qui arrive trop
      lentement pour qu'on sache quand elle a commence. */
-  const records = useMemo(() => {
-    const acc = new Map<number, number>();
-    for (const s of seances.data ?? []) {
-      if (dateExclue !== undefined && s.date.slice(0, 10) >= dateExclue.slice(0, 10)) continue;
-      for (const bloc of s.exercices) {
-        const idExercice = typeof bloc.exercice === 'string'
-          ? Number(bloc.exercice.split('/').pop())
-          : bloc.exercice.id;
-        for (const serie of bloc.series) {
-          if (serie.reps === null || serie.poids === null || serie.reps < 1 || serie.poids <= 0) continue;
-          const rm = serie.poids * (1 + 0.0333 * serie.reps);
-          const actuel = acc.get(idExercice);
-          if (actuel === undefined || rm > actuel) acc.set(idExercice, rm);
-        }
-      }
-    }
-    return acc;
-  }, [seances.data, dateExclue]);
+  const records = useMemo(
+    () => recordsAnterieurs(seances.data ?? [], dateExclue),
+    [seances.data, dateExclue]);
 
   return { records, pret: !seances.isLoading };
 }
@@ -884,35 +873,9 @@ export function useHistorique() {
 
   // Le plus lourd des trois : il construit deux séries de points par exercice,
   // en réallouant un tableau à chaque ajout. Memoise pour la meme raison.
-  const { rm, volume } = useMemo(() => {
-    const rmAcc = new Map<number, number[]>();
-    const volumeAcc = new Map<number, number[]>();
-
-    const triees = [...(seances.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
-
-    for (const s of triees) {
-      for (const bloc of s.exercices) {
-        const id = typeof bloc.exercice === 'string'
-          ? Number(bloc.exercice.split('/').pop())
-          : bloc.exercice.id;
-
-        let meilleur = 0;
-        let total = 0;
-        for (const serie of bloc.series) {
-          if (serie.reps === null || serie.poids === null) continue;
-          if (serie.reps < 1 || serie.poids <= 0) continue;
-          total += serie.reps * serie.poids;
-          if (serie.reps <= 15) {
-            const e = serie.poids * (1 + 0.0333 * serie.reps);
-            if (e > meilleur) meilleur = e;
-          }
-        }
-        if (meilleur > 0) rmAcc.set(id, [...(rmAcc.get(id) ?? []), Math.round(meilleur * 10) / 10]);
-        if (total > 0) volumeAcc.set(id, [...(volumeAcc.get(id) ?? []), Math.round(total)]);
-      }
-    }
-    return { rm: rmAcc, volume: volumeAcc };
-  }, [seances.data]);
+  const { rm, volume } = useMemo(
+    () => historiqueParExercice(seances.data ?? []),
+    [seances.data]);
 
   return { rm, volume, pret: !seances.isLoading };
 }
