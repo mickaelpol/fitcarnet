@@ -1,0 +1,1 @@
+{"nodes": [{"id": "api_config_packages_cache_config", "label": "Framework Cache Configuration (filesystem app pool)", "file_type": "code", "source_file": "api/config/packages/cache.yaml", "source_location": "framework.cache", "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

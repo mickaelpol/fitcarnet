@@ -111,5 +111,17 @@ sauvegardes/
 # ---------------------------------------------------------------------
 /noms-exercices.txt
 
-# Artefacts du graphe de connaissances (audit)
-graphify-out/
+# Artefacts du graphe de connaissances.
+#
+# Le graphe lui-meme (graph.json, graph.html) se reconstruit et pese 5 Mo qui
+# changent a chaque build : il n'a rien a faire dans l'historique.
+#
+# SON CACHE SEMANTIQUE, SI. Ces 480 Ko sont le produit des agents d'extraction
+# — 125 000 tokens au dernier build — et ils sont PORTABLES : indexes par
+# empreinte de contenu, sans un seul chemin absolu. Versionnes, une machine
+# neuve reconstruit le graphe sans redepenser un token de modele.
+# Le cache AST (2,1 Mo) reste exclu : il est deterministe et gratuit a refaire.
+graphify-out/*
+!graphify-out/cache/
+graphify-out/cache/*
+!graphify-out/cache/semantic/

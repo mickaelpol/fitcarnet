@@ -7,6 +7,21 @@ web + Android (`front/`), PostgreSQL 16 (`db/`), déployée sur un NAS Synology 
 **Le code, les commentaires, les noms de variables et les messages de commit sont en français.**
 Les identifiants métier aussi (`Aliment`, `Seance`, `cleDHabitude`). Garder cette langue.
 
+## Sur une machine neuve
+
+```bash
+git clone ssh://git@gitea.mickael-pol.fr:2222/mickael/fitcarnet.git
+cd fitcarnet && ./installer-outils.sh     # graphify, intelephense, outillage
+# redémarrer Claude Code ici — il installe alors les plugins déclarés
+./installer.sh                            # l'application : base, conteneurs, compte
+```
+
+Le dépôt porte **tout l'outillage** : `CLAUDE.md`, les hooks et `skillOverrides`,
+la déclaration des cinq plugins (`enabledPlugins`, installés au premier
+démarrage), les skills propres au projet, `.graphifyignore`, et le **cache
+sémantique de graphify** — 480 Ko qui évitent de redépenser 125 000 tokens
+d'extraction. Seul le graphe lui-même se reconstruit : `/graphify .`.
+
 ## Commandes
 
 ```bash
