@@ -214,6 +214,75 @@ export function calculer(
     lip: macros.lip - cibles.lip,
   };
 
+  /* ------------------------------------------------------------------
+   * QUI PORTE LE SURPLUS, ET COMBIEN EN RETIRER.
+   *
+   * « Ce que tu as déjà dépasse l'objectif en féculents et sucres. Réduis une
+   * quantité. » — LAQUELLE, ET DE COMBIEN ? Le message ne le disait pas, et
+   * c'est la seule chose qu'on veuille savoir devant sa balance à midi.
+   * L'information existe pourtant ici même : on connaît l'écart au gramme
+   * près, et on sait quel aliment imposé apporte quoi.
+   *
+   * ON DÉSIGNE LE PLUS GROS PORTEUR, PAS TOUS. Répartir le surplus sur trois
+   * aliments donnerait trois nombres à soustraire, trois pesées à refaire et
+   * une décision de plus à prendre. Un seul aliment, un seul nombre, un seul
+   * geste — quitte à ce que ce soit approximatif : la balance tranchera.
+   * ------------------------------------------------------------------ */
+  const porteurDe = (macro: 'prot' | 'gluc' | 'lip') => {
+    let tete: { nom: string; apport: number; quantite: number } | null = null;
+    for (const f of fixesRef) {
+      if (f.reference <= 0) continue;
+      const apport = macrosDe(f.aliment, f.reference, glucidesTotaux)[macro];
+      if (apport <= 0) continue;
+      if (tete === null || apport > tete.apport) {
+        tete = { nom: f.aliment.nom, apport, quantite: f.reference };
+      }
+    }
+
+    return tete;
+  };
+
+  /**
+   * « Retire environ 47 g de pommes de terre. » — OU « ajoute environ 44 g ».
+   *
+   * LES DEUX SENS, DANS UNE SEULE FONCTION, et ce n'était pas le cas au
+   * premier essai : je n'avais écrit que le retrait, et le manque s'affichait
+   * comme « trop de glucides de -7,5 g ». Un nombre négatif derrière le mot
+   * « trop » ne se lit pas, il se déchiffre. Un écart a un signe ; le message
+   * doit changer de verbe avec lui, pas se contenter de changer de nombre.
+   *
+   * Rend une chaîne VIDE quand il n'y a rien d'utile à dire — aucun aliment
+   * du repas ne porte cette macro, ou le calcul donnerait zéro gramme. Mieux
+   * vaut le message générique qu'un conseil qui désigne le mauvais aliment.
+   */
+  const conseil = (macro: 'prot' | 'gluc' | 'lip', ecart: number): string => {
+    const p = porteurDe(macro);
+    if (p === null) return '';
+    const parGramme = p.apport / p.quantite;
+    if (!(parGramme > 0)) return '';
+    const grammes = Math.round(Math.abs(ecart) / parGramme);
+    if (grammes <= 0) return '';
+    const nom = p.nom.toLowerCase();
+
+    if (ecart < 0) return ` Ajoute environ ${grammes} g de « ${nom} ».`;
+
+    /* Retirer plus qu'il n'y en a n'a pas de sens : on le dit, plutôt que
+       d'annoncer « retire 400 g » d'un aliment qui n'en pèse que 290. */
+    return grammes >= p.quantite
+      ? ` Même en retirant tout le « ${nom} » (${Math.round(p.quantite)} g), `
+        + "il resterait un écart : c'est ailleurs qu'il faut couper."
+      : ` Retire environ ${grammes} g de « ${nom} » `
+        + '— ou garde-les pour le repas suivant.';
+  };
+
+  /** L'écart, dit en toutes lettres, avec le total et la cible. */
+  const constat = (quoi: string, ecart: number, total: number, cible: number): string =>
+    (ecart > 0
+      ? `Trop de ${quoi} de ${ecart.toFixed(1)} g`
+      : `Il manque ${(-ecart).toFixed(1)} g de ${quoi}`)
+    + ` : ce repas en apporte ${total.toFixed(1)} g `
+    + `pour un objectif de ${cible.toFixed(1)} g.`;
+
   // diagnostics explicites sur les écarts qui subsistent
   if (Math.abs(ecarts.lip) > tolerance.lip) {
     if (ecarts.lip > 0 && arrondis.lipide <= 0) {
@@ -233,10 +302,11 @@ export function calculer(
       diagnostics.push({
         gravite: 'avertissement',
         code: 'lipides_hors_cible',
-        message: ecarts.lip > 0
-          ? `Un peu trop gras : ${ecarts.lip.toFixed(1)} g de plus que l'objectif.`
-          : `Pas assez gras : ${(-ecarts.lip).toFixed(1)} g de moins que l'objectif. ` +
-            'Ajoute des oléagineux ou un peu d\'huile.',
+        message: constat('lipides', ecarts.lip, macros.lip, cibles.lip)
+          + (conseil('lip', ecarts.lip)
+            || (ecarts.lip > 0
+              ? ' Choisis une source plus maigre.'
+              : " Ajoute des oléagineux ou un peu d'huile.")),
       });
     }
   }
@@ -244,22 +314,23 @@ export function calculer(
     diagnostics.push({
       gravite: arrondis.glucide <= 0 ? 'blocage' : 'avertissement',
       code: 'glucides_hors_cible',
-      message:
-        arrondis.glucide <= 0
-          ? 'Ce que tu as déjà dépasse l\'objectif en féculents et sucres. ' +
-            'Réduis une quantité, ou garde-en pour le repas suivant.'
-          : (ecarts.gluc > 0
-              ? `Un peu trop de féculents : ${ecarts.gluc.toFixed(1)} g de plus que l'objectif.`
-              : `Il manque ${(-ecarts.gluc).toFixed(1)} g de féculents.`),
+      /* LE SIGNE DE L'ÉCART DÉCIDE DU VERBE, pas le fait qu'il reste ou non
+         quelque chose d'ajustable. `arrondis.glucide <= 0` dit seulement que
+         le calcul n'a plus de levier de ce côté — souvent parce que TU as
+         imposé la quantité du féculent. Ça ne dit rien du sens de l'écart. */
+      message: constat('glucides', ecarts.gluc, macros.gluc, cibles.gluc)
+        + (conseil('gluc', ecarts.gluc)
+          || (ecarts.gluc > 0
+            ? ' Réduis une quantité, ou garde-en pour le repas suivant.'
+            : ' Ajoute un féculent à ce repas.')),
     });
   }
   if (Math.abs(ecarts.prot) > tolerance.prot) {
     diagnostics.push({
       gravite: 'avertissement',
       code: 'proteines_hors_cible',
-      message: ecarts.prot > 0
-        ? `Un peu trop de protéines : ${ecarts.prot.toFixed(1)} g de plus que l'objectif.`
-        : `Il manque ${(-ecarts.prot).toFixed(1)} g de protéines.`,
+      message: constat('protéines', ecarts.prot, macros.prot, cibles.prot)
+        + conseil('prot', ecarts.prot),
     });
   }
 

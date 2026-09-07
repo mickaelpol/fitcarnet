@@ -26,10 +26,11 @@ import {
   MODELE, NOM_REPAS, REPAS,
   type AuMieux, type DemandeDatee, type DemandeRepas, type Repas, type Role,
   cleDuRepas, composer, listeDeCourses, resoudreLaPeriode, roleDe, rolesDuRepas,
+  releveDe,
 } from '@/solveur/composer';
 import { verifierCatalogue } from '@/calcul/plausibilite';
 import { basculer, estCoche } from '@/calcul/selectionRepas';
-import { versReference } from '@/solveur/solveur';
+import { convertir, versReference } from '@/solveur/solveur';
 import type { Aliment, Fixe } from '@/solveur/types';
 import { C, E, N, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 
@@ -114,6 +115,9 @@ const demandePour = (
 ): DemandeRepas => {
   const fixes: Fixe[] = [];
   const variables: { proteine?: Aliment; glucide?: Aliment; lipide?: Aliment } = {};
+  /* Ce qu'on a DÉCLARÉ avoir sous la main, par aliment. Un plafond, pas une
+     quantité à servir : voir plus bas, et `DemandeRepas.plafonds`. */
+  const plafonds: Record<string, number> = {};
 
   /* Un ajout n'a de sens qu'avec une quantité : sans elle, il ne pèse rien
      et n'apparaît pas dans le résultat. On le pose donc à zéro tant que
@@ -134,18 +138,51 @@ const demandePour = (
     const reste = compose.restes[String(aliment.id)];
     const saisi = (reste?.grammes ?? '').trim();
     const grammes = Number(saisi.replace(',', '.'));
+    const declare = saisi !== '' && Number.isFinite(grammes) && grammes >= 0;
 
-    /* Un reste déclaré fige la quantité : l'aliment sort des variables et
-       le repas se recompose autour de lui.
-       Zéro est une valeur COMME UNE AUTRE — « je n'en mets pas » — et non
-       un champ vide. C'est ce qui permet d'écarter un aliment sans le
-       remplacer, et le repas se recalcule autour des autres. */
-    if (saisi !== '' && Number.isFinite(grammes) && grammes >= 0) {
-      fixes.push({ aliment, grammes, unite: reste!.unite });
-    } else if (fixe !== undefined) {
-      // même règle que `composer` : la quantité s'entend dans l'état de
-      // référence de l'aliment, donc ce qu'on sert.
-      fixes.push({ aliment, grammes: fixe * portions });
+    /* UN RESTE DÉCLARÉ EST UN PLAFOND, PLUS UNE QUANTITÉ IMPOSÉE.
+     *
+     * Il figeait la quantité : l'aliment sortait des variables et le repas se
+     * recomposait autour de lui. Écrire « il me reste 290 g de pommes de
+     * terre » revenait donc à exiger d'en manger 290 — et à devoir ajuster
+     * tout le reste à la main pour rattraper des macros qu'on n'avait pas
+     * demandé de casser.
+     *
+     * On dit maintenant ce qu'on a ; le calcul sert ce qu'il faut, sans
+     * jamais dépasser. Le mécanisme n'est pas neuf : c'est celui qui borne
+     * déjà chaque aliment au contenu du frigo, relève par un autre aliment
+     * comprise. Un plafond déclaré est simplement un frigo plus petit, le
+     * temps d'un repas.
+     *
+     * ZÉRO RESTE UN RETRAIT, PAS UN PLAFOND. « Je n'en mets pas » doit écarter
+     * l'aliment ; un plafond à zéro, lui, ferait chercher un remplaçant du
+     * même rôle — l'inverse de ce qu'on demande. */
+    if (declare && grammes === 0) {
+      fixes.push({ aliment, grammes: 0, unite: reste!.unite });
+      continue;
+    }
+
+    /* Le plafond se compte dans l'unité du STOCK — la colonne « à cuire » —
+       alors que la saisie peut être en cuit. On convertit ici, une fois, au
+       lieu de laisser le solveur deviner. */
+    if (declare) {
+      plafonds[String(aliment.id)] = convertir(
+        aliment, versReference(aliment, grammes, reste!.unite),
+      ).aCuire;
+    }
+
+    if (fixe !== undefined) {
+      /* Un rôle que le modèle impose — légume, fruit, laitage — n'a aucune
+         variable à optimiser. On sert ce que le modèle demande, borné par ce
+         qu'on a sous la main. Même règle que `composer` : la quantité
+         s'entend dans l'état de référence de l'aliment. */
+      const duModele = fixe * portions;
+      fixes.push({
+        aliment,
+        grammes: declare
+          ? Math.min(duModele, versReference(aliment, grammes, reste!.unite))
+          : duModele,
+      });
     } else if (cle === MODELE[repas].proteine) {
       variables.proteine = aliment;
     } else if (cle === MODELE[repas].glucide) {
@@ -166,6 +203,10 @@ const demandePour = (
     },
     verrous: new Set(compose.verrous),
     glucidesTotaux: cible.glucidesTotaux === true,
+    /* `undefined` et non un objet vide : le solveur n'enveloppe alors même
+       pas sa fonction de stock, et le cas courant ne paie rien. */
+    plafonds: Object.keys(plafonds).length > 0 ? plafonds : undefined,
+    releves: Object.keys(compose.releves ?? {}).length > 0 ? compose.releves : undefined,
   };
 };
 
@@ -182,6 +223,15 @@ interface Compose {
    * unique. Le repas se recalcule autour d'eux.
    */
   ajouts: Aliment[];
+  /**
+   * QUI PREND LE RELAIS quand un aliment vient à manquer, par rôle.
+   *
+   * Sans ce choix, le relais était le premier candidat trouvé dans la liste
+   * du frigo : « le reste est porté par Boulgour » parce que le boulgour
+   * passait avant le riz, et rien ne permettait de dire non. Vide = le calcul
+   * décide, comme avant.
+   */
+  releves: Partial<Record<Role, Aliment>>;
   /** l'aliment dont on a un reste, avec ce qu'il en reste */
   restes: Record<string, { grammes: string; unite: 'cru' | 'cuit' }>;
   /** les rôles que l'utilisateur a décidés lui-même : jamais remplacés d'office */
@@ -243,6 +293,11 @@ export default function Calculateur() {
   const [plan, setPlan] = useState<Record<string, Compose> | null>(null);
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [remplacer, setRemplacer] = useState<{ cle: string; role: Role } | null>(null);
+  /* Le relais qu'on est en train de choisir : quel repas, quel rôle, et
+     l'aliment épuisé — c'est LUI qui décide des candidats acceptables, pas le
+     rôle : l'huile peut suppléer un oléagineux, l'inverse aussi. */
+  const [relais, setRelais] = useState<
+    { cle: string; role: Role; epuise: Aliment } | null>(null);
   const [ajouter, setAjouter] = useState<string | null>(null);
   const [courses, setCourses] = useState(false);
   /* Le pliage. Un seul jour ouvert à la fois — un accordéon, pas sept encarts
@@ -599,7 +654,7 @@ const dateCourte = (iso: string | null | undefined): string => {
           roles[role as Role] = aliment;
         }
 
-        suite[cle] = { roles, restes: {}, verrous: [], ajouts: [] };
+        suite[cle] = { roles, restes: {}, verrous: [], ajouts: [], releves: {} };
       }
     }
 
@@ -1501,6 +1556,26 @@ const dateCourte = (iso: string | null | undefined): string => {
     (a) => roleDe(a) === remplacer.role
       && a.id !== plan[remplacer.cle]?.roles[remplacer.role]?.id);
 
+  /* LES MÊMES RÈGLES QUE LE CALCUL, PAS DES RÈGLES PARALLÈLES. `releveDe` est
+     la fonction dont le solveur se sert pour choisir tout seul ; on lui pose
+     la même question. Proposer ici un aliment qu'il refuserait ensuite
+     donnerait un choix sans effet, et rien à l'écran ne dirait pourquoi. */
+  const relayeurs = relais === null ? [] : (() => {
+    const permis = releveDe(relais.epuise);
+    const compose = plan[relais.cle];
+    /* Un aliment déjà au menu de ce repas serait refusé par le calcul : il
+       ne peut pas tenir deux lignes à la fois. Le proposer quand même
+       donnerait un choix sans effet — on appuie, et rien ne change. */
+    const dejaLa = new Set<number | string>([
+      ...Object.values(compose?.roles ?? {}).map((a: Aliment) => a.id),
+      ...(compose?.ajouts ?? []).map((a) => a.id),
+    ]);
+
+    return stock.filter((a) => permis.includes(roleDe(a) as Role)
+      && !dejaLa.has(a.id)
+      && stockDe(a) > 0);
+  })();
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={s.page}>
@@ -1510,7 +1585,8 @@ const dateCourte = (iso: string | null | undefined): string => {
           Voilà ce que ton frigo permet. Change ce qui ne te va pas : les
           quantités se recalculent toutes seules pour retomber sur tes
           objectifs. S'il te reste un fond de casserole, écris son poids dans
-          la case « reste » — mets 0 pour retirer un aliment de ce repas.
+          la case « reste » : c'est un maximum, le calcul en sert ce qu'il
+          faut et pas plus. Mets 0 pour retirer un aliment de ce repas.
         </Discret>
 
         {/* Un plan de sept jours porte une trentaine de lignes, dont beaucoup
@@ -1573,6 +1649,7 @@ const dateCourte = (iso: string | null | undefined): string => {
                     ouvert={ouvert === cle}
                     onOuvrir={() => setOuvert(ouvert === cle ? null : cle)}
                     onRemplacer={(role) => setRemplacer({ cle, role })}
+                    onChoisirRelais={(role, epuise) => setRelais({ cle, role, epuise })}
                     onAjouter={() => setAjouter(cle)}
                     onRetirerAjout={(id) => setPlan((p) => ({
                       ...p!,
@@ -1643,6 +1720,34 @@ const dateCourte = (iso: string | null | undefined): string => {
         <Bouton variante="contour" onPress={() => { setPlan(null); setBatch(false); }}>
           ← Changer les jours</Bouton>
       </View>
+
+      {/* CHOISIR QUI COMPLÈTE, plutôt que de subir le premier de la liste. */}
+      <ChoixDansListe
+        visible={relais !== null}
+        titre={relais ? `Compléter ${relais.epuise.nom.toLowerCase()} avec…` : ''}
+        elements={relayeurs.map((a, i) => ({
+          id: i, nom: a.nom, couleur: couleurRole(a.categorie),
+        }))}
+        onChoisir={(index) => {
+          if (relais === null) return;
+          const choisi = relayeurs[index];
+          if (!choisi) return;
+
+          setPlan((p) => {
+            const courant = p![relais.cle]!;
+
+            return {
+              ...p!,
+              [relais.cle]: {
+                ...courant,
+                releves: { ...courant.releves, [relais.role]: choisi },
+              },
+            };
+          });
+          setRelais(null);
+        }}
+        onFermer={() => setRelais(null)}
+      />
 
       <ChoixDansListe
         visible={remplacer !== null}
@@ -1750,9 +1855,73 @@ const dateCourte = (iso: string | null | undefined): string => {
 
 /* ------------------------------------------------------ une carte de repas */
 
+/**
+ * L'UNITÉ PAR DÉFAUT D'UNE SAISIE DE POIDS, ÉCRITE UNE FOIS.
+ *
+ * Elle valait `cuit` pour les aliments choisis par le calcul et `cru` pour
+ * ceux qu'on ajoute soi-même — deux contrôles identiques à l'œil, de sens
+ * opposé selon la ligne. Personne n'avait décidé ça ; deux littéraux avaient
+ * divergé.
+ *
+ * `cru` PARCE QUE C'EST DÉJÀ LA CONSIGNE. L'écran écrit, trois lignes plus
+ * haut : « On pèse AVANT cuisson ». Un défaut qui contredit la consigne
+ * affichée au-dessus de lui est un piège, pas un réglage.
+ */
+const DEFAUT_UNITE: 'cru' | 'cuit' = 'cru';
+
+/**
+ * CRU OU CUIT : DEUX PUCES, PAS UN BOUTON.
+ *
+ * C'ÉTAIT UN BOUTON DONT L'ÉTIQUETTE ÉTAIT SON PROPRE ÉTAT. Il affichait
+ * « cru », ce qui veut dire « ton nombre est lu comme du cru » — et se lisait
+ * comme « appuie pour passer en cru ». Deux sens opposés pour le même mot, et
+ * rien à l'écran pour trancher.
+ *
+ * ET IL NE CONVERTISSAIT PAS LE NOMBRE. Appuyer changeait la LECTURE des
+ * grammes déjà saisis : 127 g lus crus puis lus cuits, ce ne sont pas les
+ * mêmes macros pour la même saisie. Un bouton qui semble convertir et qui
+ * réinterprète est le pire des deux mondes.
+ *
+ * Deux puces côte à côte, l'active en surbrillance : on LIT dans quelle unité
+ * la saisie est comprise, et on DÉSIGNE l'autre pour en changer. L'état et
+ * l'action ne se disputent plus le même mot.
+ */
+function CruOuCuit({
+  unite, onChanger,
+}: {
+  unite: 'cru' | 'cuit';
+  onChanger: (u: 'cru' | 'cuit') => void;
+}) {
+  return (
+    <View style={s.uniteGroupe}>
+      {(['cru', 'cuit'] as const).map((u) => {
+        const actif = u === unite;
+
+        return (
+          <Pressable
+            key={u}
+            onPress={() => onChanger(u)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: actif }}
+            accessibilityLabel={`Poids pesé ${u}`}
+            style={[s.unitePuce, actif && s.unitePuceActive]}
+          >
+            <Discret style={actif
+              ? { fontSize: T.petit, color: C.fond, fontFamily: P.fort }
+              : { fontSize: T.petit }}
+            >
+              {u}
+            </Discret>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function CarteRepas({
   repas, compose, cible, portions, resultat, fibresDe,
-  ouvert, onOuvrir, onRemplacer, onAjouter, onRetirerAjout, onReste,
+  ouvert, onOuvrir, onRemplacer, onChoisirRelais, onAjouter, onRetirerAjout, onReste,
   cuissonDe, onCuisson,
 }: {
   repas: Repas;
@@ -1768,6 +1937,8 @@ function CarteRepas({
   ouvert: boolean;
   onOuvrir: () => void;
   onRemplacer: (role: Role) => void;
+  /** ouvrir le choix de l'aliment qui complétera celui qui manque */
+  onChoisirRelais: (role: Role, epuise: Aliment) => void;
   onAjouter: () => void;
   onRetirerAjout: (id: number | string) => void;
   onReste: (cle: string, valeurs: { grammes: string; unite: 'cru' | 'cuit' }) => void;
@@ -1952,19 +2123,16 @@ function CarteRepas({
                   <Champ
                     valeur={reste?.grammes ?? ''}
                     onChange={(v) => onReste(String(aliment.id),
-                      { grammes: v, unite: reste?.unite ?? 'cuit' })}
+                      { grammes: v, unite: reste?.unite ?? DEFAUT_UNITE })}
                     placeholder="reste"
                     unite="g" numerique style={{ width: 92 }}
                   />
-                  <Pressable
-                    onPress={() => onReste(String(aliment.id), {
-                      grammes: reste?.grammes ?? '',
-                      unite: reste?.unite === 'cru' ? 'cuit' : 'cru',
+                  <CruOuCuit
+                    unite={reste?.unite ?? DEFAUT_UNITE}
+                    onChanger={(u) => onReste(String(aliment.id), {
+                      grammes: reste?.grammes ?? '', unite: u,
                     })}
-                    style={s.action}
-                  >
-                    <Discret style={{ fontSize: T.petit }}>{reste?.unite ?? 'cuit'}</Discret>
-                  </Pressable>
+                  />
                 </View>
 
                 {renforts.map((q) => (
@@ -1981,13 +2149,27 @@ function CarteRepas({
                   </View>
                 ))}
 
+                {/* LE RELAIS EST UNE DÉCISION, DONC IL SE TOUCHE. Il était
+                    annoncé comme un fait — « le reste est porté par
+                    Boulgour » — alors que c'est un choix parmi ceux du frigo,
+                    fait par défaut. On le rend modifiable là où il s'affiche,
+                    plutôt que d'obliger à le deviner ailleurs. */}
                 {notes.map((pl) => (
-                  <Discret key={String(pl.aliment.id)} style={s.plafond}>
-                    {pl.aliment.nom} : {nb(pl.grammes)} g, c'est tout ce que tu as.
-                    {pl.releve
-                      ? ` Le reste est porté par ${pl.releve.nom}.`
-                      : ' Rien d\'autre ne peut prendre le relais.'}
-                  </Discret>
+                  <Pressable
+                    key={String(pl.aliment.id)}
+                    onPress={() => onChoisirRelais(pl.role, pl.aliment)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Choisir ce qui complète ${pl.aliment.nom}`}
+                  >
+                    <Discret style={s.plafond}>
+                      {pl.aliment.nom} : {nb(pl.grammes)} g, c'est tout ce que tu as.
+                      {pl.releve
+                        ? ` Le reste est porté par ${pl.releve.nom}.`
+                        : ' Rien d\'autre ne peut prendre le relais.'}
+                      {' '}
+                      <Texte style={{ color: C.vif, fontSize: T.petit }}>Changer</Texte>
+                    </Discret>
+                  </Pressable>
                 ))}
 
                 {echange && (
@@ -2029,7 +2211,7 @@ function CarteRepas({
                   <Champ
                     valeur={reste?.grammes ?? ''}
                     onChange={(v) => onReste(String(a.id),
-                      { grammes: v, unite: reste?.unite ?? 'cru' })}
+                      { grammes: v, unite: reste?.unite ?? DEFAUT_UNITE })}
                     placeholder="quantité"
                     unite="g" numerique style={{ width: 112 }}
                   />
@@ -2041,15 +2223,12 @@ function CarteRepas({
                       Quantité illisible — cet aliment compte pour 0 g.
                     </Discret>
                   )}
-                  <Pressable
-                    onPress={() => onReste(String(a.id), {
-                      grammes: reste?.grammes ?? '',
-                      unite: reste?.unite === 'cru' ? 'cuit' : 'cru',
+                  <CruOuCuit
+                    unite={reste?.unite ?? DEFAUT_UNITE}
+                    onChanger={(u) => onReste(String(a.id), {
+                      grammes: reste?.grammes ?? '', unite: u,
                     })}
-                    style={s.action}
-                  >
-                    <Discret style={{ fontSize: T.petit }}>{reste?.unite ?? 'cru'}</Discret>
-                  </Pressable>
+                  />
                 </View>
               </View>
             );
@@ -2195,6 +2374,17 @@ const s = StyleSheet.create({
     minHeight: TOUCHE - 10, justifyContent: 'center', paddingHorizontal: E.s,
     borderRadius: R.s, borderWidth: 1, borderColor: C.ligne,
   },
+  /* Les deux puces sont collées dans un même cadre : c'est ce qui les fait
+     lire comme UN choix à deux positions, et non comme deux boutons voisins
+     qu'on pourrait presser tous les deux. */
+  uniteGroupe: {
+    flexDirection: 'row', borderRadius: R.s, borderWidth: 1,
+    borderColor: C.ligne, overflow: 'hidden',
+  },
+  unitePuce: {
+    minHeight: TOUCHE - 10, justifyContent: 'center', paddingHorizontal: E.s,
+  },
+  unitePuceActive: { backgroundColor: C.vif },
   renfort: { paddingLeft: E.m, borderLeftWidth: 2, borderLeftColor: C.ok },
   ajouterAliment: {
     borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.ligne, borderRadius: R.s,

@@ -308,7 +308,7 @@ export interface Ajuste {
  * quand le skyr manquait, la variable « proteine » de la collation cherchait
  * une protéine et proposait du blanc de poulet à 16 h.
  */
-const releveDe = (a: Aliment): Role[] => {
+export const releveDe = (a: Aliment): Role[] => {
   const role = roleDe(a);
   if (role === 'lipide' || role === 'huile') return ['lipide', 'huile'];
 
@@ -338,6 +338,19 @@ export function ajusterAuStock(
   stockDe: (a: Aliment) => number,
   candidats: Aliment[],
   glucidesTotaux = false,
+  /**
+   * CE QUE L'UTILISATEUR A CHOISI POUR PRENDRE LE RELAIS, par rôle.
+   *
+   * Sans ça, le relais est le PREMIER candidat trouvé — un ordre de liste,
+   * pas une décision. On se retrouvait avec du boulgour parce qu'il passait
+   * avant le riz, et il n'y avait aucun moyen de dire non.
+   *
+   * Le choix reste SOUMIS AUX MÊMES CONDITIONS que le choix automatique :
+   * bon rôle, encore en stock, pas déjà au menu. Un choix devenu impossible
+   * n'est pas imposé de force — l'écran montrera ce qui a réellement pris le
+   * relais, plutôt qu'une ligne qui ment.
+   */
+  releves: Readonly<Partial<Record<Role, Aliment>>> = {},
 ): Ajuste {
   const variables: Variables = { ...depart.variables };
   let fixes = [...depart.fixes];
@@ -347,6 +360,28 @@ export function ajusterAuStock(
     ...Object.values(variables).map((a) => a.id),
     ...fixes.map((f) => f.aliment.id),
   ]);
+
+  /**
+   * Qui prend le relais d'un aliment épuisé : le choix de l'utilisateur s'il
+   * en a fait un et qu'il tient debout, le premier candidat valable sinon.
+   *
+   * UNE SEULE FONCTION POUR LES DEUX ENDROITS où l'on plafonne — une quantité
+   * imposée qui déborde, et une variable qui déborde. C'étaient deux copies
+   * de la même recherche ; ajouter le choix manuel à l'une et pas à l'autre
+   * aurait donné un écran qui obéit une fois sur deux.
+   */
+  const choisirReleve = (epuise: Aliment, role: Role | null): Aliment | undefined => {
+    const permis = releveDe(epuise);
+    const valable = (c: Aliment | undefined): boolean => c !== undefined
+      && permis.includes(roleDe(c) as Role)
+      && !utilises.has(c.id)
+      && stockDe(c) > 0;
+
+    const voulu = role === null ? undefined : releves[role];
+    if (valable(voulu)) return voulu;
+
+    return candidats.find((c) => valable(c));
+  };
 
   /* Une boucle bornée : chaque tour consomme un aliment du stock, et le
      stock est fini. La borne n'est là que pour qu'un cas non prévu s'arrête
@@ -376,11 +411,7 @@ export function ajusterAuStock(
       const manque = convertir(f.aliment, versReference(f.aliment, f.grammes, f.unite))
         .assiette - dispo * r;
 
-      const permis = releveDe(f.aliment);
-      const releve = candidats.find(
-        (c) => permis.includes(roleDe(c) as Role)
-          && !utilises.has(c.id)
-          && stockDe(c) > 0);
+      const releve = choisirReleve(f.aliment, roleDe(f.aliment));
 
       // `unite: 'cru'` : le stock se compte avant cuisson, comme la colonne « à cuire »
       fixes = fixes.map((x, i) => (i === iDeborde
@@ -429,11 +460,7 @@ export function ajusterAuStock(
     fixes = [...fixes, { aliment: deborde.aliment, grammes: deborde.dispo, unite: 'cru' }];
     delete variables[deborde.cle];
 
-    const permis = releveDe(deborde.aliment);
-    const releve = candidats.find(
-      (c) => permis.includes(roleDe(c) as Role)
-        && !utilises.has(c.id)
-        && stockDe(c) > 0);
+    const releve = choisirReleve(deborde.aliment, deborde.cle);
 
     if (releve !== undefined) {
       variables[deborde.cle] = releve;
@@ -500,8 +527,10 @@ export function resoudreAuMieux(
   candidats: Aliment[],
   verrous: ReadonlySet<Role> = new Set(),
   glucidesTotaux = false,
+  releves: Readonly<Partial<Record<Role, Aliment>>> = {},
 ): AuMieux {
-  const base = ajusterAuStock(depart, cibles, stockDe, candidats, glucidesTotaux);
+  const base = ajusterAuStock(
+    depart, cibles, stockDe, candidats, glucidesTotaux, releves);
   let meilleur: AuMieux = { ...base, echanges: [] };
   if (base.resultat.ok) return meilleur;
 
@@ -511,7 +540,7 @@ export function resoudreAuMieux(
     echange: { role: Role; retire: Aliment; mis: Aliment },
   ) => {
     const tente = ajusterAuStock(
-      { variables, fixes }, cibles, stockDe, candidats, glucidesTotaux);
+      { variables, fixes }, cibles, stockDe, candidats, glucidesTotaux, releves);
     if (penalite(tente.resultat) >= penalite(meilleur.resultat)) return;
 
     /* Le plafonnement du stock peut faire revenir l'aliment qu'on venait de
@@ -593,6 +622,31 @@ export interface DemandeRepas {
   /** les rôles que l'utilisateur a choisis lui-même */
   verrous: ReadonlySet<Role>;
   glucidesTotaux: boolean;
+  /**
+   * CE DONT ON DISPOSE POUR CE REPAS-LÀ, quand l'utilisateur l'a déclaré.
+   *
+   * « Il me reste 290 g de pommes de terre » : un PLAFOND, pas une quantité
+   * imposée. Le calcul en sert ce qu'il faut pour tenir les cibles, jamais
+   * plus. Avant, une telle déclaration figeait la quantité et sortait
+   * l'aliment des variables — on se retrouvait à ajuster les autres à
+   * l'aveugle pour rattraper une colonne qu'on n'avait pas demandée.
+   *
+   * PAR ALIMENT ET PAR REPAS, et c'est tout l'intérêt d'être ici plutôt que
+   * dans `stockDe` : un fond de casserole annoncé ce midi ne doit pas brider
+   * le dîner de jeudi.
+   *
+   * Les grammes s'entendent dans l'unité du STOCK — celle de la colonne
+   * « à cuire », donc l'aliment cru ou sec. L'appelant convertit.
+   */
+  plafonds?: Readonly<Record<string, number>>;
+  /**
+   * QUI PREND LE RELAIS QUAND UN ALIMENT MANQUE, choisi par l'utilisateur.
+   *
+   * Par rôle, parce que c'est le rôle qui manque — « il n'y a plus assez de
+   * féculent » — et non l'aliment en particulier. Absent : le calcul prend le
+   * premier candidat valable, comme avant.
+   */
+  releves?: Readonly<Partial<Record<Role, Aliment>>>;
 }
 
 /**
@@ -688,9 +742,21 @@ export function resoudreLaPeriode(
     (x, y) => x.jour - y.jour || REPAS.indexOf(x.repas) - REPAS.indexOf(y.repas));
 
   for (const d of enOrdre) {
+    /* LE PLAFOND DÉCLARÉ SE COMPORTE COMME UN FRIGO PLUS PETIT, et rien de
+       plus. Tout ce qui suit — le plafonnement, la relève par un autre
+       aliment du même rôle, le message « le reste est porté par X » — existe
+       déjà pour le stock. On ne réécrit pas ce mécanisme, on lui donne un
+       stock plus bas le temps d'un repas. */
+    const dispo = d.plafonds === undefined
+      ? restant
+      : (a: Aliment): number => Math.min(
+        restant(a),
+        d.plafonds![String(a.id)] ?? Number.POSITIVE_INFINITY,
+      );
+
     const sortie = resoudreAuMieux(
       { variables: d.variables, fixes: d.fixes },
-      d.cibles, restant, candidats, d.verrous, d.glucidesTotaux);
+      d.cibles, dispo, candidats, d.verrous, d.glucidesTotaux, d.releves);
 
     /* On retire ce que ce repas vient de prendre, dans l'unité du stock —
        celle de la colonne « à cuire ». */
