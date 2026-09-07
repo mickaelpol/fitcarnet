@@ -579,11 +579,14 @@ MOTS_DECISIFS = ("naturel", "huile", "complet", "ecreme", "allege", "fume")
 #  l'utilisateur passe devant.
 SAISIE_MANUELLE = "moi"
 
-# Les champs personnalises Grocy dont CE script a besoin. Il les cree lui-meme
-# plutot que de dependre d'un autre outil : grocy_macros.py sait aussi les
-# creer, mais son --appliquer reecrit AU PASSAGE les macros de tous les
-# produits depuis sa propre table, ecrasant le travail fait ici. Demander a
-# quelqu'un de lancer l'un pour reparer l'autre etait un piege.
+# Les champs personnalises Grocy dont CE script a besoin, qu'il cree lui-meme.
+#
+# Un seul outil ecrit dans Grocy, et c'est celui-ci. Il a existe un
+# grocy_macros.py qui savait aussi creer ces champs, mais son --appliquer
+# reecrivait AU PASSAGE les macros de tous les produits depuis sa propre table
+# — en valeurs CUITES, l'inverse de la convention du projet. Il a ete supprime
+# en septembre 2026 : demander a quelqu'un de lancer l'un pour reparer l'autre
+# etait un piege.
 CHAMPS_REQUIS = [
     ("cat", "Catégorie", "text-single-line"),
     ("kcal100", "kcal / 100 g", "number-decimal"),

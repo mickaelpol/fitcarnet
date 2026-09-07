@@ -339,9 +339,9 @@ for cle, libelle in EXACTS.items():
 
 # Grocy refuse une écriture entière si UN champ manque, avec un 400 laconique :
 # « Field source_valeurs is not a valid userfield of the given entity ». Le
-# script crée donc ce qu'il lui faut, plutôt que de dépendre de grocy_macros.py
-# — dont le --appliquer réécrivait au passage les macros de tous les produits
-# depuis sa propre table, effaçant le travail fait ici.
+# script crée donc ce qu'il lui faut. Il a existé un grocy_macros.py dont le
+# --appliquer réécrivait au passage les macros de tous les produits depuis sa
+# propre table, en valeurs cuites ; il a été supprimé en septembre 2026.
 CHAMPS_REQUIS = BOITE["CHAMPS_REQUIS"]
 noms_champs = {c[0] for c in CHAMPS_REQUIS}
 

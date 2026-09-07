@@ -1,125 +1,166 @@
-# fitcarnet — étape 1 : socle
+# fitcarnet
 
-Application multi-utilisateurs (séances de musculation + calculateur de repas),
-**déployée à côté de ton carnet actuel**, qui continue de fonctionner sans changement.
+Suivi nutritionnel et de musculation, multi-comptes, auto-hébergé.
+Compose des repas qui atteignent des cibles de macros à partir de ce qu'il y a
+vraiment dans le frigo, et suit la progression en salle.
 
-- Front : React (à venir, étape 2)
-- API : Symfony + API Platform sur **FrankenPHP**, PHP 8.3
-- Base : PostgreSQL 16, dédiée
-- Sous-domaine visé : `fitcarnet.mickael-pol.fr` (port local **8094**)
-
-> **Pourquoi FrankenPHP plutôt que nginx + php-fpm** : un seul conteneur au lieu
-> de deux, plus aucune configuration nginx à maintenir, HTTP/3 natif, et la
-> possibilité d'activer plus tard le *mode worker* (application gardée en
-> mémoire, débit 3 à 4×). On démarre en **mode classique** : même modèle de
-> requête que php-fpm, sans le risque de fuite mémoire des workers longue durée.
+Projet personnel. Le code, les commentaires et les messages de commit sont en
+français — les identifiants métier aussi (`Aliment`, `Seance`, `cleDHabitude`).
 
 ---
 
-## Ce que contient cette livraison
+## Ce que l'application fait
 
-```
-fitcarnet/
-├─ docker-compose.yml        stack (db + api + web)
-├─ .env.exemple              variables à renseigner
-├─ docker/
-│  ├─ Dockerfile             image FrankenPHP (cibles dev et prod)
-│  └─ Caddyfile              API sous /api + front React ailleurs
-└─ db/
-   ├─ 01-schema.sql          12 tables + 1 vue
-   └─ 02-donnees.sql         50 aliments + 20 exercices de référence
-```
+**Composer un repas.** On donne des cibles — 45 g de protéines, 80 g de
+glucides, 20 g de lipides — et le solveur rend des grammages atteignables avec
+le stock du moment. C'est un vrai système linéaire résolu par élimination de
+Gauss, pas un tâtonnement : à court de brocoli il sert des haricots, arrondit
+les quantités **avant** de recalculer les macros pour que le chiffre affiché
+soit celui qu'on pèse, et **explique chaque écart** à la cible.
+
+**Planifier plusieurs jours.** Le stock se partage sur la période, les fournées
+de batch cooking se répartissent, et la liste de courses répond à la vraie
+question : de quoi ai-je besoin pour manger ce que je *voulais* manger, et non
+ce que mon frigo m'impose.
+
+**Suivre le frigo.** Deux sources interchangeables derrière la même interface :
+la table `stock` de la base, ou une instance [Grocy](https://grocy.info)
+distante. Le champ `utilisateur.source_frigo` aiguille l'une ou l'autre.
+
+**Suivre les séances.** Modèles réutilisables, séries prévues et réalisées
+côte à côte, 1RM estimé par Epley — **uniquement sur les séries courtes**, parce
+qu'au-delà de quinze répétitions aucune formule n'est fiable.
+
+### Deux règles qui expliquent beaucoup de choix
+
+**Les valeurs nutritionnelles décrivent le produit tel qu'on le pèse.** Le riz
+sec vaut 350 kcal/100 g, pas 130. Le rendement cru/cuit se dérive des pesées à
+la lecture ; il ne se stocke pas.
+
+**Un chiffre faux est pire qu'un refus de répondre.** Ce qui s'affiche sera pesé
+et mangé. En cas de doute, l'application montre l'incertitude ou refuse.
 
 ---
 
-## Installation
+## Pile technique
 
-> Ceci est l'installation **en production, sur le NAS**. Pour monter un poste de
-> développement — outillage compris — voir [NOUVELLE-MACHINE.md](NOUVELLE-MACHINE.md).
+| Couche | Choix |
+|---|---|
+| **API** | Symfony 7.4 · API Platform 4.3 · Doctrine ORM 3.6 · PHP 8.3 sur FrankenPHP |
+| **Front** | Expo SDK 54 · React Native 0.81 · React 19 · TypeScript strict · expo-router 6 · TanStack Query |
+| **Base** | PostgreSQL 16 — schéma écrit à la main, contraintes et invariants portés par la base |
+| **Déploiement** | Docker Compose sur NAS Synology, derrière Caddy |
 
-**1. Arborescence sur le NAS**
+Android et web. Pas d'iOS : la distribution se fait par APK.
+
+---
+
+## Démarrage
+
+**Poste de développement neuf** → [NOUVELLE-MACHINE.md](NOUVELLE-MACHINE.md),
+qui couvre les prérequis, l'outillage et l'application, dans l'ordre.
+
+**En résumé :**
 
 ```bash
-sudo mkdir -p /volume1/docker/fitcarnet/{db,docker,api,front,pgdata}
+git clone ssh://git@gitea.mickael-pol.fr:2222/mickael/fitcarnet.git
+cd fitcarnet
+cp .env.exemple .env        # DB_PASSWORD, APP_SECRET, JWT_PASSPHRASE
+./installer-outils.sh       # outillage de développement
+./installer.sh              # base, migrations, compte, catalogue
+cd front && npm install
 ```
 
-Dépose `db/*.sql` dans `/volume1/docker/fitcarnet/db/`, puis `Dockerfile` et
-`Caddyfile` dans `/volume1/docker/fitcarnet/docker/`.
+---
 
-**2. Secrets**
+## Commandes
 
 ```bash
-cd /volume1/docker/fitcarnet
-cp .env.exemple .env
-# génère trois valeurs distinctes :
-openssl rand -hex 24    # DB_PASSWORD
-openssl rand -hex 32    # APP_SECRET
-openssl rand -hex 24    # JWT_PASSPHRASE
+cd front && npm test        # tsc --noEmit + 362 tests node:test
+cd front && npm run verif   # typage seul, plus rapide
+cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
+
+docker compose -f compose.dev.yml up          # environnement de développement
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 102 tests API
+docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
+
+db/manuel/verifier-schema.sh      # base neuve == base migrée ?
+db/manuel/verifier-migrations.sh  # les migrations tiennent-elles sur des données réelles ?
 ```
 
-**3. Déploiement**
+---
 
-Portainer → Stacks → Add stack → colle `docker-compose.yml` → ajoute les trois
-variables d'environnement → Deploy.
+## Structure
 
-Les fichiers SQL sont joués **automatiquement à la création de la base**, dans
-l'ordre alphabétique. Ils ne seront **pas rejoués** ensuite : pour repartir de
-zéro, supprime le dossier `pgdata`.
-
-**4. Vérification**
-
-```bash
-sudo docker exec -it fitcarnet-db psql -U fitcarnet -d fitcarnet \
-  -c "\dt" -c "SELECT count(*) FROM aliment;" -c "SELECT count(*) FROM exercice;"
+```
+api/          Symfony — 18 entités, contrôleurs, services, extensions Doctrine
+front/        Expo — 27 écrans, le solveur de repas, les modules de calcul
+  src/solveur/    composition de repas : algèbre, garanties, tests de propriété
+  src/calcul/     nutrition, cuisson, performance, plausibilité
+db/           01-schema.sql (le schéma complet) + manuel/ (20 migrations)
+docker/       Dockerfile, Caddyfile, point d'entrée de production
+docs/         audit-2026-09/ — 84 constats classés
+.claude/      outillage : skills du projet, agents, hooks, réglages
 ```
 
-Attendu : 12 tables, 50 aliments, 20 exercices.
+---
 
-**5. Reverse proxy**
+## Qualité
 
-DSM → Portail de connexion → Proxy inversé → `fitcarnet.mickael-pol.fr`
-vers `IP_NAS:8094`, avec certificat Let's Encrypt.
+**464 tests** — 362 côté front, 102 côté API — et quatre garde-fous automatiques
+qui tournent sans qu'on y pense :
+
+- **PHPStan** niveau 5 sur l'API ;
+- **`ModeleExposeTest`** refuse toute entité exposée qui n'implémente pas
+  `ProprieteUtilisateur` sans dérogation écrite — c'est le seul filet contre une
+  fuite de données entre comptes ;
+- **`verifier-schema.sh`** construit une base neuve et une base migrée dans deux
+  conteneurs jetables, et exige un diff vide ;
+- **`verifier-migrations.sh`** rejoue les migrations sur des données volontairement
+  aberrantes, pour qu'une migration ne casse pas le démarrage en production.
+
+Deux hooks lancent le typage front et l'analyse PHP après chaque édition.
+
+**TDD sans exception** : le test échoue d'abord, le correctif le fait passer
+ensuite. Sinon on « corrige » un bug en ajustant le test qui fige la mauvaise
+valeur.
 
 ---
 
-## Le modèle de données en un coup d'œil
+## Documentation
 
-**Commun à tous** — `aliment`, `exercice`, `emplacement`.
-Enrichi par n'importe quel utilisateur, profite à tout le monde.
-
-**Privé par utilisateur** — `stock`, `cible`, `modele` (+ exercices et séries),
-`seance` (+ exercices et séries).
-
-**Le point clé** : `utilisateur.source_frigo` vaut `grocy` pour toi et `base`
-pour les autres. C'est ce seul champ qui aiguille le calculateur vers l'API
-Grocy ou vers la table `stock`. Ta mécanique diète actuelle reste intacte.
-
-**Les séries conservent le prévu et le réalisé** (`reps` / `reps_cible`), ce qui
-permet de comparer la séance à son modèle sans dupliquer les données.
-
-La vue `v_performance` calcule le 1RM estimé (Epley), la meilleure tenue et le
-meilleur chrono par exercice et par date — de quoi alimenter directement les
-courbes de progression sans recalcul côté application.
+| Document | Pour quoi |
+|---|---|
+| [NOUVELLE-MACHINE.md](NOUVELLE-MACHINE.md) | monter un poste de développement de zéro |
+| [INSTALLATION.md](INSTALLATION.md) | installer les données pas à pas |
+| [DEPLOIEMENT.md](DEPLOIEMENT.md) | mettre en production sur le NAS |
+| [MISE-A-JOUR.md](MISE-A-JOUR.md) | livrer une nouvelle version |
+| [CALCULATEUR.md](CALCULATEUR.md) | le calculateur de repas : parcours et décisions |
+| [CLAUDE.md](CLAUDE.md) | les sept règles non négociables du projet |
+| [docs/audit-2026-09/](docs/audit-2026-09/README.md) | audit complet, 84 constats et leur plan de correction |
 
 ---
 
-## Étape suivante
+## Conventions
 
-Squelette Symfony + API Platform : entités, DTO, authentification JWT,
-et création des comptes réservée à l'admin.
+Les commentaires de ce projet **racontent la panne réelle et sa date**. C'est
+volontaire : c'est ce qui rend une divergence repérable des mois plus tard, et
+ce qui a permis à l'audit de retrouver l'origine de chaque défaut.
 
+Les sept règles non négociables sont dans [CLAUDE.md](CLAUDE.md) — double
+écriture du schéma, filtrage par propriétaire, valeurs pesées, convention
+européenne des fibres, aucune formule métier recopiée, vide ≠ zéro, et le refus
+d'un chiffre faux.
+
+**Une seule arborescence fait foi**, sous WSL2 ou Linux. Jamais de second clone
+synchronisé par copie de fichiers : deux copies désynchronisées ont déjà coûté
+un bug en production. Ce qui circule passe par git.
 
 ---
 
-## Passer en mode worker plus tard
+## Licence
 
-Quand l'application tournera et que tu voudras la performance :
-
-1. décommente le bloc `frankenphp { worker ./public/index.php 2 }` du `Caddyfile` ;
-2. installe `runtime/frankenphp-symfony` côté Symfony ;
-3. surveille la mémoire du conteneur les premiers jours.
-
-Les workers gardent l'application en mémoire entre les requêtes : c'est ce qui
-donne le gain de débit, mais aussi ce qui rend visibles les fuites mémoire que
-php-fpm masquait en redémarrant à chaque requête. À activer une fois l'app
-stabilisée, pas avant.
+Projet personnel, sans licence de distribution.
+Les silhouettes musculaires dérivent de
+[body-highlighter](https://github.com/hicham-elabbassi/body-highlighter) (MIT) —
+voir `front/src/muscles/LICENCE-body-highlighter.txt`.

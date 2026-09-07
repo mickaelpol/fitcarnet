@@ -125,3 +125,12 @@ graphify-out/*
 !graphify-out/cache/
 graphify-out/cache/*
 !graphify-out/cache/semantic/
+
+# Sources externes, retelechargeables — pas la place d'un dump dans un depot de code.
+# exercises.json : 17 Mo, la commande curl est dans INSTALLATION.md.
+# Table_Ciqual_2025.xlsx : 1,5 Mo, publiee par l'Anses.
+exercises.json
+Table_Ciqual_2025.xlsx
+noms-exercices.txt
+carnet*.json
+pictogrammes-muscles.zip
