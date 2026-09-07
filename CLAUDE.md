@@ -144,12 +144,43 @@ Ne pas appliquer les patrons hexagonaux à du code existant sans une décision
 explicite — et ne jamais mélanger cette refonte avec une correction de bug dans
 le même commit.
 
-**graphify** dessine une carte, il ne remplace pas `grep`. Il est bon pour la vue
-d'ensemble (communautés, nœuds pivots, liens inattendus entre documents) et
-mauvais pour retrouver un symbole précis. Surtout : **son graphe se périme à
-chaque commit**. Le reconstruire (`/graphify . --update`) avant de s'y fier, ou
-ne pas s'en servir.
+**graphify** a sa propre section plus bas.
 
 ## Audit
 
 `docs/audit-2026-09/` — 84 constats classés, avec scénarios reproduits et plan de correction en lots.
+
+## graphify
+
+Le projet porte un graphe de connaissances dans `graphify-out/` : nœuds pivots,
+communautés, liens entre fichiers, **et les 84 constats de l'audit reliés au code
+qu'ils désignent**. Deux hooks `PreToolUse` (`.claude/settings.json`) rappellent
+ces règles avant chaque recherche ou lecture.
+
+**S'orienter d'abord, lire ensuite.**
+
+| Besoin | Commande |
+|---|---|
+| Comprendre un pan du code | `graphify query "<question>"` |
+| Relation entre deux choses | `graphify path "<A>" "<B>"` |
+| Un concept précis | `graphify explain "<concept>"` |
+| Vue d'architecture | `graphify-out/GRAPH_REPORT.md`, en dernier recours |
+
+**Puis `grep` et `Read` sans hésiter** pour la ligne exacte à corriger. Le graphe
+oriente ; il ne remplace pas la lecture du code au moment de le modifier. Une
+requête coûte plus qu'un `grep` ciblé et revient parfois tronquée : elle sert à
+savoir *où regarder*, pas à retrouver un symbole dont on connaît déjà le nom.
+
+**Le tenir à jour** : `graphify update .` après une modification de code (AST
+seul, aucun appel à un modèle). Pour un changement de documentation,
+`/graphify . --update` dans l'assistant, qui relance l'extraction sémantique.
+Sans ça le graphe ment : il a déjà décrit une méthode supprimée pendant une
+demi-journée.
+
+**`.graphifyignore` définit le périmètre** et doit le rester. Les 58 fichiers de
+skills tierces de `.claude/skills/`, les dumps de données et les binaires en sont
+exclus : ingérés, ils noient les communautés du projet sous de la documentation
+PostgreSQL et Symfony qui ne parle pas de fitcarnet.
+
+*Cette section a été posée par `graphify claude install` puis récrite en
+français. Une réinstallation la remplacera par la version anglaise d'origine.*

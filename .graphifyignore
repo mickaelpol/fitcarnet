@@ -1,0 +1,37 @@
+# Ce que le graphe de connaissances ne doit PAS ingérer.
+#
+# graphify cartographie fitcarnet. Tout ce qui suit est soit du contenu tiers,
+# soit du binaire, soit un dump de données : présent dans l'arbre, mais étranger
+# au projet. Ingéré, il noie les communautés sous de la documentation qui ne
+# parle pas de fitcarnet — un « PgBouncer / réplication PostgreSQL » a la même
+# taille qu'un vrai module du projet et coûte autant à extraire.
+
+# --- Skills et agents tiers -------------------------------------------------
+# 58 fichiers de documentation Symfony, PostgreSQL et PlanetScale, installés
+# comme outillage. Ils décrivent des frameworks, pas ce projet.
+.claude/skills/
+.claude/agents/
+
+# --- Dumps de données -------------------------------------------------------
+# 17 Mo de catalogue d'exercices : une liste, aucune structure à cartographier.
+exercises.json
+Table_Ciqual_2025.xlsx
+noms-exercices.txt
+carnet.json
+carnet-*.json
+
+# --- Binaires et médias -----------------------------------------------------
+# Sons d'interface (minuteur de repos) : aucune parole à transcrire.
+front/assets/sons/*.wav
+# Icônes de l'application : rien à lire, pas même en vision.
+front/assets/images/*.png
+pictogrammes-muscles.zip
+
+# --- Sorties de build -------------------------------------------------------
+# front/dist est versionné volontairement (c'est le build servi par Caddy),
+# mais c'est du JavaScript minifié : illisible, et il change à chaque build.
+front/dist/
+graphify-out/
+sauvegardes/
+logs/
+telecharger/*.apk

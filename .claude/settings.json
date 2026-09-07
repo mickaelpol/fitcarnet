@@ -8,13 +8,33 @@
             "type": "command",
             "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; case \"$f\" in */front/src/*.ts|*/front/src/*.tsx|*/front/app/*.ts|*/front/app/*.tsx) cd \"${f%%/front/*}/front\" && npm run --silent verif ;; esac; }",
             "timeout": 120,
-            "statusMessage": "Vérification du typage front..."
+            "statusMessage": "V\u00e9rification du typage front..."
           },
           {
             "type": "command",
             "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; case \"$f\" in */api/src/*.php|*/api/tests/*.php) docker ps --format '{{.Names}}' 2>/dev/null | grep -qx fitcarnet-app-dev || exit 0; rel=\"${f#*/api/}\"; docker exec fitcarnet-app-dev sh -c \"cd /app && vendor/bin/phpstan analyse --no-progress --error-format=raw '$rel'\" ;; esac; }",
             "timeout": 120,
             "statusMessage": "Analyse statique PHP..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/micka/.local/bin/graphify hook-guard search"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/micka/.local/bin/graphify hook-guard read"
           }
         ]
       }
