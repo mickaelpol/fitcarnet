@@ -29,15 +29,36 @@
 --  demarrage, elle arreterait la production. Les UPDATE ci-dessous ne
 --  touchent que des valeurs deja fausses.
 --
+--  ZERO POUR LES COLONNES NOT NULL, NULL POUR LES AUTRES.
+--
+--  Ce fichier a longtemps ecrit `SET kcal_100 = NULL` sur une colonne NOT
+--  NULL. Le nettoyage lui-meme etait donc impossible, et il echouait AVANT
+--  DE POSER LE MOINDRE GARDE-FOU : pas seulement celui d'`aliment`, les six.
+--  Tant qu'aucune valeur negative n'existait, l'UPDATE ne touchait aucune
+--  ligne et personne ne voyait rien. Le jour ou une seule apparaissait — le
+--  cas decrit quinze lignes plus haut, donc deja arrive —, `entrypoint-prod.sh`
+--  s'arretait sur ON_ERROR_STOP et le conteneur applicatif ne redemarrait plus.
+--
+--  NULL voudrait dire « on ne sait pas », ce qui serait la verite. Mais ces
+--  quatre colonnes d'`aliment` et ces quatre de `cible` l'interdisent, et
+--  changer leur nullabilite pour raccommoder une faute de signe couterait plus
+--  cher que ca ne vaut. Zero est donc un pis-aller assume : la valeur reste
+--  fausse, mais elle est VISIBLE — `src/calcul/plausibilite.ts` signale un
+--  aliment a 0 kcal dont les macros ne le sont pas, et la ligne remonte a
+--  l'ecran au lieu de bloquer le demarrage.
+--
+--  Verifie par `db/manuel/verifier-migrations.sh`, qui rejoue tout ce dossier
+--  sur une base portant precisement ces valeurs aberrantes.
+--
 --  Idempotent.
 -- =====================================================================
 
 -- ------------------------------------------------------------- aliment
 
-UPDATE aliment SET kcal_100   = NULL WHERE kcal_100   < 0;
-UPDATE aliment SET prot_100   = NULL WHERE prot_100   < 0;
-UPDATE aliment SET gluc_100   = NULL WHERE gluc_100   < 0;
-UPDATE aliment SET lip_100    = NULL WHERE lip_100    < 0;
+UPDATE aliment SET kcal_100   = 0    WHERE kcal_100   < 0;
+UPDATE aliment SET prot_100   = 0    WHERE prot_100   < 0;
+UPDATE aliment SET gluc_100   = 0    WHERE gluc_100   < 0;
+UPDATE aliment SET lip_100    = 0    WHERE lip_100    < 0;
 UPDATE aliment SET fibres_100 = NULL WHERE fibres_100 < 0;
 
 DO $$
@@ -82,10 +103,10 @@ END $$;
 
 -- --------------------------------------------------------------- cible
 
-UPDATE cible SET kcal = NULL WHERE kcal < 0;
-UPDATE cible SET prot = NULL WHERE prot < 0;
-UPDATE cible SET gluc = NULL WHERE gluc < 0;
-UPDATE cible SET lip  = NULL WHERE lip  < 0;
+UPDATE cible SET kcal = 0    WHERE kcal < 0;
+UPDATE cible SET prot = 0    WHERE prot < 0;
+UPDATE cible SET gluc = 0    WHERE gluc < 0;
+UPDATE cible SET lip  = 0    WHERE lip  < 0;
 
 DO $$
 BEGIN
