@@ -110,3 +110,6 @@ sauvegardes/
 #  qui traine a la racine part dans le commit sans que personne ne le decide.
 # ---------------------------------------------------------------------
 /noms-exercices.txt
+
+# Artefacts du graphe de connaissances (audit)
+graphify-out/

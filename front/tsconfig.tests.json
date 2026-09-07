@@ -1,3 +1,13 @@
+// Compilation des tests, jouee par `npm test`.
+//
+// `include` etait une LISTE ECRITE A LA MAIN des tests et de leurs dependances.
+// Un nouveau .test.ts oublie dans cette liste n'etait jamais execute, sans le
+// moindre signal : c'est ainsi que src/calcul/performance.ts — 1RM, volume,
+// paliers — s'est retrouve sans aucun test, alors que trois constats de l'audit
+// de septembre 2026 y vivent.
+//
+// Un motif suffit : TypeScript compile les fichiers inclus ET tout ce qu'ils
+// importent, donc lister les tests amene leurs dependances toutes seules.
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -18,30 +28,6 @@
     "rootDir": "src"
   },
   "include": [
-    "src/solveur/**/*.ts",
-    "src/calcul/nutrition.ts",
-    "src/calcul/nutrition.test.ts",
-    "src/calcul/frigo.ts",
-    "src/calcul/frigo.test.ts",
-    "src/calcul/planCoach.ts",
-    "src/calcul/planCoach.test.ts",
-    "src/calcul/plausibilite.ts",
-    "src/calcul/plausibilite.test.ts",
-    "src/calcul/cuisson.ts",
-    "src/calcul/cuisson.test.ts",
-    "src/calcul/selectionRepas.ts",
-    "src/calcul/selectionRepas.test.ts",
-    "src/maj/version.ts",
-    "src/maj/version.test.ts",
-    "src/composants/etatMesure.ts",
-    "src/composants/etatMesure.test.ts",
-    "src/api/uneSeuleFois.ts",
-    "src/api/uneSeuleFois.test.ts",
-    "src/api/adresse.ts",
-    "src/api/adresse.test.ts",
-    "src/theme/index.ts",
-    "src/theme/charte.test.ts",
-    "src/muscles/vocabulaire.ts",
-    "src/muscles/vocabulaire.test.ts"
+    "src/**/*.test.ts"
   ]
 }

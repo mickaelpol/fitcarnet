@@ -1,0 +1,35 @@
+# Analyse statique de l'API.
+#
+# POURQUOI CE FICHIER EXISTE
+# L'audit de septembre 2026 a trouve un appel a une methode supprimee, en
+# production, sur le chemin du bouton « J'ai cuisine » : PlansController
+# appelait FrigoGrocy::inventorier(), retiree par le commit 1055cc2 qui avait
+# mis a jour deux appelants sur trois. Aucun test ne couvrait ce cablage.
+# PHPStan le trouve en une seconde, gratuitement, a chaque analyse.
+#
+# Le niveau 5 est un point de depart tenable sur une base existante : il
+# verifie l'existence des methodes, des proprietes et la coherence des types
+# d'arguments, sans exiger l'annotation complete des tableaux (niveaux 6+).
+# Monter d'un niveau quand le niveau courant est propre.
+#
+# Lancer :  docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
+parameters:
+    level: 5
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - src/Kernel.php
+
+    ignoreErrors:
+        # Les identifiants et champs d'entites sont affectes par Doctrine via
+        # la reflexion, jamais par une ligne de code que PHPStan puisse voir.
+        # Il en conclut que le type nullable est inutile — il l'est pour lui,
+        # pas pour l'ORM. Sans cette exception, 18 faux positifs noient les
+        # vraies erreurs, et un outil qu'on n'ecoute plus ne sert a rien.
+        #
+        # Ne PAS elargir ce motif hors de src/Entity : ailleurs, « never
+        # assigned » signale un vrai champ mort.
+        -
+            identifier: property.unusedType
+            path: src/Entity/*
