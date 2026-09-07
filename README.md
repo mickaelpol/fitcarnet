@@ -34,6 +34,9 @@ fitcarnet/
 
 ## Installation
 
+> Ceci est l'installation **en production, sur le NAS**. Pour monter un poste de
+> développement — outillage compris — voir [NOUVELLE-MACHINE.md](NOUVELLE-MACHINE.md).
+
 **1. Arborescence sur le NAS**
 
 ```bash
