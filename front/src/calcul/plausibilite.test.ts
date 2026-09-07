@@ -161,9 +161,40 @@ describe('Les calories doivent correspondre aux macros', () => {
   });
 
   it('un écart de table ordinaire ne déclenche rien', () => {
-    // 390 déclarées, 379 par Atwater : 2,8 % d'écart
-    assert.equal(Math.round(kcalAtwater(base())), 379);
+    // 390 déclarées, 383 par Atwater européen : 1,8 % d'écart
+    assert.equal(Math.round(kcalAtwater(base())), 383);
     assert.ok(!codes(base()).includes('calories_incoherentes'));
+  });
+
+  it('les fibres comptent 2 kcal/g, comme dans nutrition.ts', () => {
+    /* CONVENTION EUROPÉENNE, et c'est tout le projet qui en dépend.
+       `nutrition.ts` la pose en tête de fichier et interdit explicitement de
+       mélanger les deux tables. Ce module appliquait l'Atwater AMÉRICAIN —
+       fibres ignorées — quatre fichiers plus loin. */
+    const chia = base({
+      categorie: 'ole', kcal100: 486, prot100: 17, gluc100: 7.7, lip100: 31,
+      fibres100: 34, ratio: 1,
+    });
+
+    // 4×17 + 4×7,7 + 2×34 + 9×31 = 445,8
+    assert.equal(Math.round(kcalAtwater(chia)), 446);
+  });
+
+  it('un aliment riche en fibres n\'est pas accusé à tort', () => {
+    /* Des graines de chia réelles : aucune des deux valeurs saisies n'est
+       fausse. En ignorant les 34 g de fibres, le calcul tombait à 378 et
+       l'écart de 108 kcal dépassait la marge de 20 % — le module dont la
+       raison d'être est de repérer les données qui mentent accusait une
+       donnée juste, sur toute la famille des oléagineux. */
+    assert.ok(!codes(base({
+      categorie: 'ole', kcal100: 486, prot100: 17, gluc100: 7.7, lip100: 31,
+      fibres100: 34, ratio: 1,
+    })).includes('calories_incoherentes'));
+  });
+
+  it('des fibres absentes valent zéro, jamais NaN', () => {
+    // `fibres100` est facultatif : le type le dit, le calcul doit le tenir.
+    assert.equal(Math.round(kcalAtwater(base({ fibres100: undefined }))), 379);
   });
 
   it('les aliments très peu caloriques ne crient pas au loup', () => {
