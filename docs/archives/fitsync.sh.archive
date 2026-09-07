@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# =====================================================================
+#  fitsync — répercute le clone Windows dans le clone WSL.
+#
+#  Sens unique : Windows -> WSL. Jamais l'inverse.
+#  Aucune suppression : rsync n'efface rien côté WSL.
+#  Toute écrasure est sauvegardée dans ~/.fitsync-backup/<horodatage>/
+#
+#  Usage :
+#    fitsync              simulation, confirmation, synchro, typage
+#    fitsync -y           sans confirmation
+#    fitsync -n           simulation seule, n'écrit rien
+#    fitsync --watch [s]  surveille et synchronise (défaut : 5 s)
+# =====================================================================
+set -euo pipefail
+
+SRC="/mnt/c/Users/micka/dev/fitcarnet/"
+DST="$HOME/perso/fitcarnet/"
+BACKUP_ROOT="$HOME/.fitsync-backup"
+
+# Exclusions. Les trois premières protègent l'état propre à chaque clone,
+# les suivantes protègent ce qui n'existe que côté WSL, les dernières
+# évitent de recalculer des sommes de contrôle sur 19 Mo de données figées.
+EXCLUDES=(
+  --exclude='.git/'
+  --exclude='node_modules/'
+  --exclude='.expo/'
+  --exclude='dist-tests/'
+  --exclude='vendor/'
+  --exclude='.env'
+  --exclude='donnees-perso/'
+  --exclude='*.patch'
+  --exclude='fitsync.sh'
+  --exclude='exercises.json'
+  --exclude='Table_Ciqual_2025.xlsx'
+)
+
+rouge()  { printf '\033[31m%s\033[0m\n' "$*"; }
+vert()   { printf '\033[32m%s\033[0m\n' "$*"; }
+jaune()  { printf '\033[33m%s\033[0m\n' "$*"; }
+
+[ -d "$SRC" ] || { rouge "Source introuvable : $SRC"; exit 1; }
+[ -d "$DST" ] || { rouge "Destination introuvable : $DST"; exit 1; }
+
+# Liste les fichiers qui seraient modifiés. Sortie vide = rien à faire.
+a_faire() {
+  rsync -rcn --out-format='%n' "${EXCLUDES[@]}" "$SRC" "$DST"
+}
+
+synchroniser() {
+  local horodatage
+  horodatage="$(date +%Y%m%d-%H%M%S)"
+  jaune "Écriture :"
+  rsync -rc --out-format='  %n' \
+    --backup --backup-dir="$BACKUP_ROOT/$horodatage" \
+    "${EXCLUDES[@]}" "$SRC" "$DST"
+  vert "Sauvegarde des versions écrasées : $BACKUP_ROOT/$horodatage"
+}
+
+typage() {
+  ( cd "$DST/front" && npx tsc --noEmit ) \
+    && vert "TYPAGE OK — 0 erreur" \
+    || { rouge "TYPAGE EN ECHEC"; return 1; }
+}
+
+# ---------------------------------------------------------------- watch
+if [ "${1:-}" = "--watch" ]; then
+  INTERVALLE="${2:-5}"
+  jaune "Surveillance toutes les ${INTERVALLE} s. Ctrl-C pour arrêter."
+  jaune "Scrutation active : inotify ne fonctionne pas sur /mnt/c."
+  while true; do
+    if [ -n "$(a_faire)" ]; then
+      echo
+      jaune "--- $(date +%H:%M:%S) — changement détecté ---"
+      synchroniser
+      typage || true
+    fi
+    sleep "$INTERVALLE"
+  done
+fi
+
+# ------------------------------------------------------------ une passe
+CHANGES="$(a_faire)"
+
+if [ -z "$CHANGES" ]; then
+  vert "Rien à répercuter, les deux clones sont identiques."
+  exit 0
+fi
+
+jaune "Fichiers qui seraient écrasés côté WSL :"
+printf '  %s\n' $CHANGES
+
+if [ "${1:-}" = "-n" ]; then
+  jaune "Simulation seule, rien n'a été écrit."
+  exit 0
+fi
+
+if [ "${1:-}" != "-y" ]; then
+  read -r -p "Répercuter ? [o/N] " reponse
+  case "$reponse" in
+    o|O|y|Y) ;;
+    *) jaune "Annulé."; exit 0 ;;
+  esac
+fi
+
+synchroniser
+echo
+jaune "git status côté WSL :"
+git -C "$DST" status --short || true
+echo
+typage
