@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { creerEnvoyeur } from './envoiSerialise';
+import type { Envoyeur, EtatSauvegarde } from './envoiSerialise';
 
-export type EtatSauvegarde = 'repos' | 'attente' | 'envoi' | 'enregistre' | 'erreur';
+/* Le type reste exporté d'ici : une quinzaine d'écrans l'importent, et le
+   déplacer n'apporterait rien qu'un diff. */
+export type { EtatSauvegarde };
 
 /**
  * Sauvegarde différée : on attend que la saisie se calme avant d'envoyer,
@@ -25,32 +29,25 @@ export function useSauvegardeAuto<T>(
   const [motif, setMotif] = useState<string | null>(null);
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const derniereEnvoyee = useRef<string | null>(null);
-  const enCours = useRef(false);
   const valeurCourante = useRef<T | null>(valeur);
 
   valeurCourante.current = valeur;
 
-  const envoyer = async () => {
-    const v = valeurCourante.current;
-    if (v === null || enCours.current) return;
+  /* LA RÈGLE DE CONCURRENCE VIT DANS `envoiSerialise.ts`, ÉPROUVÉE.
+     Elle tenait ici en un `if (enCours) return;` qui PERDAIT la saisie : un
+     envoi en vol, une charge tapée, un retour en arrière, et la charge ne
+     partait jamais. Le hook ne fournit plus que React autour d'elle. */
+  const enregistrerRef = useRef(enregistrer);
+  enregistrerRef.current = enregistrer;
 
-    const signature = JSON.stringify(v);
-    if (signature === derniereEnvoyee.current) return;
+  const envoyeurRef = useRef<Envoyeur<T> | null>(null);
+  envoyeurRef.current ??= creerEnvoyeur<T>(
+    (v) => enregistrerRef.current(v),
+    { etat: setEtat, motif: setMotif },
+  );
 
-    enCours.current = true;
-    setEtat('envoi');
-    try {
-      await enregistrer(v);
-      derniereEnvoyee.current = signature;
-      setMotif(null);
-      setEtat('enregistre');
-    } catch (e) {
-      setMotif(e instanceof Error ? e.message : String(e));
-      setEtat('erreur');
-    } finally {
-      enCours.current = false;
-    }
-  };
+  const envoyer = async (): Promise<void> =>
+    envoyeurRef.current?.envoyer(() => valeurCourante.current);
 
   /* CE QUI SUIT EXISTE PARCE QUE 2,5 SECONDES SUFFISENT A PERDRE UNE SAISIE.
      On tape une charge, on repose le telephone ou on revient en arriere : la
