@@ -1,6 +1,6 @@
 # Installer fitcarnet sur une machine neuve
 
-De zéro à « je peux coder », en quatre étapes. Compter **une trentaine de
+De zéro à « je peux coder », en cinq étapes. Compter **une trentaine de
 minutes**, dont l'essentiel en téléchargements.
 
 Ce document chapeaute les autres : il dit **dans quel ordre** et **ce qu'on
@@ -120,6 +120,43 @@ cd front && npm install
 
 ---
 
+## 5. Tes données — la partie qui n'est pas dans le dépôt
+
+**À la fin de l'étape 4, l'application tourne, mais elle est vide de ton
+historique.** C'est normal, et voulu : le dépôt porte le code, jamais les
+données. Tu auras :
+
+| Présent d'emblée | Absent |
+|---|---|
+| le schéma et les 20 migrations | tes **séances** et ton historique |
+| le référentiel commun — ~50 aliments, exercices, emplacements | le **stock** de ton frigo |
+| le catalogue de 1 338 exercices (téléchargé par `installer.sh`) | tes **aliments personnels** |
+| tes **cibles par repas** (`db/manuel/cibles.sql`, versionné) | tes **plans enregistrés** |
+| un compte administrateur | |
+
+**Pour développer, c'est suffisant** — une base de test propre vaut mieux que
+tes vraies données pour corriger un bug.
+
+**Pour retrouver ton carnet**, il faut apporter un dump. Il n'y en a pas dans le
+dépôt et il ne faut pas en mettre :
+
+```bash
+# depuis la machine qui a les données, ou depuis le NAS
+scp sauvegardes/fitcarnet_*.dump  autre-pc:~/fitcarnet/sauvegardes/
+
+# puis, sur la nouvelle machine
+./sauvegarde.sh --restaurer sauvegardes/fitcarnet_2026-08-11_185210.dump
+```
+
+`./sauvegarde.sh --lister` montre ce qui est disponible. La restauration demande
+confirmation et **écrase** la base locale.
+
+> Attention si tu travailles depuis deux machines : **la base ne se synchronise
+> pas**. Deux bases divergentes, c'est le même piège que deux clones du code.
+> Décide laquelle fait foi, et restaure depuis elle.
+
+---
+
 ## Vérifier que tout est en place
 
 Chaque commande doit donner **au moins** ce résultat — ce sont les chiffres du
@@ -182,4 +219,6 @@ le projet se travaille en terminal, avec Claude Code.
 - [ ] `cd front && npm install`
 - [ ] Les quatre vérifications ci-dessus au vert
 - [ ] `/graphify .` pour le graphe
-- [ ] `./sauvegarde.sh` — le dépôt protège le code, pas les données
+- [ ] **Tes données** : la base est vide de ton historique. Apporter un dump et
+      `./sauvegarde.sh --restaurer <fichier>` si tu veux retrouver ton carnet
+- [ ] `./sauvegarde.sh` avant de repartir — le dépôt protège le code, pas les données
