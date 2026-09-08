@@ -132,6 +132,7 @@ valeur.
 
 | Document | Pour quoi |
 |---|---|
+| [REPRENDRE.md](REPRENDRE.md) | **où en est le chantier** : ce qui reste, les décisions prises, celles qui attendent |
 | [NOUVELLE-MACHINE.md](NOUVELLE-MACHINE.md) | monter un poste de développement de zéro |
 | [INSTALLATION.md](INSTALLATION.md) | installer les données pas à pas |
 | [DEPLOIEMENT.md](DEPLOIEMENT.md) | mettre en production sur le NAS |

@@ -7,6 +7,13 @@ web + Android (`front/`), PostgreSQL 16 (`db/`), déployée sur un NAS Synology 
 **Le code, les commentaires, les noms de variables et les messages de commit sont en français.**
 Les identifiants métier aussi (`Aliment`, `Seance`, `cleDHabitude`). Garder cette langue.
 
+## Où on en est — À LIRE EN PREMIER
+
+[REPRENDRE.md](REPRENDRE.md) est le journal de bord du chantier : ce qui est
+fait, par quoi continuer, les décisions déjà prises et celles qui attendent un
+arbitrage. Rien de tout cela ne se déduit du code. **Le lire avant de
+travailler, et le tenir à jour en repartant.**
+
 ## Sur une machine neuve
 
 ```bash
@@ -25,7 +32,7 @@ d'extraction. Seul le graphe lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 320 tests node:test — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 362 tests node:test — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
 cd api && bin/phpunit         # tests API — sans base ni noyau, aucun effet de bord
