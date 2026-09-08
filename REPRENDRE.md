@@ -22,6 +22,47 @@ lot 3 — sécurité et isolation — est le suivant.** Tout est documenté dans
 
 ---
 
+## En arrivant : quoi taper
+
+**1. Monter la machine** — [NOUVELLE-MACHINE.md](NOUVELLE-MACHINE.md) en entier
+si elle est neuve, sinon juste se remettre à jour :
+
+```bash
+git pull
+cd front && npm install          # si package.json a bougé
+docker compose -f compose.dev.yml up -d
+```
+
+**2. Vérifier qu'on part d'un socle sain.** Ces chiffres sont ceux du
+8 septembre ; ils ne peuvent que monter :
+
+```bash
+cd front && npm test                                                  # 362 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 102 tests, 422 assertions
+```
+
+Si l'un des deux est rouge **avant** d'avoir touché à quoi que ce soit, c'est
+que l'environnement est en cause, pas le code : le régler d'abord.
+
+**3. Le premier message à donner à Claude**, tel quel :
+
+> Lis `REPRENDRE.md`, puis attaque le lot 3 de l'audit en commençant par É1 —
+> le contrôle de propriété manquant sur `POST /api/mon-frigo/inventaire`. En
+> TDD : le test échoue d'abord. Ne travaille pas sur une autre branche que
+> `master` sans me le demander.
+
+Trois précisions qui évitent les allers-retours, si Claude ne les prend pas de
+lui-même : la skill à utiliser est **`superpowers:test-driven-development`**,
+le motif à copier est **`alimentAccessible()` dans `FrigoController.php:157`**,
+et **`docs/audit-2026-09/README.md` porte déjà le scénario reproduit** — inutile
+de le redécouvrir.
+
+**4. En repartant** : mettre ce fichier à jour, cocher le lot dans le tableau
+d'avancement de l'audit, `graphify update .`, et pousser. Le prochain à ouvrir
+le projet n'aura, lui non plus, que ce qui est écrit.
+
+---
+
 ## Par quoi continuer : le lot 3
 
 | | Constat | Effort |
