@@ -103,9 +103,9 @@ claude plugin list        # expo, php-lsp, context7, superpowers, superpowers-sy
 ```
 
 Le dépôt porte déjà, sans rien à faire : `CLAUDE.md` et les sept règles du
-projet, les hooks de vérification, les `skillOverrides` (6 skills projet
-coupées), les 11 skills projet et 2 agents, `.graphifyignore`, et le cache
-sémantique de graphify.
+projet, les hooks de vérification, les **6 skills du projet** — isolation des
+données, tests API, front, nutrition, schéma, postgres — et 2 agents,
+`.graphifyignore`, et le cache sémantique de graphify.
 
 ---
 

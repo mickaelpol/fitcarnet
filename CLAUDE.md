@@ -124,7 +124,10 @@ déviation par rapport à la cible doit être expliquée à l'écran.
 - Les scripts de la racine ne sont pas des jouets : `installer.sh`, `restaurer-nas.sh`,
   `deployer-nas.sh`, `publier*.sh` déploient ou détruisent. Ne jamais les lancer pour « voir ».
 - `test_ecriture_grocy.py` écrit dans `db/manuel/16-catalogue-ciqual.sql`, fichier versionné.
-- `tsconfig.tests.json` doit inclure tout nouveau `.test.ts`, sinon il n'est jamais exécuté.
+- `tsconfig.tests.json` n'inclut plus une liste écrite à la main mais **un motif**,
+  `src/**/*.test.ts` — la liste manuelle avait laissé `performance.ts` sans test
+  pendant des mois. Le piège qui reste : le motif ne couvre que `src/`, donc un
+  test posé dans `front/app/` n'est **jamais exécuté**, sans le moindre signal.
 
 ## Méthode de travail
 
@@ -143,8 +146,24 @@ déviation par rapport à la cible doit être expliquée à l'écran.
 
 ## Skills : laquelle, quand
 
-Le projet charge beaucoup de skills. Six skills **du projet** sont coupées dans
-`.claude/settings.json` (`skillOverrides`) — inutile de les rallumer sans raison.
+**Les six skills du dépôt portent ce que personne d'autre ne peut écrire.** Elles
+sont dans `.claude/skills/`, toutes actives, et disent le métier et les pièges de
+*ce* projet :
+
+| Skill | Ce qu'elle porte |
+|---|---|
+| `isolation-donnees` | La règle 2, ses trois pièces, et le corollaire « chaque chemin d'écriture » |
+| `tests-api` | PHPUnit sans base ni noyau, services `final readonly`, `createStub` |
+| `front-fitcarnet` | Modules de référence, `node:test`, Node 22, `front/dist/` |
+| `nutrition-fitcarnet` | Fibres à 2 kcal/g, produit tel qu'on le pèse, vide ≠ zéro |
+| `schema-base` | Double écriture du schéma, idempotence, ordre dans `installer.sh` |
+| `postgres` | Index, plan de requête, `VACUUM` |
+
+Le 9 septembre 2026, dix skills « du projet » ont été **supprimées** : génériques,
+sans une ligne sur fitcarnet, toutes écrites pour une architecture hexagonale que
+`api/src` n'a pas — et redondantes avec `superpowers-symfony`, dont les 44 skills
+ciblent la vraie pile. Le tri d'alors était à l'envers : les coupées étaient celles
+du travail quotidien, les actives celles d'une refonte jamais commencée.
 
 **`skillOverrides` ne peut rien contre les skills des plugins.** Vérifié le
 8 septembre 2026 : une entrée `expo:expo-dom` ou `superpowers-symfony:tdd-with-pest`
@@ -152,30 +171,38 @@ ne coupe rien, ni depuis le dépôt ni depuis `~/.claude/settings.json`. Le seul
 levier est `claude plugin disable` — le plugin entier. Les vingt-deux entrées de
 ce genre ont été retirées : elles faisaient croire à une économie qui n'existait
 pas (~2 950 tokens de contexte payés à chaque session malgré tout). Ne pas en
-réécrire.
+réécrire. Sur les skills du dépôt, en revanche, `skillOverrides` fonctionne — il
+n'y en a simplement plus une seule à couper.
 
 Pour l'aiguillage :
 
 | Travail | Skill à prendre |
 |---|---|
 | Corriger un bug, ajouter un comportement | **`superpowers:test-driven-development`**, sans exception |
+| Exposer une entité, écrire un contrôleur ou un processeur | **`isolation-donnees`** — avant de coder, pas après |
+| Écrire un test API | **`tests-api`** d'abord — le motif du projet ; **`superpowers-symfony:tdd-with-phpunit`** pour le générique PHPUnit (le projet n'est pas en Pest) |
+| Toucher à `front/src` ou `front/app` | **`front-fitcarnet`** |
+| Un calcul, un import d'aliments, un chiffre affiché | **`nutrition-fitcarnet`** |
+| Table, colonne, contrainte, migration | **`schema-base`** |
 | Cadrer une demande vague ou vaste | **`superpowers:brainstorming`** (celle de `superpowers`, pas celle de `superpowers-symfony`) |
 | API Platform : ressource, filtre, processeur, sérialisation | **`superpowers-symfony:api-platform-*`** — elles ciblent la v4, celle du projet |
 | Doctrine : relations, migrations, transactions, N+1 | **`superpowers-symfony:doctrine-*`** |
-| Tests API | **`superpowers-symfony:tdd-with-phpunit`** (le projet est en PHPUnit, pas Pest) |
 | Écran, navigation, données | **`expo:expo-router`**, **`expo:expo-data-fetching`** |
 | Après un `eas update` : est-il arrivé sur les téléphones | **`expo:eas-update-insights`** — aucune skill ne couvre la publication elle-même, c'est `publier.sh` |
 | Index, plan de requête, VACUUM | **`postgres`** |
 | Déployer, publier, restaurer | **rien d'automatique** : lire `DEPLOIEMENT.md` et `MISE-A-JOUR.md` |
 
-**Hexagonal / DDD.** Les skills `symfony-hexagonal-architecture`,
-`symfony-domain-modeling`, `symfony-ports-adapters` et `symfony-cqrs-handlers`
-sont installées parce qu'une migration vers l'architecture hexagonale est un
-objectif assumé. **Elle n'a pas commencé** : `api/src` suit toujours la structure
-Symfony classique (`Controller`, `Service`, `Entity`, `Repository`, `State`).
-Ne pas appliquer les patrons hexagonaux à du code existant sans une décision
-explicite — et ne jamais mélanger cette refonte avec une correction de bug dans
-le même commit.
+**Hexagonal / DDD.** La migration vers l'architecture hexagonale reste un objectif
+assumé, et **elle n'a toujours pas commencé** : `api/src` suit la structure Symfony
+classique (`Controller`, `Service`, `Entity`, `Repository`, `State`). Ne pas
+appliquer ces patrons à du code existant sans une décision explicite — et ne jamais
+mélanger cette refonte avec une correction de bug dans le même commit.
+
+Ce qui reste pour le jour J : les deux agents `hexagonal-architect` et
+`hexagonal-reviewer` (`.claude/agents/`), qui notent la conformité d'un module, et
+les skills `superpowers-symfony:ports-and-adapters`, `:cqrs-and-handlers`,
+`:value-objects-and-dtos`. Les quatre skills projet qui doublonnaient tout cela ont
+été supprimées le 9 septembre 2026.
 
 **graphify** a sa propre section plus bas.
 

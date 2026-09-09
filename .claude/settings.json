@@ -14,15 +14,7 @@
     "superpowers@claude-plugins-official": true,
     "superpowers-symfony@superpowers-symfony": true
   },
-  "skillOverrides": {
-    "symfony-api-response": "off",
-    "symfony-doctrine-persistence": "off",
-    "symfony-messenger-async": "off",
-    "symfony-security-voters": "off",
-    "symfony-testing": "off",
-    "symfony-validation": "off"
-  },
-  "hooks": {
+    "hooks": {
     "PostToolUse": [
       {
         "matcher": "Write|Edit",

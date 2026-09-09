@@ -1,0 +1,69 @@
+---
+name: nutrition-fitcarnet
+description: Les conventions nutritionnelles de fitcarnet — fibres à 2 kcal/g comptées à part, valeurs décrivant le produit tel qu'on le pèse, rendement cru/cuit dérivé et non stocké. À charger avant de toucher à un calcul de macros, un import d'aliments, une écriture dans Grocy, ou tout ce qui affiche un chiffre à l'utilisateur.
+---
+
+# Les conventions nutritionnelles
+
+**C'est une application de nutrition : ce qui est affiché sera pesé et mangé.**
+Les quatre règles ci-dessous ont chacune été enfreinte au moins une fois, et
+l'audit de septembre 2026 en a mesuré le coût.
+
+## 1. Convention EUROPÉENNE des fibres
+
+Les fibres valent **2 kcal/g** et sont comptées **séparément** des glucides.
+`KCAL_FIBRES` dans `front/src/calcul/nutrition.ts` fait foi.
+
+**Ne jamais utiliser l'Atwater américain** (`4P + 4G + 9L`, fibres ignorées) : il
+déclare incohérents des aliments riches en fibres dont les valeurs sont pourtant
+justes. Deux constats de l'audit viennent de là — `plausibilite.ts` appliquait la
+formule américaine, et `cibles_incoherentes` comptait les fibres à 4 kcal/g.
+
+Reste ouvert (M1 et M4 du lot 2) : deux formules Atwater encore recopiées, dans
+`solveur.ts:340` et `objectifs.tsx:78`.
+
+## 2. Les valeurs décrivent le produit TEL QU'ON LE PÈSE
+
+Le riz sec vaut **350 kcal/100 g**, pas 130. Un légume se pèse **cru**.
+
+Le rendement cru/cuit se **dérive des pesées à la lecture** ; il ne se stocke pas
+dans les valeurs nutritionnelles. Un aliment dont on a stocké les valeurs « cuit »
+est un aliment dont plus personne ne sait ce qu'il décrit.
+
+Cette règle vaut aussi pour **les scripts d'import** et pour ce qu'on écrit dans
+**Grocy**.
+
+## 3. Ta balance passe avant CIQUAL
+
+Une pesée réelle prime sur la table de référence. C'est ce que prouvent
+`RendementMesureTest` côté API et `plausibilite.ts` côté front : la provenance de
+la valeur remonte jusqu'à l'écran, pour que l'utilisateur sache d'où vient le
+chiffre qu'on lui montre.
+
+## 4. Vide ≠ zéro
+
+Un champ vide veut dire « je ne sais pas ». Un zéro veut dire « zéro ». « Sans
+cuisson » est un choix, pas une absence de réponse. Aucune valeur par défaut
+silencieuse ne remplace une donnée manquante — elle serait indiscernable d'une
+mesure.
+
+## 5. Un chiffre faux est pire qu'un refus de répondre
+
+En cas de doute sur un calcul : afficher l'incertitude, ou refuser. **Jamais une
+valeur plausible non vérifiée.** Toute déviation par rapport à la cible doit être
+expliquée à l'écran plutôt que lissée.
+
+## Où vivent les formules
+
+`front/src/calcul/nutrition.ts` (macros, Atwater, catégories) et
+`front/src/calcul/cuisson.ts` (cru/cuit, fournées, habitudes) sont les **seuls**
+porteurs de ces formules. Un écran, un hook ou un script qui recalcule importe le
+module — il ne recopie pas. Voir la skill `front-fitcarnet`.
+
+## Attention aux scripts d'import
+
+`test_ecriture_grocy.py` **écrit** dans `db/manuel/16-catalogue-ciqual.sql`, un
+fichier versionné. Et `entrypoint-prod.sh` rejoue `db/manuel/` à **chaque**
+démarrage : une migration qui écrit des données écrase les corrections manuelles à
+chaque redémarrage du conteneur. Le constat 10 de l'audit décrit exactement ça —
+la migration 16 réécrit quatre aliments communs à chaque démarrage.
