@@ -28,11 +28,34 @@ bobine du premier coup.
 flottant, ni compte à rebours, ni filigrane — et il enregistre la définition
 réelle de l'écran. C'est le seul dont on ne voit pas qu'il était là.
 
+### Où l'installer : sur Windows, pas dans WSL
+
+**WSL2 n'a aucun accès USB.** Vérifié le 9 septembre 2026 sur cette machine :
+`/dev/bus/usb` n'y contient que les deux hubs racine, et aucun téléphone ne peut
+y apparaître sans `usbipd-win`. L'affichage, lui, ne pose pas de problème — WSLg
+est présent (`DISPLAY=:0`), une fenêtre scrcpy s'afficherait très bien.
+
+Trois voies, de la plus simple à la plus laborieuse :
+
+**1. scrcpy sur Windows** — recommandé. Le zip des *releases* GitHub est
+autonome : `adb` est dedans, il n'y a rien à installer. On branche le téléphone
+en USB et c'est fini. Les MP4 atterrissent dans `C:\…`, que WSL lit par `/mnt/c/`.
+
+**2. scrcpy dans WSL, en ADB sans fil** — si l'on tient à rester sous Linux.
+Pas d'USB du tout : le débogage sans fil d'Android 11+ suffit, et WSL2 joint le
+réseau local.
+
 ```bash
-sudo apt install scrcpy          # ou : snap install scrcpy
-# téléphone : Options développeur → Débogage USB, puis
+sudo apt install scrcpy android-tools-adb
+# téléphone : Options développeur → Débogage sans fil → Associer un appareil
+adb pair 192.168.x.x:PORT        # le code à six chiffres affiché sur le téléphone
+adb connect 192.168.x.x:5555
 scrcpy --record ~/tournage/bobine-1.mp4 --max-size 1080 --stay-awake
 ```
+
+**3. USB depuis WSL via `usbipd-win`** — possible, mais il faut l'installer côté
+Windows, puis `usbipd bind --busid …` en administrateur et `usbipd attach --wsl`
+**à chaque branchement**. Beaucoup de friction pour filmer une vidéo.
 
 ## 2. Régler le téléphone avant la première prise
 
