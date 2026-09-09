@@ -227,7 +227,7 @@ l'image : les quatre secondes de carton suffisent à respirer.
 
 | Chapitre | À l'écran | Ce que tu dis |
 |---|---|---|
-| **0:00** | Connexion | « Un compte par invitation. Chaque compte ne voit que ses propres données — j'y reviendrai, c'est le point technique le plus sérieux. » |
+| **0:00** | Ouverture | « Un compte par invitation, la session est déjà ouverte. Chaque compte ne voit que ses propres données — j'y reviendrai, c'est le point technique le plus sérieux. » |
 | **0:11** | Le frigo — le stock | « Voilà ce qu'il y a dans le frigo, rangé par emplacement, avec les valeurs pour 100 grammes. » … *(sur le détail d'un aliment)* « Et la mention "poids cru" : c'est ce qui décide de la justesse de tous les calculs derrière. » |
 | **0:31** | Le frigo — l'inventaire | « Je fais mon inventaire. Je ne ressaisis pas quatorze aliments : je corrige les trois qui ont bougé. » … « J'envoie. Regardez le message — l'écran rend la main tout de suite, le traitement continue sans lui. Et le stock est à jour. » |
 | **0:51** | Les repas — les cibles | « Une cible par repas, pas seulement un total pour la journée. Le matin, le midi, seize heures, le soir — chacun a ses calories et ses macros. » |

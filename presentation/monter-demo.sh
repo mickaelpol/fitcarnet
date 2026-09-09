@@ -35,11 +35,16 @@ trap 'rm -rf "$TRAVAIL"' EXIT
 #  fichier » — pratique pour la dernière séquence, dont la longueur dépend
 #  de la fermeture du navigateur.
 #
-#  POUR RECALER : ouvrir le brut dans un lecteur qui affiche le temps
-#  (`mpv --osd-level=3 presentation/tournage/brut/*.webm`), noter l'instant
-#  où chaque parcours commence, reporter ici. Le script vérifie que les
-#  bornes croissent et tiennent dans la durée réelle, et refuse de monter
-#  sinon plutôt que de produire un film muet aux coupes fausses.
+#  POUR RECALER : lire `presentation/tournage/decoupe.json`, que le tournage
+#  écrit lui-même en notant l'instant où il passe d'une séquence à l'autre, et
+#  reporter ses `debut` ici. Ne pas les relever à l'œil dans un lecteur : c'est
+#  long, et faux à la seconde près. Le script vérifie que les bornes croissent
+#  et tiennent dans la durée réelle, et refuse de monter sinon plutôt que de
+#  produire un film aux coupes fausses.
+#
+#  ATTENTION AU DÉCALAGE SILENCIEUX : si une séquence du tournage échoue, tout
+#  ce qui suit remonte dans le brut, les bornes restent valides — et les cartons
+#  annoncent alors le mauvais parcours. Relire decoupe.json à chaque tournage.
 # ---------------------------------------------------------------------
 #  CES BORNES NE SONT PAS DEVINÉES : elles viennent de
 #  `presentation/tournage/decoupe.json`, que le tournage écrit lui-même en
@@ -69,7 +74,7 @@ DECOUPE=(
 #  « = », « ; », « # » et « \ », qu'on évite plutôt que de les échapper.
 # ---------------------------------------------------------------------
 SEQUENCES=(
-    "1. Connexion|1 · Connexion|Un compte par invitation, une session courte|Connexion — chaque compte ne voit que ses propres données"
+    "1. Ouverture|1 · Ouverture|Un compte par invitation, une session déjà ouverte|Ouverture de l'application — chaque compte ne voit que ses propres données"
     "2. Le frigo, le stock|2 · Le frigo — le stock|Ce qu'il y a, où c'est rangé, et ce que ça vaut|Stock par emplacement · le détail d'un aliment, tel qu'on le pèse"
     "3. Le frigo, l'inventaire|3 · Le frigo — l'inventaire|On ne corrige que ce qui a bougé|Trois écarts saisis · envoi en lot · application en tâche de fond"
     "4. Les repas, les cibles|4 · Les repas — les cibles|Une cible par repas, pas seulement un total pour la journée|Cibles par repas · un repas déplié montre sa part de la journée"
