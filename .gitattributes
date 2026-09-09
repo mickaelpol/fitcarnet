@@ -55,3 +55,4 @@ bin/*       text eol=lf
 *.ttf       binary
 *.mp4       binary
 *.pem       binary
+graphify-out/graph.json merge=graphify

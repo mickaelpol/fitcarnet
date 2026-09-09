@@ -5,7 +5,8 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 8 septembre 2026** — É1 corrigé, outillage remis d'aplomb.
+**Dernière mise à jour : 9 septembre 2026** — É1 corrigé, skills du projet
+réécrites, jeu de démonstration et support de présentation.
 
 ---
 
@@ -145,6 +146,20 @@ système singulier.
 
 ---
 
+**Le réseau sortant des conteneurs est cassé sur cette machine.** Ni DNS ni
+routage : même vers une IP brute, `curl` rend `000` depuis `fitcarnet-app-dev`.
+D'où l'échec de `composer install` dans le conteneur, contourné en installant
+`vendor` depuis l'hôte (le dossier est monté). C'est du NAT Docker sous WSL2,
+pas le dépôt — **réparation à faire**, elle n'a pas été tentée.
+
+**Le port 8080 se dispute avec `gestion-interne-api`.** Son Keycloak le tenait ;
+`fitcarnet-app-dev` refusait de démarrer, puis a tourné sans port publié — sain
+au `docker ps`, injoignable. Le recréer (`up -d --force-recreate app`) après
+avoir libéré le port. **Keycloak a été arrêté le 9 septembre et n'a pas été
+relancé.**
+
+---
+
 ## Pièges vérifiés, qui reviendront
 
 - **`verifier-schema.sh` signale 280 lignes de divergence.** Ce n'est pas un raté
@@ -169,6 +184,20 @@ système singulier.
   plugin entier ; on paie donc ~2 950 tokens de contexte par session pour des
   skills dont on ne se sert pas ici. À rouvrir si Claude Code gagne un réglage
   par composant.
+- **Monter l'environnement sans `installer.sh` laisse une base INCOMPLÈTE.**
+  PostgreSQL ne joue que `db/*.sql` à la création du volume ; les migrations de
+  `db/manuel/` ne partent que par `installer.sh` ou `entrypoint-prod.sh`, dont
+  l'ordre est écrit à la main. Le 9 septembre, la base avait 18 tables au lieu de
+  20 : `inventaire_lot` manquait, et l'envoi d'un inventaire répondait
+  « relation "inventaire_lot" does not exist ». Rejouer la liste dans l'ordre
+  d'`installer.sh` — les 21 migrations passent, `25-garde-fous.sql` compris.
+- **`bin/console` exige `api/.env`, que le clone ne fournit pas.** Sans lui :
+  « Unable to read the "/app/.env" ». L'API servie par FrankenPHP s'en passe —
+  ses variables viennent du conteneur. Un fichier local suffit, avec `APP_ENV`
+  et `DEFAULT_URI` ; il est ignoré par git.
+- **Les clés JWT ne sont pas dans le dépôt** (et c'est heureux). Sans elles, la
+  connexion répond « An error occurred while trying to encode the JWT token ».
+  `bin/console lexik:jwt:generate-keypair --skip-if-exists`.
 - **Une machine neuve n'a ni `front/node_modules` ni `api/vendor`, et rien ne le
   dit.** Le 8 septembre, `npm test` a échoué sur `expo/tsconfig.base not found`
   et `bin/phpunit` n'existait pas. Faire `cd front && npm install`, et pour l'API
