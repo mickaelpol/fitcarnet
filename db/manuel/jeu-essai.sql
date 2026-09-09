@@ -7,6 +7,13 @@
 --  db/ est monté dans docker-entrypoint-initdb.d, où PostgreSQL exécute
 --  tout .sql à la création de la base. Or ce jeu suppose un compte existant.
 --
+--  REMIS EN SERVICE LE 9 SEPTEMBRE 2026. Il inserait encore la colonne
+--  `etat_reference`, que la migration 18 « un seul etat » avait supprimee :
+--  depuis, il echouait sur « column "etat_reference" does not exist » et ne
+--  posait plus rien. Personne ne s'en etait apercu — un jeu d'essai qu'on ne
+--  joue pas ne previent pas qu'il est casse. Les macros sont desormais
+--  toujours celles du produit CRU, il n'y a plus d'etat a porter.
+--
 --  À quoi il sert. Le frigo, l'inventaire et la gestion des aliments sont
 --  écrits pour deux sources — Grocy pour l'administrateur, la table
 --  « aliment » pour les autres. Ce fichier crée de quoi exercer l'autre.
@@ -75,9 +82,9 @@ BEGIN
     --  dans un seul emplacement, et le regroupement n'est pas exerce.
     -- ----------------------------------------------------------------
     INSERT INTO aliment (nom, categorie, kcal_100, prot_100, gluc_100, lip_100,
-                         fibres_100, ratio, etat_reference, source, public, cree_par)
+                         fibres_100, ratio, source, public, cree_par)
     SELECT t.nom, t.categorie, t.kcal_100, t.prot_100, t.gluc_100, t.lip_100,
-           t.fibres_100, t.ratio, t.etat_reference, 'manuel', FALSE, v_utilisateur
+           t.fibres_100, t.ratio, 'manuel', FALSE, v_utilisateur
     FROM  (SELECT a.*,
                   row_number() OVER (PARTITION BY a.categorie ORDER BY a.nom) AS rang
            FROM   aliment a
@@ -88,9 +95,9 @@ BEGIN
     -- Un aliment que le catalogue de reference ne contient pas : il verifie
     -- le parcours « creer de zero » et le cloisonnement entre comptes.
     INSERT INTO aliment (nom, categorie, kcal_100, prot_100, gluc_100, lip_100,
-                         fibres_100, ratio, etat_reference, source, public, cree_par)
+                         fibres_100, ratio, source, public, cree_par)
     VALUES ('Skyr d''essai (compte ordinaire)', 'lait', 63, 10.5, 4.0, 0.2,
-            0, 1, 'cuit', 'manuel', FALSE, v_utilisateur)
+            0, 1, 'manuel', FALSE, v_utilisateur)
     ON CONFLICT (lower(nom), cree_par) WHERE cree_par IS NOT NULL DO NOTHING;
 
     -- ----------------------------------------------------------------
