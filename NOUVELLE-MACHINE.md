@@ -74,11 +74,20 @@ Il vérifie les prérequis, installe **graphify** (avec son support SQL) et
 clone du marketplace, correction de son manifeste, installation du plugin. Il
 ne touche ni à la base, ni aux conteneurs.
 
+Il finit par **confronter les cinq plugins déclarés dans `.claude/settings.json`
+à ceux réellement installés**, et pose ceux qui manquent.
+
 Chaque ligne doit être verte. Si l'une est rouge, elle dit quoi faire.
 
-**Puis démarre Claude Code dans ce dossier.** C'est ce démarrage qui installe
-les quatre plugins officiels déclarés dans `.claude/settings.json` — Expo,
-php-lsp, context7, superpowers — et charge les skills du projet.
+**Puis démarre Claude Code dans ce dossier.** C'est ce démarrage qui charge les
+skills — celles du projet et celles des plugins.
+
+> **Pourquoi ce contrôle existe.** Les quatre plugins officiels sont normalement
+> posés par Claude Code au premier démarrage, d'après `enabledPlugins`. Le
+> 8 septembre 2026 il en a posé trois : `expo` a échoué sans un log, et le
+> script comptait alors les plugins *déclarés* au lieu des installés — il
+> annonçait « 5 plugins » avec quatre sur le disque. Une relance à la main a
+> suffi à poser `expo` : la panne était passagère, l'aveuglement non.
 
 > **Pourquoi le script installe `superpowers-symfony` lui-même, et pas Claude
 > Code.** Le manifeste de ce marketplace déclare son ancien nom d'organisation,
@@ -94,7 +103,7 @@ claude plugin list        # expo, php-lsp, context7, superpowers, superpowers-sy
 ```
 
 Le dépôt porte déjà, sans rien à faire : `CLAUDE.md` et les sept règles du
-projet, les hooks de vérification, les `skillOverrides` (28 skills inutiles
+projet, les hooks de vérification, les `skillOverrides` (6 skills projet
 coupées), les 11 skills projet et 2 agents, `.graphifyignore`, et le cache
 sémantique de graphify.
 
@@ -193,8 +202,20 @@ sur toute machine sans clé GitHub autorisée.
 la mise à jour réécrit le manifeste et efface la correction. Le symptôme est net
 — `claude plugin list` ne montre plus que quatre plugins.
 
+**Un plugin peut manquer sans que rien ne le dise.** C'est ce que le contrôle du
+script attrape désormais : il installe le manquant, en scope projet. Sans
+`--scope project`, `claude plugin install` pose le plugin en scope *utilisateur*
+et l'active dans tous les dépôts de la machine.
+
 **Les `skillOverrides` ne prennent effet qu'au redémarrage suivant.** Normal :
 Claude Code lit la configuration au lancement.
+
+**Et ils ne peuvent rien contre les skills des plugins.** Une entrée
+`expo:expo-dom` est acceptée sans broncher et ne coupe rien — vérifié le
+8 septembre 2026 dans les deux fichiers de configuration, projet et utilisateur.
+Seules les skills de `.claude/skills/` obéissent. Pour une skill de plugin, le
+seul levier est `claude plugin disable`, qui désactive le plugin entier. Le
+script prévient si une entrée de ce genre réapparaît.
 
 **Le graphe se périme.** `graphify update .` après une modification de code
 (gratuit, AST seul) ; `/graphify . --update` après un changement de
@@ -212,7 +233,7 @@ le projet se travaille en terminal, avec Claude Code.
 - [ ] Docker, Node 22, git + clé SSH Gitea, jq, uv
 - [ ] `git clone` sous WSL2 ou Linux — **jamais** dans `C:\`
 - [ ] `.env` créé depuis `.env.exemple`, trois secrets renseignés
-- [ ] `./installer-outils.sh` — **toutes les lignes vertes**
+- [ ] `./installer-outils.sh` — **toutes les lignes vertes**, dont « 5/5 plugins installés »
 - [ ] **Claude Code démarré dans le dossier** ← l'oubli le plus fréquent
 - [ ] `claude plugin list` montre bien les **cinq** plugins
 - [ ] `./installer.sh`

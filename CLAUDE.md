@@ -18,16 +18,17 @@ travailler, et le tenir à jour en repartant.**
 
 ```bash
 git clone ssh://git@gitea.mickael-pol.fr:2222/mickael/fitcarnet.git
-cd fitcarnet && ./installer-outils.sh     # graphify, intelephense, outillage
-# redémarrer Claude Code ici — il installe alors les plugins déclarés
+cd fitcarnet && ./installer-outils.sh     # graphify, intelephense, les cinq plugins
+# redémarrer Claude Code ici — c'est ce qui charge les skills
 ./installer.sh                            # l'application : base, conteneurs, compte
 ```
 
 Le dépôt porte **tout l'outillage** : `CLAUDE.md`, les hooks et `skillOverrides`,
-la déclaration des cinq plugins (`enabledPlugins`, installés au premier
-démarrage), les skills propres au projet, `.graphifyignore`, et le **cache
-sémantique de graphify** — 480 Ko qui évitent de redépenser 125 000 tokens
-d'extraction. Seul le graphe lui-même se reconstruit : `/graphify .`.
+la déclaration des cinq plugins (`enabledPlugins` — Claude Code les pose au
+premier démarrage, et `installer-outils.sh` vérifie qu'il l'a fait), les skills
+propres au projet, `.graphifyignore`, et le **cache sémantique de graphify** —
+480 Ko qui évitent de redépenser 125 000 tokens d'extraction. Seul le graphe
+lui-même se reconstruit : `/graphify .`.
 
 ## Commandes
 
@@ -142,18 +143,28 @@ déviation par rapport à la cible doit être expliquée à l'écran.
 
 ## Skills : laquelle, quand
 
-Le projet charge beaucoup de skills. Celles qui n'ont aucun usage ici sont déjà
-coupées dans `.claude/settings.json` (`skillOverrides`) — inutile de les rallumer
-sans raison. Pour le reste, l'aiguillage :
+Le projet charge beaucoup de skills. Six skills **du projet** sont coupées dans
+`.claude/settings.json` (`skillOverrides`) — inutile de les rallumer sans raison.
+
+**`skillOverrides` ne peut rien contre les skills des plugins.** Vérifié le
+8 septembre 2026 : une entrée `expo:expo-dom` ou `superpowers-symfony:tdd-with-pest`
+ne coupe rien, ni depuis le dépôt ni depuis `~/.claude/settings.json`. Le seul
+levier est `claude plugin disable` — le plugin entier. Les vingt-deux entrées de
+ce genre ont été retirées : elles faisaient croire à une économie qui n'existait
+pas (~2 950 tokens de contexte payés à chaque session malgré tout). Ne pas en
+réécrire.
+
+Pour l'aiguillage :
 
 | Travail | Skill à prendre |
 |---|---|
 | Corriger un bug, ajouter un comportement | **`superpowers:test-driven-development`**, sans exception |
-| Cadrer une demande vague ou vaste | **`superpowers:brainstorming`** (celle de `superpowers`, pas `symfony:`) |
-| API Platform : ressource, filtre, processeur, sérialisation | **`symfony:api-platform-*`** — elles ciblent la v4, celle du projet |
-| Doctrine : relations, migrations, transactions, N+1 | **`symfony:doctrine-*`** |
-| Tests API | **`symfony:tdd-with-phpunit`** (le projet est en PHPUnit, pas Pest) |
-| Écran, navigation, EAS update | **`expo-router`**, **`eas-update`**, **`expo-data-fetching`** |
+| Cadrer une demande vague ou vaste | **`superpowers:brainstorming`** (celle de `superpowers`, pas celle de `superpowers-symfony`) |
+| API Platform : ressource, filtre, processeur, sérialisation | **`superpowers-symfony:api-platform-*`** — elles ciblent la v4, celle du projet |
+| Doctrine : relations, migrations, transactions, N+1 | **`superpowers-symfony:doctrine-*`** |
+| Tests API | **`superpowers-symfony:tdd-with-phpunit`** (le projet est en PHPUnit, pas Pest) |
+| Écran, navigation, données | **`expo:expo-router`**, **`expo:expo-data-fetching`** |
+| Après un `eas update` : est-il arrivé sur les téléphones | **`expo:eas-update-insights`** — aucune skill ne couvre la publication elle-même, c'est `publier.sh` |
 | Index, plan de requête, VACUUM | **`postgres`** |
 | Déployer, publier, restaurer | **rien d'automatique** : lire `DEPLOIEMENT.md` et `MISE-A-JOUR.md` |
 
@@ -174,35 +185,10 @@ le même commit.
 
 ## graphify
 
-Le projet porte un graphe de connaissances dans `graphify-out/` : nœuds pivots,
-communautés, liens entre fichiers, **et les 84 constats de l'audit reliés au code
-qu'ils désignent**. Deux hooks `PreToolUse` (`.claude/settings.json`) rappellent
-ces règles avant chaque recherche ou lecture.
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
-**S'orienter d'abord, lire ensuite.**
-
-| Besoin | Commande |
-|---|---|
-| Comprendre un pan du code | `graphify query "<question>"` |
-| Relation entre deux choses | `graphify path "<A>" "<B>"` |
-| Un concept précis | `graphify explain "<concept>"` |
-| Vue d'architecture | `graphify-out/GRAPH_REPORT.md`, en dernier recours |
-
-**Puis `grep` et `Read` sans hésiter** pour la ligne exacte à corriger. Le graphe
-oriente ; il ne remplace pas la lecture du code au moment de le modifier. Une
-requête coûte plus qu'un `grep` ciblé et revient parfois tronquée : elle sert à
-savoir *où regarder*, pas à retrouver un symbole dont on connaît déjà le nom.
-
-**Le tenir à jour** : `graphify update .` après une modification de code (AST
-seul, aucun appel à un modèle). Pour un changement de documentation,
-`/graphify . --update` dans l'assistant, qui relance l'extraction sémantique.
-Sans ça le graphe ment : il a déjà décrit une méthode supprimée pendant une
-demi-journée.
-
-**`.graphifyignore` définit le périmètre** et doit le rester. Les 58 fichiers de
-skills tierces de `.claude/skills/`, les dumps de données et les binaires en sont
-exclus : ingérés, ils noient les communautés du projet sous de la documentation
-PostgreSQL et Symfony qui ne parle pas de fitcarnet.
-
-*Cette section a été posée par `graphify claude install` puis récrite en
-français. Une réinstallation la remplacera par la version anglaise d'origine.*
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

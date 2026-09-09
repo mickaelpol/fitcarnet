@@ -7,15 +7,17 @@
 #  Ce que le dépôt porte déjà et que ce script n'a pas à refaire :
 #    - CLAUDE.md, les règles du projet et l'aiguillage des skills ;
 #    - .claude/settings.json — hooks, skillOverrides, ET la déclaration des
-#      plugins (extraKnownMarketplaces + enabledPlugins) : Claude Code les
-#      installe tout seul au premier démarrage dans ce dossier ;
+#      plugins (extraKnownMarketplaces + enabledPlugins) ;
 #    - .claude/skills/ et .claude/agents/ — les skills propres au projet ;
 #    - .graphifyignore, phpstan.dist.neon, les scripts de vérification.
 #
 #  Ce que ce script installe, parce qu'aucun fichier du dépôt ne peut le faire :
 #    - graphify (outil Python global) ;
 #    - intelephense (serveur de langage PHP, requis par le plugin php-lsp) ;
-#    - le contournement du manifeste cassé de superpowers-symfony.
+#    - le contournement du manifeste cassé de superpowers-symfony ;
+#    - les plugins déclarés que le démarrage de Claude Code n'a pas posés. Il est
+#      censé s'en charger seul, mais il a déjà échoué en silence (voir la section
+#      « Plugins déclarés par le dépôt »), alors on vérifie.
 #
 #  Il ne touche NI à la base, NI aux conteneurs, NI au NAS. Pour l'application
 #  elle-même, voir INSTALLATION.md et installer.sh.
@@ -141,11 +143,101 @@ PY
     fi
 fi
 
+# ------------------------------------------- les plugins que le dépôt déclare
+titre "Plugins déclarés par le dépôt"
+#
+# LE 8 SEPTEMBRE 2026, `expo` MANQUAIT ET RIEN NE LE DISAIT.
+#
+# Les quatre plugins officiels sont posés par Claude Code au démarrage dans ce
+# dossier, d'après `enabledPlugins`. Ce jour-là il en a posé trois — php-lsp et
+# context7 à 11:17:16, superpowers à 11:17:37 — et rien pour `expo`, le seul dont
+# la source oblige à cloner un sous-dossier d'un AUTRE dépôt (`git-subdir` vers
+# github.com/expo/skills). L'échec n'a laissé aucun log. Et le contrôle de ce
+# script comptait les plugins DÉCLARÉS, jamais les installés : il annonçait
+# « 5 plugins » alors qu'il n'y en avait que quatre sur le disque. Une relance à
+# la main a suffi à poser expo — la panne était passagère, l'aveuglement non.
+#
+# D'où cette section : on compare vraiment, et on installe ce qui manque.
+declares=()
+plugins_manquants=()
+plugins_verifies=1
+plugins_poses=0
+
+if ! command -v claude >/dev/null 2>&1; then
+    plugins_verifies=0
+    jaune "  Claude Code n'est pas installé — impossible de vérifier."
+else
+    mapfile -t declares < <(jq -r '.enabledPlugins // {} | to_entries[] | select(.value) | .key' \
+                              "$RACINE/.claude/settings.json")
+    installes="$(claude plugin list --json 2>/dev/null | jq -r '.[].id' 2>/dev/null || true)"
+
+    for plugin in "${declares[@]}"; do
+        if grep -qxF "$plugin" <<<"$installes"; then
+            vert "  ✓ $plugin"
+            continue
+        fi
+
+        # Marketplace inconnu : `claude plugin install` échouerait sans dire
+        # pourquoi. `claude-plugins-official` est intégré à Claude Code.
+        marche="${plugin##*@}"
+        if [[ "$marche" != "claude-plugins-official" ]] \
+           && ! jq -e --arg m "$marche" 'has($m)' \
+                   "$HOME/.claude/plugins/known_marketplaces.json" >/dev/null 2>&1 \
+           && ! jq -e --arg m "$marche" '.extraKnownMarketplaces | has($m)' \
+                   "$RACINE/.claude/settings.json" >/dev/null 2>&1; then
+            rouge "  ✗ $plugin — marketplace « $marche » inconnu"
+            rouge "    claude plugin marketplace add <organisation>/$marche"
+            plugins_manquants+=("$plugin")
+            continue
+        fi
+
+        # `--scope project` n'est pas décoratif : sans lui l'installation part en
+        # scope utilisateur, et le plugin s'active dans TOUS les projets de la
+        # machine — expo dans un dépôt qui n'a pas une ligne de React Native.
+        if claude plugin install "$plugin" --scope project >/dev/null 2>&1; then
+            vert "  ✓ $plugin — installé"
+            plugins_poses=1
+        else
+            rouge "  ✗ $plugin — installation refusée ; relance, ou vois NOUVELLE-MACHINE.md"
+            plugins_manquants+=("$plugin")
+        fi
+    done
+
+    # Le CLI réécrit .claude/settings.json en réordonnant ses clés : contenu
+    # identique, diff bruyant. Le dire, plutôt que de laisser un `git status` sale
+    # sans explication. Seulement si on vient d'installer, et seulement dans un
+    # dépôt git — sinon on accuserait le CLI d'une modification faite à la main.
+    if (( plugins_poses )) \
+       && git -C "$RACINE" rev-parse --git-dir >/dev/null 2>&1 \
+       && ! git -C "$RACINE" diff --quiet .claude/settings.json 2>/dev/null; then
+        jaune "  ⚠ .claude/settings.json réordonné par le CLI (contenu inchangé)"
+        jaune "    git checkout -- .claude/settings.json"
+    fi
+fi
+
 # ------------------------------------------------------------------ contrôle
 titre "Contrôle"
 cd "$RACINE"
 [[ -f CLAUDE.md ]]                  && vert "  ✓ CLAUDE.md"
-[[ -f .claude/settings.json ]]      && vert "  ✓ .claude/settings.json ($(jq '.enabledPlugins | length' .claude/settings.json) plugins déclarés, $(jq '.skillOverrides | length' .claude/settings.json) skills coupées)"
+# `skillOverrides` NE COUPE QUE LES SKILLS LOCALES. Vérifié le 8 septembre 2026 :
+# les six entrées sans préfixe (skills de .claude/skills) sont bien refusées à
+# l'invocation, tandis que les vingt-deux qui visaient `expo:` et
+# `superpowers-symfony:` ne coupaient rien — ni depuis ce fichier, ni depuis
+# ~/.claude/settings.json, testé en déplaçant un témoin. Elles ont été retirées :
+# elles annonçaient « 28 skills coupées » et payaient quand même ~2 950 tokens
+# de contexte à chaque session. Pour une skill de plugin, le seul levier est
+# `claude plugin disable` — le plugin entier, pas une skill.
+coupees=$(jq '.skillOverrides | length' .claude/settings.json)
+morts=$(jq '[.skillOverrides // {} | keys[] | select(contains(":"))] | length' .claude/settings.json)
+if (( ! plugins_verifies )); then
+    jaune "  ⚠ .claude/settings.json — plugins NON vérifiés, $coupees skills coupées"
+elif (( ${#plugins_manquants[@]} )); then
+    rouge "  ✗ .claude/settings.json — $(( ${#declares[@]} - ${#plugins_manquants[@]} ))/${#declares[@]} plugins installés"
+    rouge "    manque : ${plugins_manquants[*]}"
+else
+    vert "  ✓ .claude/settings.json (${#declares[@]}/${#declares[@]} plugins installés, $coupees skills coupées)"
+fi
+(( morts )) && jaune "  ⚠ $morts skillOverrides visent une skill de plugin : sans effet, à retirer"
 [[ -d .claude/skills ]]             && vert "  ✓ .claude/skills ($(ls .claude/skills | wc -l) skills projet)"
 [[ -f .graphifyignore ]]            && vert "  ✓ .graphifyignore"
 [[ -f api/phpstan.dist.neon ]]      && vert "  ✓ phpstan.dist.neon"
@@ -154,8 +246,8 @@ cd "$RACINE"
 
 titre "Il reste à faire, à la main"
 cat <<'FIN'
-  1. Redémarrer Claude Code dans ce dossier — c'est ce qui installe les plugins
-     déclarés et charge les skills.
+  1. Redémarrer Claude Code dans ce dossier — c'est ce qui charge les skills des
+     plugins qui viennent d'être installés.
   2. Lancer l'application elle-même : voir INSTALLATION.md, puis ./installer.sh
      (base, conteneurs, compte administrateur).
   3. Si le graphe manque, le construire : /graphify . dans Claude Code.

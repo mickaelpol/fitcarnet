@@ -15,28 +15,6 @@
     "superpowers-symfony@superpowers-symfony": true
   },
   "skillOverrides": {
-    "expo:eas-hosting": "off",
-    "expo:eas-observe": "off",
-    "expo:eas-simulator": "off",
-    "expo:eas-update-insights": "off",
-    "expo:eas-workflows": "off",
-    "expo:expo-app-clip": "off",
-    "expo:expo-brownfield": "off",
-    "expo:expo-design-system": "off",
-    "expo:expo-dom": "off",
-    "expo:expo-module": "off",
-    "expo:expo-native-ui": "off",
-    "expo:expo-skill-feedback": "off",
-    "expo:expo-web-to-native": "off",
-    "superpowers-symfony:brainstorm": "off",
-    "superpowers-symfony:brainstorming": "off",
-    "superpowers-symfony:e2e-panther-playwright": "off",
-    "superpowers-symfony:execute-plan": "off",
-    "superpowers-symfony:executing-plans": "off",
-    "superpowers-symfony:tdd-with-pest": "off",
-    "superpowers-symfony:twig-components": "off",
-    "superpowers-symfony:write-plan": "off",
-    "superpowers-symfony:writing-plans": "off",
     "symfony-api-response": "off",
     "symfony-doctrine-persistence": "off",
     "symfony-messenger-async": "off",
@@ -53,7 +31,7 @@
             "type": "command",
             "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; case \"$f\" in */front/src/*.ts|*/front/src/*.tsx|*/front/app/*.ts|*/front/app/*.tsx) cd \"${f%%/front/*}/front\" && npm run --silent verif ;; esac; }",
             "timeout": 120,
-            "statusMessage": "Vérification du typage front..."
+            "statusMessage": "V\u00e9rification du typage front..."
           },
           {
             "type": "command",
