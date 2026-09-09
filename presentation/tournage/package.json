@@ -1,0 +1,9 @@
+{
+  "name": "fitcarnet-tournage",
+  "private": true,
+  "description": "Tournage de la demonstration : Playwright pilote l'application et enregistre une video continue.",
+  "type": "module",
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}

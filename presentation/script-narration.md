@@ -3,8 +3,9 @@
 Ce document se lit **pendant** que tu présentes. Il donne, pour chaque slide, ce
 qu'il faut dire, ce qu'il ne faut pas oublier, et ce qu'on va te demander.
 
-**Durée visée : 25 à 30 minutes**, questions comprises. La vidéo dure 74 secondes
-et se commente en direct — le minutage est en fin de document.
+**Durée visée : 25 à 30 minutes**, questions comprises. La vidéo dure 3 min 01,
+elle est muette et découpée en huit chapitres : elle se commente en direct et on
+peut y revenir — le minutage est en fin de document.
 
 **Deux publics dans la salle.** Le client attend de savoir ce que le produit
 résout ; l'équipe technique attend de savoir si c'est solide. Les actes 1 et 2
@@ -215,23 +216,29 @@ Annonce franchement : « Je vais vous dire comment c'est fabriqué. »
 
 ---
 
-## La vidéo · 74 secondes
+## La vidéo · 3 min 01 · huit chapitres
 
-Lance-la en plein écran. Voici ce que tu dis, seconde par seconde.
+Lance-la en plein écran. **Elle est muette et chapitrée** : tu peux t'arrêter,
+revenir sur un parcours pendant une question, repartir. Les cartons annoncent,
+la légende du bas rappelle ce qu'on regarde.
 
-| Temps | À l'écran | Ce que tu dis |
+Le tableau donne le début de chaque chapitre. Entre les bornes, laisse parler
+l'image : les quatre secondes de carton suffisent à respirer.
+
+| Chapitre | À l'écran | Ce que tu dis |
 |---|---|---|
-| 0-5 s | Carton d'ouverture | « Deux parcours, filmés dans l'application, sans montage. » |
-| 5-11 s | Carton « L'inventaire » | « Le premier : corriger le stock du frigo. » |
-| 11-38 s | Saisie et envoi | « Le poulet était à 623 grammes. Je pèse, il en reste 480. Je corrige cette ligne-là, et elle seule. » … « J'envoie. Regardez le message : l'écran rend la main immédiatement, le traitement continue sans lui. » … « Et voilà le stock à jour. Entre les deux, le travail s'est fait en tâche de fond. » |
-| 38-44 s | Carton « Composer les repas » | « Le deuxième parcours : composer les repas de la journée. » |
-| 44-68 s | Composition | « Je pars des quatre cibles du jour. L'application regarde ce que le frigo permet… » … « Quatre repas, avec leurs macros réelles. Les écarts à la cible sont en couleur — ici le soir est en dessous, parce que le frigo ne permettait pas mieux. Elle le dit au lieu de l'arrondir. » |
-| 68-74 s | Carton final | Laisse-le à l'écran pendant les questions. |
+| **0:00** | Connexion | « Un compte par invitation. Chaque compte ne voit que ses propres données — j'y reviendrai, c'est le point technique le plus sérieux. » |
+| **0:11** | Le frigo — le stock | « Voilà ce qu'il y a dans le frigo, rangé par emplacement, avec les valeurs pour 100 grammes. » … *(sur le détail d'un aliment)* « Et la mention "poids cru" : c'est ce qui décide de la justesse de tous les calculs derrière. » |
+| **0:31** | Le frigo — l'inventaire | « Je fais mon inventaire. Je ne ressaisis pas quatorze aliments : je corrige les trois qui ont bougé. » … « J'envoie. Regardez le message — l'écran rend la main tout de suite, le traitement continue sans lui. Et le stock est à jour. » |
+| **0:51** | Les repas — les cibles | « Une cible par repas, pas seulement un total pour la journée. Le matin, le midi, seize heures, le soir — chacun a ses calories et ses macros. » |
+| **1:06** | Les repas — composer | « Je demande à l'application de composer. Elle part des cibles et de ce que le frigo permet. » … « Quatre repas, les grammes à peser, et l'écart à la cible affiché en clair quand le frigo ne permet pas mieux. » **C'est le chapitre le plus long : laisse-le se dérouler.** |
+| **1:58** | Les repas — batch cooking | « Une cuisson, plusieurs boîtes. La colonne "boîte", c'est ce qu'on met dedans pour tout le monde ; la colonne "une personne", ce qu'on se sert. » |
+| **2:34** | Les séances | « Le carnet. La liste des séances, puis le détail. Je saisis une série… » … « …et le 1RM estimé se recalcule sous les yeux. Regardez la barre de progression : plus 2,8 kg sur neuf séances. » |
+| **3:01** | Les modèles | « Et les programmes, qui servent de patron aux séances. » |
 
-**Si on te demande de revoir un passage** : la vidéo est un fichier MP4 ordinaire,
-tu peux revenir en arrière. C'est aussi pour ça qu'elle est muette.
-
----
+**Si on t'arrête sur un parcours** : les chapitres sont incrustés dans le
+fichier, la plupart des lecteurs les affichent — tu retombes dessus sans
+chercher.
 
 ## Les questions qui viendront
 

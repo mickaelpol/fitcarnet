@@ -411,11 +411,14 @@ SLIDES = [
     """),
 
     ("titre", "Démonstration", """
-      <p class="accroche">Deux parcours, en conditions réelles.</p>
-      <p class="sous">L'inventaire d'un frigo, saisi en écarts et appliqué en tâche de fond ·
-         La composition automatique de quatre repas à partir du stock disponible</p>
-      <p class="meta">Les données de démonstration couvrent neuf semaines d'usage :
-         23 séances, 123 séries, 14 aliments, 2 plans de repas.</p>
+      <p class="accroche">Huit parcours, filmés dans l'application, sans montage des écrans.</p>
+      <p class="sous">Le stock du frigo et le détail d'un aliment · un inventaire à trois écarts,
+         appliqué en tâche de fond · les cibles par repas · la composition automatique ·
+         le batch cooking · une séance, la saisie d'une série et le 1RM qui se recalcule ·
+         les programmes</p>
+      <p class="meta">Les données couvrent neuf semaines d'usage : 23 séances, 123 séries,
+         14 aliments, 2 plans de repas. La vidéo est muette : elle se commente en direct,
+         et chaque parcours est un chapitre — on peut y revenir pendant les questions.</p>
     """),
 ]
 
