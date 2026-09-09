@@ -34,8 +34,11 @@
 --  Puis :
 --    docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet < db/manuel/jeu-demo.sql
 --
---  IL EST REJOUABLE. Il efface d'abord ce qu'il avait posé pour ce compte —
---  séances, modèles, plans, cibles — et le repose. Il ne touche ni au frigo
+--  IL EST REJOUABLE, ET IL EFFACE AVANT DE POSER — séances, modèles, plans,
+--  cibles du compte visé. Un garde-fou refuse donc un compte qui a déjà des
+--  séances : sur une base de production, une adresse mal recopiée détruirait un
+--  historique réel. Pour repasser sur un compte de démonstration déjà garni :
+--  `psql -v ecraser=oui`. Il ne touche ni au frigo
 --  ni aux aliments : c'est le domaine du jeu d'essai.
 -- =====================================================================
 
@@ -43,6 +46,7 @@ DO $$
 DECLARE
     v_email        TEXT := 'demo@fitcarnet.local';   -- <<< à adapter
     v_utilisateur  UUID;
+    v_existant     INT;
     v_modele_push  BIGINT;
     v_modele_pull  BIGINT;
     v_modele_legs  BIGINT;
@@ -68,6 +72,27 @@ BEGIN
     SELECT id INTO v_utilisateur FROM utilisateur WHERE lower(email) = lower(v_email);
     IF v_utilisateur IS NULL THEN
         RAISE EXCEPTION 'Aucun compte pour « % ». Crée-le d''abord, sans --admin ni --grocy.', v_email;
+    END IF;
+
+    -- ----------------------------------------------------------------
+    --  LE GARDE-FOU. CE FICHIER EFFACE AVANT DE POSER.
+    --
+    --  Il supprime les seances, les modeles, les plans et les cibles du
+    --  compte vise. Sur une base de PRODUCTION, une adresse mal recopiee
+    --  en tete de ce fichier detruirait des mois d'historique reel — et
+    --  personne ne s'en apercevrait avant d'ouvrir l'application.
+    --
+    --  On refuse donc de toucher a un compte qui a deja vecu. Pour repasser
+    --  sur un compte de demonstration deja garni, c'est un geste conscient :
+    --      psql -v ecraser=oui -f db/manuel/jeu-demo.sql
+    -- ----------------------------------------------------------------
+    SELECT count(*) INTO v_existant FROM seance WHERE utilisateur_id = v_utilisateur;
+
+    IF v_existant > 0 AND current_setting('psql.ecraser', TRUE) IS DISTINCT FROM 'oui' THEN
+        RAISE EXCEPTION
+            'Le compte « % » a deja % seance(s). Ce fichier les EFFACERAIT. '
+            'Si c''est bien un compte de demonstration, relance avec : psql -v ecraser=oui',
+            v_email, v_existant;
     END IF;
 
     SELECT id INTO v_ex_developpe FROM exercice WHERE nom_fr ILIKE '%chest press%' OR nom ILIKE '%chest press%' LIMIT 1;
