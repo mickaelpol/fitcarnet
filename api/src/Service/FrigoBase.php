@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\Utilisateur;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -77,12 +78,60 @@ final readonly class FrigoBase
     }
 
     /** Fixe la quantite d'un aliment dans le frigo de l'utilisateur. */
+    /**
+     * CES ALIMENTS SONT-ILS COMMUNS, OU LES MIENS ?
+     *
+     * LA REGLE N'EXISTE QU'ICI, ET C'EST TOUT L'INTERET. Elle vivait dans
+     * `FrigoController`, devant une seule de ses routes ; sa jumelle
+     * `POST /mon-frigo/inventaire` ecrivait le meme stock sans jamais la poser
+     * — constat E-01 de l'audit du 7 septembre 2026. Une regle recopiee est
+     * une regle qui finira par ne plus l'etre a un endroit.
+     *
+     * Posee en lot pour qu'un inventaire de cinq cents lignes tienne en une
+     * requete.
+     *
+     * @param list<int> $idsAliments
+     *
+     * @return list<int> ceux qui sont accessibles, parmi les demandes
+     */
+    public function alimentsAccessibles(Utilisateur $utilisateur, array $idsAliments): array
+    {
+        if ([] === $idsAliments) {
+            return [];
+        }
+
+        return \array_map('\intval', $this->cnx->fetchFirstColumn(
+            'SELECT id FROM aliment
+              WHERE id IN (:a) AND (cree_par IS NULL OR cree_par = :u)',
+            ['a' => $idsAliments, 'u' => $utilisateur->getId()],
+            ['a' => ArrayParameterType::INTEGER],
+        ));
+    }
+
     public function definirStock(
         Utilisateur $utilisateur,
         int $idAliment,
         float $quantite,
         ?int $idEmplacement = null,
     ): void {
+        /* LA DERNIERE PORTE, ET ELLE EST FERMEE POUR LES TROIS APPELANTS.
+         *
+         * Cette methode ecrit du stock pour le compte de `POST /mon-frigo/stock`,
+         * de l'inventaire differe et du bouton « J'ai cuisine ». Seule la
+         * premiere posait la question de la propriete. Bob posait 1 g sur
+         * l'aliment prive d'Alice par l'inventaire, et l'aliment d'Alice
+         * devenait indelebile : `AlimentSuppressionProcessor` compte les lignes
+         * de stock tous comptes confondus, et l'application ne lui offrait
+         * aucun moyen de defaire ce blocage.
+         *
+         * Une exception, et non un retour silencieux : l'appelant qui n'a pas
+         * verifie doit s'arreter. Le travailleur de fond, lui, l'attrape deja
+         * et nomme la ligne en echec.
+         */
+        if ([] === $this->alimentsAccessibles($utilisateur, [$idAliment])) {
+            throw new \RuntimeException('Cet aliment n’existe pas dans ton catalogue.');
+        }
+
         // A defaut d'emplacement precise on garde CELUI DEJA CONNU, et le
         // premier defini seulement pour un aliment jamais range. Reprendre le
         // premier a chaque fois deplacerait dans le frigo un produit du placard

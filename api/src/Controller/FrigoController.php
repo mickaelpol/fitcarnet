@@ -10,7 +10,6 @@ use App\Service\Frigo;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
 use App\Service\InventaireLots;
-use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -53,7 +52,6 @@ final class FrigoController extends AbstractController
         private readonly FrigoBase $base,
         private readonly FrigoGrocy $grocy,
         private readonly InventaireLots $lots,
-        private readonly Connection $cnx,
     ) {
     }
 
@@ -123,11 +121,7 @@ final class FrigoController extends AbstractController
      */
     private function alimentAccessible(Utilisateur $utilisateur, int $idAliment): bool
     {
-        return false !== $this->cnx->fetchOne(
-            'SELECT 1 FROM aliment
-              WHERE id = :a AND (cree_par IS NULL OR cree_par = :u)',
-            ['a' => $idAliment, 'u' => $utilisateur->getId()],
-        );
+        return [] !== $this->base->alimentsAccessibles($utilisateur, [$idAliment]);
     }
 
     #[Route('/mon-frigo/stock', methods: ['POST'])]
@@ -373,6 +367,32 @@ final class FrigoController extends AbstractController
             }
 
             $parReference[$reference] = ['reference' => $reference, 'quantite' => $quantite];
+        }
+
+        /* LE MEME CONTROLE QUE SUR /mon-frigo/stock, QUI MANQUAIT ICI.
+           Constat E-01 de l'audit du 7 septembre 2026 : cette route ecrit du
+           stock par un autre chemin, et ne demandait a personne si l'aliment
+           vise etait commun ou celui du demandeur. Bob posait 1 g sur l'aliment
+           prive d'Alice, et Alice ne pouvait plus supprimer le sien.
+
+           Au DEPOT, pas a l'application : le lot part en tache de fond, et un
+           refus rendu une heure plus tard n'a plus personne devant l'ecran.
+
+           Seule la source `base` est concernee — une reference `grocy:` designe
+           un produit de Grocy, que la table `aliment` ne connait pas. */
+        if ('base' === $source) {
+            $demandes = \array_map(
+                static fn (string $reference): int => (int) \substr($reference, \strlen($prefixe)),
+                \array_keys($parReference));
+
+            if (\count($this->base->alimentsAccessibles($utilisateur, $demandes)) !== \count($demandes)) {
+                /* MEME REPONSE QUE POUR « n'existe pas », ET SANS DIRE LEQUEL.
+                   Nommer la ligne fautive rendrait l'enumeration des
+                   identifiants d'aliments confortable. */
+                return $this->json([
+                    'erreur' => 'Un aliment de cet inventaire n’existe pas dans ton catalogue.',
+                ], 404);
+            }
         }
 
         try {

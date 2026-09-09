@@ -107,11 +107,22 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 ## Les 15 constats élevés
 
 ### Sécurité
-- **É1** — L'inventaire différé n'a aucun contrôle de propriété sur l'aliment.
-  `FrigoController.php:332-390` + `AppliqueInventaire.php:146-179`. Le chemin jumeau
-  (`POST /api/mon-frigo/stock`) a reçu `alimentAccessible()` pour corriger exactement cette faille ;
-  `POST /api/mon-frigo/inventaire` ne l'a pas eu. Un compte peut écrire une ligne de stock sur
-  l'aliment privé d'un autre, qui ne peut alors plus le supprimer. *45 min – 1 h.*
+- **É1** — ✅ **corrigé le 8 septembre 2026.** L'inventaire différé n'avait aucun contrôle de
+  propriété sur l'aliment. `FrigoController.php:332-390` + `AppliqueInventaire.php:146-179`. Le
+  chemin jumeau (`POST /api/mon-frigo/stock`) avait reçu `alimentAccessible()` pour corriger
+  exactement cette faille ; `POST /api/mon-frigo/inventaire` ne l'avait pas eu. Un compte pouvait
+  écrire une ligne de stock sur l'aliment privé d'un autre, qui ne pouvait alors plus le supprimer.
+
+  **Ce qui a été fait.** Le contrôle est posé **au dépôt** du lot, en une requête pour tout
+  l'inventaire, et refuse en 404 sans nommer la ligne fautive — distinguer « n'existe pas » de
+  « n'est pas à toi » rendait l'énumération des identifiants confortable. Surtout, la règle a
+  déménagé dans `FrigoBase::alimentsAccessibles()` et `definirStock()` la pose lui-même : les
+  **trois** appelants sont couverts d'un coup — la route `/stock`, l'inventaire différé et le
+  bouton « J'ai cuisiné » de `PlansController`, dont deux ne vérifiaient rien. Les deux appelants
+  de fond attrapaient déjà `\Throwable` et nomment l'échec, donc aucun 500 nouveau.
+  Tests : `tests/Controller/InventaireProprieteTest.php` et `tests/Service/StockProprieteTest.php`,
+  chacun avec son témoin « mon propre aliment passe toujours ». Reste de E-01 : le message DBAL
+  brut rendu au client, qui appartient à **M-03**.
 
 ### Données et infrastructure
 - **É2** — `25-garde-fous.sql:37-41,85-88` fait `UPDATE … SET kcal_100 = NULL` sur une colonne
@@ -190,7 +201,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **0 — garde-fous** | ✅ | `CLAUDE.md`, PHPStan niveau 5, `ModeleExposeTest`, `verifier-schema.sh`, `verifier-migrations.sh`, glob des tests, 2 hooks |
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
-| **3 — sécurité et isolation** | ⬜ ~5 h | É1, C3, É8, M-01 à M-03 — **le prochain** |
+| **3 — sécurité et isolation** | 🟨 1/6 · ~4 h | **É1 fait** · restent C3, É8, M-01 à M-03 — **en cours** |
 | **4 — base reproductible** | ⬜ ~4 h | C2 : `verifier-schema.sh` signale toujours **280 lignes** d'écart |
 | **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |

@@ -5,7 +5,7 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 8 septembre 2026** — 23 commits les 7 et 8 septembre.
+**Dernière mise à jour : 8 septembre 2026** — É1 corrigé, outillage remis d'aplomb.
 
 ---
 
@@ -14,11 +14,12 @@ prises, ce qui attend un arbitrage, et par quoi continuer.
 Un audit complet a relevé **84 constats** (3 critiques, 15 élevés). Les **lots 0,
 1 et 2 sont terminés** : les garde-fous automatiques sont posés, ce qui était
 cassé est réparé, les chiffres faux montrés à l'utilisateur sont corrigés. **Le
-lot 3 — sécurité et isolation — est le suivant.** Tout est documenté dans
+lot 3 — sécurité et isolation — est entamé : É1 est fait**, restent C3, É8 et
+M-01 à M-03. Tout est documenté dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
 
-État : **464 tests au vert** (362 front, 102 API), 8 erreurs PHPStan connues,
-`master` synchronisé sur Gitea.
+État : **468 tests au vert** (362 front, 106 API), 8 erreurs PHPStan connues —
+les mêmes qu'avant, aucune sur les fichiers touchés.
 
 ---
 
@@ -46,16 +47,22 @@ que l'environnement est en cause, pas le code : le régler d'abord.
 
 **3. Le premier message à donner à Claude**, tel quel :
 
-> Lis `REPRENDRE.md`, puis attaque le lot 3 de l'audit en commençant par É1 —
-> le contrôle de propriété manquant sur `POST /api/mon-frigo/inventaire`. En
-> TDD : le test échoue d'abord. Ne travaille pas sur une autre branche que
-> `master` sans me le demander.
+> Lis `REPRENDRE.md`, puis continue le lot 3 de l'audit : C3 — aucun test ne
+> vérifie l'isolation des données entre comptes. En TDD : le test échoue
+> d'abord. Ne travaille pas sur une autre branche que `master` sans me le
+> demander.
 
-Trois précisions qui évitent les allers-retours, si Claude ne les prend pas de
-lui-même : la skill à utiliser est **`superpowers:test-driven-development`**,
-le motif à copier est **`alimentAccessible()` dans `FrigoController.php:157`**,
-et **`docs/audit-2026-09/README.md` porte déjà le scénario reproduit** — inutile
-de le redécouvrir.
+Deux précisions qui évitent les allers-retours, si Claude ne les prend pas de
+lui-même : la skill à utiliser est **`superpowers:test-driven-development`**, et
+**`docs/audit-2026-09/README.md` porte déjà le scénario reproduit** — inutile de
+le redécouvrir.
+
+**Le motif de test est désormais écrit** : `tests/Controller/InventaireProprieteTest.php`
+monte un contrôleur avec ses vrais services et une seule `Connection` doublée
+(`self::createStub`, pas `createMock` — `failOnNotice` refuse un mock sans
+attente). Les services du projet sont `final readonly`, donc indoublables : c'est
+en les instanciant pour de vrai autour d'une connexion doublée qu'on teste le
+**câblage**, et le câblage est précisément ce qui manquait à É1.
 
 **4. En repartant** : mettre ce fichier à jour, cocher le lot dans le tableau
 d'avancement de l'audit, `graphify update .`, et pousser. Le prochain à ouvrir
@@ -67,7 +74,7 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 
 | | Constat | Effort |
 |---|---|---|
-| **É1** | `POST /api/mon-frigo/inventaire` n'a **aucun contrôle de propriété** sur l'aliment, là où son jumeau `/stock` a reçu `alimentAccessible()` pour corriger exactement cette faille. Un compte peut écrire du stock sur l'aliment privé d'un autre, qui ne peut alors plus le supprimer | 1 h |
+| ~~**É1**~~ | ✅ **fait le 8 septembre.** La règle « commun OU le mien » a déménagé dans `FrigoBase::alimentsAccessibles()`, et `definirStock()` la pose lui-même : les **trois** chemins d'écriture sont couverts — `/stock`, l'inventaire différé et « J'ai cuisiné » — au lieu d'un seul. Refus en 404 sans nommer la ligne, pour ne pas offrir l'énumération | — |
 | **C3** | **Aucun test ne vérifie l'isolation entre comptes.** Le code est bon — relu ligne à ligne — mais toute la garantie tient à deux `tags:` dans `services.yaml`. `ModeleExposeTest` couvre les entités ; il manque le test de `FiltreProprietaire` lui-même | 2 h |
 | **É8** | Les exercices « personnels » sont **visibles de tous**. `Exercice` porte `public` et `creePar`, jamais renseignés ni lus, pendant que l'écran affiche « ★ exercice personnel ». **Décision produit à trancher** : filtrer, ou supprimer les colonnes et l'étiquette | 1-2 h |
 | **M-01 à M-03** | Un PATCH admin privatise un aliment commun · jeton de rafraîchissement d'un an sans rotation · messages DBAL bruts rendus au client | 3 h |
@@ -148,6 +155,41 @@ système singulier.
 - **`superpowers-symfony` ne s'installe pas seul** — manifeste pointant sur
   l'ancien nom d'organisation, clone SSH refusé. `installer-outils.sh` s'en
   charge ; à relancer après un `claude plugin marketplace update`.
+- **Un plugin déclaré peut manquer sans un mot.** Le 8 septembre, `expo` n'a pas
+  été posé par le démarrage de Claude Code, et le contrôle d'`installer-outils.sh`
+  comptait les plugins *déclarés* au lieu des installés : il annonçait « 5 » avec
+  quatre sur le disque. Le script compare désormais pour de bon et pose ce qui
+  manque, en `--scope project` — sans ce drapeau, le plugin s'active dans tous
+  les dépôts de la machine. La ligne à lire : « 5/5 plugins installés ».
+- **`skillOverrides` ne coupe que les skills du projet.** Les vingt-deux entrées
+  qui visaient `expo:` et `superpowers-symfony:` n'ont jamais rien coupé — le
+  8 septembre, une skill déclarée « off » s'est chargée à la demande, et la
+  déplacer dans `~/.claude/settings.json` n'y a rien changé. Retirées. Le seul
+  levier pour une skill de plugin est `claude plugin disable`, qui prend le
+  plugin entier ; on paie donc ~2 950 tokens de contexte par session pour des
+  skills dont on ne se sert pas ici. À rouvrir si Claude Code gagne un réglage
+  par composant.
+- **Une machine neuve n'a ni `front/node_modules` ni `api/vendor`, et rien ne le
+  dit.** Le 8 septembre, `npm test` a échoué sur `expo/tsconfig.base not found`
+  et `bin/phpunit` n'existait pas. Faire `cd front && npm install`, et pour l'API
+  un `composer install` — ce qui suppose Composer, absent de cette machine :
+  récupéré par `getcomposer.org` et lancé avec `--ignore-platform-reqs`, l'hôte
+  n'ayant pas `php8.3-xml`. L'exécution, elle, se fait dans le conteneur, qui a
+  toutes les extensions.
+- **Node 22 est exigé, et `installer-outils.sh` ne vérifie que la présence de
+  node.** La machine avait 20.11.1 : `node --test` n'y développe pas les globs,
+  donc `npm test` répondait « Could not find dist-tests/**/*.test.js » — un
+  message qui ne parle pas de version. `nvm install 22 && nvm alias default 22`.
+  Attention, un terminal déjà ouvert garde l'ancien PATH.
+- **Le port 8080 se dispute avec les autres projets.** Le Keycloak de
+  `gestion-interne-api` le tenait ; `fitcarnet-app-dev` refusait de démarrer.
+  `docker stop gestion-intenre-api-keycloak-1` le temps de la session — **et le
+  redémarrer après**.
+- **Le réseau sortant des conteneurs est cassé sur cette machine.** Ni DNS ni
+  routage : même vers une IP brute, `curl` rend `000`. D'où l'échec de
+  `composer install` dans le conteneur. Contourné en installant `vendor` depuis
+  l'hôte (le dossier est monté), **réparation remise à plus tard** : c'est du
+  NAT Docker sous WSL2, pas le dépôt.
 - **Le graphe se périme.** `graphify update .` après du code, `/graphify . --update`
   après de la documentation.
 
