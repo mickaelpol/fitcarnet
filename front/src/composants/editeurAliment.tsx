@@ -24,7 +24,16 @@ export interface AlimentSaisi {
   peseeApres?: number | null;
 }
 
-const vide: AlimentSaisi = {
+/**
+ * Point de départ d'une création : aucune valeur préremplie.
+ *
+ * EXPORTÉ DEPUIS LE 15 SEPTEMBRE 2026, parce qu'il en existait une seconde
+ * copie mot pour mot dans `app/(onglets)/frigo.tsx` (D6 de l'audit). Deux
+ * objets identiques de dix champs, dont l'écran se servait pour « Créer de
+ * zéro » : un champ ajouté ici et pas là-bas, et la création partait avec un
+ * `undefined` que l'éditeur ne distingue pas d'une valeur absente.
+ */
+export const ALIMENT_VIDE: AlimentSaisi = {
   nom: '', categorie: 'prot', kcal100: 0, prot100: 0, gluc100: 0,
   lip100: 0, fibres100: null, ratio: 1,
   peseeAvant: null, peseeApres: null,
@@ -83,7 +92,7 @@ export function EditeurAliment({
   nomModifiable?: boolean;
   /** faux quand l'état de référence est déduit de la catégorie, non stocké */
 }) {
-  const [a, setA] = useState<AlimentSaisi>(aliment ?? vide);
+  const [a, setA] = useState<AlimentSaisi>(aliment ?? ALIMENT_VIDE);
   const [mesurer, setMesurer] = useState(false);
   const [avant, setAvant] = useState('');
   const [apres, setApres] = useState('');
@@ -95,9 +104,35 @@ export function EditeurAliment({
      garde donc le texte tel quel ; le nombre n'en est que la lecture. */
   const [textes, setTextes] = useState<Record<CleNombre, string>>(textesDe(aliment));
 
+  /* ON DÉPEND DE L'IDENTITÉ DE L'ALIMENT, PAS DE LA RÉFÉRENCE DE L'OBJET.
+     ET C'EST UNE CORRECTION, DU 15 SEPTEMBRE 2026.
+
+     Cet effet dépendait de `aliment`, donc de la référence. L'appelant
+     construit cet objet à la volée — `versSaisie(edite)` — c'est-à-dire un
+     objet NEUF à chaque rendu du parent. Chaque rendu rejouait donc l'effet
+     et remettait le formulaire à ses valeurs de départ, EN PLEINE SAISIE,
+     sans rien afficher.
+
+     Le déclencheur n'avait rien de théorique : `useSuiviInventaire` bat
+     toutes les deux secondes tant qu'un inventaire tourne, et son
+     `refetchIntervalInBackground` le fait battre même écran quitté. Corriger
+     les fibres d'un aliment pendant un inventaire, c'était voir sa saisie
+     s'effacer toutes les deux secondes.
+
+     Corrigé ICI plutôt que chez l'appelant, en mémoïsant de son côté : un
+     seul composant appelle `EditeurAliment` aujourd'hui, le prochain
+     n'héritera pas du piège. C'est la leçon d'É1 — le contrôle va au point de
+     passage obligé, pas devant chaque porte.
+
+     `id` suffit à dire « c'est un autre aliment ». Un contenu qui change sans
+     que l'identité change, c'est justement le rechargement dont il ne faut
+     PAS écraser la saisie ; et à l'ouverture, `visible` passe à vrai, donc le
+     formulaire part bien des données fraîches. */
+  const identite = aliment?.id ?? null;
+
   useEffect(() => {
     if (visible) {
-      const depart = aliment ?? vide;
+      const depart = aliment ?? ALIMENT_VIDE;
       setA(depart);
       setTextes(textesDe(aliment));
       setMesurer(false);
@@ -105,7 +140,9 @@ export function EditeurAliment({
       setAvant(depart.peseeAvant ? String(depart.peseeAvant) : '');
       setApres(depart.peseeApres ? String(depart.peseeApres) : '');
     }
-  }, [visible, aliment]);
+    // `aliment` est volontairement absent des dépendances : voir ci-dessus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, identite]);
 
   const maj = (champs: Partial<AlimentSaisi>) => setA({ ...a, ...champs });
 
