@@ -132,7 +132,12 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   écrit des données écrase les corrections manuelles à chaque redémarrage.
 - Les scripts de la racine ne sont pas des jouets : `installer.sh`, `restaurer-nas.sh`,
   `deployer-nas.sh`, `publier*.sh` déploient ou détruisent. Ne jamais les lancer pour « voir ».
-- `test_ecriture_grocy.py` écrit dans `db/manuel/16-catalogue-ciqual.sql`, fichier versionné.
+- `ciqual_vers_grocy.py --exporter-catalogue` écrit dans `db/manuel/16-catalogue-ciqual.sql`,
+  fichier versionné, et y remet des `LIKE '%…%'` non ancrés que la version committée a corrigés
+  à la main. C'est voulu pour une régénération décidée ; ce ne l'était pas pour
+  `test_ecriture_grocy.py`, qui l'appelle. Depuis le 14 septembre 2026 le banc passe `--sortie`
+  vers un temporaire et vérifie en fin de course que le fichier versionné n'a pas bougé.
+  Tout nouveau code qui appelle `--exporter-catalogue` doit passer `--sortie`.
 - `tsconfig.tests.json` n'inclut plus une liste écrite à la main mais **un motif**,
   `src/**/*.test.ts` — la liste manuelle avait laissé `performance.ts` sans test
   pendant des mois. Le piège qui reste : le motif ne couvre que `src/`, donc un

@@ -22,8 +22,11 @@ libellés nécessaires.
 
 Aucune dépendance au-delà d'openpyxl, que le script principal exige déjà.
 Rien n'est écrit dans ton vrai Grocy : le serveur tourne sur 127.0.0.1.
+Rien n'est écrit dans le dépôt non plus : tout part dans un dossier temporaire,
+et une vérification finale le prouve. Voir le commentaire de l'export, plus bas.
 """
 
+import hashlib
 import json
 import os
 import subprocess
@@ -236,6 +239,24 @@ def nombre(champs, cle):
         return float("nan")
 
 
+# La migration versionnee du catalogue commun. Ce banc ne doit JAMAIS l'ecrire :
+# on releve son empreinte avant de lancer quoi que ce soit, et on la revérifie.
+MIGRATION_VERSIONNEE = os.path.join(os.path.dirname(SCRIPT), "db", "manuel",
+                                    "16-catalogue-ciqual.sql")
+
+
+def empreinte_migration_versionnee():
+    """Le contenu du fichier versionne, ou None s'il n'existe pas."""
+    try:
+        with open(MIGRATION_VERSIONNEE, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except FileNotFoundError:
+        return None
+
+
+VERSIONNEE_AVANT = empreinte_migration_versionnee()
+
+
 def main():
     serveur = HTTPServer(("127.0.0.1", PORT), FauxGrocy)
     threading.Thread(target=serveur.serve_forever, daemon=True).start()
@@ -360,22 +381,44 @@ def main():
     # Les 50 aliments de reference sont le point de depart de tout nouveau
     # compte. Ils sont GENERES depuis Ciqual, avec les memes regles que pour
     # Grocy — aucun chiffre tape a la main, donc aucun a corriger deux fois.
+    #
+    # CE BANC N'ECRIT PAS DANS LE DEPOT. Jusqu'au 14 septembre 2026 il lancait
+    # `--exporter-catalogue` sans destination, et le script ecrivait donc dans
+    # `db/manuel/16-catalogue-ciqual.sql`, migration VERSIONNEE que
+    # `entrypoint-prod.sh` rejoue a chaque demarrage. Le commit c0f6f10 du
+    # 10 aout 2026 a 19 h 59 en porte la trace : la migration y passe de 53
+    # UPDATE a 4 — exactement les quatre aliments de CIQUAL_FACTICE ci-dessus.
+    # 49 aliments du catalogue commun ont disparu de la production ce jour-la,
+    # emportes par un commit intitule « Batch cooking ».
+    #
+    # Un test ecrit dans un fichier temporaire. Toujours.
     with tempfile.TemporaryDirectory() as dossier:
         table = os.path.join(dossier, "ciqual-factice.xlsx")
         ecrire_table(table)
+        chemin = os.path.join(dossier, "16-catalogue-ciqual.sql")
 
         export = subprocess.run(
-            [sys.executable, SCRIPT, table, "--exporter-catalogue"],
+            [sys.executable, SCRIPT, table, "--exporter-catalogue",
+             "--sortie", chemin],
             env=dict(os.environ,
                      GROCY_URL="http://127.0.0.1:1",
                      GROCY_API_KEY="factice"),
             capture_output=True, text=True)
 
-    verifier("l'export se termine sans erreur", export.returncode == 0)
+        if export.returncode != 0:
+            print("--- export stdout ---"); print(export.stdout[-1500:])
+            print("--- export stderr ---"); print(export.stderr[-1500:])
 
-    chemin = os.path.join(os.path.dirname(SCRIPT), "db", "manuel",
-                          "16-catalogue-ciqual.sql")
-    sql = open(chemin, encoding="utf-8").read() if os.path.exists(chemin) else ""
+        verifier("l'export se termine sans erreur", export.returncode == 0)
+        verifier("l'export a bien ecrit la ou on le lui a demande",
+                 os.path.exists(chemin))
+        sql = (open(chemin, encoding="utf-8").read()
+               if os.path.exists(chemin) else "")
+
+    # La garde qui manquait : si quelqu'un retire `--sortie`, ce test doit
+    # tomber AVANT que le fichier versionne ne parte dans un commit.
+    verifier("la migration versionnee n'a pas ete touchee par ce banc",
+             VERSIONNEE_AVANT == empreinte_migration_versionnee())
 
     verifier("la migration est écrite", len(sql) > 500)
     verifier("elle est dans une transaction",

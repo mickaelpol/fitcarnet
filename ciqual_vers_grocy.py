@@ -17,6 +17,11 @@ Usage :
     GROCY_URL=... GROCY_API_KEY=... python3 ciqual_vers_grocy.py Table_Ciqual.xlsx
     GROCY_URL=... GROCY_API_KEY=... python3 ciqual_vers_grocy.py Table_Ciqual.xlsx --appliquer
 
+    # la migration du catalogue commun, dans db/manuel/16-catalogue-ciqual.sql
+    python3 ciqual_vers_grocy.py Table_Ciqual.xlsx --exporter-catalogue
+    # ... ou ailleurs, ce que tout test DOIT faire
+    python3 ciqual_vers_grocy.py Table_Ciqual.xlsx --exporter-catalogue --sortie /tmp/essai.sql
+
 Le script cherche chaque produit Grocy dans Ciqual a partir d'une table de
 correspondance ci-dessous, verifie la coherence energetique de chaque valeur
 retenue, et n'ecrit qu'apres ton accord.
@@ -41,7 +46,35 @@ except ImportError:
 GROCY_URL = os.environ.get("GROCY_URL", "").rstrip("/")
 API_KEY = os.environ.get("GROCY_API_KEY", "")
 APPLIQUER = "--appliquer" in sys.argv
-FICHIERS = [a for a in sys.argv[1:] if not a.startswith("--")]
+
+
+def _valeur_option(nom: str) -> str:
+    """La valeur qui suit une option, ou une chaine vide si l'option est absente."""
+    if nom not in sys.argv:
+        return ""
+    i = sys.argv.index(nom) + 1
+    if i >= len(sys.argv) or sys.argv[i].startswith("--"):
+        sys.exit(f"{nom} attend un chemin de fichier juste apres.")
+
+    return sys.argv[i]
+
+
+# `--sortie` : ou ecrire la migration du catalogue. Ajoute le 14 septembre 2026,
+# apres avoir compris que `test_ecriture_grocy.py` lancait
+# `--exporter-catalogue` sans destination et ecrasait donc
+# `db/manuel/16-catalogue-ciqual.sql`, un fichier VERSIONNE. Le 10 aout 2026,
+# a 19 h 59, le commit c0f6f10 a ainsi emporte la migration : 53 UPDATE
+# ramenes aux 4 aliments de la table factice du banc d'essai. Comme
+# `entrypoint-prod.sh` rejoue db/manuel/ a chaque demarrage, la production a
+# perdu 49 aliments du catalogue commun sans qu'aucune alerte ne le dise.
+SORTIE_CATALOGUE = _valeur_option("--sortie")
+
+# La valeur de `--sortie` n'est pas un tableur Ciqual : on l'ecarte PAR SA
+# POSITION, pas par sa valeur — deux arguments identiques resteraient sinon
+# tous les deux ecartes.
+_POSITION_SORTIE = sys.argv.index("--sortie") + 1 if SORTIE_CATALOGUE else -1
+FICHIERS = [a for i, a in enumerate(sys.argv)
+            if i >= 1 and i != _POSITION_SORTIE and not a.startswith("--")]
 
 if not GROCY_URL or not API_KEY:
     sys.exit(
@@ -660,6 +693,9 @@ def coherent(a) -> tuple[bool, float]:
 
 # Relatif au SCRIPT et non au dossier courant : on le lance souvent depuis
 # ailleurs, et un fichier ecrit au hasard du `cd` est un fichier perdu.
+#
+# CE FICHIER EST VERSIONNE ET RELU A LA MAIN. Il n'est ecrit ici que sur une
+# commande tapee expressement. Pour un essai, passe `--sortie`.
 CHEMIN_CATALOGUE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "db", "manuel",
     "16-catalogue-ciqual.sql")
@@ -674,7 +710,11 @@ def _sql(v) -> str:
     return "NULL" if v is None else f"{v:g}"
 
 
-def exporter_catalogue(aliments) -> int:
+def exporter_catalogue(aliments, chemin: str = "") -> int:
+    # Sans `--sortie`, on ecrit la migration versionnee : c'est l'usage normal,
+    # fait a la main et relu avant commit. Un test, lui, passe TOUJOURS un
+    # chemin temporaire.
+    chemin = chemin or CHEMIN_CATALOGUE
     lignes, introuvables = [], []
 
     for motif, (motifs_ciqual, categorie, ratio) in sorted(CORRESPONDANCE.items()):
@@ -780,18 +820,18 @@ WHERE  cree_par IS NULL AND fibres_100 IS NULL
 ORDER  BY categorie, nom;
 """
 
-    os.makedirs(os.path.dirname(CHEMIN_CATALOGUE), exist_ok=True)
-    with open(CHEMIN_CATALOGUE, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(os.path.abspath(chemin)), exist_ok=True)
+    with open(chemin, "w", encoding="utf-8") as f:
         f.write(entete + "".join(lignes) + "\n" + pied)
 
-    print(f"{len(lignes)} aliment(s) ecrits dans {CHEMIN_CATALOGUE}")
+    print(f"{len(lignes)} aliment(s) ecrits dans {chemin}")
     if introuvables:
         print(f"\n{len(introuvables)} sans equivalent Ciqual, laisses tels quels :")
         for motif, motifs in introuvables:
             print(f"  - {motif:24} (cherche : « {motifs} »)")
     print("\nRelis le fichier, puis joue-le :")
     print("  docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet"
-          f" -f - < {CHEMIN_CATALOGUE}")
+          f" -f - < {chemin}")
 
     return 0
 
@@ -891,7 +931,7 @@ def main() -> int:
 
     # --exporter-catalogue : écrit la migration du catalogue COMMUN
     if "--exporter-catalogue" in sys.argv:
-        return exporter_catalogue(aliments)
+        return exporter_catalogue(aliments, SORTIE_CATALOGUE)
 
     # --chercher « amande » : liste les libellés Ciqual disponibles
     if "--chercher" in sys.argv:
