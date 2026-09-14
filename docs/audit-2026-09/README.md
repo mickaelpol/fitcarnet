@@ -260,7 +260,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
 | **3 — sécurité et isolation** | ✅ 6/6 | É1, C3, É8, M-01, M-03 · **M-02 partiel** : fenêtre ramenée à 90 j, la visibilité des sessions reste à faire |
-| **4 — base reproductible** | 🟨 C2, É5, É6 faits | `verifier-schema.sh` : **✓ identiques**. Restent les index de clés étrangères |
+| **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
 | **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |

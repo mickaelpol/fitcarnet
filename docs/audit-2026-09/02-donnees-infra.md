@@ -341,9 +341,9 @@ sur ce marqueur. **Effort : 45 min.**
 
 ---
 
-## 11. Dix colonnes de clé étrangère sans index
+## 11. ✅ corrigé le 14 septembre 2026 — Dix colonnes de clé étrangère sans index
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ (relevé sur la base B)**
+**Gravité : MOYENNE — Statut : CORRIGÉ, sur cinq colonnes des dix** (migration 31). Les cinq autres — `stock.emplacement_id`, `seance.modele_id`, `cuisson_habituelle.mode_cuisson_id`, `invitation.invite_par`, `invitation.utilisateur_id` — sont laissées sans index **délibérément** : tables courtes, jointures rares, aucune contrainte `RESTRICT` à faire respecter. La remarque de `28-muscle-cible-filtrable.sql` vaut aussi dans ce sens — un index que personne n'interroge coûte à chaque écriture. Les deux index sur `cree_par` sont **partiels** (`WHERE cree_par IS NOT NULL`) : la quasi-totalité des lignes sont communes, les indexer n'apporterait rien.
 
 **Emplacement** `db/01-schema.sql` (tables `aliment`, `stock`, `exercice`, `modele_exercice`,
 `modele_serie`, `seance`, `cuisson_habituelle`, `invitation`).

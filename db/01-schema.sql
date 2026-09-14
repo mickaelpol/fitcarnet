@@ -195,6 +195,10 @@ CREATE TABLE stock (
     CONSTRAINT stock_quantite_positive CHECK (quantite >= 0)
 );
 CREATE INDEX ON stock (utilisateur_id);
+-- `ON DELETE RESTRICT` sur aliment_id : sans cet index, PostgreSQL balaie tout
+-- `stock` a chaque suppression d'aliment pour verifier qu'aucune ligne ne s'y
+-- oppose (migration 31).
+CREATE INDEX stock_par_aliment ON stock (aliment_id);
 
 -- ---------------------------------------------------------------------
 --  Cibles macro par repas et par utilisateur
@@ -358,6 +362,19 @@ CREATE TABLE serie (
     )
 );
 CREATE INDEX ON serie (seance_exercice_id);
+
+-- Le pendant cote MODELE, longtemps oublie (migration 31). C'est le chemin
+-- chaud : `ChargementComplet` joint `exercices.series` a chaque lecture de
+-- modele. L'asymetrie avec la ligne ci-dessus etait un oubli, pas un choix.
+CREATE INDEX modele_serie_par_exercice ON modele_serie (modele_exercice_id);
+CREATE INDEX modele_exercice_par_exercice ON modele_exercice (exercice_id);
+
+-- Index PARTIELS sur les deux moities « le mien » de FiltreAliment et
+-- FiltreExercice. La quasi-totalite des lignes ont `cree_par IS NULL` : les
+-- indexer ne servirait a rien, ce qu'on cherche vite ce sont les rares lignes
+-- qui appartiennent a quelqu'un.
+CREATE INDEX aliment_par_auteur  ON aliment  (cree_par) WHERE cree_par IS NOT NULL;
+CREATE INDEX exercice_par_auteur ON exercice (cree_par) WHERE cree_par IS NOT NULL;
 
 -- ---------------------------------------------------------------------
 --  Vue pratique : dernière performance et 1RM estimé par exercice
