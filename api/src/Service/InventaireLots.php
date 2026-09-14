@@ -102,7 +102,7 @@ final readonly class InventaireLots
      * d'attendre. Aujourd'hui il n'y en a qu'un ; le jour ou il y en aura
      * deux, rien a changer.
      *
-     * @return array{id: int, utilisateur_id: int, source: string, lignes: string, total: int, traites: int}|null
+     * @return array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int}|null
      */
     public function prendre(): ?array
     {
@@ -125,7 +125,7 @@ final readonly class InventaireLots
                   WHERE id = :id",
                 ['id' => $lot['id']]);
 
-            /** @var array{id: int, utilisateur_id: int, source: string, lignes: string, total: int, traites: int} $lot */
+            /** @var array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int} $lot */
             return $lot;
         });
     }

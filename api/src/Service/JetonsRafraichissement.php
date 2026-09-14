@@ -19,12 +19,25 @@ final class JetonsRafraichissement
     /**
      * Duree de vie, repoussee a chaque usage.
      *
-     * Un an ne veut pas dire « la session dure un an » : elle dure tant que
-     * l'application sert, et se termine sur un clic « Se deconnecter ». Ce
-     * delai n'existe que pour qu'un telephone abandonne cesse un jour d'etre
-     * une porte ouverte.
+     * Quatre-vingt-dix jours ne veulent pas dire « la session dure trois
+     * mois » : elle dure tant que l'application sert — l'echeance est
+     * repoussee d'autant a chaque rafraichissement — et se termine sur un clic
+     * « Se deconnecter ». Ce delai n'existe que pour qu'un telephone abandonne
+     * cesse un jour d'etre une porte ouverte.
+     *
+     * C'ETAIT UN AN, ET C'ETAIT TROP (constat M-02, corrige le 14 septembre
+     * 2026). Le jeton n'est jamais remplace : un exemplaire copie — sauvegarde
+     * de telephone, appareil revendu — ouvrait un acces d'un an, indetectable,
+     * puisque rien ne trahit un second usage et qu'aucun ecran ne liste les
+     * sessions. Trois mois glissants ne changent rien pour qui se sert de
+     * l'application, et divisent la fenetre par quatre pour qui l'a oubliee.
+     *
+     * CE QUI MANQUE ENCORE : la visibilite. Pouvoir constater et couper UNE
+     * session precise — `GET /api/mes-sessions`, `DELETE /api/mes-sessions/{id}`
+     * — reste la vraie reponse au constat. La table porte deja tout sauf
+     * « vu le ». Les revocations existantes sont toutes « tout ou rien ».
      */
-    public const DUREE = '+1 year';
+    public const DUREE = '+90 days';
 
     /**
      * 32 octets tires au sort, soit 256 bits.

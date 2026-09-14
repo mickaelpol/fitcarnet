@@ -48,7 +48,13 @@ final readonly class AppliqueInventaire
     }
 
     /**
-     * @param array{id: int, utilisateur_id: int, source: string, lignes: string, total: int, traites: int} $lot
+     * `utilisateur_id` est une CHAINE : la colonne est un UUID, et `utilisateur()`
+     * fait `Uuid::fromString` dessus. Le type disait `int` — faux depuis
+     * toujours, releve par PHPStan le 14 septembre 2026 en ecrivant le test de
+     * M-03. Personne ne s'en apercevait : le code convertit en `(string)` juste
+     * avant, ce qui rattrapait l'erreur de declaration sans la corriger.
+     *
+     * @param array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int} $lot
      *
      * @return int nombre de lignes envoyees en tout
      */
@@ -173,8 +179,24 @@ final readonly class AppliqueInventaire
                MAUVAISE HABITUDE AILLEURS. Ce code tourne dans une boucle sans
                personne devant : une exception non rattrapee tuerait le
                travailleur et laisserait le lot « en cours » pour dix minutes.
-               La ligne echoue, elle est nommee, on continue. */
-            return $e->getMessage();
+               La ligne echoue, elle est nommee, on continue.
+
+               CE QU'ON DIT, ET CE QU'ON GARDE (constat M-03, 14 septembre
+               2026). C'etait `$e->getMessage()` qui repartait tel quel : pour
+               une exception DBAL, la requete SQL complete, les noms de tables
+               et de contraintes, parfois les parametres — la carte interne de
+               la base, offerte a tout compte authentifie. Le detail va
+               desormais au journal, ou il sert a quelqu'un ; le client apprend
+               que la ligne n'est pas passee, ce qui est tout ce qu'il peut en
+               faire. Taire n'est pas perdre : sans le `error` ci-dessous, on
+               aurait echange une fuite contre un angle mort. */
+            $this->journal->error('inventaire : {reference} a echoue — {erreur}', [
+                'reference' => $reference,
+                'erreur' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
+            return 'Cette ligne n’a pas pu être appliquée.';
         }
     }
 }

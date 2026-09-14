@@ -11,6 +11,7 @@ use App\Service\DeductionGrocy;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -73,6 +74,7 @@ final class PlansController extends AbstractController
         private readonly Frigo $frigo,
         private readonly FrigoBase $base,
         private readonly DeductionGrocy $deductionGrocy,
+        private readonly LoggerInterface $journal,
     ) {
     }
 
@@ -194,7 +196,18 @@ final class PlansController extends AbstractController
                     try {
                         $this->base->definirStock($utilisateur, $idAliment, $quantite);
                     } catch (\Throwable $e) {
-                        $echecs[$idAliment] = $e->getMessage();
+                        /* LE DETAIL VA AU JOURNAL, PAS AU CLIENT — constat
+                           M-03, 14 septembre 2026. Un message DBAL porte la
+                           requete, les tables et les contraintes ; rendu tel
+                           quel, il dessinait la carte interne de la base pour
+                           tout compte authentifie. L'echec reste nomme, ce qui
+                           est le seul point qui interesse l'utilisateur. */
+                        $this->journal->error('cuisine : deduction de {aliment} echouee — {erreur}', [
+                            'aliment' => $idAliment,
+                            'erreur' => $e->getMessage(),
+                            'exception' => $e,
+                        ]);
+                        $echecs[$idAliment] = 'Le stock n’a pas pu être déduit.';
                     }
                 }
             }

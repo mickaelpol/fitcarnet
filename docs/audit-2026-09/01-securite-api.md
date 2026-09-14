@@ -114,10 +114,10 @@ produit (`UPDATE aliment SET cree_par = NULL, public = true WHERE …`).
 
 ---
 
-## M-02 — Le jeton de rafraîchissement vit un an, glissant, sans rotation ni visibilité
+## M-02 — 🟨 partiellement corrigé le 14 septembre 2026 — Le jeton de rafraîchissement vivait un an
 
 - **Gravité : MOYENNE**
-- **Statut : CONFIRMÉ**
+- **Statut : FENÊTRE RÉDUITE, VISIBILITÉ TOUJOURS ABSENTE** — `DUREE` est passée de `+1 year` à `+90 days`, toujours glissante : une session active ne le sent pas, un appareil oublié cesse d'être une porte trois mois plus tard au lieu de douze. **Ce qui manquait vraiment reste manquant** : rien ne permet de constater ni de couper UNE session. L'option 1 ci-dessous — `GET /api/mes-sessions` + `DELETE /api/mes-sessions/{id}` — reste la vraie réponse, et n'a pas été faite.
 - **Emplacement :** `api/src/Service/JetonsRafraichissement.php:27` (`DUREE = '+1 year'`), `:65-85` (prolongation à chaque usage, pas de rotation), `api/src/Entity/JetonRafraichissement.php:91-94`
 
 **Ce qui se passe.** Le jeton est tiré sur 256 bits et n'est stocké qu'en
@@ -145,10 +145,11 @@ se défend pour cet usage. Ce qui manque n'est pas la rotation, c'est la
 
 ---
 
-## M-03 — Les messages d'exception brute remontent jusqu'au client
+## M-03 — ✅ corrigé le 14 septembre 2026 — Les messages d'exception brute remontaient jusqu'au client
 
 - **Gravité : MOYENNE**
-- **Statut : CONFIRMÉ**
+- **Statut : CORRIGÉ aux trois emplacements.** Le détail va au journal, le client reçoit un motif court et stable. L'échec reste **nommé** — une ligne qui disparaît en silence serait pire — mais la carte interne de la base ne sort plus. Un témoin vérifie les deux faces : que le SQL ne parte pas, et que le journal le conserve, faute de quoi on aurait échangé une fuite contre un angle mort.
+- **Trouvé au passage** : `AppliqueInventaire::traiter()` et `InventaireLots` déclaraient `utilisateur_id: int` alors que la colonne est un UUID et que le code fait `Uuid::fromString` dessus. Faux depuis toujours, masqué par un `(string)` posé juste avant. Relevé par PHPStan en écrivant le test.
 - **Emplacement :** `api/src/Service/AppliqueInventaire.php:177` (`return $e->getMessage();`, stocké dans `echecs` puis rendu par `GET /api/mon-frigo/inventaire/dernier`), `api/src/Controller/PlansController.php:193` (idem via `deduits/ignores`), `api/src/State/FusionExerciceProcessor.php:92-94`
 
 **Ce qui se passe.** Sur les chemins où une exception est rattrapée pour ne pas

@@ -9,6 +9,7 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Dto\FusionExercice;
 use App\Entity\Exercice;
 use Doctrine\DBAL\Connection;
+use Psr\Log\LoggerInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -29,6 +30,7 @@ final readonly class FusionExerciceProcessor implements ProcessorInterface
     public function __construct(
         private EntityManagerInterface $em,
         private Connection $cnx,
+        private LoggerInterface $journal,
     ) {
     }
 
@@ -89,8 +91,17 @@ final readonly class FusionExerciceProcessor implements ProcessorInterface
         } catch (\Throwable $e) {
             $this->cnx->rollBack();
 
+            /* Meme regle qu'ailleurs, meme si cette route est reservee a
+               ROLE_ADMIN : un administrateur n'a pas besoin du SQL a l'ecran
+               pour comprendre qu'une fusion a echoue, et le journal le lui
+               donne mieux (constat M-03, 14 septembre 2026). */
+            $this->journal->error('fusion d\'exercices echouee — {erreur}', [
+                'erreur' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+
             throw new UnprocessableEntityHttpException(
-                'Fusion impossible : ' . $e->getMessage(), $e,
+                'Fusion impossible. Le détail est dans le journal du serveur.', $e,
             );
         }
     }
