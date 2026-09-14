@@ -119,8 +119,20 @@ fi
 # --no-owner --no-privileges : le propriétaire dépend de l'installation.
 vidange() {
     docker exec -e PGPASSWORD=verif "$CONTENEUR" \
-        pg_dump -U verif --schema-only --no-owner --no-privileges "$1"
+        pg_dump -U verif --schema-only --no-owner --no-privileges "$1" \
+        | sed '/^\\\(un\)\?restrict /d'
 }
+#
+# LE `sed` N'EST PAS UNE COMMODITÉ, IL EST INDISPENSABLE.
+#
+# pg_dump 17 encadre sa sortie de `\restrict <jeton>` / `\unrestrict <jeton>`,
+# où le jeton est TIRÉ AU SORT À CHAQUE APPEL. Deux vidanges de la MÊME base
+# différaient donc toujours de deux lignes : le script ne pouvait pas annoncer
+# « identiques », même sur une base parfaitement alignée, et son critère de
+# réussite était hors d'atteinte.
+#
+# Constaté le 14 septembre 2026, en corrigeant C2 : sur les 280 lignes
+# annoncées, deux étaient ce bruit-là.
 
 TMP="$(mktemp -d)"
 trap 'nettoyer; rm -rf "$TMP"' EXIT INT TERM

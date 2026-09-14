@@ -71,6 +71,33 @@ gris "Schéma initial..."
 psql_ < "$RACINE/db/01-schema.sql"
 [[ -f "$RACINE/db/02-donnees.sql" ]] && psql_ < "$RACINE/db/02-donnees.sql"
 
+# ------------------------------------------------ retour avant la migration 25
+#
+# ON RECULE LE SCHÉMA, ET C'EST TOUT L'OBJET DE CE SCRIPT.
+#
+# Ce test rejoue les migrations sur des données ABERRANTES, celles qui ont été
+# réellement observées en base avant que les garde-fous n'existent. Or depuis
+# la correction de C2 (14 septembre 2026), `01-schema.sql` porte ces garde-fous
+# — comme il le doit, une base neuve étant censée valoir une base migrée. Les
+# valeurs aberrantes ne peuvent donc plus être insérées : le script échouait à
+# l'injection, en annonçant une contrainte violée comme si c'était un défaut.
+#
+# On retire donc les contraintes que la migration 25 pose, pour retrouver
+# l'état d'une base de PRODUCTION d'avant cette migration. C'est exactement le
+# cas que ce script existe pour éprouver : les migrations savent-elles nettoyer
+# ce qui traîne, ou refusent-elles de s'appliquer et bloquent-elles le
+# redémarrage ? Les migrations les recréent ensuite, en `IF NOT EXISTS`.
+gris "Retour à l'état d'avant les garde-fous (migration 25)..."
+psql_ <<'SQL'
+ALTER TABLE aliment      DROP CONSTRAINT IF EXISTS aliment_valeurs_positives;
+ALTER TABLE aliment      DROP CONSTRAINT IF EXISTS aliment_ratio_borne;
+ALTER TABLE aliment      DROP CONSTRAINT IF EXISTS aliment_pesees_positives;
+ALTER TABLE cible        DROP CONSTRAINT IF EXISTS cible_valeurs_positives;
+ALTER TABLE stock        DROP CONSTRAINT IF EXISTS stock_quantite_positive;
+ALTER TABLE serie        DROP CONSTRAINT IF EXISTS serie_valeurs_positives;
+ALTER TABLE modele_serie DROP CONSTRAINT IF EXISTS modele_serie_valeurs_positives;
+SQL
+
 # ---------------------------------------------------------------- données
 # Les valeurs sont celles citées en tête de 25-garde-fous.sql : ce ne sont pas
 # des cas inventés pour le test, ce sont celles qui ont été observées en base.

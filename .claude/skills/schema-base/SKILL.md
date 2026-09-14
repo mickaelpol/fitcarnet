@@ -63,3 +63,26 @@ skill **`postgres`**. Constat connu : **dix colonnes de clé étrangère sans in
 - [ ] Elle n'écrit aucune donnée qu'un humain pourrait vouloir corriger ensuite
 - [ ] Son nom figure dans la liste ordonnée d'`installer.sh`
 - [ ] `verifier-schema.sh` ne signale **rien de plus** que les 280 lignes connues
+
+## Ne JAMAIS lancer `doctrine:schema:update`
+
+`bin/console doctrine:schema:update --force` **détruirait des données**.
+Vérifié le 14 septembre 2026 : son `--dump-sql` propose `DROP TABLE invitation`,
+`DROP TABLE inventaire_lot`, la suppression de cinq index et la conversion de
+tous les `TIMESTAMPTZ` en `TIMESTAMP(0)` sans fuseau.
+
+Ce n'est pas un défaut du schéma, c'est la conséquence de la règle 1 : **le
+schéma est écrit à la main et la base porte plus que les entités**. `invitation`
+et `inventaire_lot` sont manipulées en SQL direct, aucune entité ne les décrit ;
+Doctrine en conclut qu'elles sont de trop.
+
+Corollaire : **`doctrine:schema:validate` ne passera jamais au vert sur ce
+projet**, et son échec ne veut rien dire. Le lot 0 de l'audit le proposait comme
+garde-fou — la proposition était mauvaise. Les deux vrais contrôles sont
+`db/manuel/verifier-schema.sh` (base neuve == base migrée) et
+`verifier-migrations.sh` (les migrations tiennent sur des données réelles).
+
+Une divergence déclarative subsiste et reste **sans effet** : les entités
+déclarent `datetime_immutable` là où la base est `TIMESTAMPTZ`. Doctrine lit et
+écrit correctement ; changer le mapping ferait courir plus de risque que la
+divergence n'en pose.

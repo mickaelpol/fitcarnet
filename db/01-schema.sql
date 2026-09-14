@@ -111,7 +111,25 @@ CREATE TABLE aliment (
                     CHECK (source IN ('manuel','openfoodfacts','reference')),
     public          BOOLEAN     NOT NULL DEFAULT TRUE,
     cree_par        UUID        REFERENCES utilisateur(id) ON DELETE SET NULL,
-    cree_le         TIMESTAMPTZ NOT NULL DEFAULT now()
+    cree_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- Une valeur nutritionnelle négative n'existe pas. La base le refuse
+    -- elle-même : un import bâclé ou un bogue de saisie s'arrête ici, et non
+    -- trois écrans plus loin dans un calcul de macros.
+    CONSTRAINT aliment_valeurs_positives CHECK (
+        (kcal_100   IS NULL OR kcal_100   >= 0) AND
+        (prot_100   IS NULL OR prot_100   >= 0) AND
+        (gluc_100   IS NULL OR gluc_100   >= 0) AND
+        (lip_100    IS NULL OR lip_100    >= 0) AND
+        (fibres_100 IS NULL OR fibres_100 >= 0)
+    ),
+    -- Un ratio cru/cuit au-delà de 10 est une erreur de saisie, pas un aliment.
+    CONSTRAINT aliment_ratio_borne
+        CHECK (ratio IS NULL OR (ratio > 0 AND ratio <= 10)),
+    CONSTRAINT aliment_pesees_positives CHECK (
+        (pesee_avant IS NULL OR pesee_avant > 0) AND
+        (pesee_apres IS NULL OR pesee_apres > 0)
+    )
 );
 -- Un aliment COMMUN — sans propriétaire — porte un nom unique pour tout le
 -- monde. Un aliment PRIVÉ est unique chez son propriétaire, et seulement chez
@@ -173,7 +191,8 @@ CREATE TABLE stock (
     quantite       NUMERIC(9,2) NOT NULL DEFAULT 0 CHECK (quantite >= 0),  -- en grammes
     peremption     DATE,
     maj_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (utilisateur_id, aliment_id, emplacement_id)
+    UNIQUE (utilisateur_id, aliment_id, emplacement_id),
+    CONSTRAINT stock_quantite_positive CHECK (quantite >= 0)
 );
 CREATE INDEX ON stock (utilisateur_id);
 
@@ -192,7 +211,13 @@ CREATE TABLE cible (
     -- FIBRES COMPRISES. Le dire ici évite de retrancher les fibres à la main
     -- et de se tromper d'un repas sur deux.
     glucides_totaux BOOLEAN NOT NULL DEFAULT FALSE,
-    UNIQUE (utilisateur_id, repas)
+    UNIQUE (utilisateur_id, repas),
+    CONSTRAINT cible_valeurs_positives CHECK (
+        (kcal IS NULL OR kcal >= 0) AND
+        (prot IS NULL OR prot >= 0) AND
+        (gluc IS NULL OR gluc >= 0) AND
+        (lip  IS NULL OR lip  >= 0)
+    )
 );
 
 -- ---------------------------------------------------------------------
@@ -274,7 +299,12 @@ CREATE TABLE modele_serie (
     ordre               SMALLINT NOT NULL DEFAULT 0,
     reps_cible          SMALLINT,
     poids_cible         NUMERIC(6,2),
-    secondes_cible      INTEGER
+    secondes_cible      INTEGER,
+    CONSTRAINT modele_serie_valeurs_positives CHECK (
+        (reps_cible     IS NULL OR reps_cible     >= 0) AND
+        (poids_cible    IS NULL OR poids_cible    >= 0) AND
+        (secondes_cible IS NULL OR secondes_cible >= 0)
+    )
 );
 
 -- ---------------------------------------------------------------------
@@ -320,7 +350,12 @@ CREATE TABLE serie (
     -- objectifs hérités du modèle, conservés pour comparer prévu / réalisé
     reps_cible          SMALLINT,
     poids_cible         NUMERIC(6,2),
-    secondes_cible      INTEGER
+    secondes_cible      INTEGER,
+    CONSTRAINT serie_valeurs_positives CHECK (
+        (reps     IS NULL OR reps     >= 0) AND
+        (poids    IS NULL OR poids    >= 0) AND
+        (secondes IS NULL OR secondes >= 0)
+    )
 );
 CREATE INDEX ON serie (seance_exercice_id);
 
@@ -499,3 +534,107 @@ CREATE UNIQUE INDEX invitation_en_attente
     WHERE accepte_le IS NULL;
 
 CREATE INDEX invitation_par_date ON invitation (cree_le DESC);
+
+-- ---------------------------------------------------------------------
+--  File d'attente des inventaires (migration 26)
+-- ---------------------------------------------------------------------
+--  Un inventaire de frigo peut compter des dizaines de lignes, et chacune
+--  part vers Grocy — une à deux secondes. L'API dépose donc le lot ici et
+--  répond tout de suite ; `app:inventaire:traiter` l'applique en tâche de
+--  fond, ligne par ligne, en notant son avancement pour qu'une interruption
+--  reste lisible et reprenable.
+CREATE TABLE inventaire_lot (
+    id              BIGSERIAL PRIMARY KEY,
+    utilisateur_id  UUID        NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
+    source          TEXT        NOT NULL,
+    lignes          JSONB       NOT NULL,
+    total           INT         NOT NULL,
+    traites         INT         NOT NULL DEFAULT 0,
+    echecs          JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    statut          TEXT        NOT NULL DEFAULT 'en_attente',
+    cree_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    commence_le     TIMESTAMPTZ,
+    fini_le         TIMESTAMPTZ,
+    vu_le           TIMESTAMPTZ,
+    CONSTRAINT inventaire_lot_statut_connu
+        CHECK (statut IN ('en_attente', 'en_cours', 'termine', 'echoue')),
+    CONSTRAINT inventaire_lot_source_connue
+        CHECK (source IN ('grocy', 'base')),
+    CONSTRAINT inventaire_lot_avancement_coherent
+        CHECK (traites >= 0 AND traites <= total AND total > 0)
+);
+
+-- UN SEUL LOT ACTIF PAR COMPTE, et c'est la base qui le tient. Deux
+-- inventaires simultanés du même frigo se marcheraient dessus : le second
+-- écraserait les quantités que le premier vient d'écrire.
+CREATE UNIQUE INDEX inventaire_lot_un_seul_actif
+    ON inventaire_lot (utilisateur_id)
+    WHERE statut IN ('en_attente', 'en_cours');
+
+CREATE INDEX inventaire_lot_a_faire
+    ON inventaire_lot (cree_le)
+    WHERE statut IN ('en_attente', 'en_cours');
+
+CREATE INDEX inventaire_lot_dernier
+    ON inventaire_lot (utilisateur_id, id DESC);
+
+COMMENT ON TABLE inventaire_lot IS
+    'File d''attente des inventaires. Deposes par l''API, appliques par la commande app:inventaire:traiter.';
+COMMENT ON COLUMN inventaire_lot.traites IS
+    'Lignes deja envoyees a la source. Mis a jour apres chaque ligne, pour qu''une interruption reste lisible.';
+
+-- ---------------------------------------------------------------------
+--  Compléments alimentaires (migration 27)
+-- ---------------------------------------------------------------------
+CREATE TABLE complement (
+    id              BIGSERIAL PRIMARY KEY,
+    utilisateur_id  UUID        NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
+    nom             TEXT        NOT NULL,
+    quantite        NUMERIC(10, 2) NOT NULL,
+    unite           TEXT        NOT NULL,
+    repas           TEXT        NOT NULL,
+    cree_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT complement_repas_connu
+        CHECK (repas IN ('R1', 'R2', 'R3', 'R4')),
+    CONSTRAINT complement_quantite_positive
+        CHECK (quantite > 0),
+    CONSTRAINT complement_nom_raisonnable
+        CHECK (char_length(btrim(nom)) BETWEEN 1 AND 80),
+    CONSTRAINT complement_unite_raisonnable
+        CHECK (char_length(btrim(unite)) BETWEEN 1 AND 20)
+);
+
+CREATE UNIQUE INDEX complement_unique_par_repas
+    ON complement (utilisateur_id, lower(btrim(nom)), repas);
+
+CREATE INDEX complement_par_compte
+    ON complement (utilisateur_id, repas);
+
+COMMENT ON TABLE complement IS
+    'Consignes de complements alimentaires, rattachees a un moment de repas. Ce n''est pas un journal de prises.';
+
+-- ---------------------------------------------------------------------
+--  Commentaires de colonnes posés par les migrations
+-- ---------------------------------------------------------------------
+COMMENT ON COLUMN aliment.fibres_100 IS
+  'Fibres pour 100 g, facultatif ; comptées 2 kcal/g, hors glucides.';
+COMMENT ON COLUMN aliment.pesee_avant IS
+  'Poids avant cuisson lors de la mesure du ratio ; NULL si valeur courante.';
+COMMENT ON COLUMN cible.glucides_totaux IS
+    'Vrai si la cible en glucides comprend les fibres (convention nord-americaine).';
+COMMENT ON COLUMN invitation.email IS
+    'Adresse du futur compte, figee a la creation : la personne invitee ne peut pas en changer.';
+COMMENT ON COLUMN invitation.jeton_empreinte IS
+    'SHA-256 hexadecimal du jeton. Le jeton en clair n''est jamais stocke.';
+COMMENT ON TABLE jeton_rafraichissement IS
+    'Sessions ouvertes. Une ligne par connexion, supprimee a la deconnexion.';
+COMMENT ON COLUMN jeton_rafraichissement.empreinte IS
+    'SHA-256 du jeton. Le jeton en clair n''est jamais stocke.';
+COMMENT ON COLUMN jeton_rafraichissement.expire_le IS
+    'Repousse a chaque rafraichissement : une application qui sert ne deconnecte pas.';
+COMMENT ON COLUMN plan_repas.cuisine_le IS
+    'NULL = prevu, le plan reserve son stock ; renseigne = cuisine, le stock a deja ete decremente';
+COMMENT ON INDEX aliment_nom_commun_unique IS
+    'Unicite des aliments de reference entre eux.';
+COMMENT ON INDEX aliment_nom_prive_unique IS
+    'Unicite du nom chez un utilisateur. Deux comptes peuvent nommer pareil.';

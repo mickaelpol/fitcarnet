@@ -246,7 +246,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
 | **3 — sécurité et isolation** | ✅ 6/6 | É1, C3, É8, M-01, M-03 · **M-02 partiel** : fenêtre ramenée à 90 j, la visibilité des sessions reste à faire |
-| **4 — base reproductible** | ⬜ ~4 h | C2 : `verifier-schema.sh` signale toujours **280 lignes** d'écart |
+| **4 — base reproductible** | 🟨 C2 fait | `verifier-schema.sh` : **✓ identiques**. Restent É5, É6 et les index de clés étrangères |
 | **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
@@ -276,7 +276,10 @@ Quatre outils absents, qui auraient attrapé seuls une bonne part de cette liste
 2. **Glob dans `tsconfig.tests.json`** — le fichier énumère chaque test à la main : un nouveau
    `.test.ts` non listé n'est jamais exécuté, sans le moindre signal (c'est pourquoi
    `performance.ts`, où vivent É11, M2 et M3, n'a aucun test).
-3. **`doctrine:schema:validate`** — n'existe nulle part ; détecte les divergences entités ↔ schéma.
+3. ~~**`doctrine:schema:validate`**~~ — **mauvaise proposition, écartée le 14 septembre 2026.** Elle ne
+   passera jamais sur ce projet : le schéma est écrit à la main et la base porte plus que les entités
+   (`invitation` et `inventaire_lot` n'en ont aucune). Son `--dump-sql` propose de les *supprimer*, et
+   `--force` détruirait les données. Le contrôle utile est `verifier-schema.sh`, ci-dessous.
 4. **Le script de comparaison des deux bases** que `INSTALLATION.md` propose en dernière ligne et
    qui n'avait manifestement jamais été lancé — c'est lui qui a révélé C2.
 
