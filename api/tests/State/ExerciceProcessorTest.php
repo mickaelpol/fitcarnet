@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\State;
 
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Exercice;
@@ -61,10 +62,14 @@ final class ExerciceProcessorTest extends TestCase
     }
 
     /**
-     * LE MECANISME DE PUBLICATION. Un PATCH recharge l'exercice depuis la base,
-     * auteur compris : le processeur n'y touche plus. C'est ainsi qu'un
-     * administrateur verse au catalogue commun l'exercice bien redige de
-     * quelqu'un, sans en effacer la paternite.
+     * LE MECANISME DE PUBLICATION. Sur un PATCH, le processeur ne touche a
+     * rien : c'est ainsi qu'un administrateur verse au catalogue commun
+     * l'exercice bien redige de quelqu'un, sans en effacer la paternite.
+     *
+     * Ce test passait autrefois une operation `Post` en pretendant decrire un
+     * PATCH. Il passait quand meme, parce que le processeur regardait alors
+     * l'etat du champ et non l'operation — et c'est precisement ce qui
+     * masquait M-01. Un test qui ment sur son scenario protege le defaut.
      */
     public function testUnAdministrateurPeutPublierUnExerciceExistant(): void
     {
@@ -74,7 +79,7 @@ final class ExerciceProcessorTest extends TestCase
             ->setPublic(true);            // ce que le PATCH vient de poser
 
         $recus = [];
-        self::processeur(new Utilisateur(), $recus)->process($exercice, self::operation());
+        self::processeur(new Utilisateur(), $recus)->process($exercice, new Patch());
 
         self::assertTrue($exercice->isPublic(),
             'le processeur ne doit pas defaire la publication decidee par un administrateur');
@@ -95,6 +100,36 @@ final class ExerciceProcessorTest extends TestCase
 
         self::assertNull($exercice->getCreePar(),
             'aucun auteur ne doit etre pose quand personne n\'est connecte');
+    }
+
+    /**
+     * CONSTAT M-01, REPRODUIT ICI LE JOUR MEME OU IL A ETE CORRIGE AILLEURS.
+     *
+     * Le garde `null === getCreePar()` est juste a la creation et faux partout
+     * ailleurs : un exercice du CATALOGUE COMMUN a precisement `creePar = NULL`.
+     * En se fiant a l'etat du champ plutot qu'a l'operation, le processeur
+     * s'appropriait l'exercice qu'un administrateur venait corriger — et
+     * `public = false` le faisait disparaitre du catalogue de tout le monde.
+     *
+     * C'est le cas d'usage PRINCIPAL du PATCH ici : renseigner une video ou un
+     * nom francais. Le geste le plus normal de l'administration cassait le
+     * catalogue, en silence.
+     *
+     * Meme defaut que `AlimentProcessor` (M-01) : une decision juste appliquee
+     * a un endroit et recopiee sans son contexte. Le remede est le meme —
+     * se fier a l'operation, pas a l'etat du champ.
+     */
+    public function testCorrigerUnExerciceDuCatalogueCommunNeSeLApproprie(): void
+    {
+        $commun = (new Exercice())->setNom('Developpe couche');   // creePar NULL, public true
+
+        $recus = [];
+        self::processeur(new Utilisateur(), $recus)->process($commun, new Patch());
+
+        self::assertNull($commun->getCreePar(),
+            'un PATCH d\'administration ne doit pas s\'approprier un exercice commun');
+        self::assertTrue($commun->isPublic(),
+            'corriger une video ne doit pas retirer l\'exercice du catalogue de tous');
     }
 
     /**

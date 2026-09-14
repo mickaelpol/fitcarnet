@@ -245,14 +245,14 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **0 — garde-fous** | ✅ | `CLAUDE.md`, PHPStan niveau 5, `ModeleExposeTest`, `verifier-schema.sh`, `verifier-migrations.sh`, glob des tests, 2 hooks |
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
-| **3 — sécurité et isolation** | 🟨 3/6 · ~2 h | **É1, C3 et É8 faits** · restent M-01 à M-03 — **en cours** |
+| **3 — sécurité et isolation** | 🟨 4/6 · ~1 h | **É1, C3, É8 et M-01 faits** · restent M-02 et M-03 — **en cours** |
 | **4 — base reproductible** | ⬜ ~4 h | C2 : `verifier-schema.sh` signale toujours **280 lignes** d'écart |
 | **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
 | **8 — le reste** | ⬜ | ~37 constats faibles |
 
-Tests au 14 septembre : **362 front · 134 API · 464 assertions · 8 erreurs PHPStan**
+Tests au 14 septembre : **362 front · 139 API · 474 assertions · 8 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 Deux points laissés ouverts volontairement :

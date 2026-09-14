@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Exercice;
 use App\Entity\Utilisateur;
@@ -44,7 +45,14 @@ final readonly class ExerciceProcessor implements ProcessorInterface
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
-        if ($data instanceof Exercice && null === $data->getCreePar()) {
+        /* L'OPERATION FAIT FOI, PAS L'ETAT DU CHAMP.
+           Se fier a `null === getCreePar()` semble equivalent et ne l'est pas :
+           un exercice du CATALOGUE COMMUN a precisement `creePar = NULL`. Le
+           PATCH par lequel un administrateur renseigne une video se serait
+           approprie l'exercice, et `public = false` l'aurait fait disparaitre
+           du catalogue de tout le monde. C'est le constat M-01, deja survenu
+           sur AlimentProcessor — le meme piege, a dix lignes de distance. */
+        if ($data instanceof Exercice && $operation instanceof Post) {
             $utilisateur = $this->security->getUser();
             if ($utilisateur instanceof Utilisateur) {
                 $data->setCreePar($utilisateur);

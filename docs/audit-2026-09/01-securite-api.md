@@ -88,10 +88,10 @@ pour les échecs de type contrainte.
 
 ---
 
-## M-01 — Un PATCH administrateur privatise silencieusement un aliment commun
+## M-01 — ✅ corrigé le 14 septembre 2026 — Un PATCH administrateur privatisait silencieusement un aliment commun
 
 - **Gravité : MOYENNE**
-- **Statut : CONFIRMÉ**
+- **Statut : CORRIGÉ** — l'opération fait foi, plus l'état du champ. Vérifié en base : le cas ne s'était **jamais produit** (50 aliments communs, tous sans auteur et publics), aucune remise en état nécessaire. Le même piège a été trouvé et fermé sur `ExerciceProcessor` et `ProprietaireProcessor` : trois processeurs, une seule règle.
 - **Emplacement :** `api/src/State/AlimentProcessor.php:37-43`, déclenché par `api/src/Entity/Aliment.php:39-43` (`Patch`)
 
 **Ce qui se passe.** `AlimentProcessor` pose le propriétaire « seulement s'il

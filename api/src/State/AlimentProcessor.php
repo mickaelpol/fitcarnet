@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Aliment;
 use App\Entity\Utilisateur;
@@ -34,7 +35,17 @@ final readonly class AlimentProcessor implements ProcessorInterface
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
-        if ($data instanceof Aliment && null === $data->getCreePar()) {
+        /* L'OPERATION FAIT FOI, PAS L'ETAT DU CHAMP — constat M-01, corrige le
+           14 septembre 2026.
+           Ce garde etait `null === $data->getCreePar()`, ce qui semble
+           equivalent et ne l'est pas : un aliment de reference a precisement
+           `creePar = NULL`. Corriger la valeur nutritionnelle d'un des ~50
+           aliments communs l'attribuait donc a l'administrateur et posait
+           `public = false` ; `FiltreAliment` le faisait alors disparaitre du
+           catalogue de tous les autres comptes, sans qu'aucun ecran ne le dise.
+           Une perte d'acces silencieuse a une donnee partagee, declenchee par
+           le geste le plus normal de l'administration. */
+        if ($data instanceof Aliment && $operation instanceof Post) {
             $utilisateur = $this->security->getUser();
             if ($utilisateur instanceof Utilisateur) {
                 $data->setCreePar($utilisateur);

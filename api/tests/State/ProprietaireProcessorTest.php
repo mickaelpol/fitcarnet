@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\State;
 
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Aliment;
@@ -59,7 +60,7 @@ final class ProprietaireProcessorTest extends TestCase
         $seance = (new Seance())->setUtilisateur($alice);
 
         $recus = [];
-        self::processeur($bob, $recus)->process($seance, self::operation());
+        self::processeur($bob, $recus)->process($seance, new Patch());
 
         self::assertSame($alice, $seance->getUtilisateur(),
             'modifier la seance d\'un autre ne doit pas se l\'approprier');
