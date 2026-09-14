@@ -5,8 +5,9 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 9 septembre 2026** — É1 corrigé, skills du projet
-réécrites, jeu de démonstration et support de présentation.
+**Dernière mise à jour : 14 septembre 2026** — É1 corrigé, skills du projet
+réécrites, et **le dossier de présentation client est terminé** : support,
+vidéo, scripts et inventaire complet des fonctionnalités.
 
 ---
 
@@ -19,8 +20,14 @@ lot 3 — sécurité et isolation — est entamé : É1 est fait**, restent C3, 
 M-01 à M-03. Tout est documenté dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
 
+En parallèle, un **dossier de présentation** a été monté de bout en bout pour
+montrer le produit à un client et à une équipe technique : il est complet et
+utilisable, il ne reste qu'à tourner les vidéos (voir « Le chantier
+présentation » plus bas).
+
 État : **468 tests au vert** (362 front, 106 API), 8 erreurs PHPStan connues —
-les mêmes qu'avant, aucune sur les fichiers touchés.
+les mêmes qu'avant, aucune sur les fichiers touchés. `master` synchronisé sur
+Gitea.
 
 ---
 
@@ -46,7 +53,19 @@ docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 102 test
 Si l'un des deux est rouge **avant** d'avoir touché à quoi que ce soit, c'est
 que l'environnement est en cause, pas le code : le régler d'abord.
 
-**3. Le premier message à donner à Claude**, tel quel :
+**3. Le premier message à donner à Claude.** Deux chantiers sont ouverts —
+prends celui que tu veux, la phrase est écrite pour être collée telle quelle.
+
+**Si tu reprends la présentation client** (le plus avancé, il ne reste qu'à
+filmer) :
+
+> Lis `REPRENDRE.md` et `presentation/plan-de-tournage.md`. Je veux tourner les
+> vidéos de démonstration depuis mon téléphone sur l'application de production.
+> Aide-moi à créer les deux comptes de démonstration sur le NAS, à y charger le
+> jeu de données, et guide-moi bobine par bobine. Ne travaille pas sur une autre
+> branche que `master` sans me le demander.
+
+**Si tu reprends l'audit** :
 
 > Lis `REPRENDRE.md`, puis continue le lot 3 de l'audit : C3 — aucun test ne
 > vérifie l'isolation des données entre comptes. En TDD : le test échoue
@@ -86,6 +105,71 @@ Les skills `superpowers-symfony:api-platform-security`, `symfony-voters` et
 Le graphe sait où chercher : la communauté **« Propriété manquante sur
 l'inventaire »** rassemble É1, `FrigoController::alimentAccessible` et
 `AppliqueInventaire`.
+
+---
+
+## Le chantier présentation — terminé, sauf le tournage
+
+Monté du 9 au 14 septembre 2026 pour présenter fitcarnet **à un client et à une
+équipe technique dans la même salle**. Tout est dans `presentation/`.
+
+| Fichier | Ce que c'est | État |
+|---|---|---|
+| `fitcarnet-presentation.html` | 28 slides en quatre actes : le produit, l'architecture, les garanties, l'outillage IA. Captures embarquées, fichier autonome | ✅ fait |
+| `construire.py` | le génère ; **relancer après toute modification** | ✅ |
+| `fitcarnet-demonstration.mp4` | 3 min 01, muette, 8 chapitres | ✅ fait, à refaire au téléphone |
+| `tournage/tourner.mjs` | pilote l'application avec Playwright et enregistre en continu | ✅ |
+| `monter-demo.sh` | cartons, légendes, chapitres | ✅ |
+| `script-narration.md` | ce qu'il faut dire, slide par slide, vidéo minutée | ✅ |
+| `features.md` | **les ~220 fonctionnalités**, avec fichier et ligne | ✅ |
+| `plan-de-tournage.md` | le script de tournage en 8 bobines, pour filmer au téléphone | ✅ |
+
+**Ce qui reste à faire**, et c'est la suite naturelle :
+
+1. Créer les **deux comptes de démonstration sur la production** — un ordinaire,
+   un administrateur. Les commandes sont dans `plan-de-tournage.md`, partie I.3.
+   Sans le compte admin, les bobines 1 et 8 sont impossibles : les quatre écrans
+   d'administration ne s'affichent pas pour un compte ordinaire.
+2. Y charger le jeu de données (`jeu-essai.sql` puis `jeu-demo.sql`). **Relire
+   l'adresse dans les `sed`** : `jeu-demo.sql` efface avant de poser. Un garde-fou
+   refuse tout compte ayant déjà des séances, il faut `-v ecraser=oui` pour passer
+   outre — si le message nomme un compte personnel, l'adresse est fausse.
+3. **Tourner les huit bobines** avec scrcpy (installé sur Windows, pas dans WSL2 :
+   WSL2 n'a aucun accès USB).
+4. Remonter la vidéo à partir des prises téléphone.
+
+**Deux choses à ne pas découvrir caméra allumée** : la source Grocy n'est
+tournable que si `GROCY_URL` est renseigné sur l'instance filmée, et le **partage
+d'un modèle est inopérant** (constat F-05).
+
+**Le jeu de démonstration local est en place** sur cette machine : 14 aliments,
+14 lignes de stock, 23 séances, 123 séries, 2 plans, 4 cibles, et un 1RM qui monte
+de 50,7 à 63,3 kg sur neuf semaines. Compte `demo@fitcarnet.local`.
+
+---
+
+## Ce que l'inventaire des fonctionnalités a mis au jour
+
+`presentation/features.md` a été établi par exploration systématique du code —
+écrans, calculs, back-end. Il recense environ **220 capacités** là où un premier
+inventaire de surface en voyait 57. Il a aussi montré que **la documentation
+mentait sur deux points** :
+
+- **`front/src/calcul/texte.ts` n'existe pas.** `CLAUDE.md` l'annonçait comme le
+  seul porteur de la suppression des accents : c'était la *correction prévue* au
+  lot 6 (constat D4), présentée comme faite. `sansAccent` est toujours recopié
+  quatre fois. Corrigé dans `CLAUDE.md` et dans la skill `front-fitcarnet`.
+- **`front/src/solveur/periode.ts` n'existe pas** — seul son fichier de test
+  existe, il éprouve une fonction qui vit dans `composer.ts`.
+
+**Trois pistes ouvertes, à trancher un jour :**
+
+- `front/src/composants/inventaire.tsx` semble être du **code mort** — aucun
+  écran ne l'importe, `frigo.tsx` réimplémente le mode inventaire.
+- `Invitation::domaineAccepteDuCourrier()` — vérification DNS complète et
+  documentée — **n'a aucun appelant** dans l'API.
+- **Aucun appel à OpenFoodFacts** n'existe côté back, alors que le champ
+  `Aliment::source` en prévoit la valeur.
 
 ---
 
@@ -219,6 +303,11 @@ relancé.**
   `composer install` dans le conteneur. Contourné en installant `vendor` depuis
   l'hôte (le dossier est monté), **réparation remise à plus tard** : c'est du
   NAT Docker sous WSL2, pas le dépôt.
+- **scrcpy ne voit pas le téléphone depuis WSL2.** WSL2 n'a aucun accès USB :
+  `/dev/bus/usb` n'y contient que les deux hubs racine. L'affichage, lui, marche
+  (WSLg est présent). Installer scrcpy **sur Windows** — le zip des *releases*
+  GitHub est autonome, `adb` compris. Les voies de repli sont dans
+  `presentation/plan-de-tournage.md`.
 - **Le graphe se périme.** `graphify update .` après du code, `/graphify . --update`
   après de la documentation.
 
