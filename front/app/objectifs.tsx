@@ -5,6 +5,12 @@ import { useCibles, useEnregistrerCible } from '@/api/hooks';
 import type { Cible } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { convertir, fibresDouteuses } from '@/calcul/planCoach';
+/* La formule des calories ne se recopie pas : elle vit dans le solveur, qui
+   tient ses coefficients de `src/calcul/nutrition.ts`. L'alias `@/` est sans
+   danger ici — `app/` n'est jamais compilé vers `dist-tests/`. */
+import {
+  SEUIL_COHERENCE, bornesDeCoherence, ecartDeCoherence, kcalDesMacros,
+} from '@/solveur/solveur';
 import { C, E, P, R, T, TOUCHE, nb } from '@/theme';
 
 const REPAS = [
@@ -61,12 +67,23 @@ export default function Objectifs() {
     return <Erreur message={cibles.error.message} onReessayer={() => void cibles.refetch()} />;
   }
 
-  /* Les calories découlent des grammes : 4 / 4 / 9. On les recalcule dès
-     qu'une macro change, sinon l'utilisateur affiche un objectif impossible. */
+  /* Les calories découlent des grammes. On les recalcule dès qu'une macro
+     change, sinon l'utilisateur affiche un objectif impossible.
+
+     M1, 15 septembre 2026 : ce `4·P + 4·G + 9·L` était écrit ici à la main,
+     et une deuxième fois vingt lignes plus bas. La formule vit maintenant dans
+     `kcalDesMacros`, qui tient ses coefficients de `src/calcul/nutrition.ts`.
+
+     Ce que ce champ propose reste la borne HAUTE quand la case « glucides
+     totaux » est cochée : sans connaître la part de fibres, c'est la seule
+     valeur qu'on puisse écrire, et l'avertissement plus bas raisonne sur
+     l'intervalle entier pour ne pas la contredire. */
   const majMacro = (champ: 'prot' | 'gluc' | 'lip', valeur: string) => {
     const suite = { ...saisie, [champ]: valeur };
     const p = parseFloat(suite.prot); const g = parseFloat(suite.gluc); const l = parseFloat(suite.lip);
-    if (![p, g, l].some(Number.isNaN)) suite.kcal = String(Math.round(4 * p + 4 * g + 9 * l));
+    if (![p, g, l].some(Number.isNaN)) {
+      suite.kcal = String(Math.round(kcalDesMacros({ prot: p, gluc: g, lip: l })));
+    }
     setSaisie(suite);
   };
 
@@ -75,8 +92,14 @@ export default function Objectifs() {
     lip: parseFloat(saisie.lip), kcal: parseFloat(saisie.kcal),
   };
   const valide = Object.values(valeurs).every((v) => !Number.isNaN(v) && v >= 0);
-  const kcalDesMacros = valide ? 4 * valeurs.prot + 4 * valeurs.gluc + 9 * valeurs.lip : 0;
-  const incoherent = valide && Math.abs(valeurs.kcal - kcalDesMacros) > 15;
+  /* Même règle que le solveur, et la même fonction : en glucides TOTAUX les
+     fibres sont dans la cible sans qu'on sache combien, donc les mêmes grammes
+     couvrent un intervalle de calories. Compter les fibres à 4 kcal/g déclarait
+     « incohérente » une cible atteignable dès 7,5 g de fibres — l'écran
+     accusait l'utilisateur d'une faute qu'il n'avait pas commise. */
+  const bornes = valide ? bornesDeCoherence(valeurs) : { min: 0, max: 0 };
+  const incoherent = valide
+    && Math.abs(ecartDeCoherence(valeurs, totaux)) > SEUIL_COHERENCE;
 
   /* Le convertisseur ne fait qu'une chose : retrancher les fibres des
      glucides. C'est là qu'est le piège d'un plan américain, et nulle part
@@ -246,7 +269,11 @@ export default function Objectifs() {
 
           {incoherent && (
             <Discret style={{ color: C.vif, fontSize: T.normal }}>
-              Tes grammes représentent {nb(kcalDesMacros)} calories, pas {nb(valeurs.kcal)}.
+              {totaux
+                ? `Tes grammes représentent entre ${nb(bornes.min)} et ${nb(bornes.max)} `
+                  + `calories selon la part de fibres, pas ${nb(valeurs.kcal)}. `
+                : `Tes grammes représentent ${nb(bornes.max)} calories, `
+                  + `pas ${nb(valeurs.kcal)}. `}
               L'app respecte les grammes ; les calories suivent.
             </Discret>
           )}

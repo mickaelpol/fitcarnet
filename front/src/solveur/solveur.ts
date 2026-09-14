@@ -1,10 +1,71 @@
 import { arrondir, resoudre } from './algebre';
+/* Chemin RELATIF, jamais `@/calcul/nutrition` : ce sont des VALEURS, et
+   `tsc -p tsconfig.tests.json` ne réécrit pas l'alias — le `require('@/…')`
+   partirait tel quel dans `dist-tests/` et casserait au `node --test`. */
+import {
+  KCAL_FIBRES, KCAL_GLUCIDES, KCAL_LIPIDES, KCAL_PROTEINES,
+} from '../calcul/nutrition';
 import type {
   Aliment, Cibles, Diagnostic, Fixe, Macros, Options, Quantite, Resultat, Variables,
 } from './types';
 
 const TOLERANCE_DEFAUT: Macros = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 };
 const ARRONDI_DEFAUT = { proteine: 1, glucide: 5, lipide: 0.5 };
+
+/** Au-delà, l'écart entre les kcal annoncées et les grammes n'est plus un arrondi. */
+export const SEUIL_COHERENCE = 15;
+
+/**
+ * LES CALORIES QUE DÉCRIVENT DES GRAMMES, dans la convention de l'application.
+ *
+ * Les coefficients viennent de `src/calcul/nutrition.ts`, qui fait foi — ils ne
+ * sont pas réécrits ici. Trois copies de `4·P + 4·G + 9·L` vivaient dans le
+ * projet (`solveur.ts`, et deux fois dans `app/objectifs.tsx`), toutes en
+ * Atwater AMÉRICAIN, celui que l'en-tête de `nutrition.ts` interdit.
+ *
+ * `fibres` est facultatif parce que `Cibles` ne sait pas l'exprimer : une cible
+ * dit trois grammages et des calories, jamais sa part de fibres. Absent, il ne
+ * vaut pas « zéro fibre » — il veut dire « cette macro n'en parle pas », et
+ * c'est à l'appelant de décider ce qu'il en fait. `ecartDeCoherence` le fait.
+ */
+export const kcalDesMacros = (
+  m: { prot: number; gluc: number; lip: number; fibres?: number },
+): number =>
+  KCAL_PROTEINES * m.prot
+  + KCAL_GLUCIDES * m.gluc
+  + KCAL_LIPIDES * m.lip
+  + KCAL_FIBRES * (m.fibres ?? 0);
+
+/**
+ * DE COMBIEN LES CALORIES ANNONCÉES RATENT CE QUE LES GRAMMES PEUVENT DONNER.
+ * `0` quand la cible est atteignable : il n'y a alors rien à signaler.
+ *
+ * En convention européenne, les grammes de glucides excluent les fibres : la
+ * cible décrit un seul nombre de calories, et l'écart se lit directement.
+ *
+ * En glucides TOTAUX, les fibres sont DEDANS sans qu'on sache combien. Les
+ * mêmes grammes couvrent alors tout un intervalle — de « tout en fibres »
+ * (2 kcal/g) à « aucune fibre » (4 kcal/g) — et une cible qui tombe dedans est
+ * atteignable. La compter à 4 kcal/g accusait à tort dès 7,5 g de fibres.
+ * On ne devine pas la part manquante : on refuse de trancher, ce qui est la
+ * seule réponse honnête quand la donnée n'est pas là.
+ */
+export const ecartDeCoherence = (cibles: Cibles, glucidesTotaux = false): number => {
+  const sansFibres = kcalDesMacros(cibles);
+  if (!glucidesTotaux) return cibles.kcal - sansFibres;
+
+  const toutEnFibres = kcalDesMacros({ ...cibles, gluc: 0, fibres: cibles.gluc });
+  if (cibles.kcal > sansFibres) return cibles.kcal - sansFibres;
+  if (cibles.kcal < toutEnFibres) return cibles.kcal - toutEnFibres;
+
+  return 0;
+};
+
+/** Bornes des calories que ces grammes peuvent décrire, en glucides totaux. */
+export const bornesDeCoherence = (cibles: Cibles): { min: number; max: number } => ({
+  min: kcalDesMacros({ ...cibles, gluc: 0, fibres: cibles.gluc }),
+  max: kcalDesMacros(cibles),
+});
 
 /**
  * Ramène une quantité vers le POIDS PESÉ, seul état dans lequel les valeurs
@@ -334,20 +395,39 @@ export function calculer(
     });
   }
 
-  // Les kcal ne sont pas une contrainte indépendante : elles découlent des
-  // macros. Si la cible kcal ne correspond pas à 4·P + 4·G + 9·L, aucune
-  // combinaison d'aliments ne peut satisfaire les deux — autant le dire.
-  const kcalDesMacros = 4 * cibles.prot + 4 * cibles.gluc + 9 * cibles.lip;
-  const incoherence = cibles.kcal - kcalDesMacros;
-  if (Math.abs(incoherence) > 15) {
+  /* Les kcal ne sont pas une contrainte indépendante : elles découlent des
+     macros. Si la cible kcal ne correspond pas à ce que les grammes peuvent
+     donner, aucune combinaison d'aliments ne satisfait les deux — autant le
+     dire.
+
+     M1, 15 septembre 2026. La formule était réécrite ici en `4·P + 4·G + 9·L`,
+     l'Atwater AMÉRICAIN que l'en-tête de `nutrition.ts` interdit. Tout le reste
+     de `calculer` sait lire `glucidesTotaux` ; pas cette ligne. En glucides
+     totaux la cible en glucides COMPREND les fibres, à 2 kcal/g et non 4, si
+     bien que 7,5 g de fibres suffisaient à franchir le seuil de 15 kcal et à
+     accuser une cible parfaitement atteignable. Mesuré sur
+     {710 kcal, 40 P, 100 G, 20 L} : « font forcément 740 calories, pas 710 »,
+     alors que 100 g de glucides totaux dont 15 g de fibres font bien 710. */
+  const incoherence = ecartDeCoherence(cibles, glucidesTotaux);
+  if (Math.abs(incoherence) > SEUIL_COHERENCE) {
+    const grammes =
+      `${cibles.prot} g de protéines, ${cibles.gluc} g de glucides ` +
+      `et ${cibles.lip} g de lipides`;
+    const bornes = bornesDeCoherence(cibles);
     diagnostics.push({
       gravite: 'info',
       code: 'cibles_incoherentes',
       message:
-        `Tes objectifs ne collent pas entre eux : ${cibles.prot} g de protéines, ` +
-        `${cibles.gluc} g de glucides et ${cibles.lip} g de lipides font forcément ` +
-        `${kcalDesMacros.toFixed(0)} calories, pas ${cibles.kcal.toFixed(0)}. ` +
-        'L\'app respecte les grammes ; les calories suivent.',
+        `Tes objectifs ne collent pas entre eux : ${grammes} font `
+        /* En glucides totaux, la part de fibres n'est PAS dans la cible. On
+           annonce donc l'intervalle que les grammes peuvent couvrir plutôt
+           qu'un chiffre unique qu'il faudrait inventer. */
+        + (glucidesTotaux
+          ? `entre ${bornes.min.toFixed(0)} et ${bornes.max.toFixed(0)} calories `
+            + 'selon la part de fibres, '
+          : `forcément ${bornes.max.toFixed(0)} calories, `)
+        + `pas ${cibles.kcal.toFixed(0)}. `
+        + 'L\'app respecte les grammes ; les calories suivent.',
     });
   }
 

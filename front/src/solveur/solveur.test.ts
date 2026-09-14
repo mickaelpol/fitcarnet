@@ -1,7 +1,14 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 import { resoudre, arrondir } from './algebre';
-import { calculer, convertir, pourObtenirCuit, versReference } from './solveur';
+/* Chemin RELATIF, et pas `@/calcul/nutrition` : `tsc -p tsconfig.tests.json`
+   ne réécrit pas l'alias, et un `require('@/…')` casse dans `dist-tests/` au
+   moment du `node --test`, pas au typage. */
+import { controler } from '../calcul/nutrition';
+import {
+  bornesDeCoherence, calculer, convertir, ecartDeCoherence, kcalDesMacros,
+  pourObtenirCuit, versReference,
+} from './solveur';
 import { A, CIBLES } from './aliments.test-data';
 import type { Fixe } from './types';
 
@@ -31,6 +38,71 @@ describe('algèbre', () => {
     assert.equal(arrondir(12.6, 5), 15);
     assert.equal(arrondir(12.3, 0.5), 12.5);
     assert.equal(arrondir(12.34, 0), 12.34);
+  });
+
+  /**
+   * M4, corrigé le 15 septembre 2026. `EPSILON = 1e-10` était comparé en
+   * valeur ABSOLUE à un pivot fait de macros pour 100 g — des coefficients qui
+   * valent 0,07 ou 0,78, jamais 1e-10. Le garde-fou ne pouvait donc se
+   * déclencher que sur des aliments STRICTEMENT identiques, c'est-à-dire
+   * jamais dans le cas qu'annonce son propre message.
+   *
+   * Deux riz distants de 1,4 % donnaient un déterminant de 6,4e-4 — six ordres
+   * de grandeur au-dessus du seuil — et `resoudre` rendait une « solution » de
+   * −41 109 g / +41 094 g. Le rattrapage des négatifs cachait le chiffre, mais
+   * l'explication affichée devenait fausse : « le reste apporte déjà tout ce
+   * qu'il faut » alors que les protéines finissaient à 6,4 g pour 40 visés.
+   *
+   * Le seuil est désormais RELATIF à l'amplitude de la colonne d'origine, donc
+   * sans unité : c'est la seule forme qui ait un sens quand les coefficients
+   * sont des grammes pour 100 g.
+   */
+  describe('un pivot minuscule n’est pas un pivot nul (M4)', () => {
+    /* Colonnes = aliments, lignes = protéines / glucides / lipides pour 1 g.
+       Riz A 7,0/78,0/0,6 · riz B 7,1/78,2/0,62 · huile 0/0/100. */
+    const DEUX_RIZ_JUMEAUX = [
+      [0.070, 0.071, 0],
+      [0.780, 0.782, 0],
+      [0.006, 0.0062, 1],
+    ];
+    /* Les mêmes rôles, mais du riz blanc contre du riz COMPLET : 7,5 g de
+       protéines, 76 g de glucides, 2,5 g de lipides. Deux aliments qu'on a le
+       droit de départager — le seuil ne doit pas les refuser. */
+    const BLANC_ET_COMPLET = [
+      [0.070, 0.075, 0],
+      [0.780, 0.760, 0],
+      [0.006, 0.025, 1],
+    ];
+    const CIBLE = [40, 100, 20];
+
+    it('refuse deux féculents que rien ne distingue vraiment', () => {
+      assert.equal(resoudre(DEUX_RIZ_JUMEAUX, CIBLE), null,
+        'le déterminant vaut 6,4e-4 : largement au-dessus de 1e-10, et pourtant '
+          + 'la « solution » pesait ±41 kg de riz');
+    });
+
+    it('résout encore deux féculents réellement différents', () => {
+      const x = resoudre(BLANC_ET_COMPLET, CIBLE);
+      assert.ok(x, 'riz blanc contre riz complet reste un système légitime');
+      /* et la solution est bien celle du système, pas un artefact */
+      for (let i = 0; i < 3; i++) {
+        const obtenu = BLANC_ET_COMPLET[i]!.reduce((s, c, j) => s + c * x![j]!, 0);
+        assert.ok(Math.abs(obtenu - CIBLE[i]!) < 1e-6);
+      }
+    });
+
+    it('le verdict ne dépend pas de l’unité choisie', () => {
+      /* Un seuil absolu n'est pas une propriété du système : il suffit de
+         changer d'échelle pour changer de réponse. Exprimer les mêmes macros
+         par milligramme déclarait singulier un système parfaitement sain. */
+      const parMilliardieme = (M: number[][]): number[][] =>
+        M.map((l) => l.map((v) => v * 1e-9));
+
+      assert.ok(resoudre(parMilliardieme(BLANC_ET_COMPLET), CIBLE.map((v) => v * 1e-9)),
+        'un système sain le reste quelle que soit l’unité');
+      assert.equal(resoudre(parMilliardieme(DEUX_RIZ_JUMEAUX), CIBLE.map((v) => v * 1e-9)), null,
+        'un système dégénéré le reste quelle que soit l’unité');
+    });
   });
 });
 
@@ -194,6 +266,38 @@ describe('robustesse', () => {
       { proteine: A.huile, glucide: A.huile, lipide: A.huile }, []);
     assert.equal(r.ok, false);
     assert.ok(r.diagnostics.some((d) => d.code === 'systeme_singulier'));
+  });
+
+  /**
+   * M4 vu de l'écran. Le message « ces aliments se ressemblent trop » ne sortait
+   * que sur des aliments STRICTEMENT identiques — jamais sur deux qui se
+   * ressemblent seulement, c'est-à-dire jamais dans son propre cas.
+   *
+   * À la place, `resoudre` rendait ±41 kg de riz, la boucle des négatifs
+   * zéroait la colonne fautive, et l'écran affichait « Pas de Riz A dans ce
+   * repas : le reste apporte déjà tout ce qu'il faut » pendant que les
+   * protéines finissaient à 6,4 g pour 40 visés. L'écart était juste ; c'est
+   * l'explication qui mentait — et une explication fausse coûte plus qu'un
+   * refus, parce qu'elle empêche de comprendre quoi changer.
+   */
+  it('refuse deux féculents qui se ressemblent trop, sans inventer d’explication', () => {
+    const jumeau = (nom: string, k: number, p: number, g: number, l: number) =>
+      ({ id: nom, nom, categorie: 'fec' as const, kcal100: k, prot100: p, gluc100: g, lip100: l, ratio: 1 });
+    const r = calculer({ kcal: 710, prot: 40, gluc: 100, lip: 20 }, {
+      proteine: jumeau('Riz A', 350, 7.0, 78.0, 0.6),
+      glucide: jumeau('Riz B', 351, 7.1, 78.2, 0.62),
+      lipide: A.huile,
+    }, []);
+
+    assert.equal(r.ok, false);
+    assert.ok(r.diagnostics.some((d) => d.code === 'systeme_singulier'),
+      `attendu « se ressemblent trop », reçu ${JSON.stringify(r.diagnostics.map((d) => d.code))}`);
+    /* Et surtout : plus une seule phrase qui prétende que le repas se passe
+       très bien de l'aliment qu'on vient d'écarter. */
+    assert.equal(r.diagnostics.some((d) => d.code === 'quantite_negative'), false);
+    for (const d of r.diagnostics) {
+      assert.doesNotMatch(d.message, /apporte déjà tout ce qu'il faut/);
+    }
   });
 
   it('ne produit jamais de quantité négative', () => {
@@ -425,6 +529,118 @@ describe('cibles incohérentes entre elles', () => {
       { proteine: A.poulet, glucide: A.riz, lipide: A.amandes },
       [{ aliment: A.haricots, grammes: 200 }]);
     assert.equal(r.diagnostics.some((x) => x.code === 'cibles_incoherentes'), false);
+  });
+
+  /**
+   * M1, corrigé le 15 septembre 2026. La ligne écrivait `4·P + 4·G + 9·L` à la
+   * main — l'Atwater AMÉRICAIN, celui que `nutrition.ts` interdit en tête de
+   * fichier. Tout le reste de `calculer` sait lire `glucidesTotaux` ; pas
+   * celle-là.
+   *
+   * En glucides TOTAUX la cible en glucides COMPREND les fibres, et une fibre
+   * vaut 2 kcal/g, pas 4. Compter les 100 g à 4 kcal/g surestimait donc de
+   * 2 kcal par gramme de fibre. Le seuil du diagnostic étant de 15 kcal,
+   * 7,5 g de fibres suffisaient à faire accuser une cible parfaitement
+   * atteignable — et c'est la famille d'aliments la plus banale.
+   *
+   * La cible ne dit PAS sa part de fibres, et on ne l'invente pas : en mode
+   * totaux on ne compare plus à un nombre mais à l'INTERVALLE que les grammes
+   * peuvent produire, de « tout en fibres » à « aucune fibre ».
+   */
+  describe('en glucides totaux, la part de fibres est inconnue', () => {
+    const trio = { proteine: A.poulet, glucide: A.riz, lipide: A.amandes };
+
+    it('ne crie pas à l’incohérence pour une cible que des fibres rendent juste', () => {
+      /* 100 g de glucides TOTAUX dont ~15 g de fibres :
+         4×40 + 4×85 + 2×15 + 9×20 = 160 + 340 + 30 + 180 = 710. */
+      const r = calculer({ kcal: 710, prot: 40, gluc: 100, lip: 20 },
+        trio, [], { glucidesTotaux: true });
+      const d = r.diagnostics.find((x) => x.code === 'cibles_incoherentes');
+      assert.equal(d, undefined,
+        `710 kcal est atteignable avec 15 g de fibres — reçu : ${d?.message}`);
+    });
+
+    it('signale encore une cible qu’aucune part de fibres ne peut sauver', () => {
+      /* Bornes : 4×40 + 2×100 + 9×20 = 540 (tout en fibres) à
+         4×40 + 4×100 + 9×20 = 740 (aucune fibre). 300 est hors de tout. */
+      const r = calculer({ kcal: 300, prot: 40, gluc: 100, lip: 20 },
+        trio, [], { glucidesTotaux: true });
+      assert.ok(r.diagnostics.some((x) => x.code === 'cibles_incoherentes'),
+        '300 kcal est hors de l’intervalle [540 ; 740], quelle que soit la part de fibres');
+    });
+
+    it('le message annonce l’intervalle, jamais un chiffre unique inventé', () => {
+      const r = calculer({ kcal: 300, prot: 40, gluc: 100, lip: 20 },
+        trio, [], { glucidesTotaux: true });
+      const d = r.diagnostics.find((x) => x.code === 'cibles_incoherentes');
+      assert.ok(d);
+      assert.match(d!.message, /540/);
+      assert.match(d!.message, /740/);
+    });
+
+    it('en convention européenne, rien ne change', () => {
+      /* Les fibres sont hors des glucides : la cible dit exactement ce
+         qu'elle vaut, et le diagnostic garde son chiffre unique. */
+      const r = calculer({ kcal: 710, prot: 40, gluc: 100, lip: 20 }, trio, []);
+      const d = r.diagnostics.find((x) => x.code === 'cibles_incoherentes');
+      assert.ok(d, '4×40 + 4×100 + 9×20 = 740, pas 710');
+      assert.match(d!.message, /740/);
+      assert.match(d!.message, /pas 710/);
+    });
+  });
+
+  /**
+   * Règle 5 : aucune formule métier recopiée. `nutrition.ts` porte
+   * `KCAL_PROTEINES / KCAL_GLUCIDES / KCAL_FIBRES / KCAL_LIPIDES` et fait foi.
+   * Ce test lie les deux modules : réécrire un 4 ou un 9 en dur ici, ou
+   * changer une constante là-bas, fait diverger les deux côtés.
+   */
+  it('les calories des macros sortent de nutrition.ts, pas d’une copie', () => {
+    const m = { prot: 40, gluc: 85, lip: 20, fibres: 15 };
+    assert.equal(kcalDesMacros(m), controler({ kcal: 0, ...m }).calculees);
+    assert.equal(kcalDesMacros({ prot: 40, gluc: 100, lip: 20 }), 740);
+  });
+
+  /**
+   * `app/objectifs.tsx` affiche le même avertissement que le solveur et
+   * appelle ces deux fonctions pour le faire. Il ne peut pas être testé
+   * lui-même — le motif de `tsconfig.tests.json` ne descend que sous `src/`,
+   * donc un test posé dans `app/` ne serait jamais exécuté, sans un signal.
+   * C'est ici, et seulement ici, que sa règle est vérifiée.
+   */
+  describe('la coherence des cibles, telle que l’écran objectifs la lit', () => {
+    const cible = { kcal: 710, prot: 40, gluc: 100, lip: 20 };
+
+    it('borne les calories par la part de fibres, de 2 à 4 kcal/g', () => {
+      /* 4×40 + 9×20 = 340 de socle ; 100 g de glucides valent 200 kcal tout en
+         fibres, 400 sans aucune fibre. */
+      assert.deepEqual(bornesDeCoherence(cible), { min: 540, max: 740 });
+    });
+
+    it('en européen, l’écart se lit sur un chiffre unique', () => {
+      assert.equal(ecartDeCoherence(cible), 710 - 740);
+      assert.equal(ecartDeCoherence({ ...cible, kcal: 740 }), 0);
+    });
+
+    it('en glucides totaux, toute cible dans l’intervalle est atteignable', () => {
+      for (const kcal of [540, 600, 710, 740]) {
+        assert.equal(ecartDeCoherence({ ...cible, kcal }, true), 0,
+          `${kcal} kcal tombe dans [540 ; 740] : une part de fibres l'explique`);
+      }
+    });
+
+    it('en glucides totaux, l’écart se compte depuis la borne franchie', () => {
+      assert.equal(ecartDeCoherence({ ...cible, kcal: 800 }, true), 800 - 740);
+      assert.equal(ecartDeCoherence({ ...cible, kcal: 300 }, true), 300 - 540);
+    });
+
+    it('sans glucides, les deux conventions disent la même chose', () => {
+      /* Pas de glucides, donc pas de fibres possibles : l'intervalle se
+         referme sur un point et la question de la convention ne se pose plus. */
+      const sansGluc = { kcal: 340, prot: 40, gluc: 0, lip: 20 };
+      assert.equal(ecartDeCoherence(sansGluc, true), ecartDeCoherence(sansGluc, false));
+      assert.deepEqual(bornesDeCoherence(sansGluc), { min: 340, max: 340 });
+    });
   });
 });
 
