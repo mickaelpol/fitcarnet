@@ -200,6 +200,7 @@ Pour l'aiguillage :
 | Travail | Skill à prendre |
 |---|---|
 | Corriger un bug, ajouter un comportement | **`superpowers:test-driven-development`**, sans exception |
+| Relire du code, chercher une régression | **`revue-de-code`** — les huit motifs de défaut du projet, avec un cas daté pour chacun |
 | Exposer une entité, écrire un contrôleur ou un processeur | **`isolation-donnees`** — avant de coder, pas après |
 | Écrire un test API | **`tests-api`** d'abord — le motif du projet ; **`superpowers-symfony:tdd-with-phpunit`** pour le générique PHPUnit (le projet n'est pas en Pest) |
 | Toucher à `front/src` ou `front/app` | **`front-fitcarnet`** |
@@ -212,6 +213,13 @@ Pour l'aiguillage :
 | Après un `eas update` : est-il arrivé sur les téléphones | **`expo:eas-update-insights`** — aucune skill ne couvre la publication elle-même, c'est `publier.sh` |
 | Index, plan de requête, VACUUM | **`postgres`** |
 | Déployer, publier, restaurer | **rien d'automatique** : lire `DEPLOIEMENT.md` et `MISE-A-JOUR.md` |
+
+## Agents
+
+| Agent | Quand l'invoquer |
+|---|---|
+| **`revue-fitcarnet`** | Avant de pousser, sur une modification en cours, ou pour éprouver un pan de code. Lecture seule : il rapporte, il ne corrige pas. Il applique les **huit motifs de défaut réellement trouvés** par l'audit — le jumeau oublié, le garde qui regarde l'état au lieu de l'intention, le commentaire qui ment, le test qui ne peut pas échouer… — via la skill `revue-de-code`. Une revue générique ne trouve rien sur ce projet ; celle-ci sait où regarder. |
+| `hexagonal-architect`, `hexagonal-reviewer` | Installés pour la refonte hexagonale, **non commencée**. Sans objet tant que `api/src` suit la structure Symfony classique. |
 
 **Hexagonal / DDD.** La migration vers l'architecture hexagonale reste un objectif
 assumé, et **elle n'a toujours pas commencé** : `api/src` suit la structure Symfony
