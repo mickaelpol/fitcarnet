@@ -6,6 +6,7 @@ import {
   imposePour, saisieIllisible, vers,
 } from './demandeRepas';
 import type { Aliment } from '@/solveur/types';
+import { LEGUME_PAR_PORTION } from '../solveur/composer';
 
 /**
  * CE QUI EST TESTÉ ICI, ET POURQUOI ÇA N'EXISTAIT PAS AVANT.
@@ -177,12 +178,26 @@ describe('demandePour — un reste déclaré est un plafond', () => {
     assert.equal(legume?.grammes, (imposePour('R2', 'legume') ?? 0) * 3);
   });
 
-  it('un rôle imposé est borné par ce qu\'on a déclaré avoir', () => {
+  /* CE TEST DISAIT L'INVERSE, ET IL FIGEAIT UN DÉFAUT.
+     Écrit le 14 septembre en CARACTÉRISANT le code — démarche légitime pour un
+     refactoring mécanique, mais qui grave la valeur fausse dès qu'elle en est
+     une. Il exigeait 50 g là où le plan en demandait 600, et aurait donc
+     interdit la correction d'É2 : le prochain à corriger aurait vu un test
+     rouge et cru à une régression.
+     Le bornage n'a pas disparu, il a repris sa place — dans `plafonds`, que
+     `composer` sait relever avec un relais. Voir le bloc « un reste déclaré ne
+     rabote PAS ce que le plan demande ». */
+  it('un rôle imposé n\'est PAS raboté par le reste : le plafond s\'en charge', () => {
     const c = compose({
       roles: { legume: BROCOLI },
       restes: { b: { grammes: '50', unite: 'cru' } },
     });
-    assert.equal(demandePour('R2', c, 3, CIBLE).fixes.find((f) => f.aliment.id === 'b')?.grammes, 50);
+    const d = demandePour('R2', c, 3, CIBLE);
+
+    assert.equal(d.fixes.find((f) => f.aliment.id === 'b')?.grammes,
+      (imposePour('R2', 'legume') ?? 0) * 3, 'le plan en veut 600 pour trois convives');
+    assert.ok(Math.abs((d.plafonds?.['b'] ?? 0) - 50) < 0.5,
+      'et le plafond dit qu\'on n\'en a que 50');
   });
 
   it('un ajout sans quantité pèse zéro, sans faire échouer le calcul', () => {
@@ -197,6 +212,61 @@ describe('demandePour — un reste déclaré est un plafond', () => {
 });
 
 /* ---------------------------------------------- aliments ajoutables (D8) */
+
+describe('un reste déclaré ne rabote PAS ce que le plan demande', () => {
+  /* CONSTAT É2, SECOND CHEMIN — trouvé le 15 septembre 2026.
+   *
+   * Le correctif de septembre portait sur `composer.ts` : `ignorerPlafonds`
+   * empêche la liste de courses de se laisser rétrécir par un plafond. Mais un
+   * rôle IMPOSÉ par le modèle ne passait pas par les plafonds : sa quantité
+   * était rabotée ici, dans `fixes`, par un `Math.min`.
+   *
+   * Un `fixes` raboté est indiscernable d'un « je n'en veux que 80 g » une fois
+   * arrivé au solveur : l'information « le plan en voulait 200 » est détruite
+   * AVANT d'entrer dans `composer.ts`, et `ignorerPlafonds` ne peut plus la
+   * relever. La liste de courses faisait donc sous-acheter — exactement É2.
+   *
+   * Et ce n'est pas tout. `composer` borne lui-même les fixes au stock, mais en
+   * cherchant un RELAIS pour le manque (`choisirReleve`, composer.ts:398-420).
+   * Raboter en amont lui cache le débordement : aucun relais n'est proposé, et
+   * l'utilisateur perd les 120 g au lieu de se les voir remplacés.
+   *
+   * Le commentaire du bloc disait déjà le bon comportement — « un plafond
+   * déclaré est simplement un frigo plus petit », « relève par un autre aliment
+   * comprise ». Le `Math.min` le contredisait. */
+  const avecReste = (grammes: string) => compose({
+    roles: { legume: BROCOLI },
+    restes: { b: { grammes, unite: 'cru' as const } },
+  });
+
+  it('garde la quantité du modèle dans les fixes, et pose le plafond à côté', () => {
+    const d = demandePour('R2', avecReste('80'), 1, CIBLE);
+
+    const legume = d.fixes.find((f) => f.aliment.id === 'b');
+    assert.ok(legume, 'le légume imposé par le modèle doit être dans les fixes');
+    assert.equal(legume.grammes, LEGUME_PAR_PORTION,
+      'le plan en veut ce qu\'il en veut : c\'est au solveur de le borner, avec relais');
+    assert.ok(Math.abs((d.plafonds?.['b'] ?? 0) - 80) < 0.5,
+      'le reste déclaré reste un PLAFOND — c\'est lui qui dit ce qu\'on a');
+  });
+
+  /* Le témoin. Sans reste déclaré rien ne change — sinon on ne saurait pas si
+     le test précédent décrit une correction ou une régression. */
+  it('sans reste déclaré, la quantité du modèle est servie telle quelle', () => {
+    const d = demandePour('R2', compose({ roles: { legume: BROCOLI } }), 1, CIBLE);
+
+    assert.equal(d.fixes.find((f) => f.aliment.id === 'b')?.grammes, LEGUME_PAR_PORTION);
+    assert.equal(d.plafonds?.['b'], undefined, 'sans reste déclaré, aucun plafond');
+  });
+
+  /* Zéro garde son sens de RETRAIT, et ce n'est pas la même chose : « je n'en
+     mets pas » doit écarter l'aliment, pas demander un relais. */
+  it('zéro reste un retrait, pas un plan raboté', () => {
+    const d = demandePour('R2', avecReste('0'), 1, CIBLE);
+
+    assert.equal(d.fixes.find((f) => f.aliment.id === 'b')?.grammes, 0);
+  });
+});
 
 describe('alimentsAjoutables — une seule liste, pas deux', () => {
   const stock = [RIZ, POULET, BROCOLI, AMANDE];

@@ -25,7 +25,7 @@ En parallèle, un **dossier de présentation** est monté de bout en bout dans
 `presentation/` : complet et utilisable, il ne reste qu'à tourner les vidéos
 (voir « Le chantier présentation » plus bas).
 
-État : **394 front · 149 API · 491 assertions**, 8 erreurs PHPStan connues,
+État : **448 front · 149 API · 491 assertions**, 8 erreurs PHPStan connues,
 `verifier-schema.sh` et `verifier-migrations.sh` **au vert tous les deux**.
 `master` synchronisé sur Gitea.
 

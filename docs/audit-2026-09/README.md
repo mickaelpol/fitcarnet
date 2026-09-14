@@ -320,11 +320,11 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **3 — sécurité et isolation** | ✅ 6/6 | É1, C3, É8, M-01, M-03 · **M-02 partiel** : fenêtre ramenée à 90 j, la visibilité des sessions reste à faire |
 | **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
 | **5 — scripts dangereux** | ✅ | É4, É7, `sauvegarde.sh` (É9 fait le 8 sept.) · a révélé **C4**, tranché |
-| **6 — architecture front** | 🟨 rangs 1, 2, 4, 5 faits | `hooks.ts` en 10 modules · `texte.ts` et `demandeRepas.ts` créés · D4, D7, D8, D10 clos · `repas.tsx` 2 397 → 2 193. Restent les rangs 6 à 12 |
+| **6 — architecture front** | 🟨 rangs 1, 2, 4, 5, 7, 9, 10, 11 faits | Les trois écrans passent de **3 935 à 1 491 lignes**. `hooks.ts` en 10 modules. **Les 10 duplications D1-D10 sont closes.** Restent les rangs 6, 8 et 12 |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
 | **8 — le reste** | ⬜ | ~37 constats faibles |
 
-Tests au 15 septembre : **394 front · 149 API · 491 assertions · 8 erreurs PHPStan**
+Tests au 15 septembre : **448 front · 149 API · 491 assertions · 8 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 Deux points laissés ouverts volontairement :

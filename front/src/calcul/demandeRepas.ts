@@ -146,16 +146,32 @@ export const demandePour = (
 
     if (fixe !== undefined) {
       /* Un rôle que le modèle impose — légume, fruit, laitage — n'a aucune
-         variable à optimiser. On sert ce que le modèle demande, borné par ce
-         qu'on a sous la main. Même règle que `composer` : la quantité
-         s'entend dans l'état de référence de l'aliment. */
-      const duModele = fixe * portions;
-      fixes.push({
-        aliment,
-        grammes: declare
-          ? Math.min(duModele, versReference(aliment, grammes, reste!.unite))
-          : duModele,
-      });
+         variable à optimiser : on sert ce que le modèle demande. La quantité
+         s'entend dans l'état de référence de l'aliment.
+ 
+         ON NE RABOTE PAS ICI, ET C'EST UNE CORRECTION DU 15 SEPTEMBRE 2026.
+ 
+         La ligne portait `Math.min(duModele, ce qui reste)`. C'était appliquer
+         DEUX FOIS la même contrainte : le plafond est déjà posé quinze lignes
+         plus haut, et c'est lui qui dit ce qu'on a.
+ 
+         Le rabotage faisait deux dégâts. D'abord, un `fixes` raboté est
+         indiscernable d'un « je n'en veux que 80 g » une fois arrivé au
+         solveur : l'information « le plan en voulait 200 » était détruite avant
+         `composer.ts`, `ignorerPlafonds` ne pouvait plus la relever, et la liste
+         de courses faisait SOUS-ACHETER — c'est le constat É2, par un second
+         chemin que l'audit ne décrivait pas.
+ 
+         Ensuite, et c'est pire : `composer` borne lui-même les fixes au stock,
+         mais en cherchant un RELAIS pour le manque (`choisirReleve`). Raboter
+         en amont lui cachait le débordement — aucun relais n'était proposé, et
+         l'utilisateur perdait les 120 g au lieu de se les voir remplacés.
+ 
+         Le commentaire de ce bloc le disait déjà, quelques lignes plus haut :
+         « un plafond déclaré est simplement un frigo plus petit, le temps d'un
+         repas », « relève par un autre aliment comprise ». Le code contredisait
+         son propre commentaire. */
+      fixes.push({ aliment, grammes: fixe * portions });
     } else if (cle === MODELE[repas].proteine) {
       variables.proteine = aliment;
     } else if (cle === MODELE[repas].glucide) {
