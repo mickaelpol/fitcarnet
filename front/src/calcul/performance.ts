@@ -18,9 +18,22 @@ import type { SeanceExercice, Serie } from '@/api/types';
  */
 export const REPS_MAX_POUR_1RM = 15;
 
+/**
+ * Le coefficient d'Epley, et il n'est ecrit QU'ICI.
+ *
+ * Il l'etait trois fois dans ce meme fichier — la formule, son inverse, et le
+ * calcul des repetitions par palier. Trois copies d'Epley aux bornes
+ * divergentes avaient deja produit un « record » de 79,96 kg que la formule
+ * elle-meme declare invalide (constat E1) ; les avoir toutes rapatriees ici
+ * n'aurait servi a rien en laissant le nombre se repeter dans le module de
+ * reference lui-meme. Releve le 15 septembre 2026.
+ */
+const COEF_EPLEY = 0.0333;
+
+
 /** Estimation d'Epley, fiable jusqu'à une quinzaine de répétitions. */
 export const epley = (poids: number, reps: number): number =>
-  poids * (1 + 0.0333 * reps);
+  poids * (1 + COEF_EPLEY * reps);
 
 /**
  * Le 1RM d'un ensemble de séries : la meilleure série courte.
@@ -97,10 +110,6 @@ export function performanceDe(bloc: SeanceExercice, mode: string): Performance {
 /* ---------------------------------------------------------------- 
    Calculateur de RM : trouver la charge à viser pour un objectif    */
 
-/** Charge à mettre pour atteindre un nombre de répétitions donné. */
-export const chargePour = (rm: number, reps: number): number =>
-  rm / (1 + 0.0333 * reps);
-
 /** Arrondi au palier réellement disponible en salle. */
 export function arrondirCharge(kg: number, pas = 2.5): number {
   return Math.round(kg / pas) * pas;
@@ -128,4 +137,4 @@ export const PALIERS = [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50] as const;
  * À 100 %, c'est une répétition : c'est la définition du 1RM.
  */
 export const repsAu = (pourcent: number): number =>
-  pourcent >= 100 ? 1 : Math.max(1, Math.round((100 / pourcent - 1) / 0.0333));
+  pourcent >= 100 ? 1 : Math.max(1, Math.round((100 / pourcent - 1) / COEF_EPLEY));

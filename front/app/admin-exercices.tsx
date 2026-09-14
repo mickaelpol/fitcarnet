@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useExerciceDetail, useExercices, useMajExercice, useMoi } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
+import { sansAccent } from '@/calcul/texte';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { ChoixMuscle } from '@/composants/choixMuscle';
 import { ChoixPuces } from '@/composants/choixPuces';
@@ -113,9 +114,6 @@ const FILTRES: { cle: Filtre; libelle: string }[] = [
  * où le nom semblait renseigné.
  */
 const aTraduire = (e: Exercice): boolean => e.source !== 'perso' && !e.nomFr;
-
-const sansAccent = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 // ---------------------------------------------------------------- éditeur
 

@@ -85,19 +85,26 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Macros, Atwater, catégories | `front/src/calcul/nutrition.ts` |
 | Cru/cuit, fournées, habitudes | `front/src/calcul/cuisson.ts` |
 | Composition de repas | `front/src/solveur/` |
-| Suppression des accents | **n'existe pas encore** — voir ci-dessous |
+| Suppression des accents | `front/src/calcul/texte.ts` |
 
 Un hook qui recalcule un 1RM importe `performance.ts`. Trois copies d'Epley aux bornes divergentes
 ont produit un « record » de 79,96 kg que la formule elle-même déclare invalide.
 
-**`front/src/calcul/texte.ts` N'EXISTE PAS.** Cette ligne du tableau annonçait
-une correction qui n'a pas été faite — vérifié le 14 septembre 2026. La
-suppression des accents est aujourd'hui **recopiée quatre fois** :
-`solveur/composer.ts:182`, `calcul/frigo.ts:39`, `composants/choixAliment.tsx:49`
-et `app/admin-exercices.tsx:117`. C'est le constat **D4** de l'audit, prévu au
-lot 6, et la correction consiste précisément à créer ce module en s'alignant sur
-la table manuelle de `cleDHabitude`. En attendant : **ne pas ajouter de
-cinquième copie**, et importer depuis l'un des quatre.
+**`front/src/calcul/texte.ts` existe depuis le 15 septembre 2026** (constat D4).
+Il a longtemps figuré dans ce tableau sans exister : la ligne annonçait une
+correction qui n'avait pas été faite. Les quatre copies de `sansAccent` sont
+désormais fusionnées.
+
+**Elles appelaient toutes `normalize('NFD')`** — soit quatre `TypeError` en
+puissance, Hermes ne l'implémentant pas partout. Le module s'aligne donc sur la
+table manuelle de `cleDHabitude`, et son test **retire `String.prototype.normalize`
+le temps de l'appel** : toute réécriture en `normalize` tombe sur le poste, et non
+sur un téléphone.
+
+Deux choses restent à faire, et elles sont notées : la table est écrite **deux
+fois**, dans `texte.ts` et dans `cuisson.ts` (`SANS_ACCENT` est exporté pour que
+la fusion tienne en une ligne), et une **sixième copie** dort dans
+`src/solveur/garanties.test.ts:394` — un test qui réimplémente ce qu'il garantit.
 
 Exception : `cleDHabitude` utilise **volontairement** une table de correspondance manuelle plutôt
 que `normalize('NFD')`, parce que Hermes ne l'implémente pas partout. Ne pas « factoriser » celle-là.

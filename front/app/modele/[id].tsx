@@ -11,11 +11,10 @@ import { Confirmer } from '@/composants/confirmer';
 import { lireFormat } from '@/composants/exerciceSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
 import { C, E, P, R, T, TOUCHE, nb } from '@/theme';
+import { idDe } from '@/api/types';
 
 const TYPES = ['Push', 'Pull', 'Legs'] as const;
 const COULEUR: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
-const idDe = (v: Exercice | string) =>
-  typeof v === 'string' ? Number(v.split('/').pop()) : v.id;
 
 export default function DetailModele() {
   const { id } = useLocalSearchParams<{ id: string }>();

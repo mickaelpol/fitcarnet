@@ -5,22 +5,6 @@ import { ChronoEffort } from './chronoSerie';
 import type { CibleMesure } from './etatMesure';
 import { C, E, R, T, TOUCHE, nb } from '@/theme';
 
-/** « 42 » ou « 1:20 » -> secondes. */
-export const versSecondes = (t: string): number | null => {
-  const s = t.trim();
-  if (!s) return null;
-  if (s.includes(':')) {
-    const [m, sec] = s.split(':');
-
-    return (parseInt(m ?? '0', 10) || 0) * 60 + (parseInt(sec ?? '0', 10) || 0);
-  }
-
-  return parseInt(s, 10) || 0;
-};
-
-export const versTemps = (s: number | null): string =>
-  s === null ? '' : s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : String(s);
-
 /**
  * Une série. Cocher la remplit avec l'objectif si les champs sont vides,
  * puis relance le repos : c'est le geste le plus fréquent en salle.

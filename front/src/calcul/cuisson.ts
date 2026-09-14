@@ -6,6 +6,7 @@ import type { Aliment } from '@/solveur/types';
    acceptait un objet là où on attend « R1 ». `composer` n'importe pas ce
    fichier, il n'y a donc pas de cycle. */
 import type { Repas as MomentDuRepas } from '@/solveur/composer';
+import { SANS_ACCENT } from './texte';
 
 /**
  * LES FOURNÉES DU BATCH COOKING.
@@ -479,26 +480,19 @@ export function dejaPromis(
 export type Habitudes = Record<string, number | null>;
 
 /*
- * Les accents, à la main.
+ * La table des accents vit dans `calcul/texte.ts`, et nulle part ailleurs.
  *
- * `String.prototype.normalize('NFD')` ferait la même chose en une ligne, et
- * c'est ce que j'avais écrit d'abord. Mais Hermes — le moteur JavaScript de
- * React Native — ne l'implémente pas toujours : selon la version et selon que
- * l'Intl complet est embarqué ou non, `normalize` est là ou n'y est pas. Une
- * table de quinze lettres ne dépend d'aucun moteur, et le français n'en
- * demande pas plus.
+ * Elle a longtemps ete ecrite ici seulement, avec la bonne raison :
+ * `String.prototype.normalize('NFD')` ferait la meme chose en une ligne, mais
+ * Hermes — le moteur JavaScript de React Native — ne l'implemente pas
+ * toujours, selon la version et selon que l'Intl complet est embarque. Une
+ * table de quinze lettres ne depend d'aucun moteur.
+ *
+ * Le 15 septembre 2026, `texte.ts` a ete cree pour absorber les SIX copies de
+ * `sansAccent` qui trainaient dans le projet, toutes en `normalize('NFD')`.
+ * Laisser la table ici en aurait fait une septieme — et la regle 5 vaut aussi
+ * pour les tables de correspondance.
  */
-const SANS_ACCENT: Record<string, string> = {
-  à: 'a', â: 'a', ä: 'a', á: 'a', ã: 'a', å: 'a',
-  ç: 'c',
-  è: 'e', é: 'e', ê: 'e', ë: 'e',
-  ì: 'i', í: 'i', î: 'i', ï: 'i',
-  ñ: 'n',
-  ò: 'o', ó: 'o', ô: 'o', ö: 'o', õ: 'o',
-  ù: 'u', ú: 'u', û: 'u', ü: 'u',
-  ý: 'y', ÿ: 'y',
-  œ: 'oe', æ: 'ae',
-};
 
 /**
  * La clé sous laquelle une habitude s'écrit ET se relit.
@@ -512,7 +506,15 @@ const SANS_ACCENT: Record<string, string> = {
  * l'utilisateur verrait ses réglages disparaître au moindre changement de
  * casse.
  *
- * CETTE FONCTION EST LA SEULE À NORMALISER, dans tout le projet. L'API stocke
+ * CETTE FONCTION EST LA SEULE À PRODUIRE UN IDENTIFIANT. `sansAccent` de
+ * `texte.ts` sert aux RECHERCHES et s'arrête aux accents ; celle-ci va plus
+ * loin — elle coupe sur tout ce qui n'est ni lettre ni chiffre — parce qu'une
+ * clé doit être stable, pas seulement lisible. Les deux partagent la même
+ * table, et un test de `texte.ts` vérifie qu'elles ne divergent pas.
+ *
+ * Ce commentaire disait « la seule à normaliser dans tout le projet ». C'était
+ * faux : il y avait six copies de la suppression d'accents, toutes en
+ * `normalize`. Elles ont été fusionnées le 15 septembre 2026. L'API stocke
  * ce qu'elle reçoit sans le lire. La règle doit être la même à l'écriture et
  * à la lecture ; l'écrire des deux côtés, ce serait se donner deux règles
  * libres de diverger — et le jour où elles divergent, l'habitude s'écrit sous

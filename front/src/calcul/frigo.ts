@@ -7,6 +7,7 @@
  */
 
 import type { AlimentDisponible } from '@/api/types';
+import { sansAccent } from './texte';
 
 /** Ordre de parcours d'un inventaire réel : on descend du frais au sec. */
 export const ORDRE_EMPLACEMENTS = ['Frigo', 'Congélateur', 'Congelateur', 'Placard'];
@@ -35,9 +36,6 @@ export function grouperParEmplacement(aliments: AlimentDisponible[]): SectionFri
       data: [...data].sort((x, y) => x.nom.localeCompare(y.nom, 'fr')),
     }));
 }
-
-const sansAccent = (v: string): string =>
-  v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
  * Recherche sur le nom et l'emplacement, insensible aux accents et à la casse.

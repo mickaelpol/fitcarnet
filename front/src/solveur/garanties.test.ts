@@ -7,6 +7,13 @@ import {
   MODELE, REPAS, ajusterAuStock, composer, resoudreAuMieux, resoudreLaJournee,
   roleDe, rolesDuRepas,
 } from './composer';
+import { sansAccent } from '../calcul/texte';
+
+/* SIXIEME COPIE DE sansAccent, retiree le 15 septembre 2026 (constat D4).
+   Ce test REIMPLEMENTAIT ce qu'il garantit : le composeur cherche par nom,
+   et la garantie cherchait par nom de son cote. Les deux pouvaient donc
+   diverger sans qu'un seul test tombe — le test aurait continue a passer
+   en validant sa propre copie. */
 import { CATALOGUE, CIBLES_PLAN, type Frigo, frigoAleatoire } from './frigos.test-data';
 import { calculer as calculerBrut } from './solveur';
 import type { Aliment, Cibles, Macros, Quantite } from './types';
@@ -390,9 +397,6 @@ describe('Deux fois la même question, deux fois la même réponse', () => {
          un choix légitime, et l'inverser en est un autre. */
       const inverse = [...s.frigo.aliments].reverse();
       const c = composer(inverse, s.portions, new Set(), s.repas);
-
-      const sansAccent = (v: string): string =>
-        v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
       const cles = ['proteine', 'glucide', 'lipide'] as const;
       for (const cle of cles) {

@@ -1,4 +1,5 @@
 import type { Seance } from '@/api/types';
+import { idDe } from '../api/types';
 import { rmDesSeries, volumeDesSeries } from './performance';
 
 /**
@@ -22,12 +23,7 @@ import { rmDesSeries, volumeDesSeries } from './performance';
  * @see historiqueSeances.test.ts
  */
 
-/** L'identifiant d'exercice, qu'il arrive en IRI (`/api/exercices/7`) ou en objet. */
-function idDeLExercice(exercice: unknown): number {
-  if (typeof exercice === 'string') return Number(exercice.split('/').pop());
 
-  return (exercice as { id: number }).id;
-}
 
 /**
  * Meilleur 1RM atteint AVANT `dateExclue`, par exercice.
@@ -48,7 +44,7 @@ export function recordsAnterieurs(
       const rm = rmDesSeries(bloc.series);
       if (rm === null) continue;
 
-      const id = idDeLExercice(bloc.exercice);
+      const id = idDe(bloc.exercice);
       const actuel = records.get(id);
       if (actuel === undefined || rm > actuel) records.set(id, rm);
     }
@@ -76,7 +72,7 @@ export function historiqueParExercice(seances: readonly Seance[]): {
 
   for (const s of triees) {
     for (const bloc of s.exercices) {
-      const id = idDeLExercice(bloc.exercice);
+      const id = idDe(bloc.exercice);
 
       const meilleur = rmDesSeries(bloc.series);
       if (meilleur !== null) rm.set(id, [...(rm.get(id) ?? []), meilleur]);

@@ -455,11 +455,4 @@ const s = StyleSheet.create({
     backgroundColor: C.surface2, borderRadius: R.s, padding: E.m,
     borderWidth: 1, borderColor: C.ligne,
   },
-  mini: { flexDirection: 'row', backgroundColor: C.surface2, borderColor: C.ligne,
-    borderWidth: 1, borderRadius: R.s, padding: 2 },
-  miniBouton: {
-    flex: 1, minHeight: TOUCHE - 4, alignItems: 'center', justifyContent: 'center',
-    borderRadius: R.s - 2,
-  },
-  miniActif: { backgroundColor: C.ligne },
 });

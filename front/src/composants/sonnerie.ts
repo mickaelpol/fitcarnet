@@ -82,7 +82,7 @@ export async function chargerSonnerie(): Promise<string> {
   return choisie;
 }
 
-export async function definirSonnerie(cle: string): Promise<void> {
+async function definirSonnerie(cle: string): Promise<void> {
   choisie = cle;
   chargee = true;
   await coffre.ecrire(CLE, cle);

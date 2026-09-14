@@ -17,14 +17,12 @@ import { CarteExercice, lireFormat } from '@/composants/exerciceSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
 import { libelleEtat, useSauvegardeAuto } from '@/composants/sauvegardeAuto';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
+import { idDe, iriDe } from '@/api/types';
 
 const TYPES = ['Push', 'Pull', 'Legs'] as const;
 const COULEUR: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
 
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
-const iri = (v: Exercice | string) => (typeof v === 'string' ? v : v['@id']);
-const idDe = (v: Exercice | string) =>
-  typeof v === 'string' ? Number(v.split('/').pop()) : v.id;
 
 /**
  * Recopie le seul identifiant qui compte : celui de la séance.
@@ -200,7 +198,7 @@ export default function DetailSeance() {
       ...seance,
       type: m.type ?? seance.type,
       exercices: m.exercices.map((me, i) => ({
-        exercice: iri(me.exercice as Exercice | string),
+        exercice: iriDe(me.exercice as Exercice | string),
         ordre: i,
         mode: me.mode,
         notes: null,

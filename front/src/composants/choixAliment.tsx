@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Bouton, Champ, Discret, Texte } from './base';
 import { ChoixMuscle } from './choixMuscle';
+import { sansAccent } from '@/calcul/texte';
 import { dansLeGroupe } from '@/muscles/groupes';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
@@ -45,9 +46,6 @@ export function ChoixDansListe({
   /* La rangée n'apparaît que si les éléments portent un muscle : les aliments
      n'en ont pas, et le même composant les sert. */
   const avecMuscles = elements.some((e) => e.muscle !== undefined);
-
-  const sansAccent = (s: string) =>
-    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
   const filtres = useMemo(() => {
     const q = sansAccent(recherche.trim());

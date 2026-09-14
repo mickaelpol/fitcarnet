@@ -36,7 +36,7 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 | Macros, Atwater, catégories | `src/calcul/nutrition.ts` |
 | Cru/cuit, fournées, habitudes | `src/calcul/cuisson.ts` |
 | Composition de repas | `src/solveur/` |
-| Suppression des accents | **aucun** — quatre copies, constat D4 (voir plus bas) |
+| Suppression des accents | `src/calcul/texte.ts` |
 
 **Aucune formule métier recopiée.** Un écran qui recalcule un 1RM importe
 `performance.ts`. Trois copies d'Epley aux bornes divergentes ont produit un
@@ -46,12 +46,15 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 table de correspondance manuelle plutôt que `normalize('NFD')`, parce que Hermes
 ne l'implémente pas partout.
 
-**La suppression des accents n'a pas de module de référence, contrairement à ce
-que `CLAUDE.md` a longtemps affirmé.** Elle est recopiée quatre fois :
-`solveur/composer.ts:182`, `calcul/frigo.ts:39`, `composants/choixAliment.tsx:49`,
-`app/admin-exercices.tsx:117` — constat **D4** de l'audit, non corrigé. Ne pas en
-écrire une cinquième : importer depuis l'une des quatre, et si tu factorises,
-aligne-toi sur la table manuelle de `cleDHabitude` et non sur `normalize('NFD')`.
+**`src/calcul/texte.ts` porte `sansAccent` depuis le 15 septembre 2026** (D4).
+Les quatre copies sont fusionnées. Elles utilisaient toutes `normalize('NFD')` :
+quatre `TypeError` en puissance, Hermes ne l'implémentant pas partout. Le module
+s'aligne sur la **table manuelle**, jamais sur `normalize` — et son test retire
+`String.prototype.normalize` du prototype pour qu'une rechute tombe ici.
+
+Deux restes notés : la table est écrite deux fois (`texte.ts` et `cuisson.ts` ;
+`SANS_ACCENT` est exporté pour que la fusion tienne en une ligne), et une
+**sixième copie** vit dans `src/solveur/garanties.test.ts:394`.
 
 ## Les tests
 
@@ -66,6 +69,24 @@ de l'audit y vivaient. Ne jamais revenir à une liste.
 `repas.tsx` (2 316 lignes) consiste à **extraire vers `src/`**.
 
 Convention du projet : un module pur et son `.test.ts` en regard.
+
+## L'alias `@/` ne survit pas à la compilation des tests
+
+**Un module de `src/` qui importe une VALEUR doit le faire en chemin relatif.**
+`tsc -p tsconfig.tests.json` ne réécrit pas `@/` : le `require('@/calcul/texte')`
+part tel quel dans `dist-tests/` et casse en `MODULE_NOT_FOUND` — **au moment du
+`node --test`, pas au typage**. `npm run verif` passe, `npm test` tombe.
+
+```ts
+import type { Seance } from '@/api/types';   // OK : un import type est EFFACÉ
+import { idDe } from '../api/types';         // OK : une valeur, en relatif
+import { idDe } from '@/api/types';          // CASSE dans dist-tests/
+```
+
+Les fichiers de `app/` ne sont jamais compilés vers `dist-tests/` : l'alias y est
+sans danger. Le piège ne concerne que `src/`.
+
+Relevé le 15 septembre 2026, après que deux agents y sont tombés le même jour.
 
 ## Les règles qui produisent des chiffres faux si on les oublie
 

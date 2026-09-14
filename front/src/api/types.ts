@@ -81,6 +81,39 @@ export interface Exercice {
   instructions?: string | null;
 }
 
+/**
+ * L'identifiant d'un exercice, qu'il arrive en IRI (`/api/exercices/7`) ou en
+ * objet complet.
+ *
+ * API Platform sérialise la même relation des deux façons selon les groupes de
+ * la route : `exercice` est un objet sur la fiche d'une séance, une chaîne dans
+ * la collection. Le ternaire qui tranche était recopié CINQ fois — constat D10
+ * de l'audit de septembre 2026 : `app/seance/[id].tsx`, `app/modele/[id].tsx`
+ * et trois fois dans `api/hooks.ts`. Cinq copies d'une conversion, c'est cinq
+ * endroits où la forme non prévue passera un jour en silence, et un `NaN` qui
+ * ne dit pas d'où il vient.
+ *
+ * ÉTAT AU 15 SEPTEMBRE 2026 : trois copies restent, et elles attendent.
+ * `calcul/historiqueSeances.ts:26` en garde une, privée, qui a absorbé deux des
+ * cinq au passage de l'extraction ; `app/seance/[id].tsx:26` et
+ * `app/modele/[id].tsx:18` gardent les leurs. Les trois doivent importer
+ * celle-ci — ce sont trois lignes, hors du périmètre du découpage des hooks.
+ */
+export const idDe = (v: Exercice | string): number =>
+  typeof v === 'string' ? Number(v.split('/').pop()) : v.id;
+
+/**
+ * L'autre moitie du meme ternaire : l'IRI plutot que l'identifiant.
+ *
+ * `useSeanceVersModele` en a besoin — l'API veut « /api/exercices/7 » et non
+ * 7 — et `app/seance/[id].tsx` en portait sa propre copie. Deux copies d'un
+ * ternaire de deux lignes ne sont pas un drame ; deux copies qui divergent
+ * font pointer un modele sur le mauvais exercice, et personne ne le voit
+ * avant la seance suivante. Rassemblees le 15 septembre 2026.
+ */
+export const iriDe = (v: Exercice | string): string =>
+  typeof v === 'string' ? v : v['@id'];
+
 export interface Serie {
   id?: number;
   ordre: number;

@@ -1,3 +1,4 @@
+import { sansAccent } from '../calcul/texte';
 import { calculer, convertir, versReference } from './solveur';
 import type { Aliment, Cibles, Fixe, Resultat, Variables } from './types';
 
@@ -178,10 +179,6 @@ export const rolesDuRepas = (repas: Repas): Set<Role> => {
     ...m.imposes.map((i) => i.role),
   ]);
 };
-
-const sansAccent = (v: string): string =>
-  v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
 
 export interface Composition {
   variables: Variables;
