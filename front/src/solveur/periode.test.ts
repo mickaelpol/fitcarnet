@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  cleDuRepas, composer, listeDeCourses, REPAS, resoudreLaJournee, resoudreLaPeriode,
-} from './composer';
-import type { DemandeDatee, Repas, Role } from './composer';
+import { composer } from './composer';
 import { CIBLES_PLAN, frigoAleatoire } from './frigos.test-data';
+import {
+  cleDuRepas, listeDeCourses, resoudreLaJournee, resoudreLaPeriode,
+} from './periode';
+import type { DemandeDatee } from './periode';
+import { REPAS } from './repasVocabulaire';
+import type { Repas, Role } from './repasVocabulaire';
 import type { Frigo } from './frigos.test-data';
 import type { Aliment } from './types';
 

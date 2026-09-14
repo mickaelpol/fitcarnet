@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { repsAu } from '@/calcul/performance';
+import {
+  paliersPour, pasConseille, REPS_MAX_POUR_1RM, type LignePalier,
+} from '@/calcul/performance';
 import { Chiffre, Discret, Texte } from './base';
-import { C, E, N, P, R, T } from '@/theme';
+import { C, E, N, P, R, T, nb } from '@/theme';
 
 export type Tendance = 'hausse' | 'stable' | 'baisse' | 'inconnue';
 
@@ -38,16 +40,13 @@ const SIGNE: Record<Tendance, string> = {
   hausse: '▲', stable: '=', baisse: '▼', inconnue: '',
 };
 
-/* `repsAu` vient de `calcul/performance.ts` : elle y était recopiée, sans la
-   garde des 100 %. Une formule métier ne s'écrit qu'à un endroit.
-
-   La table de paliers, elle, reste locale et VOLONTAIREMENT différente de
-   celle du calculateur : ce disque montre les charges de travail (90 à 40 %),
-   le calculateur montre l'échelle complète depuis le maximum (100 à 50 %).
-   À vérifier tout de même : à 40 %, `repsAu` annonce 45 répétitions alors que
-   `REPS_MAX_POUR_1RM` vaut 15 — la prédiction sort de la zone où la formule
-   veut dire quelque chose. */
-const PALIERS = [90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40];
+/* La table des paliers vient de `calcul/performance.ts`, et elle n'est plus
+   ici. Elle y était recopiée, VOLONTAIREMENT différente de celle du
+   calculateur — 90 à 40 % contre 100 à 50 % —, et le commentaire qui
+   l'accompagnait notait déjà le défaut sans l'avoir corrigé : « à 40 %,
+   `repsAu` annonce 45 répétitions alors que `REPS_MAX_POUR_1RM` vaut 15 ».
+   Deux tables pour la même question, et celle-ci mentait. Fusionnées dans le
+   module de référence le 15 septembre 2026 (règle 5, puis règle 7). */
 
 export function DisqueRM({
   valeur, precedent = null, unite = '1RM kg', onPress, ouvert,
@@ -98,21 +97,64 @@ export function DisqueRM({
   );
 }
 
+/** « 85 % » ou, quand l'arrondi les confond, « 85–82,5 % ». */
+const libellePourcents = (l: LignePalier): string => {
+  const premier = l.pourcents[0];
+  const dernier = l.pourcents[l.pourcents.length - 1];
+
+  return premier === dernier ? `${nb(premier)} %` : `${nb(premier)}–${nb(dernier)} %`;
+};
+
 /**
- * Table des paliers : à gauche le pourcentage du 1RM, au milieu la charge,
- * à droite les répétitions estimées. La zone 70-80 % est surlignée : c'est
- * le compromis volume / intensité.
+ * « 5 », « 5–6 », ou un tiret cadratin.
+ *
+ * Le tiret n'est pas un zéro : il dit « on ne sait pas ». Sous 70 % du
+ * maximum, Epley sortirait de son domaine, et un chiffre faux est pire qu'un
+ * refus de répondre.
  */
-export function PaliersRM({ rm }: { rm: number }) {
-  const lignes = useMemo(
-    () => PALIERS.map((p) => ({
-      pourcent: p,
-      charge: Math.round((rm * p) / 100 / 0.5) * 0.5,
-      reps: repsAu(p),
-      zone: p >= 70 && p <= 80,
-    })),
-    [rm],
+const libelleReps = (l: LignePalier): string => {
+  if (l.reps === null) return '—';
+
+  return l.reps.min === l.reps.max ? String(l.reps.min) : `${l.reps.min}–${l.reps.max}`;
+};
+
+function LignePaliers({ ligne, travail }: { ligne: LignePalier; travail: boolean }) {
+  return (
+    <View style={s.ligne}>
+      <View style={[s.colPct, s.cellePct]}>
+        <View style={[s.point, travail && { backgroundColor: C.vif }]} />
+        <Texte style={s.valeur}>{libellePourcents(ligne)}</Texte>
+      </View>
+      <Texte style={[s.col, s.colKg, s.valeur, travail && { color: C.vif }]}>
+        {nb(ligne.charge)} kg
+      </Texte>
+      <Texte
+        style={[
+          s.col, s.colRep, s.valeur,
+          ligne.reps === null && { color: C.discret },
+        ]}
+      >
+        {libelleReps(ligne)}
+      </Texte>
+    </View>
   );
+}
+
+/**
+ * LA table des paliers, telle qu'elle s'affiche — ici et dans le calculateur.
+ *
+ * Les deux écrans en rendaient chacun une, à partir de deux tables de
+ * pourcentages différentes. Elles ont divergé, évidemment. Une seule table,
+ * un seul rendu, depuis le 15 septembre 2026.
+ *
+ * Deux sections, et c'est le cœur du sujet : la zone de progression porte des
+ * répétitions parce qu'elles sont justes, l'échauffement n'en porte pas parce
+ * qu'elles seraient fausses.
+ */
+export function TablePaliers({ lignes }: { lignes: LignePalier[] }) {
+  const travail = lignes.filter((l) => l.nature === 'travail');
+  const echauffement = lignes.filter((l) => l.nature === 'echauffement');
+  const confondus = lignes.some((l) => l.pourcents.length > 1);
 
   return (
     <View style={s.table}>
@@ -122,25 +164,44 @@ export function PaliersRM({ rm }: { rm: number }) {
         <Discret style={[s.col, s.colRep]}>Répétitions</Discret>
       </View>
 
-      {lignes.map((l) => (
-          <View key={l.pourcent} style={[s.ligne, l.zone && s.zone]}>
-            <View style={[s.colPct, s.cellePct]}>
-              <View style={[s.point, l.zone && { backgroundColor: C.vif }]} />
-              <Texte style={{ fontFamily: P.chiffre, fontSize: T.moyen }}>{l.pourcent} %</Texte>
-            </View>
-            <Texte style={[s.col, s.colKg, s.valeur, l.zone && { color: C.vif }]}>
-              {l.charge % 1 === 0 ? l.charge : l.charge.toFixed(1)} kg
-            </Texte>
-            <Texte style={[s.col, s.colRep, s.valeur]}>{l.reps}</Texte>
+      {travail.length > 0 && (
+        <>
+          <Discret style={s.section}>Zone de progression · 70 à 90 %</Discret>
+          <View style={s.bloc}>
+            {travail.map((l) => (
+              <LignePaliers key={l.pourcents[0]} ligne={l} travail />
+            ))}
           </View>
-      ))}
+        </>
+      )}
+
+      {echauffement.length > 0 && (
+        <>
+          <Discret style={s.section}>Échauffement</Discret>
+          {echauffement.map((l) => (
+            <LignePaliers key={l.pourcents[0]} ligne={l} travail={false} />
+          ))}
+        </>
+      )}
 
       <Discret style={s.note}>
-        Zone surlignée : 70 à 80 % du 1RM, le compromis volume / intensité.
-        Estimation d'Epley, fiable jusqu'à une quinzaine de répétitions.
+        Sous 70 % du maximum, la charge est indiquée mais pas les répétitions :
+        l'estimation d'Epley dépasserait {REPS_MAX_POUR_1RM} répétitions, où
+        elle ne veut plus rien dire.
+        {confondus
+          ? ' Un intervalle de pourcentages signale des paliers que l\'arrondi confond : à cette charge, ils sont le même geste.'
+          : ''}
       </Discret>
     </View>
   );
+}
+
+/** La table dépliée sous le disque, sur la carte d'exercice. */
+export function PaliersRM({ rm, pas }: { rm: number; pas?: number }) {
+  const effectif = pas ?? pasConseille(rm);
+  const lignes = useMemo(() => paliersPour(rm, effectif), [rm, effectif]);
+
+  return <TablePaliers lignes={lignes} />;
 }
 
 const s = StyleSheet.create({
@@ -158,9 +219,13 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
     borderBottomWidth: 1, borderBottomColor: C.ligneVoile,
   },
-  zone: { backgroundColor: C.vifVoile, borderRadius: 5 },
+  bloc: { backgroundColor: C.vifVoile, borderRadius: R.s, paddingHorizontal: 6 },
+  section: {
+    fontSize: T.minuscule, letterSpacing: 0.6, textTransform: 'uppercase',
+    marginTop: E.s, marginBottom: 2,
+  },
   col: { fontSize: T.petit },
-  colPct: { flex: 1.1 },
+  colPct: { flex: 1.3 },
   colKg: { flex: 1, textAlign: 'right' },
   colRep: { flex: 1, textAlign: 'right' },
   cellePct: { flexDirection: 'row', alignItems: 'center', gap: 7 },

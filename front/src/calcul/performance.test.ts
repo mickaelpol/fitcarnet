@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 
 import type { Serie } from '@/api/types';
 import {
-  arrondirCharge, epley, estimerDepuisEssai, PALIERS, repsAu,
-  REPS_MAX_POUR_1RM, rmDesSeries, volumeDesSeries,
+  arrondirCharge, epley, estimerDepuisEssai, PALIERS, paliersPour, pasConseille,
+  PAS_DISPONIBLES, predictionValide, MIN_CHARGES_TRAVAIL, repsAu, REPS_MAX_POUR_1RM, rmDesSeries,
+  volumeDesSeries,
 } from './performance';
 
 /**
@@ -93,9 +94,130 @@ test('à 100 % du maximum, c\'est une répétition', () => {
   assert.equal(repsAu(100), 1);
 });
 
-test('la table des paliers descend du maximum vers le plus léger', () => {
-  assert.deepEqual([...PALIERS], [...PALIERS].sort((a, b) => b - a));
-  assert.equal(PALIERS[0], 100);
+/* CE TEST A ÉTÉ RÉÉCRIT le 15 septembre 2026, et il faut dire pourquoi.
+   Il exigeait `PALIERS[0] === 100` et comparait la table brute à son propre
+   tri. Il ne disait rien de faux : il figeait une FORME — une table de nombres
+   partant du maximum — que la décision produit change. Ce qu'il garantissait
+   vraiment, l'ordre décroissant, est conservé ci-dessous ; le reste décrivait
+   l'ancienne table, pas une propriété du domaine. */
+test('la table descend du plus lourd au plus léger', () => {
+  const pourcents = PALIERS.map((p) => p.pourcent);
+  assert.deepEqual(pourcents, [...pourcents].sort((a, b) => b - a));
+  assert.equal(new Set(pourcents).size, pourcents.length);
+});
+
+test('la zone de progression 70-90 % est couverte, palier par palier', () => {
+  /* « Pour progresser en musculation il faut travailler entre 70 et 90 %
+     environ. » Neuf paliers par pas de 2,5 %, et neuf cibles de répétitions
+     distinctes : on choisit sa ligne par le nombre de répétitions visé. */
+  const travail = PALIERS.filter((p) => p.nature === 'travail').map((p) => p.pourcent);
+  assert.deepEqual(travail, [90, 87.5, 85, 82.5, 80, 77.5, 75, 72.5, 70]);
+  assert.deepEqual(travail.map(repsAu), [3, 4, 5, 6, 8, 9, 10, 11, 13]);
+});
+
+test('l\'échauffement reste proposé, sous la zone de travail', () => {
+  /* Un débutant comme un confirmé s'échauffe : les paliers légers ne
+     disparaissent pas, ils perdent seulement leur prédiction. */
+  const echauffement = PALIERS.filter((p) => p.nature === 'echauffement').map((p) => p.pourcent);
+  assert.ok(echauffement.length >= 3);
+  assert.ok(echauffement.every((p) => p < 70));
+});
+
+/* --------------------------------------------- le domaine de prédiction */
+
+test('le domaine se déduit du plafond, il ne se réécrit pas à la main', () => {
+  assert.ok(predictionValide(70));
+  assert.ok(!predictionValide(65));
+  assert.ok(repsAu(70) <= REPS_MAX_POUR_1RM);
+  assert.ok(repsAu(65) > REPS_MAX_POUR_1RM);
+});
+
+test('aucune ligne n\'annonce de répétitions hors du domaine d\'Epley', () => {
+  for (const rm of [7.5, 12, 20, 37.5, 60, 100, 210]) {
+    for (const ligne of paliersPour(rm, pasConseille(rm))) {
+      if (ligne.reps === null) continue;
+      for (const pct of ligne.pourcents) {
+        assert.ok(
+          predictionValide(pct),
+          `${rm} kg : la ligne annonce des répétitions alors que ${pct} % en vaut ${repsAu(pct)}`,
+        );
+      }
+      assert.ok(ligne.reps.max <= REPS_MAX_POUR_1RM);
+      assert.ok(ligne.reps.min <= ligne.reps.max);
+    }
+  }
+});
+
+test('sous 70 %, la charge est donnée mais jamais la prédiction', () => {
+  /* Le disque affichait « 45 répétitions » à 40 % avec le même aplomb que
+     « 3 répétitions à 90 % ». `estimerDepuisEssai` REFUSE de calculer au-delà
+     de 15 répétitions : la table promettait ce que la formule refuse.
+     Règle 7 — un chiffre faux est pire qu'un refus de répondre. */
+  const echauffement = paliersPour(100).filter((l) => l.nature === 'echauffement');
+  assert.ok(echauffement.length >= 3);
+  assert.ok(echauffement.every((l) => l.reps === null));
+  assert.ok(echauffement.every((l) => l.charge > 0));
+});
+
+/* ------------------------------------------- les paliers qui se confondent */
+
+test('deux paliers qui donnent la même charge ne font qu\'une ligne', () => {
+  /* 1RM de 20 kg, pas de 2,5 kg : l'ancienne table affichait ONZE lignes pour
+     cinq charges — trois d'entre elles disaient « 15 kg » sans que rien ne
+     signale qu'elles se confondaient. */
+  const lignes = paliersPour(20, 2.5);
+  const charges = lignes.map((l) => l.charge);
+  assert.deepEqual(charges, [...new Set(charges)]);
+
+  assert.deepEqual(lignes[0].pourcents, [90, 87.5, 85, 82.5]);
+  assert.equal(lignes[0].charge, 17.5);
+  assert.deepEqual(lignes[0].reps, { min: 3, max: 6 });
+});
+
+test('une ligne confondue dit son étendue, pas une seule de ses valeurs', () => {
+  const confondues = paliersPour(20, 2.5).filter((l) => l.pourcents.length > 1);
+  assert.ok(confondues.length > 0);
+  for (const l of confondues) {
+    if (l.reps === null) continue;
+    assert.ok(l.reps.max > l.reps.min, 'une ligne confondue doit couvrir plusieurs répétitions');
+  }
+});
+
+test('la prédiction tombe dès qu\'un pourcentage confondu sort du domaine', () => {
+  /* À très petit maximum, l'arrondi peut confondre un palier de travail et un
+     palier d'échauffement. La ligne garde alors la charge et perd la
+     prédiction : une seule extrémité hors domaine suffit. */
+  for (const rm of [3, 5, 7.5, 9]) {
+    for (const l of paliersPour(rm, pasConseille(rm))) {
+      if (l.pourcents.some((p) => !predictionValide(p))) {
+        assert.equal(l.reps, null, `${rm} kg : ${l.pourcents.join('/')} % garde une prédiction`);
+      }
+    }
+  }
+});
+
+test('les charges descendent strictement, et aucune ne vaut zéro', () => {
+  for (const rm of [1, 3, 7.5, 20, 62.5, 140, 300]) {
+    const lignes = paliersPour(rm, pasConseille(rm));
+    assert.ok(lignes.length > 0, `${rm} kg ne produit aucune ligne`);
+    for (let i = 1; i < lignes.length; i += 1) {
+      assert.ok(
+        lignes[i].charge < lignes[i - 1].charge,
+        `${rm} kg : ${lignes[i].charge} kg ne descend pas sous ${lignes[i - 1].charge} kg`,
+      );
+    }
+    assert.ok(lignes.every((l) => l.charge > 0));
+  }
+});
+
+test('tous les paliers sont rendus, ou fondus, jamais perdus en silence', () => {
+  const rendus = paliersPour(100, 2.5).flatMap((l) => l.pourcents);
+  assert.deepEqual(rendus, PALIERS.map((p) => p.pourcent));
+});
+
+test('un maximum absent ou nul ne produit aucune ligne', () => {
+  assert.deepEqual(paliersPour(0), []);
+  assert.deepEqual(paliersPour(-10), []);
 });
 
 /* ------------------------------------------------------------ charges */
@@ -108,4 +230,44 @@ test('les charges s\'arrondissent au palier de 2,5 kg, comme les disques', () =>
 
 test('le pas d\'arrondi se règle, pour les haltères par kilo', () => {
   assert.equal(arrondirCharge(62.3, 1), 62);
+});
+
+test('le pas conseillé reste celui de la salle tant qu\'il tient', () => {
+  /* 2,5 kg, c'est un disque de 1,25 kg de chaque côté : la charge existe. Une
+     première version de `pasConseille` descendait à 1 kg dès 40 kg de maximum
+     et proposait « 53 kg » à 60 kg de 1RM — une charge qu'aucun jeu de disques
+     ne fait. Corrigé avant d'être affiché, le 15 septembre 2026. */
+  assert.equal(pasConseille(60), 2.5);
+  assert.equal(pasConseille(100), 2.5);
+  assert.equal(pasConseille(200), 2.5);
+  for (const rm of [55, 60, 82.5, 100, 140, 200]) {
+    for (const l of paliersPour(rm, pasConseille(rm))) {
+      assert.equal(l.charge % 2.5, 0, `${rm} kg : ${l.charge} kg ne se charge pas sur une barre`);
+    }
+  }
+});
+
+test('le pas conseillé se resserre quand la zone de travail s\'effondre', () => {
+  assert.equal(pasConseille(20), 1);
+  assert.equal(pasConseille(40), 1);
+  for (const rm of [0, 1, 12, 20, 40, 47, 60, 83, 119, 260]) {
+    assert.ok(PAS_DISPONIBLES.includes(pasConseille(rm) as never));
+    const travail = paliersPour(rm, pasConseille(rm)).filter((l) => l.nature === 'travail');
+    if (rm >= 20) {
+      assert.ok(
+        travail.length >= MIN_CHARGES_TRAVAIL,
+        `${rm} kg : ${travail.length} charge(s) de travail seulement`,
+      );
+    }
+  }
+});
+
+test('à 20 kg de maximum, la zone de progression garde cinq charges distinctes', () => {
+  /* La seconde exigence de l'auteur : « ne pas oublier les personnes qui ne
+     soulèvent pas beaucoup ». Avec l'ancienne table et un pas figé à 2,5 kg,
+     la zone de travail de ce débutant tenait en DEUX charges, et le tableau
+     répétait trois fois « 15 kg ». */
+  const travail = paliersPour(20, pasConseille(20)).filter((l) => l.nature === 'travail');
+  assert.deepEqual(travail.map((l) => l.charge), [18, 17, 16, 15, 14]);
+  assert.ok(travail.every((l) => l.reps !== null));
 });

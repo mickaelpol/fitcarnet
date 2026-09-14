@@ -3,12 +3,11 @@ import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View,
 } from 'react-native';
 import { Bouton, Champ, Chiffre, Discret, Texte } from './base';
+import { TablePaliers } from './disqueRM';
 import {
-  arrondirCharge, estimerDepuisEssai, PALIERS, repsAu, REPS_MAX_POUR_1RM,
+  estimerDepuisEssai, paliersPour, pasConseille, PAS_DISPONIBLES, REPS_MAX_POUR_1RM,
 } from '@/calcul/performance';
 import { C, E, N, P, R, T, nb } from '@/theme';
-
-const PAS = [1, 2.5, 5] as const;
 
 /**
  * Calculateur de RM, ouvert DEPUIS l'exercice en cours.
@@ -28,10 +27,13 @@ export function ModaleCalculateurRM({
 }) {
   const [poids, setPoids] = useState('');
   const [reps, setReps] = useState('');
-  const [pas, setPas] = useState<number>(2.5);
+  /* `null` = « je n'ai pas choisi », et c'est différent de « 2,5 kg ». Le pas
+     par défaut se déduit du maximum : à 20 kg de 1RM, un pas de 2,5 kg faisait
+     répéter trois fois « 15 kg » dans le tableau. Vide ≠ zéro, règle 6. */
+  const [pasChoisi, setPasChoisi] = useState<number | null>(null);
 
   useEffect(() => {
-    if (visible) { setPoids(''); setReps(''); }
+    if (visible) { setPoids(''); setReps(''); setPasChoisi(null); }
   }, [visible]);
 
   const p = parseFloat(poids.replace(',', '.'));
@@ -41,6 +43,7 @@ export function ModaleCalculateurRM({
 
   const rm = saisi && !tropLong ? estimerDepuisEssai(p, r) : rmConnu;
   const estime = saisi && !tropLong;
+  const pas = pasChoisi ?? (rm !== null ? pasConseille(rm) : PAS_DISPONIBLES[1]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onFermer}>
@@ -87,43 +90,26 @@ export function ModaleCalculateurRM({
 
                   <View style={s.pas}>
                     <Discret style={{ fontSize: T.petit }}>Arrondi</Discret>
-                    {PAS.map((x) => (
+                    {PAS_DISPONIBLES.map((x) => (
                       <Pressable
                         key={x}
-                        onPress={() => setPas(x)}
+                        onPress={() => setPasChoisi(x)}
                         style={[s.pasBouton, pas === x && s.pasActif]}
                       >
                         <Discret style={pas === x ? { color: C.fond, fontFamily: P.fort } : undefined}>
-                          {x} kg
+                          {nb(x)} kg
                         </Discret>
                       </Pressable>
                     ))}
                   </View>
 
-                  <View style={s.table}>
-                    <View style={s.entete}>
-                      <Discret style={[s.col, s.colPct]}>%</Discret>
-                      <Discret style={[s.col, s.colKg]}>Charge</Discret>
-                      <Discret style={[s.col, s.colRep]}>Répétitions</Discret>
-                    </View>
-                    {PALIERS.map((pct) => {
-                      const charge = arrondirCharge((rm * pct) / 100, pas);
-                      const zone = pct >= 70 && pct <= 80;
-
-                      return (
-                        <View key={pct} style={[s.ligne, zone && s.zone]}>
-                          <Texte style={[s.col, s.colPct, s.valeur]}>{pct} %</Texte>
-                          <Texte style={[s.col, s.colKg, s.valeur, zone && { color: C.vif }]}>
-                            {nb(charge)} kg
-                          </Texte>
-                          <Texte style={[s.col, s.colRep, s.valeur]}>{repsAu(pct)}</Texte>
-                        </View>
-                      );
-                    })}
-                  </View>
+                  {/* La table vient de `disqueRM.tsx`, et c'est la même que
+                      celle de la carte d'exercice. Cet écran en rendait une
+                      autre, depuis une autre liste de pourcentages : c'est
+                      exactement comme cela que les deux ont divergé. */}
+                  <TablePaliers lignes={paliersPour(rm, pas)} />
 
                   <Discret style={s.note}>
-                    Zone surlignée : 70 à 80 %, le compromis volume / intensité.
                     Les répétitions sont une estimation — ton ressenti prime.
                   </Discret>
                 </>
@@ -164,17 +150,7 @@ const s = StyleSheet.create({
     backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center',
   },
   pasActif: { backgroundColor: C.vif, borderColor: C.vif },
-  table: { backgroundColor: C.surface2, borderRadius: R.s, padding: E.s },
-  entete: { flexDirection: 'row', paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: C.ligne },
-  ligne: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
-    borderBottomWidth: 1, borderBottomColor: C.ligneVoile,
-  },
-  zone: { backgroundColor: C.vifVoile, borderRadius: 5 },
-  col: { fontSize: T.petit },
-  colPct: { flex: 1 },
-  colKg: { flex: 1, textAlign: 'right' },
-  colRep: { flex: 1, textAlign: 'right' },
-  valeur: { fontFamily: P.chiffre, fontSize: T.moyen, fontVariant: ['tabular-nums'] },
+  /* Les styles de tableau ont suivi le tableau dans `disqueRM.tsx` :
+     les garder ici, c'était laisser de quoi le réécrire. */
   note: { fontSize: T.minuscule, marginTop: E.s, lineHeight: 15 },
 });

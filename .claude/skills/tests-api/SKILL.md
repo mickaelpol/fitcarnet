@@ -6,8 +6,8 @@ description: Comment on teste l'API de fitcarnet — PHPUnit sans base ni noyau,
 # Tester l'API de fitcarnet
 
 `cd api && bin/phpunit` — ou `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'`
-si `vendor/` n'est pas installé côté hôte. **124 tests, 450 assertions** au
-14 septembre 2026 ; ce chiffre ne peut que monter.
+si `vendor/` n'est pas installé côté hôte. **158 tests, 508 assertions** au
+15 septembre 2026 ; ce chiffre ne peut que monter.
 
 **La suite tourne sans base de données et sans noyau Symfony, et doit le rester.**
 C'est ce qui la rend exécutable partout, en une demi-seconde, sans effet de bord.
@@ -102,8 +102,8 @@ docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit --display-all-issues
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse --no-progress src/ tests/'
 ```
 
-PHPStan sort **8 erreurs connues** — `SessionController:108`,
-`JetonRafraichissement` ×2, `Invitation:175`, `ProtectionDuCompte:76`, et trois
+PHPStan sort **7 erreurs connues** — `SessionController:108`,
+`JetonRafraichissement::\$empreinte`, `Invitation:175`, `ProtectionDuCompte:76`, et trois
 dans `tests/`. Aucune ne doit apparaître sur un fichier que tu viens de toucher.
 
 **Ne jamais déclarer terminé sans coller la sortie.**

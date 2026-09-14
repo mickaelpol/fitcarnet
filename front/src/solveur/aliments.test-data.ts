@@ -58,3 +58,14 @@ export const CIBLES = {
   R3: { kcal: 591.7, prot: 57.3, gluc: 51.6, lip: 16.4 },
   R4: { kcal: 551.8, prot: 30.1, gluc: 80.3, lip: 15.4 },
 };
+
+/**
+ * Le frigo de référence des tests : un aliment par rôle, et rien de plus.
+ *
+ * Il vivait en tête de `composer.test.ts`. Le découpage du 15 septembre 2026
+ * l'a rendu nécessaire à trois fichiers de tests ; le recopier trois fois
+ * aurait donné trois frigos libres de diverger.
+ */
+export const STOCK = [
+  A.poulet, A.riz, A.avoine, A.amandes, A.huile, A.courgettes, A.skyr, A.banane,
+];

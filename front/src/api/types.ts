@@ -93,11 +93,17 @@ export interface Exercice {
  * endroits où la forme non prévue passera un jour en silence, et un `NaN` qui
  * ne dit pas d'où il vient.
  *
- * ÉTAT AU 15 SEPTEMBRE 2026 : trois copies restent, et elles attendent.
- * `calcul/historiqueSeances.ts:26` en garde une, privée, qui a absorbé deux des
- * cinq au passage de l'extraction ; `app/seance/[id].tsx:26` et
- * `app/modele/[id].tsx:18` gardent les leurs. Les trois doivent importer
- * celle-ci — ce sont trois lignes, hors du périmètre du découpage des hooks.
+ * D10 EST SOLDÉ. Les cinq copies ont disparu le 15 septembre 2026 :
+ * `app/seance/[id].tsx`, `app/modele/[id].tsx` et `calcul/historiqueSeances.ts`
+ * importent tous celle-ci. Dans le dernier, la copie était typée `unknown` avec
+ * un `as { id: number }` — prudence inutile, `SeanceExercice.exercice` est déjà
+ * `Exercice | string`.
+ *
+ * Ce paragraphe a d'abord annoncé « trois copies restent, et elles attendent ».
+ * C'était vrai à la minute où il a été écrit, et faux vingt minutes plus tard —
+ * les trois lignes ont été faites dans la foulée. Un état des lieux daté dans
+ * un commentaire se périme plus vite que le code qu'il décrit : c'est le motif
+ * n° 3 de la skill `revue-de-code`, observé sur lui-même.
  */
 export const idDe = (v: Exercice | string): number =>
   typeof v === 'string' ? Number(v.split('/').pop()) : v.id;

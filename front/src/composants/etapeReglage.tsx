@@ -3,7 +3,6 @@ import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import type { PlanRepas } from '@/api/hooks';
-import type { Cible } from '@/api/types';
 import { Bouton, Carte, Chiffre, Discret, Texte } from './base';
 import { Calendrier, libelleCourt, libelleDuJour } from './calendrier';
 import { Confirmer } from './confirmer';
@@ -11,10 +10,9 @@ import { Etapes } from './etapes';
 import { Pliant } from './pliant';
 import { SR } from './stylesRepas';
 import { estCuisine } from '@/calcul/cuisson';
-import type { Anomalie } from '@/calcul/plausibilite';
 import { basculer } from '@/calcul/selectionRepas';
 import { NOM_REPAS, REPAS, type Repas, cleDuRepas } from '@/solveur/composer';
-import type { Aliment } from '@/solveur/types';
+import { useFrigoCalculable } from './useFrigoCalculable';
 import { C, E, N, P, R, T, TOUCHE, nb } from '@/theme';
 
 /**
@@ -27,13 +25,21 @@ import { C, E, N, P, R, T, TOUCHE, nb } from '@/theme';
  * plans vient d'une requête que le parent tient déjà.
  *
  * L'EXTRACTION EST DONC DÉLIBÉRÉMENT MÉCANIQUE : les setters descendent tels
- * quels, en props, et pas une ligne de JSX n'a changé de sens. Leur donner un
- * état à eux est le travail du rang 8 (`usePlanCalcule`), qui n'a pas encore
- * eu lieu — le faire ici, dans le même geste, aurait mêlé un déplacement
- * vérifiable à une réécriture qui ne l'est pas.
+ * quels, en props, et pas une ligne de JSX n'a changé de sens.
+ *
+ * DEPUIS LE RANG 8, CET ÉCRAN LIT LE FRIGO LUI-MÊME. `useFrigoCalculable` lui
+ * donne le stock utilisable, les valeurs qui ne peuvent pas être vraies et les
+ * fibres manquantes ; cinq props ont disparu avec. Le parent appelle le même
+ * hook — les requêtes sont partagées par le cache de TanStack Query, donc rien
+ * n'est demandé deux fois au serveur, et les `useMemo` recalculés en double
+ * coûtent un dixième de milliseconde par rafraîchissement du frigo, mesuré.
+ *
+ * CE QUI RESTE EN PROPS RESTE EN PROPS, ET C'EST VOULU : tout ce qui est de
+ * l'ÉTAT — les jours cochés, les convives, le pliage — appartient au parent,
+ * parce que la chaîne de calcul s'en nourrit et qu'un état dupliqué ici
+ * divergerait sans rien dire.
  */
 export function EtapeReglage({
-  stock, problemeFrigo, anomalies, sansFibresConnues, cibleDe,
   plusieurs, setPlusieurs, rangs, setRangs, joursRetenus,
   calendrierOuvert, setCalendrierOuvert,
   coche, convives, setChoisis, setPortions,
@@ -42,15 +48,6 @@ export function EtapeReglage({
   planASupprimer, setPlanASupprimer, onSupprimer,
   aucunCoche, onComposer,
 }: {
-  /* --- le frigo, tel que le calculateur peut s'en servir --- */
-  stock: readonly Aliment[];
-  /** ce que le frigo répond quand il est injoignable, sinon rien */
-  problemeFrigo: string | null | undefined;
-  anomalies: readonly Anomalie[];
-  /** les aliments dont les fibres manquent, quand la cible les compte */
-  sansFibresConnues: readonly string[];
-  cibleDe: (repas: Repas) => Cible | undefined;
-
   /* --- la période --- */
   plusieurs: boolean;
   setPlusieurs: (v: boolean) => void;
@@ -83,6 +80,12 @@ export function EtapeReglage({
   aucunCoche: boolean;
   onComposer: () => void;
 }) {
+  /* Le frigo tel que le calculateur peut s'en servir : le stock utilisable, ce
+     que les données racontent et qui ne peut pas être vrai, les fibres
+     manquantes quand la cible les compte. Aucune de ces quatre valeurs n'est
+     un état — elles se dérivent des mêmes requêtes que chez le parent, et se
+     redemander soi-même coûte moins qu'une prop de plus. */
+  const { frigo, stock, anomalies, sansFibresConnues, cibleDe } = useFrigoCalculable();
   const insets = useSafeAreaInsets();
 
   return (
@@ -460,12 +463,12 @@ export function EtapeReglage({
       {stock.length === 0 && (
         <Carte style={{ gap: E.s }}>
           <Texte style={{ fontFamily: P.fort }}>
-            {(problemeFrigo ?? null) !== null
+            {(frigo.data?.probleme ?? null) !== null
               ? 'Ton frigo est injoignable'
               : "Rien d'utilisable dans ton frigo"}
           </Texte>
           <Discret style={SR.aide}>
-            {problemeFrigo
+            {frigo.data?.probleme
               ?? "Le calculateur ne travaille qu'avec des aliments dont il "
                 + 'connaît le poids par unité et les calories. Un litre ou un '
                 + 'paquet ne se pèse pas, et un aliment sans calories fausserait '

@@ -1,59 +1,48 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
-  useDerniereFois, useEnregistrerSeance, useExercices, useHistorique, useModeles,
-  useRecordsAnterieurs, useSeance, useSeanceVersModele, useSupprimerSeance,
+  useDerniereFois, useExercices, useHistorique, useModeles,
+  useRecordsAnterieurs, useSeanceVersModele, useSupprimerSeance,
 } from '@/api/hooks';
-import type { Exercice, Seance, SeanceExercice } from '@/api/types';
+import type { Exercice } from '@/api/types';
+import { avancementDe, blocDepuisExercice, blocsDepuisModele } from '@/calcul/blocSeance';
 import { Bouton, Carte, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { ChronoRepos } from '@/composants/chrono';
 import { ModaleCalculateurRM } from '@/composants/calculateurRM';
 import { BandeauMesure } from '@/composants/bandeauMesure';
-import { abonnerMesure, appliquerResultats, prendreResultats } from '@/composants/etatMesure';
 import { CarteExercice, lireFormat } from '@/composants/exerciceSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
-import { libelleEtat, useSauvegardeAuto } from '@/composants/sauvegardeAuto';
+import { libelleEtat } from '@/composants/sauvegardeAuto';
+import { useSeanceEditable } from '@/composants/useSeanceEditable';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
-import { idDe, iriDe } from '@/api/types';
+import { idDe } from '@/api/types';
 
 const TYPES = ['Push', 'Pull', 'Legs'] as const;
 const COULEUR: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
 
-const aujourdhui = () => new Date().toISOString().slice(0, 10);
-
-/**
- * Recopie le seul identifiant qui compte : celui de la séance.
- *
- * Sans lui, l'enregistrement suivant repartirait sur un POST et créerait une
- * deuxième séance. On ne remplace pas l'état par la réponse : ce qui a été
- * tapé pendant les deux secondes et demie d'attente serait perdu.
- *
- * Les identifiants des exercices et des séries ne sont PAS recopiés, et c'est
- * volontaire. Ils ne figurent que dans le groupe `seance:lire` — le front ne
- * les renvoie jamais, l'API remplace la collection entière à chaque écriture.
- * Ils ne servaient donc qu'à fabriquer les clés de liste, où les greffer
- * faisait passer une ligne de « n0 » à « 12 » : React la remontait, et le
- * champ en cours de saisie perdait le focus au beau milieu d'une frappe.
- */
-const avecIdentifiantSeance = (locale: Seance, distante: Seance): Seance =>
-  (locale.id === undefined ? { ...locale, id: distante.id } : locale);
-
 export default function DetailSeance() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const nouvelle = id === 'nouvelle';
   const router = useRouter();
 
-  const seanceApi = useSeance(nouvelle ? undefined : Number(id));
+  /* L'état de la séance, sa sauvegarde automatique et les mesures déposées
+     par le chronomètre sont partis dans ce hook le 15 septembre 2026, et la
+     logique PURE qui les accompagnait dans `calcul/blocSeance.ts` — rang 12
+     du lot 6 de l'audit. Trois règles métier vivaient en clair ici, où aucun
+     test ne pouvait les atteindre : `tsconfig.tests.json` n'inclut que
+     `src/`, donc un test posé dans `app/` n'est jamais exécuté, sans le
+     moindre signal. Elles sont désormais éprouvées dans blocSeance.test.ts. */
+  const {
+    seance, setSeance, nouvelle, seanceApi, etat, motif, enregistrerMaintenant,
+  } = useSeanceEditable(id);
+
   const exercices = useExercices();
   const modeles = useModeles();
-  const enregistrer = useEnregistrerSeance();
   const supprimer = useSupprimerSeance();
   const versModele = useSeanceVersModele();
 
-  const [seance, setSeance] = useState<Seance | null>(null);
   const [choixOuvert, setChoixOuvert] = useState(false);
   const [choixModele, setChoixModele] = useState(false);
   const [relance, setRelance] = useState(0);
@@ -92,49 +81,6 @@ export default function DetailSeance() {
     [exercices.data, seance?.type],
   );
 
-  /* La séance s'enregistre toute seule deux secondes et demie après la
-     dernière modification. Tant qu'elle n'a pas d'identifiant, on ne
-     déclenche rien : c'est le premier enregistrement qui la crée. */
-  const { etat, motif } = useSauvegardeAuto(
-    seance,
-    async (s) => {
-      const enregistree = await enregistrer.mutateAsync(s);
-
-      /* On greffe l'identifiant sur l'état LOCAL, sans naviguer.
-         Auparavant on remplaçait la route par /seance/{id} : l'écran se
-         remontait et relisait la séance depuis l'API. Tout ce qui avait été
-         saisi pendant les deux secondes et demie d'attente — une série
-         ajoutée, une charge tapée — était jeté avec l'ancien état, sans que
-         rien ne le signale. C'est ce qui donnait l'impression de changer de
-         page et de retrouver l'exercice vidé de ses séries. */
-      setSeance((courante) => (courante === null
-        ? enregistree
-        : avecIdentifiantSeance(courante, enregistree)));
-    },
-    { actif: seance !== null && seance.exercices.length > 0 },
-  );
-
-  /* Le chronomètre d'effort ne connaît pas la séance : il dépose le temps
-     mesuré, et c'est ici — seul endroit qui détient l'état — qu'on l'écrit.
-     Ce détour est ce qui permet à une mesure de survivre au changement de
-     mode, qui démonte le composant où elle s'affichait. */
-  useEffect(() => abonnerMesure(() => {
-    const resultats = prendreResultats();
-    if (resultats.length === 0) return;
-
-    setSeance((courante) => (courante === null
-      ? courante
-      : { ...courante, exercices: appliquerResultats(courante.exercices, resultats) }));
-  }), []);
-
-  useEffect(() => {
-    if (nouvelle && seance === null) {
-      setSeance({ date: aujourdhui(), type: null, exercices: [] });
-    } else if (!nouvelle && seanceApi.data && seance === null) {
-      setSeance(seanceApi.data);
-    }
-  }, [nouvelle, seanceApi.data, seance]);
-
   const parId = useMemo(() => {
     const m = new Map<number, Exercice>();
     for (const e of exercices.data ?? []) m.set(e.id, e);
@@ -148,76 +94,26 @@ export default function DetailSeance() {
   }
   if (!seance) return <Chargement />;
 
-  /* Un exercice « for time » n'a qu'un temps total : ses lignes
-     supplémentaires ne comptent pas comme des séries. */
-  const avancement = seance.exercices.reduce(
-    (acc, b) => {
-      const mode = b.mode ?? parId.get(idDe(b.exercice))?.modeDefaut ?? 'charge';
-      const series = mode === 'chrono' ? b.series.slice(0, 1) : b.series;
-
-      return {
-        faites: acc.faites + series.filter((s) => s.faite).length,
-        total: acc.total + series.length,
-      };
-    },
-    { faites: 0, total: 0 },
-  );
+  const avancement = avancementDe(seance.exercices, parId);
 
   const ajouterExercice = (idExercice: number) => {
     const ex = parId.get(idExercice);
     if (!ex) return;
 
-    /* On reprend ce qui a été FAIT la dernière fois : mêmes charges, mêmes
-       répétitions. C'est le point de départ utile — le format prescrit ne
-       sert que la première fois, faute de mieux. */
-    const passe = derniereFois.get(idExercice);
-    const f = lireFormat(ex.formatPrescrit);
-
-    const series = passe !== undefined
-      ? passe.map((x, i) => ({
-          ordre: i, reps: null, poids: null, secondes: null, faite: false,
-          repsCible: x.reps, poidsCible: x.poids, secondesCible: x.secondes,
-        }))
-      : Array.from({ length: f?.series ?? 3 }, (_, i) => ({
-          ordre: i, reps: null, poids: null, secondes: null, faite: false,
-          repsCible: f?.reps ?? null, poidsCible: null, secondesCible: null,
-        }));
-    const bloc: SeanceExercice = {
-      exercice: ex['@id'], ordre: seance.exercices.length,
-      mode: ex.modeDefaut, notes: null, secondesTotal: null, series,
-    };
+    const bloc = blocDepuisExercice(
+      ex, seance.exercices.length,
+      derniereFois.get(idExercice), lireFormat(ex.formatPrescrit),
+    );
     setSeance({ ...seance, exercices: [...seance.exercices, bloc] });
   };
 
-  /* Partir d'un modèle : on copie ses exercices, ses cibles deviennent
-     les objectifs affichés en filigrane pendant la saisie. */
   const partirDuModele = (idModele: number) => {
     const m = (modeles.data ?? []).find((x) => x.id === idModele);
     if (!m) return;
     setSeance({
       ...seance,
       type: m.type ?? seance.type,
-      exercices: m.exercices.map((me, i) => ({
-        exercice: iriDe(me.exercice as Exercice | string),
-        ordre: i,
-        mode: me.mode,
-        notes: null,
-        secondesTotal: null,
-        series: me.series.map((ms, j) => ({
-          ordre: j, reps: null, poids: null, secondes: null, faite: false,
-          repsCible: ms.repsCible, poidsCible: ms.poidsCible, secondesCible: ms.secondesCible,
-        })),
-      })),
-    });
-  };
-
-  /* Même règle que la sauvegarde automatique : on ne remplace pas la route.
-     Un remontage jetterait la saisie en cours. */
-  const enregistrerSeance = () => {
-    enregistrer.mutate(seance, {
-      onSuccess: (s) => {
-        setSeance((courante) => (courante === null ? s : avecIdentifiantSeance(courante, s)));
-      },
+      exercices: blocsDepuisModele(m),
     });
   };
 
@@ -328,7 +224,7 @@ export default function DetailSeance() {
             )}
 
             {etat === 'erreur' && (
-              <Bouton onPress={enregistrerSeance} style={{ marginTop: E.m }}>
+              <Bouton onPress={() => enregistrerMaintenant(seance)} style={{ marginTop: E.m }}>
                 Réessayer l'enregistrement
               </Bouton>
             )}

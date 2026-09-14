@@ -1,10 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  useCibles, useEnregistrerCuissons,
-  useMesCuissons, useModesCuisson, useMonFrigo, usePlans, useSupprimerPlan,
-} from '@/api/hooks';
+import { useSupprimerPlan } from '@/api/hooks';
 import type { PlanRepas } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Erreur } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
@@ -20,7 +17,7 @@ import { Pliant } from '@/composants/pliant';
    deux écrans qui les affichent à s'accorder.
 
    Descendus le 15 septembre 2026, rangs 7 et 11 du lot 6. Ce qui reste ici :
-   les hooks, la chaîne de calcul, l'état de navigation et l'aiguillage. */
+   l'état de navigation, la composition initiale, et l'aiguillage. */
 import { CarteRepas } from '@/composants/carteRepas';
 import { EtapeBatch } from '@/composants/etapeBatch';
 import { EtapeReglage } from '@/composants/etapeReglage';
@@ -31,20 +28,28 @@ import { SR } from '@/composants/stylesRepas';
    depuis le 15 septembre 2026. Il est 100 % pur, et ne pouvait pas être testé
    tant qu'il habitait cette route : `tsconfig.tests.json` ne compile que
    `src`. */
+import { type Compose, ROLES, alimentsAjoutables } from '@/calcul/demandeRepas';
+import { cleDHabitude, cleDeCuisson } from '@/calcul/cuisson';
 import {
-  type Compose, ROLES, alimentsAjoutables, demandePour, vers,
-} from '@/calcul/demandeRepas';
-import {
-  type Cuissons, cleDHabitude, cleDeCuisson, dejaPromis, depuisLesHabitudes,
-  enFournees, habitudesAEcrire, repartition, resteSansCuisson, sansCuisson,
-} from '@/calcul/cuisson';
-import {
-  MODELE, NOM_REPAS, REPAS,
-  type AuMieux, type DemandeDatee, type Repas, type Role,
-  cleDuRepas, composer, listeDeCourses, resoudreLaPeriode, roleDe, releveDe,
+  MODELE, NOM_REPAS, REPAS, type Repas, type Role,
+  cleDuRepas, composer, roleDe, releveDe,
 } from '@/solveur/composer';
-import { verifierCatalogue } from '@/calcul/plausibilite';
 import { estCoche } from '@/calcul/selectionRepas';
+/* LA CHAÎNE DE CALCUL VIT DANS `src/` DEPUIS LE 15 SEPTEMBRE 2026.
+
+   Rang 8 du lot 6 de l'audit. Quinze `useMemo` et deux `useCallback`
+   s'enchaînaient ici — `stock` → `demandes` → `resultats` → `plat` →
+   `cuissons` → `boites` — sans qu'un seul puisse être testé :
+   `tsconfig.tests.json` ne compile que `src`, et un test posé dans `app/`
+   n'est jamais exécuté, sans le moindre signal.
+
+   Le câblage est dans les deux hooks ; les décisions, elles, sont descendues
+   encore plus bas, dans `calcul/planCalcule.ts`, qui est pur et éprouvé — et
+   c'est là que le découpage a du rendement : un hook React n'est pas testable
+   ici, le projet n'embarquant ni `@testing-library` ni `react-test-renderer`,
+   donc tout ce qui pouvait sortir du hook en est sorti. */
+import { useFrigoCalculable } from '@/composants/useFrigoCalculable';
+import { usePlanCalcule } from '@/composants/usePlanCalcule';
 import type { Aliment } from '@/solveur/types';
 import { E, T, couleurRole } from '@/theme';
 
@@ -66,15 +71,13 @@ import { E, T, couleurRole } from '@/theme';
    calendrier. */
 
 export default function Calculateur() {
-  const frigo = useMonFrigo();
-  const cibles = useCibles();
-  const modesCuisson = useModesCuisson();
-  const plansGardes = usePlans();
+  /* Ce que le frigo permet : le stock utilisable, ce qu'il en reste une fois
+     retiré ce qui est promis à un plan prévu, les fibres, et les valeurs qui
+     ne peuvent pas être vraies. */
+  const {
+    frigo, cibles, plans: plansGardes, stock, stockDe, fibresDe, cibleDe,
+  } = useFrigoCalculable();
   const supprimerPlan = useSupprimerPlan();
-  /* Les cuissons déjà décidées les fois précédentes. Elles ne DÉCIDENT rien :
-     elles pré-remplissent, et l'utilisateur change ce qu'il veut. */
-  const mesCuissons = useMesCuissons();
-  const enregistrerCuissons = useEnregistrerCuissons();
   const insets = useSafeAreaInsets();
 
   /* --------------------------------------------------------- la période
@@ -123,17 +126,9 @@ export default function Calculateur() {
   const [relu, setRelu] = useState<PlanRepas | null>(null);
   const [plansOuverts, setPlansOuverts] = useState(false);
   const [planASupprimer, setPlanASupprimer] = useState<{ id: number; libelle: string } | null>(null);
-  /* Les cuissons choisies À LA MAIN pour ce plan, par repas et par aliment.
-     Rien n'est stocké sur la fiche de l'aliment : les mêmes pommes de terre
-     passent au four ce soir et à la vapeur demain. Clé : « jour|repas|id ».
-
-     Cet état ne contient QUE les choix explicites. Les habitudes se
-     superposent dessous (voir `cuissons`, plus bas) plutôt que d'être
-     recopiées ici : recopier obligerait à savoir quand recopier, à ne pas
-     écraser ce que l'utilisateur vient de faire, et à distinguer « il n'a pas
-     encore choisi » de « il a choisi la même chose ». Trois questions qui ne
-     se posent pas si le défaut reste en dessous. */
-  const [cuissonsChoisies, setCuissonsChoisies] = useState<Cuissons>({});
+  /* Quel aliment de quel repas on est en train de régler. Le CHOIX lui-même
+     appartient à `usePlanCalcule` : il est le premier maillon de la chaîne, et
+     l'écran n'a pas à savoir comment il se superpose aux habitudes. */
   const [choisirCuisson, setChoisirCuisson] = useState<
     { cle: string; aliment: Aliment } | null>(null);
 
@@ -143,6 +138,21 @@ export default function Calculateur() {
     () => (plusieurs ? [...rangs].sort((x, y) => x - y) : [0]),
     [plusieurs, rangs],
   );
+
+  /* La chaîne de calcul, d'un bout à l'autre : les demandes du plan, ce que
+     le solveur en fait sur un frigo qui se vide, la liste de courses, le plan
+     mis à plat, les cuissons effectives, les fournées et les boîtes.
+
+     `cibles.data` est passé BRUT, sans `?? []` : le `?? []` appartient aux
+     `useMemo` du hook. Le hisser ici donnerait un tableau neuf à chaque rendu,
+     et le solveur repartirait sur toute la période à chaque frappe. */
+  const {
+    modesCuisson, mesCuissons,
+    resultats, aAcheter, plat, cuissons, parFournee, restentASituer, boites,
+    retenirLesCuissons, noterLaCuisson, reglerToutLeReste, oublierLesCuissons,
+  } = usePlanCalcule({
+    plan, joursRetenus, portions, cibles: cibles.data, stock, stockDe,
+  });
 
   /**
    * Ce repas est-il à cuisiner ?
@@ -160,215 +170,6 @@ export default function Calculateur() {
     estCoche(choisis, cleDuRepas(rang, repas), cibleDe(repas) !== undefined);
   const convives = (rang: number, repas: Repas): number =>
     portions[cleDuRepas(rang, repas)] ?? 1;
-
-  /* Le calculateur ne travaille qu'avec ce qui a un poids connu : un litre ou
-     un pack n'entrent pas dans un calcul de macros pour 100 g. Un aliment sans
-     énergie non plus — l'écrire à zéro fausserait tout le repas. */
-  const stock = useMemo(
-    () => (frigo.data?.aliments ?? [])
-      .filter((a) => a.grammesParUnite !== null && a.stock > 0 && a.kcal100 > 0)
-      .map(vers),
-    [frigo.data],
-  );
-
-  /* Combien il y en a VRAIMENT, en grammes à cuire. C'est ce qui empêche le
-     calculateur de réclamer 327 g de saumon quand il n'y en a que 200. */
-  const grammesEnStock = useMemo(() => {
-    const m = new Map<number | string, number>();
-    for (const a of frigo.data?.aliments ?? []) {
-      if (a.grammesParUnite !== null) m.set(a.reference, a.stock * a.grammesParUnite);
-    }
-
-    return m;
-  }, [frigo.data]);
-
-  /**
-   * CE QUI EST DÉJÀ PROMIS À UN PLAN PRÉVU.
-   *
-   * Le bug que ça corrige : deux batch cooking d'affilée comptaient DEUX FOIS
-   * le même frigo. On compose lundi-mercredi, on enregistre ; on compose
-   * jeudi-samedi, et le solveur repartait du stock d'avant. Le premier plan
-   * avait beau vider les 800 g de poulet, le second annonçait « objectifs
-   * atteints » sur du poulet qui n'existait plus — et rien ne le disait,
-   * puisque chaque plan était juste tout seul.
-   */
-  const promis = useMemo(
-    () => dejaPromis(plansGardes.data ?? []), [plansGardes.data]);
-
-  /**
-   * Combien il y en a vraiment, DISPONIBLE — stock moins ce qui est promis.
-   *
-   * Le plancher à zéro compte : un frigo négatif n'existe pas, et le solveur
-   * le lirait comme une dette à rembourser sur les repas suivants.
-   */
-  const stockDe = useCallback(
-    (a: Aliment) => Math.max(0, (grammesEnStock.get(a.id) ?? 0) - (promis.get(a.id) ?? 0)),
-    [grammesEnStock, promis]);
-
-  /* Les fibres ne sont pas des macros pour le solveur — elles n'entrent dans
-     aucune cible — mais elles pèsent 2 kcal par gramme. Sans elles à l'écran,
-     le total de calories d'un repas paraît sorti de nulle part. */
-  const fibresPar100 = useMemo(() => {
-    const m = new Map<number | string, number>();
-    for (const a of frigo.data?.aliments ?? []) m.set(a.reference, a.fibres100 ?? 0);
-
-    return m;
-  }, [frigo.data]);
-
-  const fibresDe = useCallback(
-    (a: Aliment) => fibresPar100.get(a.id) ?? 0, [fibresPar100]);
-
-  /* Ce que les données racontent et qui ne peut pas être vrai.
-     Le solveur est juste ; il ne peut rien contre un aliment dont les valeurs
-     mentent. Des valeurs de riz CUIT posées sur un riz qu'on pèse sec se
-     calculent parfaitement — et font peser trois fois trop. On le dit AVANT
-     de composer, pas après avoir mangé. */
-  const anomalies = useMemo(() => verifierCatalogue(stock), [stock]);
-
-  /* LES FIBRES INCONNUES, QUAND LA CIBLE LES COMPTE.
-   *
-   * Une cible en glucides TOTAUX additionne glucides et fibres. Un aliment
-   * dont les fibres sont inconnues est alors compté comme s'il n'en avait
-   * aucune — et le solveur en sert davantage pour atteindre le chiffre :
-   * un pain complet à 42 g de glucides et 7 g de fibres inconnues fait
-   * peser 143 g au lieu de 122. Dix-sept pour cent de féculent en trop,
-   * quatre fois par jour.
-   *
-   * On ne corrige pas à la place de l'utilisateur — inventer 7 g de fibres
-   * serait pire que de les ignorer. On NOMME les aliments concernés, une
-   * fois, et seulement quand la cible rend le problème réel. */
-  const cibleEnGlucidesTotaux = (cibles.data ?? []).some((c) => c.glucidesTotaux === true);
-
-  const sansFibresConnues = useMemo(() => {
-    if (!cibleEnGlucidesTotaux) return [];
-
-    return (frigo.data?.aliments ?? [])
-      .filter((a) => a.fibres100 === null || a.fibres100 === undefined)
-      /* Les fibres d'une huile ou d'un blanc de poulet sont nulles, pas
-         inconnues : les signaler noierait les vrais cas. On ne parle que de
-         ce qui en contient forcément. */
-      .filter((a) => a.categorie === 'fec' || a.categorie === 'leg'
-        || a.categorie === 'fruit' || a.categorie === 'ole')
-      .map((a) => a.nom);
-  }, [frigo.data, cibleEnGlucidesTotaux]);
-
-  const cibleDe = (repas: Repas) => (cibles.data ?? []).find((c) => c.repas === repas);
-
-  /* Les demandes du plan, dans l'ordre du temps. Sert deux fois : au calcul
-     réel, bridé par le frigo, et à la liste de courses, frigo plein. */
-  const demandes = useMemo((): DemandeDatee[] => {
-    if (plan === null) return [];
-    const out: DemandeDatee[] = [];
-
-    for (const rang of joursRetenus) {
-      for (const repas of REPAS) {
-        const cle = cleDuRepas(rang, repas);
-        const compose = plan[cle];
-        const cible = (cibles.data ?? []).find((c) => c.repas === repas);
-        if (compose === undefined || cible === undefined) continue;
-        /* Le RANG du calendrier sert directement de rang de période : le
-           solveur ne s'en sert que pour ordonner et pour nommer sa sortie.
-           Lui passer un index à part obligerait à retraduire ses clés, et une
-           erreur de traduction attribuerait les repas d'un jour à un autre —
-           sans que rien ne le signale. Un seul système de numérotation. */
-        out.push({ ...demandePour(repas, compose, portions[cle] ?? 1, cible), jour: rang });
-      }
-    }
-
-    return out;
-  }, [plan, cibles.data, portions, joursRetenus]);
-
-  /* TOUTE la période résolue EN UNE PASSE, sur un frigo qui se vide. Chaque
-     repas se plafonnait déjà à ce qu'il restait ; aucun ne savait que les
-     autres avaient servi avant lui — ni hier. */
-  const resultats = useMemo(
-    () => (demandes.length === 0
-      ? new Map<string, AuMieux>()
-      : resoudreLaPeriode(demandes, stockDe, stock)),
-    [demandes, stockDe, stock],
-  );
-
-  /* Ce qu'il faut acheter pour tenir le plan. Calculé frigo plein puis
-     diminué du stock réel : le solveur CONTOURNE une pénurie au lieu de la
-     subir, donc compter les manques du plan répondrait « rien ». */
-  const aAcheter = useMemo(
-    () => (demandes.length === 0 ? [] : listeDeCourses(demandes, stockDe, stock)),
-    [demandes, stockDe, stock],
-  );
-
-  /* Le plan mis à plat, tel que `enFournees` l'attend : un repas, ses
-     quantités. Ce module ne recalcule RIEN — il regroupe ce que le solveur a
-     déjà résolu, et c'est la garantie qu'un regroupement ne peut pas fausser
-     un gramme. */
-  const plat = useMemo(
-    () => joursRetenus.flatMap((rang) => REPAS
-      .map((repas) => cleDuRepas(rang, repas))
-      .filter((cle) => resultats.has(cle))
-      /* L'ordre du TEMPS, pas celui d'une Map : on remplit ses boîtes dans
-         l'ordre où on les mangera. */
-      .map((cle) => ({
-        cle,
-        convives: portions[cle] ?? 1,
-        quantites: resultats.get(cle)!.resultat.quantites,
-      }))),
-    [resultats, joursRetenus, portions],
-  );
-
-  /**
-   * LES CUISSONS EFFECTIVES : tes habitudes, puis tes choix par-dessus.
-   *
-   * Deux couches, jamais une seule. Ce qui vient des habitudes est un DÉFAUT ;
-   * ce que tu touches à l'écran passe toujours devant, et le reste devant
-   * même si l'habitude change entre-temps. C'est ce qui rend un choix
-   * explicite indéracinable, sans un seul effet de bord.
-   *
-   * Tout le reste de l'écran lit CETTE valeur — le compteur d'aliments à
-   * situer, les fournées, les boîtes. Un endroit du code qui lirait encore
-   * `cuissonsChoisies` verrait un plan à moitié réglé et redemanderait des
-   * cuissons déjà connues.
-   */
-  const cuissons = useMemo(
-    (): Cuissons => ({
-      ...depuisLesHabitudes(plat, mesCuissons.data ?? {}),
-      ...cuissonsChoisies,
-    }),
-    [plat, mesCuissons.data, cuissonsChoisies],
-  );
-
-  /* Ce que ce plan apprend, et qui n'était pas déjà su. Rien si rien n'a
-     changé : une semaine sans nouveauté doit pouvoir se composer sans une
-     seule écriture. */
-  const habitudesNouvelles = useMemo(
-    () => habitudesAEcrire(plat, cuissons, mesCuissons.data ?? {}),
-    [plat, cuissons, mesCuissons.data],
-  );
-
-  /**
-   * Retenir ce qui vient d'être décidé — au passage au batch cooking.
-   *
-   * C'est le moment JUSTE : l'utilisateur vient de finir de régler ses
-   * cuissons, il ne reviendra pas dessus. Écrire plus tôt — à chaque appui
-   * dans le sélecteur — enregistrerait des aller-retours d'hésitation ;
-   * écrire plus tard, à l'enregistrement du plan, raterait les plans qu'on
-   * consulte sans enregistrer.
-   *
-   * L'échec ne bloque RIEN et ne s'affiche pas. Une habitude perdue coûte un
-   * appui la semaine prochaine ; interrompre quelqu'un qui va cuisiner pour
-   * lui dire qu'un défaut n'a pas été mémorisé coûte plus cher que ça.
-   */
-  const retenirLesCuissons = () => {
-    if (habitudesNouvelles.length === 0) return;
-    enregistrerCuissons.mutate(habitudesNouvelles, { onError: () => {} });
-  };
-
-  const parFournee = useMemo(
-    () => enFournees(plat, cuissons, modesCuisson.data ?? []),
-    [plat, cuissons, modesCuisson.data],
-  );
-
-  const restentASituer = useMemo(() => sansCuisson(plat, cuissons), [plat, cuissons]);
-
-  const boites = useMemo(() => repartition(plat, cuissons), [plat, cuissons]);
 
   /** « Aujourd'hui · Midi » — le nom d'une boîte. */
   const nomDeLaBoite = (cle: string): string => {
@@ -393,7 +194,7 @@ export default function Calculateur() {
     setRelu(null);
     setChoisis({});
     setPortions({});
-    setCuissonsChoisies({});
+    oublierLesCuissons();
     setRangs([0]);
     setPlusieurs(false);
     setCalendrierOuvert(false);
@@ -481,12 +282,10 @@ export default function Calculateur() {
 
   if (plan === null) {
     return (
+      /* Le frigo — stock, anomalies, fibres manquantes — n'est plus descendu
+         en props : cet écran appelle `useFrigoCalculable` lui-même. Ce qui
+         reste ici est de l'ÉTAT, dont la chaîne de calcul se nourrit. */
       <EtapeReglage
-        stock={stock}
-        problemeFrigo={frigo.data?.probleme}
-        anomalies={anomalies}
-        sansFibresConnues={sansFibresConnues}
-        cibleDe={cibleDe}
         plusieurs={plusieurs}
         setPlusieurs={setPlusieurs}
         rangs={rangs}
@@ -608,11 +407,12 @@ export default function Calculateur() {
             </Discret>
             <Bouton
               variante="contour"
-              /* On part des cuissons EFFECTIVES, habitudes comprises. Partir
-                 des seuls choix explicites marquerait « sans cuisson » un riz
-                 dont l'habitude dit « à l'eau » — une réponse fausse, posée
-                 par un bouton censé ne remplir que les trous. */
-              onPress={() => setCuissonsChoisies(resteSansCuisson(plat, cuissons))}
+              /* `reglerToutLeReste` part des cuissons EFFECTIVES, habitudes
+                 comprises. Partir des seuls choix explicites marquerait
+                 « sans cuisson » un riz dont l'habitude dit « à l'eau » — une
+                 réponse fausse, posée par un bouton censé ne remplir que les
+                 trous. */
+              onPress={reglerToutLeReste}
             >
               {restentASituer > 1
                 ? `Les ${restentASituer} autres se mangent tels quels`
@@ -819,10 +619,9 @@ export default function Calculateur() {
         })()}
         onChoisir={(id) => {
           if (choisirCuisson === null) return;
-          setCuissonsChoisies((c) => ({
-            ...c,
-            [cleDeCuisson(choisirCuisson.cle, choisirCuisson.aliment)]: id === 0 ? null : id,
-          }));
+          /* « Sans cuisson » porte l'identifiant 0 côté liste, `null` côté
+             modèle : c'est une réponse, pas une absence de réponse. */
+          noterLaCuisson(choisirCuisson.cle, choisirCuisson.aliment, id === 0 ? null : id);
           setChoisirCuisson(null);
         }}
         onFermer={() => setChoisirCuisson(null)}

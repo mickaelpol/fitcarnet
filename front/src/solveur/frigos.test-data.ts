@@ -1,5 +1,5 @@
 import type { Aliment, Cibles } from './types';
-import type { Repas } from './composer';
+import type { Repas } from './repasVocabulaire';
 
 /**
  * Des frigos plausibles, tirés au sort, mais TOUJOURS LES MÊMES.
