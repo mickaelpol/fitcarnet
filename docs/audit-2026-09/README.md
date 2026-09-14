@@ -14,7 +14,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 15 élevées, ~29 moyennes, ~37 faibles** (après dédoublonnage entre rapports).
 
-**+ C4**, découvert le 14 septembre 2026 en corrigeant É7 : le catalogue commun porte des valeurs de fixture de test, et 44 aliments sur 50 n'ont plus de fibres. Voir ci-dessous.
+**+ C4**, découvert le 14 septembre 2026 en corrigeant É7 et **tranché le jour même** : le catalogue d'aliments de départ portait des valeurs de fixture de test. Il a été supprimé plutôt que reconstitué. Voir ci-dessous.
 
 ## Ce que l'audit dit du projet
 
@@ -128,41 +128,43 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 
 ---
 
-### C4 — Le catalogue commun porte des valeurs de fixture, et 44 aliments sur 50 n'ont plus de fibres
-`db/manuel/16-catalogue-ciqual.sql` — **DÉCOUVERT le 14 septembre 2026 en corrigeant É7. NON CORRIGÉ.**
+### C4 — ✅ tranché le 14 septembre 2026 — Le catalogue d'aliments de départ est supprimé
+`db/02-donnees.sql` — **découvert en corrigeant É7, résolu par une décision produit**
 
-L'écrasement de É7 n'a pas seulement supprimé 49 `UPDATE` : il a laissé à leur place les valeurs de
-la **table factice du banc d'essai**. Comparaison faite avec la vraie table de l'Anses
-(`Table_Ciqual_2025.xlsx`, présente sur le disque, non versionnée) :
+**Le constat.** L'écrasement de É7 n'avait pas seulement supprimé 49 `UPDATE` : il avait laissé à
+leur place les valeurs de la **table factice du banc d'essai**. Vérifié contre la table de l'Anses :
+le riz portait 1,58 g de lipides au lieu de 0,79, et 3,20 g de fibres au lieu de 1,53. Deux lignes
+portaient en outre des valeurs de **cuit** dans une base qui pèse du cru — boulgour à 83 kcal quand
+le boulgour sec en fait 347 — ce que le seed signalait déjà lui-même.
 
-| aliment | Ciqual (Anses) | en base aujourd'hui |
-|---|---|---|
-| Riz blanc, cru | gluc **77,5** · lip **0,79** · fibres **1,53** | gluc 75 · lip **1,58** · fibres **3,20** |
-| Amande, émondée | fibres **9,9** | fibres **10,40** |
-| Quinoa, cru | lip **6,07** · fibres **7** | lip 6,10 · fibres **6,80** |
-| Brocoli, cru | gluc **2,15** · lip **0,36** | gluc 2,10 · lip 0,40 |
+**Ce que j'avais mal jugé, et qui a été corrigé par l'auteur du projet.** J'avais compté « 44
+aliments sur 50 sans fibres » comme un défaut. C'en est un seulement si l'application confond
+absence et zéro — or elle ne le fait pas : `controler()` distingue `fibresConnues`, élargit son
+seuil de tolérance et l'écrit à l'écran (« sans les fibres le contrôle reste approximatif »). C'est
+la règle 6 correctement appliquée. Il n'y avait rien à corriger de ce côté.
 
-Sur le riz — un aliment de base pesé presque tous les jours — les lipides et les fibres sont au
-**double** de la valeur réelle.
+**La décision, et son motif.** Le catalogue de départ est **supprimé**, plutôt que reconstitué. Les
+valeurs nutritionnelles ne sont pas une constante universelle : deux paquets du même produit ne
+portent pas les mêmes chiffres, et en France l'étiquette les donne — fibres comprises, là où les
+tables américaines les omettent. Un utilisateur qui rentre de courses a sous les yeux les valeurs
+justes pour *ce qu'il a acheté* ; une moyenne nationale posée d'avance ne peut que le tromper, en
+lui donnant l'impression que la question est réglée. Pour un compte Grocy, la question ne se pose
+pas : `FrigoGrocy` déclare le userfield « Fibres / 100 g », le crée s'il manque, le lit et l'écrit.
 
-Plus large encore : **44 des 50 aliments communs n'ont aucune valeur de fibres** (`fibres_100 IS
-NULL`). La migration 16 existait pour les renseigner ; amputée, elle n'en traite plus que 4. Pour
-une application dont la règle 4 compte les fibres à 2 kcal/g séparément des glucides, et dont la
-règle 7 refuse d'afficher un chiffre faux, c'est le cœur du sujet.
+Reconstituer 53 `UPDATE` aurait de surcroît demandé des correspondances arbitraires. Preuve par
+l'exemple : Ciqual contient « Riz thaï ou basmati, cru » (351 · 78,4 · 0,63 · 1,06), mais la
+migration visait « Riz blanc, cru » — **même la version saine d'août utilisait la mauvaise entrée**.
 
-`db/02-donnees.sql` — le seed de toute installation neuve — porte les **mêmes** valeurs de fixture,
-et sème par ailleurs des valeurs *cuites* (boulgour 83 kcal, patate douce 92, pâtes complètes 124),
-en contradiction avec la règle 3.
+**Ce qui a été fait.** Le bloc `INSERT INTO aliment` retiré de `db/02-donnees.sql` ; les
+emplacements, modes de cuisson et exercices — structurels — conservés. Les migrations 14 à 19 sont
+**gardées telles quelles**, idempotentes : sans catalogue elles ne trouvent rien à corriger, et sur
+une base existante elles gardent leur raison d'être. Chacune porte désormais un en-tête le disant.
+`installer.sh` n'annonce plus « 0 aliments » comme une anomalie.
 
-**Pourquoi ce n'est pas corrigé ici.** Reconstituer le fichier suppose d'associer chaque aliment du
-catalogue à son entrée Ciqual — « Colin / lieu » vers quelle ligne exactement ? — et d'ancrer les
-`UPDATE` sur les noms réels plutôt que sur les `LIKE '%…%'` non ancrés du générateur, qui donnaient
-631 kcal à « Lait d'amandes ». Inventer une correspondance produirait précisément le chiffre faux
-que la règle 7 interdit. **Décision produit à prendre**, la table est disponible.
-
-*Correction : ancrer la génération sur les noms de `db/02-donnees.sql`, régénérer depuis la vraie
-table, comparer ligne à ligne à `git show f5dbb94:db/manuel/16-catalogue-ciqual.sql`, puis vérifier
-que les migrations 17, 18 et 19 ont encore un sens par-dessus. ~3 h.*
+**Ce qui n'a délibérément PAS été fait** : rien n'est supprimé des bases existantes. `stock.aliment_id`
+est en `ON DELETE RESTRICT`, et surtout `plan_repas.contenu` est du **JSON** — un aliment supprimé
+qui y figure laisserait le plan incohérent sans la moindre erreur SQL. La suppression se fait donc
+à la main, depuis l'écran, aliment par aliment.
 
 ---
 
@@ -317,7 +319,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
 | **3 — sécurité et isolation** | ✅ 6/6 | É1, C3, É8, M-01, M-03 · **M-02 partiel** : fenêtre ramenée à 90 j, la visibilité des sessions reste à faire |
 | **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
-| **5 — scripts dangereux** | ✅ | É4, É7, `sauvegarde.sh` (É9 fait le 8 sept.) · **révèle C4**, non corrigé |
+| **5 — scripts dangereux** | ✅ | É4, É7, `sauvegarde.sh` (É9 fait le 8 sept.) · a révélé **C4**, tranché |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
 | **8 — le reste** | ⬜ | ~37 constats faibles |

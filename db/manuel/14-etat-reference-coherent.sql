@@ -1,3 +1,18 @@
+-- ---------------------------------------------------------------------
+--  CETTE MIGRATION NE VISE PLUS QU'UN CATALOGUE HISTORIQUE.
+--
+--  Le 14 septembre 2026, `db/02-donnees.sql` a cessé de semer les 50 aliments
+--  communs : les valeurs nutritionnelles ne sont pas une constante, chacun
+--  saisit celles de ce qu'il a acheté. Une base neuve n'a donc plus d'aliment
+--  commun, et cette migration n'y trouvera rien à corriger — elle est
+--  idempotente, elle passera sans bruit.
+--
+--  Elle est CONSERVÉE pour les bases existantes, où ces aliments sont encore
+--  là et où ses corrections gardent tout leur sens. `entrypoint-prod.sh`
+--  rejoue db/manuel/ à chaque démarrage : la retirer changerait ce qui
+--  s'exécute en production, et effacerait la trace d'une correction réelle.
+-- ---------------------------------------------------------------------
+
 -- =====================================================================
 --  L'etat de reference ne se saisit plus : il se deduit de la categorie.
 --

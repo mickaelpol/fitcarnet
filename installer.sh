@@ -121,7 +121,11 @@ ok "$nb_tables tables"
 nb_aliments=$(sql "SELECT count(*) FROM aliment;")
 nb_perso=$(sql "SELECT count(*) FROM exercice WHERE source='perso';")
 nb_chrono=$(sql "SELECT count(*) FROM exercice WHERE mode_defaut='chrono' AND source='perso';")
-ok "$nb_aliments aliments, $nb_perso exercices personnels dont $nb_chrono en chrono"
+# Zéro aliment sur une installation neuve est le comportement ATTENDU depuis
+# le 14 septembre 2026 : il n'y a plus de catalogue de départ, chacun saisit
+# les valeurs de ce qu'il a acheté. Ce n'est donc pas un contrôle, juste un
+# état des lieux — d'où le `ok` et non un `echec` sur un seuil.
+ok "$nb_aliments aliment(s), $nb_perso exercices personnels dont $nb_chrono en chrono"
 
 # ------------------------------------------------- migrations manuelles
 

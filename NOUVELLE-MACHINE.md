@@ -138,13 +138,23 @@ données. Tu auras :
 | Présent d'emblée | Absent |
 |---|---|
 | le schéma et les 20 migrations | tes **séances** et ton historique |
-| le référentiel commun — ~50 aliments, exercices, emplacements | le **stock** de ton frigo |
+| le référentiel commun — exercices, emplacements, modes de cuisson | le **stock** de ton frigo |
+| — | **tous les aliments** : il n'y a plus de catalogue de départ (voir plus bas) |
 | le catalogue de 1 338 exercices (téléchargé par `installer.sh`) | tes **aliments personnels** |
 | tes **cibles par repas** (`db/manuel/cibles.sql`, versionné) | tes **plans enregistrés** |
 | un compte administrateur | |
 
 **Pour développer, c'est suffisant** — une base de test propre vaut mieux que
 tes vraies données pour corriger un bug.
+
+> **Il n'y a plus d'aliments du tout, et c'est voulu.** Jusqu'au 14 septembre
+> 2026, l'installation semait 50 aliments communs. Ils ont été retirés : les
+> valeurs nutritionnelles ne sont pas une constante — deux paquets de la même
+> chose ne portent pas les mêmes chiffres, et l'étiquette française les donne.
+> Une moyenne posée d'avance ne peut que tromper. Chacun saisit les siennes en
+> rentrant de courses ; un compte Grocy, lui, les reçoit de Grocy, fibres
+> comprises. Pour avoir de quoi cliquer tout de suite, joue
+> `db/manuel/jeu-essai.sql`, qui crée ses propres aliments.
 
 **Pour retrouver ton carnet**, il faut apporter un dump. Il n'y en a pas dans le
 dépôt et il ne faut pas en mettre :

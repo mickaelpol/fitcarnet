@@ -146,35 +146,24 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 
 ---
 
-## Par quoi continuer : C4, avant tout le reste
+## Par quoi continuer
 
-**Le catalogue commun porte des valeurs de fixture de test, et 44 aliments sur
-50 n'ont plus de valeur de fibres.** Découvert le 14 septembre en corrigeant É7 ;
-le détail chiffré est dans [docs/audit-2026-09/](docs/audit-2026-09/README.md),
-constat **C4**.
+**C4 est tranché** : le catalogue d'aliments de départ n'existe plus. Décision
+du 14 septembre 2026, détaillée dans
+[docs/audit-2026-09/](docs/audit-2026-09/README.md).
 
-En deux lignes : le commit `c0f6f10` du 10 août — intitulé « Batch cooking », sans
-rapport — a fait tomber `16-catalogue-ciqual.sql` de 53 `UPDATE` à 4, en laissant
-les valeurs de la table factice du banc d'essai. Vérifié contre la vraie table de
-l'Anses : le riz blanc porte **le double** de lipides et de fibres.
+En deux lignes : les 50 aliments communs semés à chaque installation portaient
+des valeurs venues d'une fixture de test. Plutôt que de les reconstituer depuis
+Ciqual, ils ont été **supprimés du seed** — les valeurs nutritionnelles ne sont
+pas une constante, deux paquets du même produit diffèrent, et l'étiquette
+française donne les fibres. Chacun saisit les siennes en rentrant de courses ;
+un compte Grocy les reçoit de Grocy, où le champ « Fibres / 100 g » est déclaré
+et créé par `FrigoGrocy`.
 
-C'est le seul constat ouvert qui touche directement les règles 3, 4 et 7 — les
-valeurs pesées, les fibres à 2 kcal/g, et le refus d'un chiffre faux. **Une
-application de nutrition qui affiche de mauvaises valeurs n'a pas de raison
-d'être**, et c'est aussi ce qu'on montrerait dans la démonstration.
-
-Ce n'est pas corrigé parce que **la décision t'appartient** : associer chaque
-aliment du catalogue à son entrée Ciqual (« Colin / lieu » → quelle ligne ?) est
-un jugement, et inventer une correspondance produirait exactement le chiffre faux
-que la règle 7 interdit. `Table_Ciqual_2025.xlsx` est sur le disque, non
-versionnée.
-
-Le chemin, si tu le lances : ancrer la génération sur les noms réels de
-`db/02-donnees.sql` (le générateur émet des `LIKE '%…%'` non ancrés, qui donnaient
-631 kcal à « Lait d'amandes »), régénérer, comparer ligne à ligne à
-`git show f5dbb94:db/manuel/16-catalogue-ciqual.sql` — 53 `UPDATE`, la dernière
-version saine — puis vérifier que les migrations 17, 18 et 19 tiennent encore
-par-dessus. Compter 3 h.
+**Rien n'a été supprimé des bases existantes**, et c'est délibéré :
+`plan_repas.contenu` est du JSON, un aliment effacé qui y figure casserait le
+plan sans la moindre erreur SQL. La suppression se fait à la main, depuis
+l'écran.
 
 ---
 
