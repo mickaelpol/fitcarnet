@@ -25,7 +25,7 @@ En parallèle, un **dossier de présentation** est monté de bout en bout dans
 `presentation/` : complet et utilisable, il ne reste qu'à tourner les vidéos
 (voir « Le chantier présentation » plus bas).
 
-État : **362 front · 149 API · 491 assertions**, 8 erreurs PHPStan connues,
+État : **394 front · 149 API · 491 assertions**, 8 erreurs PHPStan connues,
 `verifier-schema.sh` et `verifier-migrations.sh` **au vert tous les deux**.
 `master` synchronisé sur Gitea.
 
@@ -171,7 +171,8 @@ l'écran.
 
 | Lot | Ce que c'est | Effort |
 |---|---|---|
-| **6 — architecture front** | `repas.tsx` (2 397 lignes, 4 écrans, 17 `useState`), `hooks.ts` (1 228 l.), 10 duplications. Le détail module par module est dans [03-front.md](docs/audit-2026-09/03-front.md) | 2-3 j |
+| **6 — architecture front** | 🟨 **rangs 1, 2, 4, 5 faits le 15 septembre.** Restent les rangs 6 à 12 : `planRelu.tsx`/`carteRepas.tsx`, `usePlanCalcule`, le découpage de `frigo.tsx` et `admin-exercices.tsx`, `etapeBatch.tsx`. Détail dans [03-front.md](docs/audit-2026-09/03-front.md) | ~2 j |
+| **É2, reste du rang 4** | le test de non-régression n'a pas été écrit : `plafonds` survit à la passe `ALaCarte` de `listeDeCourses` (`src/solveur/composer.ts`). `demandePour` a maintenant des tests qui décrivent l'entrée du bug, donc c'est plus facile qu'avant | ~1 h |
 | **7 — tests manquants** | É10 (client HTTP), le câblage non couvert | ~6 h |
 | **8 — le reste** | ~37 constats faibles, beaucoup en 5 minutes | — |
 | **M-02, second volet** | la *visibilité* des sessions : `GET /api/mes-sessions` + `DELETE`. La fenêtre est passée à 90 j, mais rien ne permet de couper une session précise | ~2 h |
