@@ -16,11 +16,23 @@ Ce qui suit a été écrit à partir de failles réelles, chacune datée.
 | `App\Entity\ProprieteUtilisateur` | Interface de **marquage**. Une entité qui l'implémente est filtrée. |
 | `App\Doctrine\FiltreProprietaire` | Extension Doctrine, **priorité 100** : pose le `WHERE utilisateur = :moi`. |
 | `App\Doctrine\ChargementComplet` | Priorité 50 : ajoute les jointures anti-N+1 **par-dessus** le filtre. |
+| `App\State\ProprietaireProcessor` | Pose le propriétaire à la création — le filtre ne sert à rien sans lui. |
 | `api/tests/ModeleExposeTest.php` | Refuse toute entité `#[ApiResource]` non conforme absente de sa liste blanche. |
 
-**Une seule exception documentée** : `Aliment`. Son propriétaire est facultatif —
-un aliment sans `cree_par` est commun à tous. `FiltreAliment` applique donc la
-règle « **commun OU le mien** » au lieu du filtre strict.
+**Deux exceptions documentées**, toutes deux des référentiels partagés que le
+filtre strict rendrait inutilisables :
+
+| Entité | Filtre | Règle | Pourquoi pas le filtre strict |
+|---|---|---|---|
+| `Aliment` | `FiltreAliment` | **commun OU le mien** | le propriétaire est facultatif : un aliment sans `cree_par` est commun |
+| `Exercice` | `FiltreExercice` | **public OU le mien** | la règle porte sur `public`, ce qui autorise un exercice **publié mais attribué** — un administrateur verse au catalogue commun l'exercice de quelqu'un sans en effacer la paternité |
+
+`Exercice` a rejoint la liste le 14 septembre 2026 (constat É8) : `public` et
+`creePar` existaient depuis l'origine sans que rien ne les renseigne ni ne les
+lise, pendant que l'écran promettait « ★ exercice personnel ». Une étiquette qui
+promet la confidentialité sans la fournir est pire qu'une étiquette absente.
+**Conséquence assumée** : un administrateur ne voit plus les exercices privés des
+autres, et ne peut donc plus les fusionner.
 
 L'entité `Utilisateur` n'a **aucune relation sortante**, volontairement : c'est un
 type auquel on se réfère, pas un module dont on dépend. Garder cette propriété.

@@ -173,11 +173,33 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   « Lait d'amandes ». Comme `entrypoint-prod.sh` rejoue les migrations, l'erreur atteint la
   production. Indice que c'est déjà arrivé : le fichier committé ne porte que 4 `UPDATE`, aux valeurs
   de la table factice du test, contre ~50 attendus. *2 h.*
-- **É8** — Les exercices « personnels » sont visibles de tous. `Exercice` porte `public` et `creePar`
-  mais ces champs ne sont **jamais renseignés ni lus** ; l'écran affiche pourtant
-  « ★ exercice personnel » (`admin-exercices.tsx:299`). Deux colonnes qui promettent une
-  confidentialité que rien n'applique. *Décision produit à trancher : filtre + processeur (~2 h), ou
-  suppression des colonnes et de l'étiquette (~1 h).*
+- **É8** — ✅ **corrigé le 14 septembre 2026.** Les exercices « personnels » étaient visibles de
+  tous : `Exercice` portait `public` et `creePar` sans que rien ne les renseigne ni ne les lise —
+  `setCreePar()` n'avait pas un seul appelant — pendant que l'écran affichait
+  « ★ exercice personnel ».
+
+  **Décision prise : les rendre vraiment privés.** `ExerciceProcessor` pose l'auteur et
+  `public = false` à la création, `FiltreExercice` applique « **public OU le mien** » en collection
+  et en item. La règle porte sur `public`, et non sur l'absence d'auteur comme pour `Aliment` : la
+  nuance ouvre une troisième possibilité, l'exercice **publié mais attribué**, par où un
+  administrateur verse au catalogue commun l'exercice bien rédigé de quelqu'un sans en effacer la
+  paternité. C'est le `PATCH` d'administration, déjà réservé à `ROLE_ADMIN`, qui publie.
+
+  Les 1 338 exercices importés sont `public = true` : ils restent visibles de tous, **aucune
+  migration de données n'a été nécessaire**.
+
+  Deux précisions, parce qu'elles se découvriraient autrement à l'usage :
+  - **Un administrateur ne voit plus les exercices privés des autres**, et ne peut donc plus les
+    fusionner. C'est la définition même de « privé », et non un effet de bord.
+  - L'étiquette n'apparaissait que dans les **deux écrans d'administration**. Ce qui mentait
+    vraiment, c'étaient les libellés « Les miens » et « tes exercices », qui désignaient tout ce
+    qui avait été ajouté via l'application quel qu'en soit l'auteur : ils disent désormais
+    « ajouté dans l'app ». Distinguer « le mien » demanderait d'exposer `creePar`, ce qui n'a pas
+    été fait.
+
+  10 témoins, chacun vu échouer. Le `PATCH` reste réservé à `ROLE_ADMIN` : **l'auteur d'un exercice
+  privé ne peut toujours pas le corriger lui-même** — c'était déjà le cas avant, rien ne régresse,
+  mais le filtrage rend la limite plus visible.
 - **É9** — `grocy_macros.py:105-113` écrit dans les mêmes champs Grocy avec la **convention inverse**
   (valeurs cuites, riz basmati à 130 kcal contre 350 sec) : un produit amorcé ainsi fait peser ~3×
   trop de riz. Et son appariement sans borne de mot fait recevoir 575 kcal à « Lait d'amandes » —
@@ -223,14 +245,14 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **0 — garde-fous** | ✅ | `CLAUDE.md`, PHPStan niveau 5, `ModeleExposeTest`, `verifier-schema.sh`, `verifier-migrations.sh`, glob des tests, 2 hooks |
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
-| **3 — sécurité et isolation** | 🟨 2/6 · ~3 h | **É1 et C3 faits** · restent É8, M-01 à M-03 — **en cours** |
+| **3 — sécurité et isolation** | 🟨 3/6 · ~2 h | **É1, C3 et É8 faits** · restent M-01 à M-03 — **en cours** |
 | **4 — base reproductible** | ⬜ ~4 h | C2 : `verifier-schema.sh` signale toujours **280 lignes** d'écart |
 | **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
 | **8 — le reste** | ⬜ | ~37 constats faibles |
 
-Tests au 14 septembre : **362 front · 124 API · 450 assertions · 8 erreurs PHPStan**
+Tests au 14 septembre : **362 front · 134 API · 464 assertions · 8 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 Deux points laissés ouverts volontairement :

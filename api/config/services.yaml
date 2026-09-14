@@ -28,6 +28,16 @@ services:
             - { name: api_platform.doctrine.orm.query_extension.collection, priority: 100 }
             - { name: api_platform.doctrine.orm.query_extension.item, priority: 100 }
 
+    # Catalogue d'exercices : « public OU le mien ». La règle porte sur
+    # `public` et non sur l'absence d'auteur — un administrateur peut ainsi
+    # publier l'exercice de quelqu'un sans en effacer la paternité.
+    # Constat E8 : `creePar` existait depuis l'origine sans jamais être
+    # renseigné, pendant que l'écran affichait « ★ exercice personnel ».
+    App\Doctrine\FiltreExercice:
+        tags:
+            - { name: api_platform.doctrine.orm.query_extension.collection, priority: 100 }
+            - { name: api_platform.doctrine.orm.query_extension.item, priority: 100 }
+
     # Une séance est lue en un seul objet : elle doit être chargée en une seule
     # requête. Sans ça, sérialiser ses collections paresseuses en déclenchait
     # près de deux cents par écran. Voir App\Doctrine\ChargementComplet.

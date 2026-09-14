@@ -68,7 +68,7 @@ export default function AdminFusion() {
   const elements = (exercices.data ?? []).map((e) => ({
     id: e.id,
     nom: e.nomFr ?? e.nom,
-    detail: `${e.source === 'perso' ? '★ tes exercices · ' : ''}`
+    detail: `${e.source === 'perso' ? "★ ajouté dans l'app · " : ''}`
       + `${e.partieCorps ? libelle(ZONES, e.partieCorps) : ''}`,
     couleur: e.source === 'perso' ? C.vif : C.ligne,
   }));

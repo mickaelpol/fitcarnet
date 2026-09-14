@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\State\ExerciceProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
@@ -56,15 +57,24 @@ use Symfony\Component\Validator\Constraints as Assert;
         // les 1338 entrees du catalogue revenait a transporter des centaines
         // de kilooctets que personne n'affiche, a chaque chargement.
         new Get(normalizationContext: ['groups' => ['exercice:lire', 'exercice:detail']]),
-        new Post(security: "is_granted('ROLE_USER')"),
+        new Post(security: "is_granted('ROLE_USER')", processor: ExerciceProcessor::class),
         // renseigner une vidéo ou un nom français relève de l'administration :
-        // le catalogue est commun, une erreur s'afficherait pour tout le monde
-        new Patch(security: "is_granted('ROLE_ADMIN')"),
+        // le catalogue est commun, une erreur s'afficherait pour tout le monde.
+        //
+        // C'est aussi par ici qu'un exercice personnel rejoint le catalogue :
+        // `public: true`. Le processeur ne touche pas un exercice qui a déjà
+        // un auteur, donc publier n'en efface pas la paternité.
+        new Patch(security: "is_granted('ROLE_ADMIN')", processor: ExerciceProcessor::class),
     ],
     normalizationContext: ['groups' => ['exercice:lire']],
     denormalizationContext: ['groups' => ['exercice:ecrire']],
     // 'perso' passe avant 'import' en ordre décroissant : tes exercices
     // restent en tête, y compris si la collection est paginée.
+    //
+    // Ce commentaire a longtemps été faux : sans filtrage, `source = 'perso'`
+    // remontait les exercices de TOUS les comptes (constat E8). Depuis le
+    // 14 septembre 2026, `FiltreExercice` ne laisse passer que le catalogue
+    // public et les siens — la phrase redevient exacte.
     order: ['source' => 'DESC', 'nom' => 'ASC'],
     paginationItemsPerPage: 1500,
     // PLUS AUCUN EN-TETE DE CACHE SUR CE CATALOGUE, ET C'EST UNE CORRECTION.

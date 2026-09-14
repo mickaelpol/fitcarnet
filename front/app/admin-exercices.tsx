@@ -88,7 +88,7 @@ const FILTRES: { cle: Filtre; libelle: string }[] = [
   { cle: 'sans_muscle', libelle: 'Sans muscle' },
   { cle: 'sans_video', libelle: 'Sans vidéo' },
   { cle: 'sans_nom_fr', libelle: 'À traduire' },
-  { cle: 'perso', libelle: 'Les miens' },
+  { cle: 'perso', libelle: "Ajoutés dans l'app" },
   { cle: 'tous', libelle: 'Tous' },
 ];
 
@@ -296,7 +296,7 @@ function Editeur({
           <Pressable style={s.feuille} onPress={(e) => e.stopPropagation()}>
             <Texte style={s.titreEditeur} numberOfLines={2}>{exercice.nom}</Texte>
             <Discret style={{ fontSize: T.petit }}>
-              {exercice.source === 'perso' ? '★ exercice personnel' : 'catalogue importé'}
+              {exercice.source === 'perso' ? "★ ajouté dans l'app" : 'catalogue importé'}
             </Discret>
 
             {detail.isLoading || brouillon === null ? (
