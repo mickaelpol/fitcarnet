@@ -14,6 +14,8 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 15 élevées, ~29 moyennes, ~37 faibles** (après dédoublonnage entre rapports).
 
+**+ C4**, découvert le 14 septembre 2026 en corrigeant É7 : le catalogue commun porte des valeurs de fixture de test, et 44 aliments sur 50 n'ont plus de fibres. Voir ci-dessous.
+
 ## Ce que l'audit dit du projet
 
 Le projet est **soigné**, et ce n'est pas une politesse : `tsc --noEmit` passe sans une erreur avec
@@ -126,6 +128,44 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 
 ---
 
+### C4 — Le catalogue commun porte des valeurs de fixture, et 44 aliments sur 50 n'ont plus de fibres
+`db/manuel/16-catalogue-ciqual.sql` — **DÉCOUVERT le 14 septembre 2026 en corrigeant É7. NON CORRIGÉ.**
+
+L'écrasement de É7 n'a pas seulement supprimé 49 `UPDATE` : il a laissé à leur place les valeurs de
+la **table factice du banc d'essai**. Comparaison faite avec la vraie table de l'Anses
+(`Table_Ciqual_2025.xlsx`, présente sur le disque, non versionnée) :
+
+| aliment | Ciqual (Anses) | en base aujourd'hui |
+|---|---|---|
+| Riz blanc, cru | gluc **77,5** · lip **0,79** · fibres **1,53** | gluc 75 · lip **1,58** · fibres **3,20** |
+| Amande, émondée | fibres **9,9** | fibres **10,40** |
+| Quinoa, cru | lip **6,07** · fibres **7** | lip 6,10 · fibres **6,80** |
+| Brocoli, cru | gluc **2,15** · lip **0,36** | gluc 2,10 · lip 0,40 |
+
+Sur le riz — un aliment de base pesé presque tous les jours — les lipides et les fibres sont au
+**double** de la valeur réelle.
+
+Plus large encore : **44 des 50 aliments communs n'ont aucune valeur de fibres** (`fibres_100 IS
+NULL`). La migration 16 existait pour les renseigner ; amputée, elle n'en traite plus que 4. Pour
+une application dont la règle 4 compte les fibres à 2 kcal/g séparément des glucides, et dont la
+règle 7 refuse d'afficher un chiffre faux, c'est le cœur du sujet.
+
+`db/02-donnees.sql` — le seed de toute installation neuve — porte les **mêmes** valeurs de fixture,
+et sème par ailleurs des valeurs *cuites* (boulgour 83 kcal, patate douce 92, pâtes complètes 124),
+en contradiction avec la règle 3.
+
+**Pourquoi ce n'est pas corrigé ici.** Reconstituer le fichier suppose d'associer chaque aliment du
+catalogue à son entrée Ciqual — « Colin / lieu » vers quelle ligne exactement ? — et d'ancrer les
+`UPDATE` sur les noms réels plutôt que sur les `LIKE '%…%'` non ancrés du générateur, qui donnaient
+631 kcal à « Lait d'amandes ». Inventer une correspondance produirait précisément le chiffre faux
+que la règle 7 interdit. **Décision produit à prendre**, la table est disponible.
+
+*Correction : ancrer la génération sur les noms de `db/02-donnees.sql`, régénérer depuis la vraie
+table, comparer ligne à ligne à `git show f5dbb94:db/manuel/16-catalogue-ciqual.sql`, puis vérifier
+que les migrations 17, 18 et 19 ont encore un sens par-dessus. ~3 h.*
+
+---
+
 ## Les 15 constats élevés
 
 ### Sécurité
@@ -155,10 +195,22 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 - **É3** — `installer.sh:167` joue les migrations sans `ON_ERROR_STOP` : psql continue après erreur
   et sort 0, l'installateur affiche « ✓ » sur un échec. C'est le mécanisme exact par lequel une
   divergence s'installe sans bruit. *15 min.*
-- **É4** — `restaurer-nas.sh:34,157` n'arrête pas les travailleurs, alors que le script écrit
-  lui-même qu'il ne faut pas restaurer sous une application qui écrit. Un lot `en_cours` restauré
-  est repris par `reprendreLesAbandonnes()` : **d'anciennes quantités repartent vers Grocy** et le
-  frigo réel est corrigé à l'envers. *30 min.*
+- **É4** — ✅ **corrigé le 14 septembre 2026.** `restaurer-nas.sh` n'arrêtait que `fitcarnet-app` ;
+  `fitcarnet-taches` tourne en `replicas: 2` et n'a donc pas de `container_name` — rien ne le
+  désignait. Les travailleurs survivent au `DROP DATABASE`, et `reprendreLesAbandonnes()`, appelé
+  **au démarrage**, remettait en attente les lots `en_cours` restaurés : d'anciennes quantités
+  repartaient vers Grocy.
+
+  **La formulation courte de ce constat se trompait de remède**, et le corps du constat avait
+  raison : arrêter les travailleurs ne recule la panne que du temps d'un `docker start`, puisque
+  c'est le *contenu restauré* qui est périmé, pas la concurrence. Le correctif est de **neutraliser
+  les lots restaurés** (`statut = 'echoue'`, jeton à `NULL`, motif lisible à l'écran) ; l'arrêt sert
+  à garantir la fenêtre où personne ne peut en prendre un.
+
+  Travailleurs trouvés par **étiquette compose** et non par nom — un nom en dur casserait sur le
+  préfixe de projet de Portainer et sur un troisième exemplaire. Script en `#!/bin/sh`, vérifié à
+  `bash -n` et `dash -n` (DSM n'a pas `bash` garanti), logique jouée sur copie jetable avec un faux
+  `docker`.
 - **É5** — ✅ **résolu par C2, le 14 septembre 2026.** Une installation de développement ne joue
   toujours pas `db/manuel/` — l'étape `dev` du Dockerfile n'a pas d'`ENTRYPOINT`, et c'est sans
   conséquence désormais : `db/01-schema.sql`, monté en `docker-entrypoint-initdb.d`, porte enfin
@@ -182,11 +234,15 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   office d'ordre de dépendances marche jusqu'au jour où un nom commence par une lettre ».
 
 ### Cohérence des données et scripts
-- **É7** — `test_ecriture_grocy.py:367` écrase `db/manuel/16-catalogue-ciqual.sql`, fichier versionné
-  et **corrigé à la main**, et y réintroduit le bug de `LIKE '%…%'` non ancré qui donnait 631 kcal à
-  « Lait d'amandes ». Comme `entrypoint-prod.sh` rejoue les migrations, l'erreur atteint la
-  production. Indice que c'est déjà arrivé : le fichier committé ne porte que 4 `UPDATE`, aux valeurs
-  de la table factice du test, contre ~50 attendus. *2 h.*
+- **É7** — ✅ **corrigé le 14 septembre 2026**, et l'écrasement est **daté**. Le banc passe désormais
+  `--sortie` vers un temporaire, et une garde compare le SHA-256 du fichier versionné avant/après :
+  retirer `--sortie` fait tomber le banc (vérifié, 38/49 au lieu de 49/49).
+
+  L'historique confirme le soupçon : `1e40ba7` (48 UPDATE) → `a09b029` (53) → `f5dbb94` (53) →
+  **`c0f6f10` (4)**, un commit intitulé « Batch cooking » sans aucun rapport. Les 4 survivants sont
+  exactement les 4 aliments que la table factice sait produire.
+
+  ⚠️ **Ce que É7 cachait est plus grave que É7** — voir le constat **C4** ci-dessous.
 - **É8** — ✅ **corrigé le 14 septembre 2026.** Les exercices « personnels » étaient visibles de
   tous : `Exercice` portait `public` et `creePar` sans que rien ne les renseigne ni ne les lise —
   `setCreePar()` n'avait pas un seul appelant — pendant que l'écran affichait
@@ -261,7 +317,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
 | **3 — sécurité et isolation** | ✅ 6/6 | É1, C3, É8, M-01, M-03 · **M-02 partiel** : fenêtre ramenée à 90 j, la visibilité des sessions reste à faire |
 | **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
-| **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
+| **5 — scripts dangereux** | ✅ | É4, É7, `sauvegarde.sh` (É9 fait le 8 sept.) · **révèle C4**, non corrigé |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
 | **8 — le reste** | ⬜ | ~37 constats faibles |
