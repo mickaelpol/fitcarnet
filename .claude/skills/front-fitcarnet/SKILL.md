@@ -36,7 +36,7 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 | Macros, Atwater, catégories | `src/calcul/nutrition.ts` |
 | Cru/cuit, fournées, habitudes | `src/calcul/cuisson.ts` |
 | Composition de repas | `src/solveur/` |
-| Suppression des accents | `src/calcul/texte.ts` |
+| Suppression des accents | **aucun** — quatre copies, constat D4 (voir plus bas) |
 
 **Aucune formule métier recopiée.** Un écran qui recalcule un 1RM importe
 `performance.ts`. Trois copies d'Epley aux bornes divergentes ont produit un
@@ -45,6 +45,13 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 **L'exception à ne pas « factoriser »** : `cleDHabitude` utilise volontairement une
 table de correspondance manuelle plutôt que `normalize('NFD')`, parce que Hermes
 ne l'implémente pas partout.
+
+**La suppression des accents n'a pas de module de référence, contrairement à ce
+que `CLAUDE.md` a longtemps affirmé.** Elle est recopiée quatre fois :
+`solveur/composer.ts:182`, `calcul/frigo.ts:39`, `composants/choixAliment.tsx:49`,
+`app/admin-exercices.tsx:117` — constat **D4** de l'audit, non corrigé. Ne pas en
+écrire une cinquième : importer depuis l'une des quatre, et si tu factorises,
+aligne-toi sur la table manuelle de `cleDHabitude` et non sur `normalize('NFD')`.
 
 ## Les tests
 
