@@ -556,6 +556,10 @@ CREATE TABLE inventaire_lot (
     commence_le     TIMESTAMPTZ,
     fini_le         TIMESTAMPTZ,
     vu_le           TIMESTAMPTZ,
+    -- Posé à la prise, présenté à chaque écriture (migration 30). Un lot
+    -- repris change de jeton : l'ancien travailleur est alors refusé, au lieu
+    -- d'écraser en silence l'avancement de son remplaçant.
+    jeton           UUID,
     CONSTRAINT inventaire_lot_statut_connu
         CHECK (statut IN ('en_attente', 'en_cours', 'termine', 'echoue')),
     CONSTRAINT inventaire_lot_source_connue

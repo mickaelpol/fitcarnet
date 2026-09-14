@@ -119,6 +119,7 @@ final class MotifDEchecTest extends TestCase
             'lignes' => json_encode([['reference' => 'base:42', 'quantite' => 1.0]], \JSON_THROW_ON_ERROR),
             'total' => 1,
             'traites' => 0,
+            'jeton' => '11111111-1111-4111-8111-111111111111',
         ]);
 
         return $dits;

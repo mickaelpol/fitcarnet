@@ -159,13 +159,27 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   lui-même qu'il ne faut pas restaurer sous une application qui écrit. Un lot `en_cours` restauré
   est repris par `reprendreLesAbandonnes()` : **d'anciennes quantités repartent vers Grocy** et le
   frigo réel est corrigé à l'envers. *30 min.*
-- **É5** — Une installation de développement suivie à la lettre ne joue jamais `db/manuel/` :
-  l'étape `dev` du Dockerfile n'a pas d'`ENTRYPOINT`. Combiné à C2 → 500 sur
-  `relation "complement" does not exist`. *15 min, ou 0 après C2.*
-- **É6** — Course sur les lots d'inventaire. `prendre()` fait bien `FOR UPDATE SKIP LOCKED` mais
-  ferme sa transaction aussitôt ; la seule protection restante est un délai de 2 min sur `vu_le`.
-  Un lot peut être volé à un travailleur vivant, **rompant l'invariant « un seul lot actif »** que
-  la migration 26 existe pour garantir. *Correction : colonne `jeton` posée par `prendre()`. ~2 h.*
+- **É5** — ✅ **résolu par C2, le 14 septembre 2026.** Une installation de développement ne joue
+  toujours pas `db/manuel/` — l'étape `dev` du Dockerfile n'a pas d'`ENTRYPOINT`, et c'est sans
+  conséquence désormais : `db/01-schema.sql`, monté en `docker-entrypoint-initdb.d`, porte enfin
+  tout le schéma. C'est exactement la base A de `verifier-schema.sh`, qui la déclare identique à
+  une base migrée. *0 min : rien à faire de plus.*
+- **É6** — ✅ **corrigé le 14 septembre 2026.** Un lot pouvait être volé à un travailleur vivant :
+  `prendre()` verrouille le temps de la prise puis referme sa transaction, et `vu_le` — touché à
+  chaque ligne — était la seule preuve de vie. Un Grocy qui met plus de deux minutes sur une ligne
+  suffisait à ce que `reprendreLesAbandonnes()` rende le lot à un second travailleur pendant que le
+  premier travaillait encore.
+
+  **Colonne `jeton`** (migration 30), tirée à la prise et présentée à chaque écriture : `avancer`,
+  `terminer` et `echouer` ne s'appliquent que si le lot est encore à nous, et rendent `false`
+  sinon. `AppliqueInventaire` s'arrête alors proprement plutôt que d'écraser l'avancement de son
+  remplaçant puis de clore le lot avec **sa** liste d'échecs. Mieux vaut une ligne envoyée deux
+  fois — `definirStock` pose une quantité absolue — qu'un lot clos sur des chiffres faux.
+
+  **Trouvé en chemin** : les trois lanceurs de migrations s'arrêtaient au glob `2[0-9]-*.sql`. La
+  migration 30 n'aurait jamais été jouée, nulle part — ni à l'installation, ni au démarrage de la
+  production. Le commentaire d'`installer.sh` prévenait pourtant : « un tri alphabétique qui fait
+  office d'ordre de dépendances marche jusqu'au jour où un nom commence par une lettre ».
 
 ### Cohérence des données et scripts
 - **É7** — `test_ecriture_grocy.py:367` écrase `db/manuel/16-catalogue-ciqual.sql`, fichier versionné
@@ -246,13 +260,13 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
 | **3 — sécurité et isolation** | ✅ 6/6 | É1, C3, É8, M-01, M-03 · **M-02 partiel** : fenêtre ramenée à 90 j, la visibilité des sessions reste à faire |
-| **4 — base reproductible** | 🟨 C2 fait | `verifier-schema.sh` : **✓ identiques**. Restent É5, É6 et les index de clés étrangères |
+| **4 — base reproductible** | 🟨 C2, É5, É6 faits | `verifier-schema.sh` : **✓ identiques**. Restent les index de clés étrangères |
 | **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
 | **8 — le reste** | ⬜ | ~37 constats faibles |
 
-Tests au 14 septembre : **362 front · 143 API · 482 assertions · 8 erreurs PHPStan**
+Tests au 14 septembre : **362 front · 149 API · 491 assertions · 8 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 Deux points laissés ouverts volontairement :

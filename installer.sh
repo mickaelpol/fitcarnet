@@ -154,7 +154,8 @@ migrations=""
 for fichier in \
     db/manuel/aliment-fibres.sql \
     db/manuel/1[0-9]-*.sql \
-    db/manuel/2[0-9]-*.sql
+    db/manuel/2[0-9]-*.sql \
+    db/manuel/3[0-9]-*.sql
 do
     [[ -f "$fichier" ]] && migrations+="$fichier"$'\n'
 done

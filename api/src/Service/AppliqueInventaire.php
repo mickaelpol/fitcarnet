@@ -54,13 +54,14 @@ final readonly class AppliqueInventaire
      * M-03. Personne ne s'en apercevait : le code convertit en `(string)` juste
      * avant, ce qui rattrapait l'erreur de declaration sans la corriger.
      *
-     * @param array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int} $lot
+     * @param array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int, jeton: string} $lot
      *
      * @return int nombre de lignes envoyees en tout
      */
     public function traiter(array $lot): int
     {
         $id = $lot['id'];
+        $jeton = $lot['jeton'];
 
         /** @var list<array{reference: string, quantite: float|int|string}> $lignes */
         $lignes = (array) \json_decode($lot['lignes'], true, 512, \JSON_THROW_ON_ERROR);
@@ -69,7 +70,7 @@ final readonly class AppliqueInventaire
         if (null === $utilisateur) {
             // Le compte a ete supprime entre le depot et le traitement. Rien a
             // appliquer, et surtout rien a reessayer indefiniment.
-            $this->lots->echouer($id, 'Le compte n’existe plus.');
+            $this->lots->echouer($id, 'Le compte n’existe plus.', $jeton);
 
             return 0;
         }
@@ -98,10 +99,25 @@ final readonly class AppliqueInventaire
             }
 
             ++$faits;
-            $this->lots->avancer($id, $faits);
+
+            /* SI LE LOT A CHANGE DE MAINS, ON S'ARRETE ICI (constat E6).
+               `avancer` rend faux quand la base n'a touche aucune ligne : le
+               jeton n'est plus le notre, donc `reprendreLesAbandonnes` a rendu
+               le lot pendant qu'on travaillait — un Grocy qui a mis plus de
+               deux minutes sur une ligne suffit. Continuer reviendrait a
+               ecraser l'avancement de notre remplacant, puis a clore le lot a
+               sa place avec NOTRE liste d'echecs. Mieux vaut deux fois la meme
+               ligne envoyee qu'un lot clos sur des chiffres faux. */
+            if (!$this->lots->avancer($id, $faits, $jeton)) {
+                $this->journal->warning(
+                    'inventaire : lot {lot} repris par un autre travailleur, on s\'arrete',
+                    ['lot' => $id, 'faites' => $faits]);
+
+                return $faits - $lot['traites'];
+            }
         }
 
-        $this->lots->terminer($id, $faits, $echecs);
+        $this->lots->terminer($id, $faits, $echecs, $jeton);
 
         /* ON VIDE LE GESTIONNAIRE ENTRE DEUX LOTS.
          *

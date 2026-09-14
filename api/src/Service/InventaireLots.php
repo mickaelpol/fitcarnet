@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Entity\Utilisateur;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * La file d'attente des inventaires.
@@ -102,7 +103,7 @@ final readonly class InventaireLots
      * d'attendre. Aujourd'hui il n'y en a qu'un ; le jour ou il y en aura
      * deux, rien a changer.
      *
-     * @return array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int}|null
+     * @return array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int, jeton: string}|null
      */
     public function prendre(): ?array
     {
@@ -119,13 +120,24 @@ final readonly class InventaireLots
                 return null;
             }
 
+            /* LE JETON DE CE TRAVAILLEUR-CI (constat E6, 14 septembre 2026).
+               Le verrou `FOR UPDATE SKIP LOCKED` ci-dessus ne dure que le temps
+               de la prise. Passe cet instant, plus rien ne distinguerait deux
+               travailleurs sur le meme lot : celui-ci sera presente a chaque
+               ecriture, et la base refusera celles de l'ancien si le lot a
+               change de mains entre-temps. */
+            $jeton = Uuid::v4()->toRfc4122();
+
             $cnx->executeStatement(
                 "UPDATE inventaire_lot
-                    SET statut = 'en_cours', commence_le = now(), vu_le = now()
+                    SET statut = 'en_cours', commence_le = now(), vu_le = now(),
+                        jeton = CAST(:jeton AS uuid)
                   WHERE id = :id",
-                ['id' => $lot['id']]);
+                ['id' => $lot['id'], 'jeton' => $jeton]);
 
-            /** @var array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int} $lot */
+            $lot['jeton'] = $jeton;
+
+            /** @var array{id: int, utilisateur_id: string, source: string, lignes: string, total: int, traites: int, jeton: string} $lot */
             return $lot;
         });
     }
@@ -139,26 +151,28 @@ final readonly class InventaireLots
      * indexee coute quelques dixiemes de milliseconde, contre une a deux
      * secondes d'attente Grocy juste avant : le cout est dans le bruit.
      */
-    public function avancer(int $id, int $traites): void
+    public function avancer(int $id, int $traites, string $jeton): bool
     {
-        $this->cnx->executeStatement(
-            'UPDATE inventaire_lot SET traites = :n, vu_le = now() WHERE id = :id',
-            ['n' => $traites, 'id' => $id]);
+        return 1 === $this->cnx->executeStatement(
+            'UPDATE inventaire_lot SET traites = :n, vu_le = now()
+              WHERE id = :id AND jeton = :jeton',
+            ['n' => $traites, 'id' => $id, 'jeton' => $jeton]);
     }
 
     /**
      * @param list<array{reference: string, motif: string}> $echecs
      */
-    public function terminer(int $id, int $traites, array $echecs): void
+    public function terminer(int $id, int $traites, array $echecs, string $jeton): bool
     {
-        $this->cnx->executeStatement(
+        return 1 === $this->cnx->executeStatement(
             "UPDATE inventaire_lot
                 SET statut = 'termine', traites = :n, echecs = CAST(:e AS jsonb), fini_le = now()
-              WHERE id = :id",
+              WHERE id = :id AND jeton = :jeton",
             [
                 'n' => $traites,
                 'e' => \json_encode($echecs, \JSON_THROW_ON_ERROR),
                 'id' => $id,
+                'jeton' => $jeton,
             ]);
     }
 
@@ -169,17 +183,18 @@ final readonly class InventaireLots
      * motif vaut pour tout le lot. Melanger les deux ferait afficher
      * quarante lignes en rouge pour une seule panne.
      */
-    public function echouer(int $id, string $motif): void
+    public function echouer(int $id, string $motif, string $jeton): bool
     {
-        $this->cnx->executeStatement(
+        return 1 === $this->cnx->executeStatement(
             "UPDATE inventaire_lot
                 SET statut = 'echoue',
                     echecs = CAST(:e AS jsonb),
                     fini_le = now()
-              WHERE id = :id",
+              WHERE id = :id AND jeton = :jeton",
             [
                 'e' => \json_encode([['reference' => '', 'motif' => $motif]], \JSON_THROW_ON_ERROR),
                 'id' => $id,
+                'jeton' => $jeton,
             ]);
     }
 
@@ -203,7 +218,7 @@ final readonly class InventaireLots
     {
         return (int) $this->cnx->executeStatement(
             "UPDATE inventaire_lot
-                SET statut = 'en_attente', commence_le = NULL
+                SET statut = 'en_attente', commence_le = NULL, jeton = NULL
               WHERE statut = 'en_cours'
                 AND COALESCE(vu_le, commence_le) < now() - INTERVAL '" . self::SILENCE_MAXIMAL . "'");
     }
