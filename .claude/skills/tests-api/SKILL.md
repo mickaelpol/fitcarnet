@@ -6,8 +6,8 @@ description: Comment on teste l'API de fitcarnet — PHPUnit sans base ni noyau,
 # Tester l'API de fitcarnet
 
 `cd api && bin/phpunit` — ou `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'`
-si `vendor/` n'est pas installé côté hôte. **106 tests, 428 assertions** au
-8 septembre 2026 ; ce chiffre ne peut que monter.
+si `vendor/` n'est pas installé côté hôte. **124 tests, 450 assertions** au
+14 septembre 2026 ; ce chiffre ne peut que monter.
 
 **La suite tourne sans base de données et sans noyau Symfony, et doit le rester.**
 C'est ce qui la rend exécutable partout, en une demi-seconde, sans effet de bord.
@@ -75,6 +75,11 @@ dans le conteneur — ce qui est exactement ce qu'on veut observer.
 
 Exemples complets : `tests/Controller/InventaireProprieteTest.php` et
 `tests/Service/StockProprieteTest.php`.
+
+**Un second motif, pour les extensions Doctrine** : un `QueryBuilder` monte sans
+base — il assemble son DQL en mémoire, l'`EntityManager` n'est sollicité qu'à
+l'exécution, qui n'a pas lieu. On lit alors `getDQL()` et les paramètres posés.
+Voir `tests/Doctrine/FiltreProprietaireTest.php`.
 
 ## Le témoin, obligatoire
 

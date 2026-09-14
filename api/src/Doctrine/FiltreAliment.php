@@ -66,8 +66,18 @@ final readonly class FiltreAliment implements QueryCollectionExtensionInterface,
             return;
         }
 
-        // parentheses indispensables : sans elles, le OR desactiverait les
-        // autres conditions de la requete, filtres de recherche compris
+        /* Le OR est parenthese pour rester un bloc : « AND » lie plus fort que
+           « OR », donc une recherche ajoutee ensuite doit contraindre les DEUX
+           moities, pas seulement « le mien ».
+
+           Ce commentaire disait ces parentheses « indispensables ». Verifie le
+           14 septembre 2026 : elles ne le sont pas. Doctrine parenthese deja
+           toute partie contenant « OR » au moment de combiner les conditions
+           (Query\Expr\Composite, correctif DDC-1237) ; les retirer ne change
+           pas une ligne du DQL produit. On les garde — elles disent l'intention
+           et survivraient a un changement de construction — mais ce n'est pas
+           d'elles que depend l'isolation. FiltreAlimentTest eprouve
+           l'invariant lui-meme, et non la mecanique qui le realise. */
         $qb->andWhere(sprintf(
             '(%s.creePar IS NULL OR %s.creePar = :utilisateur_courant)', $alias, $alias))
            ->setParameter('utilisateur_courant', $utilisateur->getId(), 'uuid');

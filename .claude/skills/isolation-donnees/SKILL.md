@@ -73,9 +73,24 @@ d'inventaire il ne nomme pas la ligne fautive.
 - [ ] Un refus ne permet pas de distinguer « inexistant » de « pas à toi »
 - [ ] Un test le prouve, **écrit et vu échouer d'abord** (voir la skill `tests-api`)
 
-## Ce qui reste ouvert
+## Le filet, et ce qu'il couvre
 
-**C3 de l'audit** : aucun test ne vérifie l'isolation elle-même. Le code est bon,
-relu ligne à ligne, mais toute la garantie tient à deux `tags:` dans
-`services.yaml`. `ModeleExposeTest` couvre l'inventaire des entités ; il manque le
-test de `FiltreProprietaire`. C'est le prochain constat du lot 3.
+**C3 fermé le 14 septembre 2026.** Quatre fichiers éprouvent le dispositif, sans
+base ni noyau — `tests/Doctrine/FiltreProprietaireTest`, `FiltreAlimentTest`,
+`tests/State/ProprietaireProcessorTest`, `tests/Security/CompteActifTest`. Chaque
+témoin a été **vu échouer** en cassant le code qu'il protège.
+
+Ce qu'ils figent, et qu'il ne faut pas défaire :
+
+| Invariant | Pourquoi il compte |
+|---|---|
+| `applyToItem` filtre autant que `applyToCollection` | sinon `GET /api/seances/{id}` rend la séance d'un autre, liste propre |
+| Non authentifié → `1 = 0` | un filtre qui « ne s'applique pas » ouvre la base entière |
+| Une entité non marquée n'est pas touchée | le témoin : un filtre qui restreint tout ressemble à une protection |
+| Le `OR` de `FiltreAliment` reste un bloc | `AND` lie plus fort que `OR` : disjoint, le catalogue commun échappe à la recherche |
+| Un propriétaire déjà posé n'est jamais écrasé | modifier la donnée d'un autre ne doit pas se l'approprier |
+
+**Une idée reçue corrigée au passage** : le commentaire de `FiltreAliment` disait
+ses parenthèses « indispensables ». Elles ne le sont pas — Doctrine parenthèse
+déjà toute partie contenant `OR` (`Query\Expr\Composite`, DDC-1237). On les garde
+pour l'intention, mais ce n'est pas d'elles que dépend l'isolation.

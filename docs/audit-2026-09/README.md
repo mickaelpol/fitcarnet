@@ -84,8 +84,28 @@ créée par aucune migration, présente dans aucune entité, référencée par a
 *Correction : replier le DDL de 25/26/27 dans le schéma, régler `secondes_total_cible`, et ajouter
 au dépôt le script qui construit A et B et exige un diff vide. ~2 h.*
 
-### C3 — Aucun test ne vérifie l'isolation des données entre comptes
-`api/tests/` — **CONFIRMÉ (absence)**
+### C3 — ✅ corrigé le 14 septembre 2026 — Aucun test ne vérifiait l'isolation entre comptes
+`api/tests/` — **CONFIRMÉ (absence), désormais couvert par 18 témoins**
+
+**Ce qui a été fait.** Quatre fichiers, sans base ni noyau, un par pièce du dispositif :
+`FiltreProprietaireTest` (5), `FiltreAlimentTest` (5), `ProprietaireProcessorTest` (4),
+`CompteActifTest` (4). Chaque témoin a été **mis en échec** en cassant le code qu'il protège,
+avant d'être conservé — la restriction retirée de `applyToItem`, le `1 = 0` supprimé, le garde
+`is_a()` court-circuité, le propriétaire écrasé, le compte désactivé laissé passer.
+
+**Deux choses apprises en chemin, qui ne figuraient nulle part :**
+
+- Le commentaire de `FiltreAliment` disait ses parenthèses « indispensables ». Elles ne le sont
+  pas : Doctrine parenthèse déjà toute partie contenant `OR` au moment de combiner les conditions
+  (`Query\Expr\Composite`, correctif DDC-1237). Les retirer ne change pas un caractère du DQL.
+  Elles sont conservées — elles disent l'intention — mais le commentaire a été corrigé, et le test
+  éprouve désormais l'invariant plutôt que la mécanique.
+- `ProprietaireProcessor` ne pose le propriétaire que s'il est absent. Vérifié : la propriété
+  `utilisateur` n'appartient à aucun groupe de `denormalizationContext`, un client ne peut donc pas
+  la transmettre. Le garde protège un PATCH, pas une usurpation.
+
+<details><summary>Le constat d'origine</summary>
+
 
 Aucune occurrence de `FiltreProprietaire`, `FiltreAliment`, `ProprietaireProcessor` ni `CompteActif`
 dans les tests. Le code, lui, **est bon** : relu ligne à ligne, le filtre s'applique en collection
@@ -97,7 +117,9 @@ C'est donc un risque, pas un défaut actif — mais toute la garantie d'isolatio
 `tags:` dans `services.yaml`** et au fait que chaque nouvelle entité pense à implémenter
 `ProprieteUtilisateur`. Une régression serait totalement silencieuse.
 
-*Correction, sans base de données : (a) test unitaire de `FiltreProprietaire` avec `Security`
+</details>
+
+*Correction proposée à l'époque : (a) test unitaire de `FiltreProprietaire` avec `Security`
 bouchonné ; (b) **test d'inventaire du modèle** — parcourir `src/Entity/*.php` et exiger que toute
 classe `#[ApiResource]` à opérations non vides implémente `ProprieteUtilisateur` ou figure dans une
 liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
@@ -201,14 +223,14 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **0 — garde-fous** | ✅ | `CLAUDE.md`, PHPStan niveau 5, `ModeleExposeTest`, `verifier-schema.sh`, `verifier-migrations.sh`, glob des tests, 2 hooks |
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
-| **3 — sécurité et isolation** | 🟨 1/6 · ~4 h | **É1 fait** · restent C3, É8, M-01 à M-03 — **en cours** |
+| **3 — sécurité et isolation** | 🟨 2/6 · ~3 h | **É1 et C3 faits** · restent É8, M-01 à M-03 — **en cours** |
 | **4 — base reproductible** | ⬜ ~4 h | C2 : `verifier-schema.sh` signale toujours **280 lignes** d'écart |
 | **5 — scripts dangereux** | ⬜ ~3 h | É4, É7, É9, `sauvegarde.sh` |
 | **6 — architecture front** | ⬜ 2-3 j | `repas.tsx` (2 397 l.), `hooks.ts` (1 228 l.), 10 duplications |
 | **7 — tests manquants** | ⬜ ~6 h | É10 (client HTTP) et le câblage non couvert |
 | **8 — le reste** | ⬜ | ~37 constats faibles |
 
-Tests au 7 septembre : **362 front · 102 API · 422 assertions · 8 erreurs PHPStan**
+Tests au 14 septembre : **362 front · 124 API · 450 assertions · 8 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 Deux points laissés ouverts volontairement :
