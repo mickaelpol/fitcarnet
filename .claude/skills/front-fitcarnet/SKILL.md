@@ -88,6 +88,26 @@ sans danger. Le piège ne concerne que `src/`.
 
 Relevé le 15 septembre 2026, après que deux agents y sont tombés le même jour.
 
+## Et un module testé ne peut RIEN importer d'un `.tsx`
+
+`tsconfig.tests.json` ne pose **aucune option `jsx`**. Un module de `src/` atteint
+par un test ne peut donc pas importer un type défini dans un `.tsx` — **même en
+`import type`**, qui est pourtant effacé à l'émission : le compilateur doit quand
+même ouvrir le fichier pour résoudre le type.
+
+```
+error TS6142: Module './vue' was resolved to '.../src/vue.tsx',
+              but '--jsx' is not set.
+```
+
+Conséquence de conception, et elle est saine : **un type partagé entre un module
+pur et un composant doit vivre dans un `.ts`.** Si une fonction ne peut pas
+descendre dans `src/` sans traîner un type de `.tsx` derrière elle, c'est que le
+type est au mauvais endroit — pas que la fonction doit rester dans l'écran.
+
+Relevé le 15 septembre 2026, en tentant de descendre `versSaisie` dans
+`calcul/frigo.ts`.
+
 ## Les règles qui produisent des chiffres faux si on les oublie
 
 Voir la skill **`nutrition-fitcarnet`** pour le détail. En deux lignes : les fibres
