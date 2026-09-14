@@ -409,7 +409,13 @@ CREATE TABLE jeton_rafraichissement (
     empreinte      VARCHAR(64) NOT NULL UNIQUE,
     utilisateur_id UUID        NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
     expire_le      TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
-    cree_le        TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL
+    cree_le        TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    -- Dernière utilisation. NULLABLE, et sur une base neuve elle ne sera
+    -- pourtant jamais NULL : l'application l'écrit à la création comme à
+    -- chaque rafraîchissement. Le NULL est là pour les lignes ouvertes AVANT
+    -- la migration 32, dont la dernière utilisation n'est pas connue — et
+    -- « je ne sais pas » ne s'invente pas (règle 6).
+    vu_le          TIMESTAMP(0) WITHOUT TIME ZONE
 );
 CREATE INDEX idx_jeton_rafraichissement_utilisateur
     ON jeton_rafraichissement (utilisateur_id);
@@ -603,6 +609,8 @@ COMMENT ON TABLE inventaire_lot IS
     'File d''attente des inventaires. Deposes par l''API, appliques par la commande app:inventaire:traiter.';
 COMMENT ON COLUMN inventaire_lot.traites IS
     'Lignes deja envoyees a la source. Mis a jour apres chaque ligne, pour qu''une interruption reste lisible.';
+COMMENT ON COLUMN inventaire_lot.jeton IS
+    'Pose a la prise, presente a chaque ecriture. Un lot repris change de jeton : l''ancien travailleur est alors refuse.';
 
 -- ---------------------------------------------------------------------
 --  Compléments alimentaires (migration 27)
@@ -653,6 +661,8 @@ COMMENT ON COLUMN jeton_rafraichissement.empreinte IS
     'SHA-256 du jeton. Le jeton en clair n''est jamais stocke.';
 COMMENT ON COLUMN jeton_rafraichissement.expire_le IS
     'Repousse a chaque rafraichissement : une application qui sert ne deconnecte pas.';
+COMMENT ON COLUMN jeton_rafraichissement.vu_le IS
+    'Derniere utilisation. NULL = session ouverte avant la migration 32, jamais revue depuis.';
 COMMENT ON COLUMN plan_repas.cuisine_le IS
     'NULL = prevu, le plan reserve son stock ; renseigne = cuisine, le stock a deja ete decremente';
 COMMENT ON INDEX aliment_nom_commun_unique IS

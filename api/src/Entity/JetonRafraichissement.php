@@ -49,6 +49,23 @@ class JetonRafraichissement
     #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $creeLe;
 
+    /**
+     * La derniere utilisation — « vu le » du constat M-02.
+     *
+     * L'ECHEANCE NE LA REMPLACE PAS, contrairement a ce qu'on pourrait croire :
+     * `expireLe` est repoussee de 90 jours a chaque usage, donc deux sessions
+     * utilisees a un mois d'intervalle affichent la meme chose a un mois pres.
+     * Ce qui permet de reconnaitre l'appareil qu'on ne reconnait pas, c'est la
+     * date brute du dernier usage.
+     *
+     * NULLABLE, ET C'EST LE SEUL CAS OU ELLE L'EST : les sessions ouvertes
+     * avant la migration 32 n'ont pas de derniere utilisation connue, et « je
+     * ne sais pas » ne se remplace pas par une valeur plausible (regle 6). Une
+     * session nee apres, elle, porte toujours une date — naitre est un usage.
+     */
+    #[ORM\Column(name: 'vu_le', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $vuLe;
+
     public function __construct(
         Utilisateur $utilisateur,
         string $empreinte,
@@ -59,6 +76,10 @@ class JetonRafraichissement
         $this->empreinte = $empreinte;
         $this->expireLe = $expireLe;
         $this->creeLe = new \DateTimeImmutable();
+        // Une session vient d'etre ouverte par une connexion : elle a servi a
+        // l'instant meme. Le meme objet que `creeLe`, et non un second appel a
+        // l'horloge, pour que les deux dates ne divergent pas d'une microseconde.
+        $this->vuLe = $this->creeLe;
     }
 
     public function getId(): Uuid
@@ -76,20 +97,38 @@ class JetonRafraichissement
         return $this->expireLe;
     }
 
+    public function getCreeLe(): \DateTimeImmutable
+    {
+        return $this->creeLe;
+    }
+
+    public function getVuLe(): ?\DateTimeImmutable
+    {
+        return $this->vuLe;
+    }
+
     public function estExpire(): bool
     {
         return $this->expireLe <= new \DateTimeImmutable();
     }
 
     /**
-     * Repousse l'echeance a chaque utilisation.
+     * Repousse l'echeance a chaque utilisation, et inscrit cette utilisation.
      *
-     * Sans cela, une session finirait par tomber au bout d'un an meme sur une
-     * application ouverte tous les jours — exactement ce qu'on cherche a
-     * eviter. Une application abandonnee, elle, finit bien par expirer.
+     * Sans la prolongation, une session finirait par tomber au bout de 90 jours
+     * meme sur une application ouverte tous les jours — exactement ce qu'on
+     * cherche a eviter. Une application abandonnee, elle, finit bien par expirer.
+     *
+     * `$maintenant` EST UN PARAMETRE, ET NON `new \DateTimeImmutable()` POSE
+     * ICI. Deux raisons, dans cet ordre : l'appelant derive l'echeance du meme
+     * instant, donc les deux dates ne peuvent pas se decaler ; et un temoin qui
+     * ne peut pas choisir l'instant ne peut pas distinguer « prolonger a ecrit
+     * la date » de « le constructeur venait de la poser » — il passerait au vert
+     * sur un `prolonger()` qui n'ecrirait rien.
      */
-    public function prolonger(\DateTimeImmutable $nouvelle): void
+    public function prolonger(\DateTimeImmutable $nouvelle, \DateTimeImmutable $maintenant): void
     {
         $this->expireLe = $nouvelle;
+        $this->vuLe = $maintenant;
     }
 }

@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Entity\JetonRafraichissement;
 use App\Entity\Utilisateur;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Cree, reconnait et revoque les jetons de rafraichissement.
@@ -32,10 +33,13 @@ final class JetonsRafraichissement
      * sessions. Trois mois glissants ne changent rien pour qui se sert de
      * l'application, et divisent la fenetre par quatre pour qui l'a oubliee.
      *
-     * CE QUI MANQUE ENCORE : la visibilite. Pouvoir constater et couper UNE
-     * session precise — `GET /api/mes-sessions`, `DELETE /api/mes-sessions/{id}`
-     * — reste la vraie reponse au constat. La table porte deja tout sauf
-     * « vu le ». Les revocations existantes sont toutes « tout ou rien ».
+     * SECOND VOLET, 15 SEPTEMBRE 2026 : la visibilite, qui etait la vraie
+     * reponse au constat. `MesSessionsController` liste et coupe UNE session
+     * precise, par `pour()` et `revoquerPour()` ci-dessous ; la colonne
+     * « vu le » a ete ajoutee a la table (migration 32) et `prolonger()`
+     * l'ecrit. Les trois revocations d'avant — deconnexion, changement de mot
+     * de passe, desactivation du compte — restent « tout ou rien », mais elles
+     * ne sont plus les seules.
      */
     public const DUREE = '+90 days';
 
@@ -91,7 +95,11 @@ final class JetonsRafraichissement
             return null;
         }
 
-        $jeton->prolonger(new \DateTimeImmutable(self::DUREE));
+        // Un SEUL appel a l'horloge : l'echeance est derivee de l'instant qu'on
+        // inscrit comme derniere utilisation, faute de quoi les deux dates
+        // seraient prises a deux microsecondes d'ecart pour rien.
+        $maintenant = new \DateTimeImmutable();
+        $jeton->prolonger($maintenant->modify(self::DUREE), $maintenant);
         $this->em->flush();
 
         return $jeton->getUtilisateur();
@@ -109,6 +117,46 @@ final class JetonsRafraichissement
 
         $this->em->remove($jeton);
         $this->em->flush();
+    }
+
+    /**
+     * Les sessions ouvertes d'un compte, pour l'ecran qui les liste.
+     *
+     * @return list<JetonRafraichissement>
+     */
+    public function pour(Utilisateur $utilisateur): array
+    {
+        return $this->em->getRepository(JetonRafraichissement::class)
+            ->findBy(['utilisateur' => $utilisateur], ['creeLe' => 'DESC']);
+    }
+
+    /**
+     * Couper UNE session, la sienne. Rend false si elle n'existe pas ou n'est
+     * pas a lui — l'appelant ne doit pas pouvoir distinguer les deux cas.
+     *
+     * LE PROPRIETAIRE EST DANS LA REQUETE, PAS DANS UN `if` QUI SUIT.
+     *
+     * Regle 2 du projet, et corollaire de la faille E1 du 8 septembre 2026 :
+     * l'identifiant vient du client, donc la propriete se verifie ici, au point
+     * de passage oblige de l'ecriture, et non dans le controleur. Un controle
+     * pose apres la lecture est un controle qu'un second appelant oubliera —
+     * c'est exactement ce qui s'etait produit entre `/mon-frigo/stock` et son
+     * jumeau `/mon-frigo/inventaire`. Retirer `'utilisateur'` de ce tableau
+     * suffirait a laisser n'importe qui deconnecter n'importe qui.
+     */
+    public function revoquerPour(Utilisateur $utilisateur, Uuid $id): bool
+    {
+        $jeton = $this->em->getRepository(JetonRafraichissement::class)
+            ->findOneBy(['id' => $id, 'utilisateur' => $utilisateur]);
+
+        if ($jeton === null) {
+            return false;
+        }
+
+        $this->em->remove($jeton);
+        $this->em->flush();
+
+        return true;
     }
 
     /**

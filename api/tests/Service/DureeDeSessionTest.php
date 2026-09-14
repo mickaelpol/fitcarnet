@@ -8,6 +8,7 @@ use App\Entity\JetonRafraichissement;
 use App\Entity\Utilisateur;
 use App\Service\JetonsRafraichissement;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -31,10 +32,13 @@ use PHPUnit\Framework\TestCase;
  * qu'un appareil oublie cesse d'etre une porte trois mois plus tard au lieu
  * de douze.
  *
- * CE QUE CELA NE REGLE PAS, et qui reste ouvert : la VISIBILITE. Rien ne
- * permet encore de constater ni de couper une session precise. La route
- * `GET /api/mes-sessions` + `DELETE /api/mes-sessions/{id}` reste la vraie
- * reponse au constat ; la table porte deja tout sauf « vu le ».
+ * SECOND VOLET, 15 septembre 2026 : la VISIBILITE, qui etait la vraie reponse
+ * au constat. `GET /api/mes-sessions` et `DELETE /api/mes-sessions/{id}`
+ * existent desormais — l'isolation entre comptes de ces deux routes est
+ * eprouvee par `MesSessionsProprieteTest`. Ce qui manquait a la table, et que
+ * les temoins ci-dessous figent, c'est « vu le » : une liste de sessions
+ * qui n'affiche pas la derniere utilisation ne permet pas de reconnaitre celle
+ * qu'on ne reconnait pas.
  */
 final class DureeDeSessionTest extends TestCase
 {
@@ -62,10 +66,83 @@ final class DureeDeSessionTest extends TestCase
         $jeton = new JetonRafraichissement(new Utilisateur(), 'empreinte',
             new \DateTimeImmutable('+2 days'));
 
-        $jeton->prolonger(new \DateTimeImmutable(JetonsRafraichissement::DUREE));
+        $jeton->prolonger(new \DateTimeImmutable(JetonsRafraichissement::DUREE),
+            new \DateTimeImmutable());
 
         self::assertEcheanceDansQuatreVingtDixJours($jeton->getExpireLe(),
             'se servir de l\'application doit repousser l\'echeance, pas la laisser courir');
+    }
+
+    /**
+     * NAITRE EST UN USAGE. Une session vient d'etre ouverte par une connexion :
+     * dire « jamais utilisee » de celle-la serait faux, et un ecran qui affiche
+     * une date fausse est pire qu'un ecran qui n'en affiche pas (regle 7).
+     *
+     * `vu_le` reste neanmoins NULLABLE : les lignes anterieures a la migration
+     * 32 n'ont pas de derniere utilisation connue, et « je ne sais pas » ne se
+     * remplace pas par une valeur plausible (regle 6). C'est la seule facon
+     * qu'a cette colonne d'etre vide.
+     */
+    public function testUneSessionNeuveEstVueALInstantOuElleNait(): void
+    {
+        $jeton = self::jetonCree();
+
+        self::assertEquals($jeton->getCreeLe(), $jeton->getVuLe(),
+            'une session qu\'on vient d\'ouvrir a servi a l\'instant meme');
+    }
+
+    /**
+     * SANS CE TEMOIN, LA LISTE DES SESSIONS MENTIRAIT PAR OMISSION.
+     *
+     * L'echeance seule ne distingue rien : elle est repoussee de 90 jours a
+     * chaque usage, donc deux sessions utilisees a un mois d'intervalle
+     * affichent la meme chose a un mois pres. Ce qui permet de reconnaitre
+     * l'appareil qu'on ne reconnait pas, c'est « vu le » — et il faut donc
+     * qu'un usage l'inscrive vraiment.
+     */
+    public function testChaqueUsageInscritLeMomentDeCetUsage(): void
+    {
+        $jeton = new JetonRafraichissement(new Utilisateur(), 'empreinte',
+            new \DateTimeImmutable('+2 days'));
+
+        /* Un instant EXPLICITE, et volontairement loin de maintenant : compare
+           a `new \DateTimeImmutable()`, ce temoin passerait meme si `prolonger`
+           n'ecrivait rien, puisque le constructeur vient de poser l'heure. */
+        $usage = new \DateTimeImmutable('2026-09-15 08:30:00');
+        $jeton->prolonger(new \DateTimeImmutable(JetonsRafraichissement::DUREE), $usage);
+
+        self::assertEquals($usage, $jeton->getVuLe(),
+            'un rafraichissement doit inscrire le moment ou il a eu lieu');
+    }
+
+    /**
+     * LE VRAI CHEMIN, celui qu'emprunte un rafraichissement reel.
+     *
+     * Les deux temoins precedents appellent `prolonger()` a la main. Le seul
+     * appelant de production, lui, est `utilisateurPour()` — et c'est lui qui
+     * derive l'echeance de l'instant d'usage. Sans ce temoin, la ligne qui fait
+     * les deux d'un coup n'etait couverte par rien : on aurait pu inscrire une
+     * derniere utilisation sans repousser l'echeance, ou l'inverse.
+     */
+    public function testUnRafraichissementReelRepousseEtInscritEnMemeTemps(): void
+    {
+        $utilisateur = new Utilisateur();
+        $jeton = new JetonRafraichissement($utilisateur, \hash('sha256', 'secret'),
+            new \DateTimeImmutable('+2 days'));
+
+        $depot = self::createStub(EntityRepository::class);
+        $depot->method('findOneBy')->willReturn($jeton);
+        $em = self::createStub(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturn($depot);
+
+        $avant = new \DateTimeImmutable();
+        $rendu = (new JetonsRafraichissement($em))->utilisateurPour('secret');
+
+        self::assertSame($utilisateur, $rendu, 'le jeton valide doit rendre son compte');
+        self::assertEcheanceDansQuatreVingtDixJours($jeton->getExpireLe(),
+            'un rafraichissement reel doit repousser l\'echeance');
+        self::assertGreaterThanOrEqual($avant, $jeton->getVuLe(),
+            'et inscrire le moment de cet usage, pas celui de la creation');
     }
 
     /**
