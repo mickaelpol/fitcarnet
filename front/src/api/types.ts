@@ -176,7 +176,12 @@ export interface Modele {
   id?: number;
   nom: string | null;
   type: 'Push' | 'Pull' | 'Legs' | null;
-  partage: boolean;
+  /* PAS DE `partage` : le partage de modèle n'existe pas, et c'est une
+     décision du 15 septembre 2026, pas un oubli (constat F-05). Le champ a
+     existé sans jamais rien faire — `FiltreProprietaire` posait
+     « WHERE utilisateur = :moi » avant que le `security:` qui le lisait ne
+     soit évalué. Il a été retiré de l'entité, de la base et d'ici le même
+     jour ; ne pas le réintroduire sans rouvrir la décision. */
   exercices: ModeleExercice[];
 }
 

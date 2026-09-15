@@ -13,7 +13,7 @@ le métier.**
 ## Les commandes, dans cet ordre
 
 ```bash
-cd front && npm test          # tsc --noEmit + 562 tests, puis 2 de rendu
+cd front && npm test          # tsc --noEmit + 562 tests, puis 7 de rendu
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, servi par Caddy)
 ```

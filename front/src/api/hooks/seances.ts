@@ -132,7 +132,6 @@ export function useSeanceVersModele() {
       const modele = {
         nom: seance.type ?? 'Modèle',
         type: seance.type,
-        partage: false,
         exercices: seance.exercices.map((bloc, i) => ({
           exercice: typeof bloc.exercice === 'string' ? bloc.exercice : bloc.exercice['@id'],
           ordre: i,

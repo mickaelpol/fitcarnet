@@ -163,7 +163,7 @@ test('les séries sont numérotées dans l\'ordre, à partir de zéro', () => {
 /* ---- blocsDepuisModele ---- */
 
 const modele = (exercices: Modele['exercices']): Modele => ({
-  nom: 'Push', type: 'Push', partage: false, exercices,
+  nom: 'Push', type: 'Push', exercices,
 });
 
 test('les cibles du modèle deviennent les objectifs de la séance', () => {

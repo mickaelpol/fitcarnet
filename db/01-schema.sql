@@ -280,7 +280,11 @@ CREATE TABLE modele (
     utilisateur_id UUID NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
     nom            TEXT,
     type           TEXT CHECK (type IN ('Push','Pull','Legs')),
-    partage        BOOLEAN NOT NULL DEFAULT FALSE,
+    -- PAS DE COLONNE `partage` : le partage de modele n'existe pas, et c'est
+    -- une decision, pas un oubli (migration 33, constat F-05). Elle a existe
+    -- sans jamais rien faire -- `FiltreProprietaire` posait « WHERE
+    -- utilisateur = :moi » avant que le `security:` qui la lisait ne soit
+    -- evalue. Ne pas la reintroduire sans rouvrir la decision.
     cree_le        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX ON modele (utilisateur_id);

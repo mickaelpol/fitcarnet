@@ -319,8 +319,11 @@ seule chose qui sépare un compte de démonstration de ton compte personnel.
 *Geste* : change l'ordre des exercices → « **Appliquer cet ordre à tes séances ?** » → **Appliquer**.
 *Tu dis* : « Et quand je change l'ordre, je peux le répercuter sur mes séances à venir. »
 
-> **À NE PAS FILMER** : le **partage d'un modèle** *(E5)*. Il est inopérant —
-> constat F-05 de l'audit. Ne le montre pas tant qu'il n'est pas corrigé.
+> ~~**À NE PAS FILMER** : le partage d'un modèle *(E5)*.~~ — **il n'existe
+> plus**, tranché le 15 septembre 2026. Le champ n'a jamais rien fait (constat
+> F-05) ; plutôt que de le faire marcher, il a été retiré de l'entité, de la
+> base et du front. Il n'y a donc plus rien à éviter de montrer : **le partage
+> de modèle ne fait pas partie de l'application.**
 
 ---
 

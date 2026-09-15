@@ -1,0 +1,45 @@
+-- =====================================================================
+--  33 — RETIRER `modele.partage` : une fonctionnalité qui n'en était pas une
+--
+--  Constat F-05 de l'audit de septembre 2026, tranché le 15 septembre 2026.
+--
+--  CE QUE CETTE COLONNE PRÉTENDAIT FAIRE, ET CE QU'ELLE FAISAIT.
+--
+--  Un modèle de séance marqué `partage = true` devait être lisible par les
+--  autres comptes. L'expression de sécurité de l'opération `Get` le disait :
+--  « object.getUtilisateur() == user OR object.isPartage() ».
+--
+--  Elle n'a jamais pu s'appliquer. `FiltreProprietaire` pose
+--  « WHERE utilisateur = :moi » dans la REQUÊTE, donc avant que l'expression
+--  ne soit évaluée : le modèle d'un autre compte n'était jamais trouvé, la
+--  réponse était 404, et la clause n'était jamais atteinte.
+--
+--  Ce n'était pas un trou de sécurité — la fermeture gagnait, et c'est le bon
+--  sens de l'erreur. C'était une fonctionnalité MORTE qui affirmait le
+--  contraire. Et une expression de sécurité qui ment sur ce que le système
+--  autorise finit recopiée là où elle ferait effet.
+--
+--  POURQUOI ON SUPPRIME PLUTÔT QUE DE FAIRE MARCHER.
+--
+--  Décision du propriétaire, le 15 septembre 2026 : **le partage de modèle ne
+--  doit pas être possible dans l'application.** L'ouvrir vraiment aurait
+--  demandé de sortir `Modele` de `FiltreProprietaire` en lecture d'item et de
+--  laisser le `security:` décider seul — c'est-à-dire de déplacer l'isolation
+--  d'une extension Doctrine vers une expression de sécurité, exactement le
+--  contraire de ce que ce projet a choisi (voir la règle 2 de CLAUDE.md).
+--
+--  AUCUNE DONNÉE N'EST PERDUE. Relevé avant d'écrire, comme l'exige la skill
+--  `donnees-de-test` : les trois modèles de la base de développement portent
+--  tous `partage = false`. La colonne n'a jamais eu de valeur `true` produite
+--  par l'application, puisque le front envoyait `partage: false` en dur à
+--  chaque création. Elle ne portait donc aucune information.
+--
+--  Le drapeau disparaît aussi de `api/src/Entity/Modele.php`, de
+--  `front/src/api/types.ts` et de `front/src/api/hooks/seances.ts` — les
+--  quatre ENSEMBLE, parce qu'une moitié de suppression est pire que rien.
+--
+--  Idempotente : `IF EXISTS`. Rejouée à chaque démarrage par
+--  `entrypoint-prod.sh`, elle ne doit jamais échouer.
+-- =====================================================================
+
+ALTER TABLE modele DROP COLUMN IF EXISTS partage;

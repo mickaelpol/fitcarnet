@@ -22,7 +22,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **564 tests front** (562 + 2 de rendu) · **231 API · 617 assertions**, 7 erreurs PHPStan
+État : **569 tests front** (562 + 7 de rendu) · **231 API · 617 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -97,7 +97,7 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 562 + 2 tests, 0 echec
+cd front && npm test                                                  # 562 + 7 tests, 0 echec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 231 tests, 617 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
@@ -444,8 +444,10 @@ Monté du 9 au 14 septembre 2026 pour présenter fitcarnet **à un client et à 
 4. Remonter la vidéo à partir des prises téléphone.
 
 **Deux choses à ne pas découvrir caméra allumée** : la source Grocy n'est
-tournable que si `GROCY_URL` est renseigné sur l'instance filmée, et le **partage
-d'un modèle est inopérant** (constat F-05).
+tournable que si `GROCY_URL` est renseigné sur l'instance filmée. ~~Le partage
+d'un modèle est inopérant~~ — **tranché le 15 septembre 2026 : il n'existe
+plus.** Voir « Le partage de modèle n'existe pas » plus bas ; il n'y a donc plus
+rien à éviter de montrer.
 
 **Le jeu de démonstration est un FICHIER, pas un état de la base.**
 `db/manuel/jeu-demo.sql` pose neuf semaines de vie d'un compte : 14 aliments,
@@ -551,20 +553,88 @@ exercices privés — était le constat **F-09**, **clos depuis** :
 
 ---
 
+## Le partage de modèle n'existe pas, et c'est une décision
+
+**Tranché le 15 septembre 2026 par le propriétaire : le partage de modèle ne
+doit pas être possible dans l'application.** Constat F-05, option 1 de l'audit,
+appliquée en entier.
+
+**Ce que la fonctionnalité faisait vraiment : rien.** `Modele` portait une
+colonne `partage`, et l'opération `Get` disait
+`object.getUtilisateur() == user OR object.isPartage()`. Cette clause n'a
+**jamais pu s'appliquer** : `FiltreProprietaire` pose
+`WHERE utilisateur = :moi` dans la requête, donc **avant** que l'expression ne
+soit évaluée. Le modèle d'un autre compte n'était jamais trouvé — 404, et la
+clause jamais atteinte.
+
+Ce n'était pas un trou de sécurité : la fermeture gagnait, et c'est le bon sens
+de l'erreur. C'était une **fonctionnalité morte qui affirmait le contraire**, et
+une expression de sécurité qui ment sur ce que le système autorise finit
+recopiée là où elle ferait effet.
+
+**Pourquoi supprimer plutôt que faire marcher.** L'ouvrir vraiment aurait
+demandé de sortir `Modele` de `FiltreProprietaire` en lecture d'item et de
+laisser le `security:` décider seul — c'est-à-dire déplacer l'isolation d'une
+extension Doctrine vers une expression de sécurité, le contraire exact de la
+règle 2.
+
+**Les quatre endroits ont été coupés ENSEMBLE**, parce qu'une moitié de
+suppression est pire que rien :
+
+| Où | Quoi |
+|---|---|
+| `api/src/Entity/Modele.php` | le champ, ses accesseurs, ses groupes de sérialisation |
+| `db/manuel/33-retirer-le-partage-de-modele.sql` | `ALTER TABLE modele DROP COLUMN IF EXISTS partage` |
+| `db/01-schema.sql` | la colonne retirée **et** la raison écrite à sa place (règle 1) |
+| `front/src/api/types.ts`, `hooks/seances.ts`, `app/modele/[id].tsx` | le type et les deux appelants |
+
+`db/manuel/jeu-demo.sql` a suivi, sans quoi le jeu de démonstration ne se
+serait plus chargé.
+
+**Aucune donnée perdue**, relevé avant d'écrire : les trois modèles de la base
+portaient tous `partage = false`, et le front envoyait `partage: false` en dur à
+chaque création. La colonne n'a jamais porté d'information.
+
+> **Un point à connaître.** Un client qui enverrait encore `"partage": true`
+> reçoit **201**, pas une erreur : API Platform ignore un attribut inconnu. Le
+> champ n'existe plus, donc rien n'est stocké ni lu — mais ce n'est pas un refus,
+> c'est un silence. Sans conséquence tant qu'aucun client ne le croit.
+
+---
+
 ## Deux chantiers laissés ouverts, sciemment
 
-**É14 n'a reçu qu'un volet sur trois.** Terminer la session quand le jeton de
-rafraîchissement a disparu suffit à rouvrir la porte — vérifié jusqu'à la
-redirection. Les deux ceintures de sécurité restantes : le bouton de déconnexion
-rendu **avant** l'écran d'erreur dans `compte.tsx` (aujourd'hui `if (isError)`
-retourne l. 24, le bouton est l. 95 — donc inatteignable quand `/moi` échoue),
-et le portier de `_layout.tsx`.
+~~**É14 n'a reçu qu'un volet sur trois.**~~ — **les trois sont faits, le
+15 septembre 2026.** Terminer la session quand le jeton de rafraîchissement a
+disparu (volet 1, vérifié jusqu'à la redirection), le portier de `_layout.tsx`
+(volet 3), et le dernier, corrigé ce soir :
 
-**Le blocage a sauté.** Elles attendaient une bibliothèque de test de
-composants ; `@testing-library/react` est installé depuis le 15 septembre 2026,
-et `src/composants/editeurAliment.test-rendu.tsx` montre le motif — suffixe
-`.test-rendu.tsx`, seconde passe de `npm test`, `--import` de
-`src/tests/environnement.js`. Il ne reste qu'à écrire les deux témoins.
+**Le bouton de déconnexion était enfermé derrière l'écran d'erreur.**
+`compte.tsx` retournait son `<Erreur>` par un `return` précoce, et son bouton
+« Se déconnecter » quarante lignes plus bas. Dès que `GET /api/moi` échouait, la
+seule façon de quitter une session disparaissait — réseau coupé, API en panne,
+jeton corrompu. **Et le chargement enfermait autant que l'erreur** :
+`src/api/client.ts` ne pose aucun délai de garde, donc une requête qui pend
+laisse `isPending` vrai indéfiniment, et l'écran restait sur son rond qui tourne
+sans erreur à montrer ni bouton pour sortir.
+
+C'est la leçon déjà écrite dans `etatMaj.tsx` — le bouton de rafraîchissement
+caché par le bug qu'il corrigeait — et pas appliquée ici. Le jumeau oublié, une
+fois de plus.
+
+Le cadre de l'écran est extrait vers **`src/composants/cadreCompte.tsx`** : il
+décide de ce qu'il montre selon trois états, et rend la sortie **hors de toute
+condition**. L'écran n'est plus que son câblage, et n'a plus un seul `return`
+précoce. `cadreCompte.test-rendu.tsx` éprouve les trois états, plus les deux
+témoins inverses — que l'erreur s'affiche toujours et se réessaie, et que le
+contenu du compte ne s'affiche **pas** tant qu'on ne l'a pas reçu (sans quoi
+« toujours afficher le bouton » se corrigerait en affichant tout, tiret compris,
+et on retomberait sur la règle 7).
+
+**Pourquoi dans `src/` et pas à côté de l'écran** : un test posé dans `app/`
+n'est jamais exécuté — `tsconfig.tests.json` ne compile que `src/`. Une garde
+qu'on ne peut pas éprouver se re-perd au découpage suivant, ce qui est
+exactement ce qui venait d'arriver.
 
 ~~**M1 et M4 du lot 2**~~ — **faits le 15 septembre 2026.** M1 n'était pas qu'une
 duplication : en mode « glucides totaux », la cible comprend les fibres à 2 kcal/g
@@ -635,7 +705,7 @@ relancé.**
   l'ordre est écrit à la main. Le 9 septembre, la base avait 18 tables au lieu de
   20 : `inventaire_lot` manquait, et l'envoi d'un inventaire répondait
   « relation "inventaire_lot" does not exist ». Rejouer la liste dans l'ordre
-  d'`installer.sh` — les 23 migrations passent, `25-garde-fous.sql` compris.
+  d'`installer.sh` — les 24 migrations passent, `25-garde-fous.sql` compris.
 - **`bin/console` exige `api/.env`, que le clone ne fournit pas.** Sans lui :
   « Unable to read the "/app/.env" ». L'API servie par FrankenPHP s'en passe —
   ses variables viennent du conteneur. Un fichier local suffit, avec `APP_ENV`

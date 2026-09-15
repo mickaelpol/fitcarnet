@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useDeconnexion, useMoi } from '@/api/hooks';
-import { Bouton, Carte, Chargement, Discret, Erreur, Texte } from '@/composants/base';
+import { Bouton, Carte, Discret, Texte } from '@/composants/base';
+import { CadreCompte } from '@/composants/cadreCompte';
 import { BandeauMaj } from '@/composants/bandeauMaj';
 import { MesComplements } from '@/composants/complements';
 import { EtatMaj } from '@/composants/etatMaj';
@@ -12,31 +13,31 @@ export default function Compte() {
   const { data, isPending, isError, error, refetch } = useMoi();
   const deconnecter = useDeconnexion();
 
-  /* `isPending` ET NON `isLoading`, DEPUIS QUE `useMoi` CONNAIT LA SESSION.
+  /* CET ECRAN N'A PLUS DE `return` PRECOCE, ET C'EST TOUT L'OBJET D'E14.
+     Il en avait deux — un pour l'attente, un pour l'erreur — et le bouton
+     « Se déconnecter » vivait quarante lignes plus bas, donc apres eux. Une
+     panne de `/api/moi` retirait ainsi la seule sortie de la session.
+     `CadreCompte` decide ce qu'il montre ; la sortie, elle, n'est plus sous
+     aucune condition. Voir `src/composants/cadreCompte.tsx` et son test.
+
+     `isPending` ET NON `isLoading`, DEPUIS QUE `useMoi` CONNAIT LA SESSION.
      `isLoading` vaut `isPending && isFetching` : quand `useMoi` est desactive
      — le temps que `useConnecte` lise le coffre, a chaque montage — rien ne
      part sur le reseau, donc `isFetching` est faux, donc `isLoading` AUSSI.
-     L'ecran passait alors les deux gardes avec `data` indefini et affichait le
-     tiret et « Gérés dans l'onglet Mon frigo » comme un fait : exactement la
-     panne decrite juste en dessous, revenue par la porte de derriere en
-     ajoutant `enabled` a `useMoi`. Relevee par la revue le 15 septembre 2026,
-     le jour meme. `isPending` dit « je n'ai pas de donnee », sans rien
-     supposer de ce qui circule. */
-  if (isPending) return <Chargement />;
-
-  /* UN ECHEC DOIT SE VOIR, ET IL NE SE VOYAIT PAS.
-     Seul `isLoading` etait lu. Reseau coupe ou session expiree, l'ecran
-     s'affichait quand meme : un nom remplace par un tiret, une adresse vide,
-     et surtout « Gérés dans l'onglet Mon frigo » affiche comme un fait alors
-     que rien n'avait ete recu. Une information fausse presentee calmement est
-     pire qu'une erreur — on la croit. Tous les autres ecrans utilisent deja ce
-     composant. */
-  if (isError) {
-    return <Erreur message={error.message} onReessayer={() => void refetch()} />;
-  }
+     L'ecran passait alors ses deux gardes avec `data` indefini et affichait le
+     tiret et « Gérés dans l'onglet Mon frigo » comme un fait. Une information
+     fausse presentee calmement est pire qu'une erreur — on la croit.
+     `isPending` dit « je n'ai pas de donnee », sans rien supposer de ce qui
+     circule. Relevee par la revue le 15 septembre 2026. */
+  const etat = isPending ? 'attente' : isError ? 'erreur' : 'pret';
 
   return (
-    <ScrollView contentContainerStyle={s.page}>
+    <CadreCompte
+      etat={etat}
+      messageErreur={isError ? error.message : ''}
+      onReessayer={() => void refetch()}
+      onDeconnexion={() => { void deconnecter().then(() => router.replace('/connexion')); }}
+    >
       <Carte>
         <Discret style={s.etiquette}>Compte</Discret>
         <Texte style={{ fontFamily: P.fort, fontSize: T.grand }}>{data?.nom ?? '—'}</Texte>
@@ -97,19 +98,11 @@ export default function Compte() {
         </>
       )}
 
-      <Bouton
-        variante="discret"
-        onPress={() => { void deconnecter().then(() => router.replace('/connexion')); }}
-        style={{ marginTop: E.l }}
-      >
-        Se déconnecter
-      </Bouton>
-    </ScrollView>
+    </CadreCompte>
   );
 }
 
 const s = StyleSheet.create({
-  page: { padding: E.m, gap: E.s },
   etiquette: {
     fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase',
     color: C.discret, marginBottom: E.xs,

@@ -37,7 +37,7 @@ export default function DetailModele() {
   useEffect(() => {
     if (modele !== null) return;
     if (nouveau) {
-      setModele({ nom: null, type: null, partage: false, exercices: [] });
+      setModele({ nom: null, type: null, exercices: [] });
     } else {
       const m = (modeles.data ?? []).find((x) => x.id === Number(id));
       if (m) setModele(m);

@@ -137,7 +137,7 @@ données. Tu auras :
 
 | Présent d'emblée | Absent |
 |---|---|
-| le schéma et les 23 migrations | tes **séances** et ton historique |
+| le schéma et les 24 migrations | tes **séances** et ton historique |
 | le référentiel commun — exercices, emplacements, modes de cuisson | le **stock** de ton frigo |
 | — | **tous les aliments** : il n'y a plus de catalogue de départ (voir plus bas) |
 | le catalogue de 1 338 exercices (téléchargé par `installer.sh`) | tes **aliments personnels** |
@@ -182,7 +182,7 @@ Chaque commande doit donner **au moins** ce résultat — ce sont les chiffres d
 7 septembre 2026 ; ils ne peuvent que monter.
 
 ```bash
-cd front && npm test                    # 562 tests, puis 2 de rendu, 0 échec
+cd front && npm test                    # 562 tests, puis 7 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
                                         # 231 tests, 617 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'

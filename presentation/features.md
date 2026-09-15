@@ -326,9 +326,13 @@ démontrer devant un client.
 - **404 et non 403 sur un modèle qui n'est pas le sien** — ne révèle pas son existence. `OrdreModeleProcessor.php:42`
 - **Suppression confirmée** — « Tes séances passées ne sont pas touchées. » `modele/[id].tsx:247`
 
-> **⚠ Le partage d'un modèle est inopérant.** Le champ existe et la règle de
-> sécurité l'autorise, mais le filtre Doctrine l'interdit — constat **F-05** de
-> l'audit. Ne pas le démontrer.
+> **Le partage d'un modèle n'existe pas, et c'est une décision** du
+> 15 septembre 2026. Le champ a existé sans jamais rien faire — la règle de
+> sécurité l'autorisait, le filtre Doctrine l'interdisait (constat **F-05**).
+> Il a été retiré de l'entité, de la base et du front plutôt que rendu
+> fonctionnel : l'ouvrir aurait déplacé l'isolation d'une extension Doctrine
+> vers une expression de sécurité, le contraire de la règle 2. **Un modèle
+> n'appartient qu'à son compte.**
 
 ---
 

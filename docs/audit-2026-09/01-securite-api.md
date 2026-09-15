@@ -266,7 +266,7 @@ détournement par cadre (clickjacking) et au *MIME sniffing*.
 ## F-05 — `Modele::$partage` est inopérant : le `security:` l'autorise, le filtre Doctrine l'interdit
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
+- **Statut : CORRIGÉ le 15 septembre 2026 — option 1, en entier**
 - **Emplacement :** `api/src/Entity/Modele.php:27` (`security: "object.getUtilisateur() == user or object.isPartage()"`) contre `api/src/Doctrine/FiltreProprietaire.php:37-46` (`applyToItem` s'applique à toute `ProprieteUtilisateur`)
 
 **Ce qui se passe.** L'expression de sécurité prévoit qu'un modèle marqué
@@ -282,6 +282,25 @@ recopiée là où elle ferait effet.
 lecture d'item et laisser le `security:` décider. La première option est plus
 sûre tant que la fonctionnalité n'est pas demandée.
 **Effort : 15 min (option 1), 1 h (option 2, avec tests).**
+
+**Ce qui a été fait.** L'**option 1**, sur décision du propriétaire le
+15 septembre 2026 : *le partage de modèle ne doit pas être possible dans
+l'application.* L'option 2 a été explicitement écartée — elle aurait déplacé
+l'isolation d'une extension Doctrine vers une expression de sécurité, le
+contraire de la règle 2.
+
+Les quatre endroits coupés ensemble, une moitié de suppression étant pire que
+rien : `api/src/Entity/Modele.php` (clause, champ, accesseurs, groupes) ·
+`db/manuel/33-retirer-le-partage-de-modele.sql` doublée dans `db/01-schema.sql`
+(règle 1, `verifier-schema.sh` au vert) · `front/src/api/types.ts`,
+`hooks/seances.ts` et `app/modele/[id].tsx` · plus `db/manuel/jeu-demo.sql`,
+sans quoi le jeu de démonstration n'aurait plus chargé.
+
+Aucune donnée perdue, relevé **avant** d'écrire : les trois modèles portaient
+`partage = false`, et le front envoyait `false` en dur à chaque création.
+
+`ModeleExposeTest::testAucuneExpressionDeSecuriteNePrometCeQueLeFiltreInterdit`
+interdit la rechute sur cette entité comme sur les autres.
 
 ---
 

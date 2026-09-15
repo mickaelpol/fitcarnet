@@ -138,8 +138,8 @@ BEGIN
     --  TROIS PROGRAMMES. Le découpage Push / Pull / Legs est celui que la
     --  base impose (contrainte CHECK sur `type`).
     -- ----------------------------------------------------------------
-    INSERT INTO modele (utilisateur_id, nom, type, partage)
-    VALUES (v_utilisateur, 'Haut du corps — poussée', 'Push', FALSE) RETURNING id INTO v_modele_push;
+    INSERT INTO modele (utilisateur_id, nom, type)
+    VALUES (v_utilisateur, 'Haut du corps — poussée', 'Push') RETURNING id INTO v_modele_push;
 
     INSERT INTO modele_exercice (modele_id, exercice_id, ordre, mode, notes)
     VALUES (v_modele_push, v_ex_developpe, 1, 'charge', 'Barre guidée, amplitude complète') RETURNING id INTO v_me;
@@ -156,8 +156,8 @@ BEGIN
     INSERT INTO modele_serie (modele_exercice_id, ordre, reps_cible, secondes_cible) VALUES
         (v_me, 1, NULL, 45), (v_me, 2, NULL, 45);
 
-    INSERT INTO modele (utilisateur_id, nom, type, partage)
-    VALUES (v_utilisateur, 'Haut du corps — tirage', 'Pull', FALSE) RETURNING id INTO v_modele_pull;
+    INSERT INTO modele (utilisateur_id, nom, type)
+    VALUES (v_utilisateur, 'Haut du corps — tirage', 'Pull') RETURNING id INTO v_modele_pull;
 
     INSERT INTO modele_exercice (modele_id, exercice_id, ordre, mode, notes)
     VALUES (v_modele_pull, v_ex_rowing, 1, 'charge', NULL) RETURNING id INTO v_me;
@@ -178,8 +178,8 @@ BEGIN
             (v_me, 1, 12, 50), (v_me, 2, 12, 50), (v_me, 3, 12, 50);
     END IF;
 
-    INSERT INTO modele (utilisateur_id, nom, type, partage)
-    VALUES (v_utilisateur, 'Bas du corps', 'Legs', FALSE) RETURNING id INTO v_modele_legs;
+    INSERT INTO modele (utilisateur_id, nom, type)
+    VALUES (v_utilisateur, 'Bas du corps', 'Legs') RETURNING id INTO v_modele_legs;
 
     INSERT INTO modele_exercice (modele_id, exercice_id, ordre, mode, notes)
     VALUES (v_modele_legs, v_ex_squat, 1, 'charge', NULL) RETURNING id INTO v_me;

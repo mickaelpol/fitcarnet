@@ -77,7 +77,7 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 562 tests, puis 2 de rendu
+cd front && npm test        # tsc --noEmit + 562 tests, puis 7 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 
@@ -98,7 +98,7 @@ api/          Symfony — 18 entités, contrôleurs, services, extensions Doctri
 front/        Expo — 16 écrans, le solveur de repas, les modules de calcul
   src/solveur/    composition de repas : algèbre, garanties, tests de propriété
   src/calcul/     nutrition, cuisson, performance, plausibilité
-db/           01-schema.sql (le schéma complet) + manuel/ (23 migrations)
+db/           01-schema.sql (le schéma complet) + manuel/ (24 migrations)
 docker/       Dockerfile, Caddyfile, point d'entrée de production
 docs/         audit-2026-09/ — 84 constats classés
 .claude/      outillage : skills du projet, agents, hooks, réglages
@@ -108,7 +108,7 @@ docs/         audit-2026-09/ — 84 constats classés
 
 ## Qualité
 
-**795 tests** — 564 côté front (562 + 2 de rendu), 231 côté API — et quatre garde-fous automatiques
+**800 tests** — 569 côté front (562 + 7 de rendu), 231 côté API — et quatre garde-fous automatiques
 qui tournent sans qu'on y pense :
 
 - **PHPStan** niveau 5 sur l'API ;

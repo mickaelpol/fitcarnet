@@ -66,7 +66,7 @@ tard » que ce bouton existe pour éviter.
 `db/01-schema.sql` — **CONFIRMÉ, reproduit par diff de deux bases réelles**
 
 Deux bases ont été construites dans un PostgreSQL 16 jetable — A depuis `01-schema.sql` seul,
-B depuis A plus les 23 migrations dans l’ordre d'`installer.sh` — et leurs `pg_dump --schema-only`
+B depuis A plus les 24 migrations dans l’ordre d'`installer.sh` — et leurs `pg_dump --schema-only`
 comparés. **Le diff fait 312 lignes.**
 
 Absents du schéma initial : la table **`complement`** (séquence, PK, FK, 2 index, 4 CHECK), la table
@@ -324,7 +324,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **7 — tests manquants** | ✅ | `client.ts` : 22 témoins, chacun prouvé par une **mutation** qui le tue (29 mutations au banc). `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
 | **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
-Tests au 15 septembre, au terme du chantier : **564 front** (562 + 2 de rendu, en deux passes) · **231 API · 617 assertions · 7 erreurs PHPStan**
+Tests au 15 septembre, au terme du chantier : **569 front** (562 + 7 de rendu, en deux passes) · **231 API · 617 assertions · 7 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 **Et une épreuve que les tests ne remplacent pas** :
@@ -333,11 +333,13 @@ cinq écrans, portier d'administration, **zéro erreur de console, zéro requêt
 échec**. C'est ce genre de témoin qui a trouvé le `GET /api/moi` sans jeton sur
 l'écran de connexion, invisible pour jsdom comme pour `tsc`.
 
-Deux points laissés ouverts volontairement :
-- **É14** n'a reçu qu'un volet sur trois. Le premier suffit à rouvrir la session ; les deux
-  ceintures de sécurité (`compte.tsx`, `_layout.tsx`) attendaient une bibliothèque de test de
-  composants — **`@testing-library/react` est installé depuis le 15 septembre**, le blocage a
-  sauté et il ne reste qu'à écrire les deux témoins.
+Un point laissé ouvert volontairement :
+- ~~**É14** n'a reçu qu'un volet sur trois~~ — **les trois sont faits le 15 septembre 2026.**
+  Le premier suffit à rouvrir la session ; le portier de `_layout.tsx` est en place ; et le
+  bouton de déconnexion de `compte.tsx`, jusque-là enfermé derrière un `return` précoce sur
+  l'erreur, est rendu **hors de toute condition** par `src/composants/cadreCompte.tsx`. Une
+  panne de `/api/moi` — ou une requête qui pend, `client.ts` n'ayant aucun délai de garde —
+  ne retire plus la seule sortie de la session. Cinq témoins de rendu.
 - ~~**La table des paliers du disque RM**~~ — **tranchée le 15 septembre 2026.** Une seule
   table, centrée sur **70-90 %**, la zone où l'on progresse et la seule où la formule dit vrai.
   Neuf paliers par pas de 2,5 %, donnant neuf cibles de répétitions distinctes. En dessous de

@@ -45,9 +45,12 @@ use Symfony\Component\Validator\Constraints as Assert;
         // `ModeleExposeTest::testAucuneExpressionDeSecuriteNePrometCeQueLeFiltreInterdit`
         // interdit desormais la rechute, sur cette entite comme sur les autres.
         //
-        // LA COLONNE `partage` RESTE EN BASE, et le champ avec : la retirer
-        // demande une migration, donc une modification sous `db/`, hors du
-        // perimetre de cette correction. Elle n'est lue par personne.
+        // LE CHAMP ET LA COLONNE ONT ETE RETIRES le 15 septembre 2026, sur
+        // decision du proprietaire : le partage de modele ne doit pas exister
+        // dans cette application. Migration `db/manuel/33-...`, doublee dans
+        // `db/01-schema.sql`, plus le type et l'appel cote front — les quatre
+        // ensemble, parce qu'une moitie de suppression est pire que rien.
+        // Aucune donnee perdue : la colonne n'a jamais porte que `false`.
         new Get(security: "object.getUtilisateur() == user"),
         new Post(processor: ProprietaireProcessor::class),
         new Patch(security: "object.getUtilisateur() == user", processor: ProprietaireProcessor::class),
@@ -82,25 +85,6 @@ class Modele implements ProprieteUtilisateur
     #[Groups(['modele:lire', 'modele:ecrire'])]
     private ?string $type = null;
 
-    /**
-     * CE DRAPEAU N'A AUCUN EFFET (constat F-05, 15 septembre 2026).
-     *
-     * Il se lit et s'ecrit, mais plus rien ne le CONSULTE : la seule
-     * expression qui s'en servait — le `security:` de l'operation `Get` —
-     * ne pouvait pas s'appliquer, `FiltreProprietaire` ayant deja pose
-     * « WHERE utilisateur = :moi » avant elle. Un modele « partage » restait
-     * introuvable pour les autres comptes, et le reste.
-     *
-     * IL EST CONSERVE, ET CE N'EST PAS UN OUBLI : le front l'envoie a chaque
-     * creation (`front/src/api/hooks/seances.ts`) et son type le declare. Le
-     * retirer des groupes casserait l'ecran ; retirer la colonne demanderait
-     * une migration. Les deux sont a faire ENSEMBLE le jour ou l'on tranche,
-     * pas a moitie aujourd'hui.
-     */
-    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
-    #[Groups(['modele:lire', 'modele:ecrire'])]
-    private bool $partage = false;
-
     #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
     #[Groups(['modele:lire'])]
     private \DateTimeImmutable $creeLe;
@@ -130,8 +114,6 @@ class Modele implements ProprieteUtilisateur
     public function setNom(?string $v): self { $this->nom = $v; return $this; }
     public function getType(): ?string { return $this->type; }
     public function setType(?string $v): self { $this->type = $v; return $this; }
-    public function isPartage(): bool { return $this->partage; }
-    public function setPartage(bool $v): self { $this->partage = $v; return $this; }
     public function getCreeLe(): \DateTimeImmutable { return $this->creeLe; }
 
     /** @return Collection<int, ModeleExercice> */
