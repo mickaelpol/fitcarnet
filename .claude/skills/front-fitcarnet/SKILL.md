@@ -13,7 +13,7 @@ le métier.**
 ## Les commandes, dans cet ordre
 
 ```bash
-cd front && npm test          # tsc --noEmit + 567 tests, puis 7 de rendu
+cd front && npm test          # tsc --noEmit + 577 tests, puis 19 de rendu
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, servi par Caddy)
 ```
@@ -37,6 +37,7 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 | Cru/cuit, fournées, habitudes | `src/calcul/cuisson.ts` |
 | Composition de repas | `src/solveur/` |
 | Suppression des accents | `src/calcul/texte.ts` |
+| Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
 
 **Aucune formule métier recopiée.** Un écran qui recalcule un 1RM importe
 `performance.ts`. Trois copies d'Epley aux bornes divergentes ont produit un
@@ -93,7 +94,7 @@ Relevé le 15 septembre 2026, après que deux agents y sont tombés le même jou
 **Deux passes, et deux suffixes.** `npm test` lance :
 
 ```bash
-node --test "dist-tests/**/*.test.js"                    # 567 tests, SANS DOM
+node --test "dist-tests/**/*.test.js"                    # 577 tests, SANS DOM
 node --import ./dist-tests/tests/environnement.js \
      --test "dist-tests/**/*.test-rendu.js"              # les tests de rendu
 ```

@@ -99,3 +99,63 @@ test('un autre aliment repart bien de ses propres valeurs', (t: TestContext) => 
   assert.equal(champFibres().value, '',
     'changer d’aliment doit repartir des valeurs du nouveau');
 });
+
+/* ======================================================================== */
+/* UNE MACRO VIDE N'EST PAS UNE MACRO À ZÉRO                                */
+/* ======================================================================== */
+
+/**
+ * LA PANNE, RELEVÉE PAR LA REVUE LE 15 SEPTEMBRE 2026. `nombre()` lisait un
+ * champ vide — ou illisible — comme 0, et l'aliment s'enregistrait avec.
+ * Les calories vides étaient déjà refusées (`kcal100 > 0`), et un zéro qui rend
+ * l'aliment incohérent l'était aussi par le contrôle. Restait le cas qui passe :
+ * une macro qui VAUT zéro pour cet aliment. Vider les protéines de l'huile
+ * d'olive donnait exactement les mêmes valeurs — et « je ne sais pas » partait
+ * en base comme « zéro gramme », règle 6.
+ */
+const huile = (): AlimentSaisi => ({ nom: 'Huile d\'olive', categorie: 'lip',
+  kcal100: 900, prot100: 0, gluc100: 0, lip100: 100, fibres100: null,
+  ratio: 1, peseeAvant: null, peseeApres: null,
+});
+
+/** Les quatre champs de macros portent la même indication « 0 » : on les prend dans l'ordre. */
+const macro = (rang: 0 | 1 | 2 | 3) => screen.getAllByPlaceholderText('0')[rang] as HTMLInputElement;
+const CALORIES = 0; const PROTEINES = 1; const LIPIDES = 3;
+
+function editer(t: TestContext): AlimentSaisi[] {
+  t.after(cleanup);
+  const envoyes: AlimentSaisi[] = [];
+  render(
+    <EditeurAliment visible aliment={huile()} onEnregistrer={(a) => { envoyes.push(a); }} onFermer={() => undefined} />,
+  );
+
+  return envoyes;
+}
+
+test('une huile intacte s\'enregistre — le témoin de l\'inverse', (t: TestContext) => {
+  const envoyes = editer(t);
+  assert.equal(macro(CALORIES).value, '900', 'le test ne vise pas le bon champ');
+
+  fireEvent.click(screen.getByText('Enregistrer'));
+
+  assert.equal(envoyes.length, 1, 'sans ce témoin, un bouton toujours désactivé passerait pour une correction');
+});
+
+test('des protéines vidées ne partent pas comme 0 g', (t: TestContext) => {
+  const envoyes = editer(t);
+
+  fireEvent.change(macro(PROTEINES), { target: { value: '' } });
+  fireEvent.click(screen.getByText('Enregistrer'));
+
+  assert.equal(envoyes.length, 0,
+    'vider un champ, c\'est dire « je ne sais pas » : l\'enregistrer à 0 g écrit un chiffre que personne n\'a donné');
+});
+
+test('des lipides illisibles ne partent pas non plus', (t: TestContext) => {
+  const envoyes = editer(t);
+
+  fireEvent.change(macro(LIPIDES), { target: { value: '10,0,0' } });
+  fireEvent.click(screen.getByText('Enregistrer'));
+
+  assert.equal(envoyes.length, 0);
+});

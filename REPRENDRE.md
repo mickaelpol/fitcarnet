@@ -22,7 +22,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **574 tests front** (567 + 7 de rendu) · **248 API · 656 assertions**, 7 erreurs PHPStan
+État : **596 tests front** (577 + 19 de rendu) · **248 API · 656 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -97,7 +97,7 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 567 + 7 tests, 0 echec
+cd front && npm test                                                  # 577 + 19 tests, 0 echec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 248 tests, 656 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
@@ -704,6 +704,126 @@ en rétrécissant le `catch`.
 > **À savoir, sans que ce soit un défaut** : avec les deux réessais de React
 > Query, un serveur totalement muet laisse le rond tourner environ 90 s avant
 > « Réessayer ». Le bouton « Se déconnecter » reste accessible pendant ce temps.
+
+---
+
+## L'épreuve sur Android — et le chiffre faux qu'elle a trouvé
+
+Le 15 septembre 2026, l'application a été éprouvée **sur le vrai moteur
+d'Android**, et plus seulement sous Node et Chromium : Expo Go sur l'émulateur
+d'Android Studio (`Medium_Phone_API_36.1`, côté Windows), piloté depuis WSL par
+`adb.exe`. Rien n'a été construit ni publié : c'est le bundle de Metro, dans
+Hermes, avec le `fetch` de React Native.
+
+**Ce qui tient sur Android** : la connexion, les cinq onglets sans une erreur
+JavaScript, la création d'une séance et ses sauvegardes automatiques
+(`POST` 201, `PATCH` 200), et le nouveau client HTTP — délai de garde,
+réponse relue puis reconstruite — qui n'avait été éprouvé que sous Node.
+
+### Le défaut : 42,5 kg tapés, 425 kg enregistrés
+
+Frappe par frappe dans le poids d'une série, sur l'émulateur :
+
+| Frappe | Le champ affichait |
+|---|---|
+| `4` | `4` |
+| `2` | `42` |
+| `,` | `42` — la virgule disparaît |
+| `5` | `425` |
+
+**La base a enregistré `poids = 425.00`**, qui part ensuite dans le 1RM, les
+records et la courbe. Le champ était piloté par le NOMBRE (`String(serie.poids)`) :
+« 42, » se lisait 42 et se réécrivait « 42 ». Ce défaut était antérieur à la
+journée, et valait sur le web comme sur Android.
+
+**Ses jumeaux, trouvés en le corrigeant et par la revue qui a suivi** :
+
+- répétitions de la série, répétitions et poids cibles du modèle — ce dernier
+  affiché via `nb()`, qui arrondissait 42,25 en « 42.3 » dans le champ même ;
+- `parseFloat(...) || 0` et `parseInt(...) || 0` dans ces quatre champs : une
+  saisie illisible devenait **zéro** (règle 6) ;
+- **les objectifs par repas** : `parseFloat('12,5')` rend 12. Prouvé sur
+  Android avant et après : 12,5 g tapés s'enregistraient **12.00** (298 kcal),
+  ils s'enregistrent **12.50** (300 kcal) ;
+- l'inventaire du frigo (« 4,2,1 » partait en 4,2), le calculateur de 1RM
+  (« 8,5 » répétitions lues 8), et l'éditeur d'aliment, qui enregistrait **0 g**
+  pour une macro laissée vide.
+
+**La correction** : une seule lecture, `src/calcul/saisieNombre.ts`
+(`nombreSaisi` — vide ou illisible donne `null`, jamais 0 ; `entier` pour les
+répétitions), sur laquelle `grammesSaisis` s'est branchée au lieu d'en garder
+une copie ; et `src/composants/champNombre.tsx`, un champ qui **garde le texte
+tapé** et ne le remplace que si la valeur change de l'extérieur. Un champ
+illisible se borde de rouge ; l'éditeur d'aliment refuse d'enregistrer une macro
+vide et dit pourquoi. Tests unitaires et de rendu, **chacun vu tomber sous
+mutation** — dont les deux que la revue a exigés : une série supprimée dont la
+voisine prend la place, et un décimal dans des répétitions qui doit rester à
+l'écran.
+
+**Le délai de garde, prouvé sur Android face à un serveur muet.** Expo Go
+effacé (plus de session), application pointée vers un serveur qui accepte les
+connexions sans jamais répondre, appui sur « Se connecter » : « Connexion… »
+à 6 s, puis **à 32 s** « *Le serveur ne répond pas (plus de 30 s) :
+http://127.0.0.1:9999/api. Réessaie dans un instant ; si ça dure, vérifie ta
+connexion et que le serveur est bien allumé.* » Le serveur muet a reçu la
+connexion, l'API réelle aucune. Jusqu'au 15 septembre, ce même écran aurait
+tourné pour toujours.
+
+**Le poids décimal, prouvé sur Android dans les deux configurations réelles** :
+
+| Téléphone | Frappes | Le champ | En base |
+|---|---|---|---|
+| anglais | `4 2 . 5` | `42.` puis `42.5` | 42.50 |
+| français (Expo Go en fr-FR) | `4 2 , 5` | `42,` puis `42,5` | 42.50 |
+
+**Les données existantes** : les 31 séries des comptes réels de la base de
+développement sont toutes cohérentes avec leur exercice. Une seule est
+invérifiable faute de point de comparaison — « Squat sumo haltère, 79 kg × 1 »,
+seule série de son exercice, qui pourrait aussi être un 7,9 kg amputé de sa
+virgule. **La base de production n'a pas été examinée.**
+
+### Refaire l'épreuve : la procédure, et ses pièges vérifiés
+
+```bash
+SDK=/mnt/c/Users/micka/AppData/Local/Android/Sdk
+$SDK/emulator/emulator.exe -avd Medium_Phone_API_36.1 -no-snapshot-save &
+$SDK/platform-tools/adb.exe install -r <Expo Go SDK 54>.apk   # api.expo.dev/v2/versions/latest
+$SDK/platform-tools/adb.exe reverse tcp:8081 tcp:8081
+cd front && npx expo start --go --localhost --port 8081 --clear   # l'adresse de l'API vient de front/.env
+$SDK/platform-tools/adb.exe shell am start -a android.intent.action.VIEW -d exp://127.0.0.1:8081
+```
+
+Chacun de ces pièges a coûté un faux résultat le 15 septembre :
+
+- **`front/.env` gagne sur la ligne de commande — et `EXPO_NO_DOTENV=1` n'y
+  change rien.** `client.ts` ne lit pas `process.env` mais le module
+  `expo/virtual/env`, que Metro remplit depuis les fichiers `.env`. Le bundle
+  portait donc à la fois `process.env.EXPO_PUBLIC_API_URL = 127.0.0.1:9999`
+  (la ligne de commande) et `expo/virtual/env = 192.168.1.118:8080` (le fichier)
+  — et c'est le second qui servait : un test « face à un serveur muet » a parlé
+  à la vraie API, vérifié dans son journal. Pour viser une autre adresse, poser
+  un **`front/.env.local`** temporaire (ignoré par git, prioritaire sur `.env`)
+  et le retirer ensuite. Le bundle porte alors les DEUX valeurs dans
+  `expo/virtual/env` — celle de `.env` et celle de `.env.local` : y trouver la
+  bonne ligne ne prouve pas qu'elle sert. **La preuve est dans le journal du
+  serveur visé**, et dans l'absence de requête chez l'autre.
+- **`CI=1` désactive le rechargement de Metro** (« *reloads are disabled* ») :
+  il sert l'ancien code, sans erreur visible, et une correction semble inopérante.
+  Relancer Metro après chaque modification, ou ne pas passer `CI=1`.
+- **Vérifier le bundle avant d'éprouver** : le demander à Metro via son manifeste
+  (`curl -H 'expo-platform: android' http://localhost:8081/`, puis
+  `launchAsset.url`) et y chercher le code attendu. Un bundle de 12 Ko est un
+  **message d'erreur**, pas du code — Expo Go continue alors sur l'ancien.
+- **Le clavier d'Android filtre le séparateur décimal selon la langue** : en
+  anglais la virgule est refusée avant d'atteindre l'application. Pour éprouver
+  un téléphone français : `adb shell cmd locale set-app-locales host.exp.exponent --locales fr-FR`.
+- **Relire l'écran après chaque geste** (`uiautomator dump`) : une sauvegarde qui
+  affiche « enregistré » décale la page de 82 pixels, et une coordonnée relevée
+  avant n'est plus la bonne.
+- **Des commandes lancées en parallèle se disputent le dossier courant** : un
+  `cd front && npm run build:web` a tourné à la racine, et un `rm -rf api/front`
+  est parti d'un autre dossier (sans rien trouver à supprimer, vérifié). **Chemins
+  absolus uniquement**, surtout pour un `rm`.
 
 ---
 

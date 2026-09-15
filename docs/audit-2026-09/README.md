@@ -324,7 +324,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **7 — tests manquants** | ✅ | `client.ts` : 22 témoins, chacun prouvé par une **mutation** qui le tue (29 mutations au banc). `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
 | **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
-Tests au 15 septembre, au terme du chantier : **574 front** (567 + 7 de rendu, en deux passes) · **248 API · 656 assertions · 7 erreurs PHPStan**
+Tests au 15 septembre, au terme du chantier : **596 front** (577 + 19 de rendu, en deux passes) · **248 API · 656 assertions · 7 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 **Et une épreuve que les tests ne remplacent pas** :

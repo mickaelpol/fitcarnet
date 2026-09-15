@@ -33,7 +33,7 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 567 tests, puis 7 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 577 tests, puis 19 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
 # 248 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
@@ -90,6 +90,7 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Cru/cuit, fournées, habitudes | `front/src/calcul/cuisson.ts` |
 | Composition de repas | `front/src/solveur/` |
 | Suppression des accents | `front/src/calcul/texte.ts` |
+| Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `front/src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
 
 Un hook qui recalcule un 1RM importe `performance.ts`. Trois copies d'Epley aux bornes divergentes
 ont produit un « record » de 79,96 kg que la formule elle-même déclare invalide.

@@ -6,6 +6,7 @@
  * même ordre — sans quoi les deux vues du même frigo divergeraient.
  */
 
+import { nombreSaisi } from './saisieNombre';
 import type { AlimentDisponible } from '@/api/types';
 import { sansAccent } from './texte';
 
@@ -81,8 +82,11 @@ export function ecartsInventaire(
     const texte = (saisies[a.reference] ?? '').trim();
     if (texte === '') continue;
 
-    const quantite = parseFloat(texte.replace(',', '.'));
-    if (Number.isNaN(quantite) || quantite < 0) continue;
+    /* `nombreSaisi` ET NON `parseFloat` : « 4,2,1 » se lisait 4,2, et partait
+       vers Grocy comme une pesée. Relevé par la revue le 15 septembre 2026.
+       Négatif et illisible rendent `null` : la ligne n'est pas envoyée. */
+    const quantite = nombreSaisi(texte);
+    if (quantite === null) continue;
     if (Math.abs(quantite - a.stock) <= SEUIL_ECART) continue;
 
     lignes.push({ reference: a.reference, quantite });

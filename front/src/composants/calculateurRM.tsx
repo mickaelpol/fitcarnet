@@ -8,6 +8,7 @@ import {
   estimerDepuisEssai, paliersPour, pasConseille, PAS_DISPONIBLES, REPS_MAX_POUR_1RM,
 } from '@/calcul/performance';
 import { C, E, N, P, R, T, nb } from '@/theme';
+import { nombreSaisi } from '@/calcul/saisieNombre';
 
 /**
  * Calculateur de RM, ouvert DEPUIS l'exercice en cours.
@@ -36,8 +37,12 @@ export function ModaleCalculateurRM({
     if (visible) { setPoids(''); setReps(''); setPasChoisi(null); }
   }, [visible]);
 
-  const p = parseFloat(poids.replace(',', '.'));
-  const r = parseInt(reps, 10);
+  /* `nombreSaisi` ET NON `parseInt` / `parseFloat` — 15 septembre 2026, relevé
+     par la revue. « 8,5 » répétitions se lisaient 8 et affichaient un 1RM estimé
+     sur une saisie qui n'en désigne aucun ; « 4,2,1 » kg se lisait 4,2. Un
+     chiffre plausible sur une saisie fausse, c'est la règle 7. */
+  const p = nombreSaisi(poids) ?? NaN;
+  const r = nombreSaisi(reps, { entier: true }) ?? NaN;
   const saisi = !Number.isNaN(p) && !Number.isNaN(r) && p > 0 && r >= 1;
   const tropLong = !Number.isNaN(r) && r > REPS_MAX_POUR_1RM;
 

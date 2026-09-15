@@ -44,6 +44,13 @@ describe('écarts d\'inventaire', () => {
       [{ reference: 'base:2', quantite: 119.5 }]);
   });
 
+  it('une saisie illisible n\'est pas envoyée comme un nombre plausible', () => {
+    /* `parseFloat` lisait « 4,2,1 » 4,2 sans broncher : un stock inventé,
+       envoyé à Grocy comme une pesée. Relevé par la revue le 15 septembre
+       2026 ; la lecture passe désormais par `nombreSaisi`, qui rend `null`. */
+    assert.deepEqual(ecartsInventaire(stock, { 'base:1': '4,2,1', 'base:2': '12O' }), []);
+  });
+
   it('écarte une saisie illisible ou négative plutôt que de deviner', () => {
     assert.deepEqual(ecartsInventaire(stock, { 'base:1': 'abc', 'base:2': '-3' }), []);
   });

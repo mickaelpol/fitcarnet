@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useCibles, useEnregistrerCible } from '@/api/hooks';
 import type { Cible } from '@/api/types';
+import { nombreSaisi } from '@/calcul/saisieNombre';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { convertir, fibresDouteuses } from '@/calcul/planCoach';
 /* La formule des calories ne se recopie pas : elle vit dans le solveur, qui
@@ -27,11 +28,12 @@ const vide: Saisie = { prot: '', gluc: '', lip: '', kcal: '' };
 type Plan = { kcal: string; prot: string; gluc: string; lip: string; fibres: string };
 const planVide: Plan = { kcal: '', prot: '', gluc: '', lip: '', fibres: '' };
 
-const lire = (v: string): number => {
-  const n = parseFloat(v.replace(',', '.'));
+/* `nombreSaisi` ET NON `parseFloat` : « 4,2,1 » se lisait 4,2 sans broncher.
+   `NaN` reste le contrat de ce convertisseur pour « rien d'utilisable ». */
+const lire = (v: string): number => nombreSaisi(v) ?? NaN;
 
-  return Number.isFinite(n) ? n : NaN;
-};
+/** Une saisie non vide qui ne désigne aucun nombre : le champ se borde de rouge. */
+const illisible = (v: string): boolean => v.trim() !== '' && nombreSaisi(v) === null;
 
 export default function Objectifs() {
   const router = useRouter();
@@ -80,16 +82,22 @@ export default function Objectifs() {
      l'intervalle entier pour ne pas la contredire. */
   const majMacro = (champ: 'prot' | 'gluc' | 'lip', valeur: string) => {
     const suite = { ...saisie, [champ]: valeur };
-    const p = parseFloat(suite.prot); const g = parseFloat(suite.gluc); const l = parseFloat(suite.lip);
+    const p = lire(suite.prot); const g = lire(suite.gluc); const l = lire(suite.lip);
     if (![p, g, l].some(Number.isNaN)) {
       suite.kcal = String(Math.round(kcalDesMacros({ prot: p, gluc: g, lip: l })));
     }
     setSaisie(suite);
   };
 
+  /* LA VIRGULE ÉTAIT IGNORÉE ICI — 15 septembre 2026, relevé par la revue.
+     `parseFloat('12,5')` rend 12 : sur un clavier Android français, 12,5 g de
+     protéines s'enregistraient 12, et le calcul des repas visait la mauvaise
+     cible sans que rien ne le montre. Le convertisseur du plan étranger, trente
+     lignes plus haut, remplaçait bien la virgule : le jumeau de ces quatre
+     lectures, oublié d'elles. */
   const valeurs = {
-    prot: parseFloat(saisie.prot), gluc: parseFloat(saisie.gluc),
-    lip: parseFloat(saisie.lip), kcal: parseFloat(saisie.kcal),
+    prot: lire(saisie.prot), gluc: lire(saisie.gluc),
+    lip: lire(saisie.lip), kcal: lire(saisie.kcal),
   };
   const valide = Object.values(valeurs).every((v) => !Number.isNaN(v) && v >= 0);
   /* Même règle que le solveur, et la même fonction : en glucides TOTAUX les
@@ -254,16 +262,16 @@ export default function Objectifs() {
           )}
 
           <View style={s.paire}>
-            <Champ etiquette="Protéines" valeur={saisie.prot} onChange={(v) => majMacro('prot', v)}
+            <Champ etiquette="Protéines" valeur={saisie.prot} onChange={(v) => majMacro('prot', v)} illisible={illisible(saisie.prot)}
               unite="g" numerique placeholder="0" style={{ flex: 1 }} />
-            <Champ etiquette="Glucides" valeur={saisie.gluc} onChange={(v) => majMacro('gluc', v)}
+            <Champ etiquette="Glucides" valeur={saisie.gluc} onChange={(v) => majMacro('gluc', v)} illisible={illisible(saisie.gluc)}
               unite="g" numerique placeholder="0" style={{ flex: 1 }} />
           </View>
           <View style={s.paire}>
-            <Champ etiquette="Lipides" valeur={saisie.lip} onChange={(v) => majMacro('lip', v)}
+            <Champ etiquette="Lipides" valeur={saisie.lip} onChange={(v) => majMacro('lip', v)} illisible={illisible(saisie.lip)}
               unite="g" numerique placeholder="0" style={{ flex: 1 }} />
             <Champ etiquette="Calories" valeur={saisie.kcal}
-              onChange={(v) => setSaisie({ ...saisie, kcal: v })}
+              onChange={(v) => setSaisie({ ...saisie, kcal: v })} illisible={illisible(saisie.kcal)}
               unite="kcal" numerique placeholder="0" style={{ flex: 1 }} />
           </View>
 

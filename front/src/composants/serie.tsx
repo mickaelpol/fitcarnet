@@ -1,9 +1,11 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { Serie } from '@/api/types';
-import { Champ, Discret, Texte } from './base';
+import { Discret, Texte } from './base';
+import { ChampNombre } from './champNombre';
 import { ChronoEffort } from './chronoSerie';
+import { texteDuNombre } from '@/calcul/saisieNombre';
 import type { CibleMesure } from './etatMesure';
-import { C, E, R, T, TOUCHE, nb } from '@/theme';
+import { C, E, R, T, TOUCHE } from '@/theme';
 
 /**
  * Une série. Cocher la remplit avec l'objectif si les champs sont vides,
@@ -44,17 +46,22 @@ export function LigneSerie({
           c'est ce détail qui montre la progression sur une série longue. */}
       {(mode === 'charge' || mode === 'chrono') && (
         <>
-          <Champ
-            valeur={serie.reps === null ? '' : String(serie.reps)}
-            onChange={(v) => onChange({ ...serie, reps: v === '' ? null : parseInt(v, 10) || 0 })}
+          {/* `ChampNombre` ET NON `Champ` + `String(serie.poids)` : piloté par le
+              nombre, ce champ effaçait la virgule pendant la frappe, et 42,5 kg
+              s'enregistraient 425 kg — prouvé sur émulateur Android le
+              15 septembre 2026. Et `|| 0` faisait d'une saisie illisible un zéro. */}
+          <ChampNombre
+            valeur={serie.reps}
+            onChange={(n) => onChange({ ...serie, reps: n })}
+            entier
             placeholder={serie.repsCible === null ? '—' : String(serie.repsCible)}
-            unite="rép" numerique style={{ flex: 1 }}
+            unite="rép" style={{ flex: 1 }}
           />
-          <Champ
-            valeur={serie.poids === null ? '' : String(serie.poids)}
-            onChange={(v) => onChange({ ...serie, poids: v === '' ? null : parseFloat(v.replace(',', '.')) || 0 })}
-            placeholder={serie.poidsCible === null ? '—' : nb(serie.poidsCible)}
-            unite="kg" numerique style={{ flex: 1 }}
+          <ChampNombre
+            valeur={serie.poids}
+            onChange={(n) => onChange({ ...serie, poids: n })}
+            placeholder={serie.poidsCible === null ? '—' : texteDuNombre(serie.poidsCible)}
+            unite="kg" style={{ flex: 1 }}
           />
         </>
       )}

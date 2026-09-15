@@ -86,16 +86,21 @@ interface ChampProps {
    * qu'on écrit en phrases. Sans ça, chaque phrase commencerait en minuscule.
    */
   multiligne?: boolean;
+  /**
+   * La saisie ne désigne rien d'utilisable : le cadre se borde de rouge. On
+   * MONTRE l'erreur plutôt que d'effacer ce qui a été tapé — voir `ChampNombre`.
+   */
+  illisible?: boolean;
 }
 
 export function Champ({
   valeur, onChange, placeholder, unite, numerique, motDePasse, etiquette, style,
-  multiligne,
+  multiligne, illisible,
 }: ChampProps) {
   return (
     <View style={[s.champBloc, style]}>
       {etiquette !== undefined && <Text style={s.etiquette}>{etiquette}</Text>}
-      <View style={[s.champCadre, multiligne === true && s.champCadreLong]}>
+      <View style={[s.champCadre, multiligne === true && s.champCadreLong, illisible === true && s.champIllisible]}>
         <TextInput
           value={valeur}
           onChangeText={onChange}
@@ -171,6 +176,7 @@ const s = StyleSheet.create({
     borderRadius: R.s, paddingHorizontal: E.m, minHeight: TOUCHE + 2,
   },
   champCadreLong: { alignItems: 'flex-start', minHeight: 140 },
+  champIllisible: { borderColor: C.erreur },
   champ: { flex: 1, color: C.encre, fontFamily: P.texte, fontSize: T.moyen, paddingVertical: E.s },
   /* `textAlignVertical` pour Android : sans lui, le texte d'un champ
      multiligne se centre verticalement au lieu de commencer en haut. */

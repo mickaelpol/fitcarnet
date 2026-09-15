@@ -1,3 +1,4 @@
+import { nombreSaisi } from './saisieNombre';
 import type { AlimentDisponible } from '@/api/types';
 import { MODELE, type DemandeRepas, type Repas, type Role } from '../solveur/composer';
 import { convertir, versReference } from '../solveur/solveur';
@@ -52,14 +53,12 @@ export const imposePour = (repas: Repas, cle: Role): number | undefined =>
  * `null` distingue « rien tapé » de « tapé mais illisible » : le premier est
  * normal, le second mérite un message.
  */
-export const grammesSaisis = (brut?: string): number | null => {
-  const saisi = (brut ?? '').trim();
-  if (saisi === '') return null;
-
-  const g = Number(saisi.replace(',', '.'));
-
-  return Number.isFinite(g) && g >= 0 ? g : null;
-};
+export const grammesSaisis = (brut?: string): number | null => nombreSaisi(brut);
+/* LA RÈGLE VIT DANS `saisieNombre.ts` DEPUIS LE 15 SEPTEMBRE 2026. Elle était
+   écrite ici, juste, pendant que quatre champs de séance et de modèle en
+   portaient chacun une version fausse — `|| 0`, et la virgule qui disparaissait
+   sous les doigts. Recopiée une cinquième fois, elle aurait fini par diverger :
+   elle est descendue d'un cran, et ce nom reste pour ses appelants. */
 
 /** Une saisie non vide que le calcul ne saura pas utiliser. */
 export const saisieIllisible = (brut?: string): boolean =>

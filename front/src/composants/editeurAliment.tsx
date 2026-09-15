@@ -8,6 +8,7 @@ import {
   provenanceRatio, ratioDepuisPesees, ratioVraisemblable, soupconKilojoules,
 } from '@/calcul/nutrition';
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
+import { nombreSaisi } from '@/calcul/saisieNombre';
 
 export interface AlimentSaisi {
   id?: number;
@@ -56,11 +57,18 @@ type CleNombre = 'kcal100' | 'prot100' | 'gluc100' | 'lip100' | 'fibres100';
  * d'y vivre. Au niveau du module, la zone morte est franchie au chargement et
  * l'ordre ne peut plus se retourner contre nous.
  */
-const nombre = (v: string): number => {
-  const x = parseFloat(v.replace(',', '.'));
+const nombre = (v: string): number => nombreSaisi(v) ?? 0;
+/* LE 0 CI-DESSUS NE SERT QU'À L'APERÇU, ET C'EST TOUT LE CORRECTIF.
+   Jusqu'au 15 septembre 2026, ce 0 partait EN BASE : une macro vidée ou
+   illisible s'enregistrait « 0 g ». Les calories vides étaient déjà refusées
+   (`kcal100 > 0`), un zéro incohérent aussi, par le contrôle — restait le cas
+   qui passe, une macro qui vaut zéro pour cet aliment : vider les protéines de
+   l'huile d'olive donnait les mêmes valeurs, et « je ne sais pas » devenait
+   « zéro gramme » (règle 6). Relevé par la revue. Désormais `valide` exige un
+   texte LISIBLE pour chaque macro obligatoire : ce 0 n'atteint plus l'API. */
 
-  return Number.isNaN(x) ? 0 : x;
-};
+/** Ce texte désigne-t-il un nombre ? Vide ne compte pas comme lisible. */
+const lisible = (texte: string): boolean => nombreSaisi(texte) !== null;
 
 /**
  * Texte de départ des champs numériques.
@@ -200,10 +208,17 @@ export function EditeurAliment({
   const controle = controler(macros);
   const kilojoules = soupconKilojoules(macros);
 
-  const ratioMesure = ratioDepuisPesees(
-    parseFloat(avant.replace(',', '.')), parseFloat(apres.replace(',', '.')));
+  /* `nombreSaisi` ET NON `parseFloat` : « 4,2,1 » g se lisait 4,2 et proposait
+     un ratio calculé sur une pesée qui n'existe pas. */
+  const ratioMesure = ratioDepuisPesees(nombreSaisi(avant) ?? NaN, nombreSaisi(apres) ?? NaN);
+
+  const OBLIGATOIRES = ['kcal100', 'prot100', 'gluc100', 'lip100'] as const;
+  const macrosLisibles = OBLIGATOIRES.every((cle) => lisible(textes[cle]))
+    && (textes.fibres100.trim() === '' || lisible(textes.fibres100));
+  const illisible = (cle: CleNombre): boolean => textes[cle].trim() !== '' && !lisible(textes[cle]);
 
   const valide = a.nom.trim() !== ''
+    && macrosLisibles
     && a.kcal100 > 0
     && ratioVraisemblable(a.ratio)
     && controle.verdict !== 'incoherent';
@@ -289,19 +304,30 @@ export function EditeurAliment({
               <View style={s.paire}>
                 <Champ etiquette="Calories" unite="kcal" numerique style={{ flex: 1 }}
                   valeur={textes.kcal100}
-                  onChange={(v) => majNombre('kcal100', v)} placeholder="0" />
+                  onChange={(v) => majNombre('kcal100', v)} placeholder="0"
+                  illisible={illisible('kcal100')} />
                 <Champ etiquette="Protéines" unite="g" numerique style={{ flex: 1 }}
                   valeur={textes.prot100}
-                  onChange={(v) => majNombre('prot100', v)} placeholder="0" />
+                  onChange={(v) => majNombre('prot100', v)} placeholder="0"
+                  illisible={illisible('prot100')} />
               </View>
               <View style={[s.paire, { marginTop: E.s }]}>
                 <Champ etiquette="Glucides" unite="g" numerique style={{ flex: 1 }}
                   valeur={textes.gluc100}
-                  onChange={(v) => majNombre('gluc100', v)} placeholder="0" />
+                  onChange={(v) => majNombre('gluc100', v)} placeholder="0"
+                  illisible={illisible('gluc100')} />
                 <Champ etiquette="Lipides" unite="g" numerique style={{ flex: 1 }}
                   valeur={textes.lip100}
-                  onChange={(v) => majNombre('lip100', v)} placeholder="0" />
+                  onChange={(v) => majNombre('lip100', v)} placeholder="0"
+                  illisible={illisible('lip100')} />
               </View>
+              {/* LE BOUTON NE SE DÉSACTIVE PAS EN SILENCE. Une macro vide bloque
+                  l'enregistrement : on dit pourquoi, et comment en sortir. */}
+              {!macrosLisibles && (
+                <Discret style={{ color: C.erreur, marginTop: E.xs }}>
+                  Renseigne les quatre valeurs — écris 0 si l'aliment n'en contient pas.
+                </Discret>
+              )}
 
               <Discret style={s.aide}>
                 Les calories se saisissent en <Texte style={{ fontSize: T.petit }}>kcal</Texte>,

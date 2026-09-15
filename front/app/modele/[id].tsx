@@ -6,6 +6,7 @@ import {
 } from '@/api/hooks';
 import type { Exercice, Modele, ModeleExercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
+import { ChampNombre } from '@/composants/champNombre';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { lireFormat } from '@/composants/exerciceSeance';
@@ -140,23 +141,26 @@ export default function DetailModele() {
         {bloc.series.map((serie, j) => (
           <View key={j} style={s.serie}>
             <Discret style={{ width: 22 }}>{j + 1}</Discret>
-            <Champ
-              valeur={serie.repsCible === null ? '' : String(serie.repsCible)}
-              onChange={(v) => majBloc(i, {
+            {/* Les jumeaux des champs de `LigneSerie`, et le même défaut : la
+                virgule effacée pendant la frappe, `|| 0` pour l'illisible — et
+                ici en plus `nb()`, qui arrondissait 42,25 en « 42.3 » dans le
+                champ même. Corrigés ensemble le 15 septembre 2026. */}
+            <ChampNombre
+              valeur={serie.repsCible}
+              onChange={(n) => majBloc(i, {
                 ...bloc,
-                series: bloc.series.map((x, k) => (k === j
-                  ? { ...x, repsCible: v === '' ? null : parseInt(v, 10) || 0 } : x)),
+                series: bloc.series.map((x, k) => (k === j ? { ...x, repsCible: n } : x)),
               })}
-              placeholder="—" unite="rép" numerique style={{ flex: 1 }}
+              entier
+              placeholder="—" unite="rép" style={{ flex: 1 }}
             />
-            <Champ
-              valeur={serie.poidsCible === null ? '' : nb(serie.poidsCible)}
-              onChange={(v) => majBloc(i, {
+            <ChampNombre
+              valeur={serie.poidsCible}
+              onChange={(n) => majBloc(i, {
                 ...bloc,
-                series: bloc.series.map((x, k) => (k === j
-                  ? { ...x, poidsCible: v === '' ? null : parseFloat(v.replace(',', '.')) || 0 } : x)),
+                series: bloc.series.map((x, k) => (k === j ? { ...x, poidsCible: n } : x)),
               })}
-              placeholder="—" unite="kg" numerique style={{ flex: 1 }}
+              placeholder="—" unite="kg" style={{ flex: 1 }}
             />
             <Pressable
               onPress={() => majBloc(i, {

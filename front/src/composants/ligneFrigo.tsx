@@ -12,6 +12,7 @@ import { Bouton, Carte, Champ, Chiffre, Discret, Texte } from './base';
 import { controler } from '../calcul/nutrition';
 import type { AlimentDisponible } from '../api/types';
 import { C, E, N, P, T, couleurRole, nb } from '../theme';
+import { nombreSaisi } from '@/calcul/saisieNombre';
 
 /* ------------------------------------------------------------- mode stock */
 
@@ -146,7 +147,12 @@ export function LigneInventaire({
         )}
       </View>
 
-      <Champ valeur={texte} onChange={onTexte} numerique placeholder="—" style={s.saisie} />
+      {/* Bordé de rouge quand le texte ne désigne aucune quantité : depuis le
+          15 septembre 2026, `ecartsInventaire` n'envoie plus une telle ligne —
+          « 4,2,1 » partait en 4,2 — et il faut que ça se VOIE, sans quoi la ligne
+          serait ignorée en silence. */}
+      <Champ valeur={texte} onChange={onTexte} numerique placeholder="—" style={s.saisie}
+        illisible={texte.trim() !== '' && nombreSaisi(texte) === null} />
 
       {/* L'unité vit à côté du champ, pas dedans : à l'intérieur elle se fait
           écraser par le nombre dès que celui-ci est long. */}
