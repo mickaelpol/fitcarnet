@@ -1,5 +1,5 @@
 # Régénérables en une commande, et lourds : on versionne la matière, pas le produit.
 #   python3 presentation/construire.py   → fitcarnet-presentation.html
-#   ./presentation/monter-video.sh       → fitcarnet-demonstration.mp4
+#   ./presentation/monter-demo.sh       → fitcarnet-demonstration.mp4
 fitcarnet-presentation.html
 fitcarnet-demonstration.mp4

@@ -9,7 +9,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 |---|---|
 | [01 — Sécurité API](01-securite-api.md) | 0 critique · 1 élevée · 3 moyennes · 9 faibles |
 | [02 — Données et infrastructure](02-donnees-infra.md) | 1 critique · 5 élevées · 6 moyennes · 7 faibles |
-| [03 — Architecture front](03-front.md) | 0 critique · 5 élevées · 14 moyennes · 14 faibles |
+| [03 — Architecture front](03-front.md) ⚠️ | 0 critique · 5 élevées · 14 moyennes · 14 faibles — **ce rapport décrit l'arborescence d'AVANT le lot 6 et n'a pas été réécrit**. `hooks.ts` n'existe plus (éclaté en `src/api/hooks/`), et tous ses numéros de ligne sont périmés. Il reste utile pour le *raisonnement* de chaque constat, jamais pour localiser du code |
 | [04 — Tests et robustesse](04-tests-qualite.md) | 2 critiques · 4 élevées · 6 moyennes · 7 faibles |
 
 **Total : 3 critiques, 15 élevées, ~29 moyennes, ~37 faibles** (après dédoublonnage entre rapports).
@@ -316,24 +316,27 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 |---|---|---|
 | **0 — garde-fous** | ✅ | `CLAUDE.md`, PHPStan niveau 5, `ModeleExposeTest`, `verifier-schema.sh`, `verifier-migrations.sh`, glob des tests, 2 hooks |
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
-| **2 — chiffres faux** | ✅ 4 élevés + 2 moyens | É11, É12, É13, É15, M2, M3 · **restent M1 et M4** |
-| **3 — sécurité et isolation** | ✅ 6/6 | É1, C3, É8, M-01, M-03 · **M-02 partiel** : fenêtre ramenée à 90 j, la visibilité des sessions reste à faire |
+| **2 — chiffres faux** | ✅ | É11, É12, É13, É15, M2, M3 · **M1 et M4 faits le 15 septembre** — M1 affichait un écart de 2 kcal/g de fibres en mode glucides totaux (7,5 g suffisaient à accuser une cible atteignable) ; M4 a reçu un seuil **relatif**, choisi sur 134 860 pivots mesurés |
+| **3 — sécurité et isolation** | ✅ | É1, C3, É8, M-01, M-02, M-03 · **M-02 complet le 15 septembre** : `GET /api/mes-sessions` et `DELETE /api/mes-sessions/{id}` |
 | **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
 | **5 — scripts dangereux** | ✅ | É4, É7, `sauvegarde.sh` (É9 fait le 8 sept.) · a révélé **C4**, tranché |
 | **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → 1 169 lignes · `composer.ts` 827 → 135 · `cuisson.ts` 613 → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
 | **7 — tests manquants** | 🟨 É10 fait | `client.ts` : 22 témoins, chacun prouvé par une **mutation** qui le tue (29 mutations au banc). Reste le câblage non couvert |
-| **8 — le reste** | ⬜ | ~37 constats faibles |
+| **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
-Tests au 15 septembre : **531 front · 158 API · 508 assertions · 7 erreurs PHPStan**
+Tests au 15 septembre, au soir : **550 front** (548 + 2 de rendu, en deux passes) · **201 API · 577 assertions · 7 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
 
 Deux points laissés ouverts volontairement :
 - **É14** n'a reçu qu'un volet sur trois. Le premier suffit à rouvrir la session ; les deux
   ceintures de sécurité (`compte.tsx`, `_layout.tsx`) attendent une bibliothèque de test de
   composants, que le projet n'a pas.
-- **La table des paliers du disque RM** (`disqueRM.tsx`) diffère de celle du calculateur.
-  Décision d'affichage à trancher : à 40 %, la formule annonce 45 répétitions alors que
-  `REPS_MAX_POUR_1RM` vaut 15.
+- ~~**La table des paliers du disque RM**~~ — **tranchée le 15 septembre 2026.** Une seule
+  table, centrée sur **70-90 %**, la zone où l'on progresse et la seule où la formule dit vrai.
+  Neuf paliers par pas de 2,5 %, donnant neuf cibles de répétitions distinctes. En dessous de
+  70 %, la charge s'affiche et la prédiction disparaît — le seuil est **dérivé** de
+  `REPS_MAX_POUR_1RM`, pas écrit à la main. `pasConseille` descend à 1 kg pour les petites
+  charges, où onze paliers ne donnaient que cinq charges distinctes.
 
 Une refonte vers l'architecture hexagonale est un objectif assumé, **non commencée**. Voir la
 section « Skills » de `CLAUDE.md` : elle ne doit jamais se mélanger à une correction de bug.

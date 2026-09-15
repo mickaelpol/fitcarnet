@@ -8,7 +8,7 @@ front/src/solveur/
 ├─ types.ts                 Aliment, Cibles, Resultat, Diagnostic…
 ├─ algebre.ts               résolution linéaire (Gauss, pivot partiel)
 ├─ solveur.ts               le calcul
-├─ solveur.test.ts          47 tests
+├─ solveur.test.ts          68 tests
 └─ aliments.test-data.ts    jeu d'aliments de référence
 ```
 
@@ -150,7 +150,7 @@ porte `aCuire` (ce qu'on pèse en cuisinant : riz sec, viande crue) et
 cd front && npx tsc && node --test dist/solveur.test.js
 ```
 
-47 tests : algèbre (systèmes simples, singuliers, pivot), cas nominal des
+68 tests : algèbre (systèmes simples, singuliers, pivot), cas nominal des
 quatre repas, conversions cru/cuit/sec, restes en unités cuites, invariance des
 macros sur 36 substitutions, calcul avec moins de trois variables, aliment
 devenu négligeable, cible inatteignable, arrondis, robustesse — plus un test de

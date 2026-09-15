@@ -45,12 +45,18 @@ docker compose -f compose.dev.yml exec app php bin/console \
 
 ## 3. Tes objectifs par repas
 
-Adapte l'adresse en tête de `db/90-cibles.sql`, puis :
+Adapte l'adresse en tête de `db/manuel/cibles.sql`, puis :
 
 ```bash
 docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet \
-  < db/90-cibles.sql
+  < db/manuel/cibles.sql
 ```
+
+> Ce chemin a été faux pendant des mois — le document annonçait
+> `db/90-cibles.sql`, qui n'a jamais existé sous ce nom. L'étape échouait en
+> « No such file » sur toute machine neuve. Relevé le 15 septembre 2026 par
+> l'agent `verite-documentaire`. `installer.sh` faisait bien, lui, référence au
+> bon fichier : c'est la procédure manuelle qui mentait.
 
 Le fichier est numéroté 90 à dessein : il vient **après** la création du
 compte, donc jamais au démarrage automatique. Il est idempotent.

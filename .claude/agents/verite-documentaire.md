@@ -112,7 +112,7 @@ qui figure encore comme ouvert fait refaire le travail.
 - Une **tournure** vieillie sans conséquence. Tu cherches des affirmations
   fausses, pas du style.
 - Un **choix délibéré** documenté ailleurs : `front/dist/` versionné, la table
-  manuelle de `cleDHabitude`, les 8 erreurs PHPStan attendues.
+  manuelle de `cleDHabitude`, les 7 erreurs PHPStan attendues.
 - Une **intention** au futur (« il faudra… ») : ce n'est pas une affirmation sur
   l'état présent.
 

@@ -1,5 +1,21 @@
 # Audit front-end fitcarnet — architecture & sécurité côté client
 
+> ⚠️ **CE RAPPORT DÉCRIT L'ARBORESCENCE D'AVANT LE LOT 6, ET N'A PAS ÉTÉ RÉÉCRIT.**
+>
+> Relevé le 15 septembre 2026. `src/api/hooks.ts` **n'existe plus** — il a été
+> éclaté en dix modules sous `src/api/hooks/` — donc la section 2 entière et la
+> trentaine de renvois `hooks.ts:826`, `:906`, `:158-163` pointent dans le vide.
+> Les tailles annoncées non plus ne valent plus : `composer.ts` 780 → **135**,
+> `cuisson.ts` 611 → **22**, `repas.tsx` 2 316 → **650**, `frigo.tsx` 827 →
+> **445**, `admin-exercices.tsx` 711 → **195**, `seance/[id].tsx` 430 → **324**.
+>
+> Les constats **F4, F10, F11, F13 sont faits**, F12 pour l'essentiel.
+>
+> Ce document garde toute sa valeur pour **le raisonnement** de chaque constat —
+> pourquoi c'est un défaut, ce qu'il coûte. Il n'en a plus aucune pour
+> **localiser** du code. Le tableau d'avancement de [README.md](README.md) fait foi.
+
+
 Périmètre : `front/app/`, `front/src/`, `front/package.json`, `front/app.json`, `front/tsconfig.json`.
 `front/dist/` et `front/node_modules/` exclus (deux lectures ponctuelles de `node_modules` pour vérifier le comportement d'une bibliothèque, signalées là où elles interviennent).
 **Audit en lecture seule : aucun fichier du projet n'a été modifié.**

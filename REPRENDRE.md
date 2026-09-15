@@ -19,7 +19,7 @@ faux, la sécurité et l'isolation, la base reproductible, les scripts dangereux
 l'architecture front, les tests du client HTTP. Le **lot 8** est presque fini :
 les onze constats du front sont faits, les neuf de sécurité API sont en cours.
 
-État : **548 tests front · 158 API · 508 assertions**, 7 erreurs PHPStan
+État : **550 tests front** (548 + 2 de rendu) · **201 API · 577 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -28,8 +28,6 @@ En parallèle, un **dossier de présentation** est monté de bout en bout dans
 `presentation/` : complet et utilisable, il ne reste qu'à tourner les vidéos
 (voir « Le chantier présentation » plus bas).
 
-État : **448 front · 149 API · 491 assertions**, 8 erreurs PHPStan connues,
-`verifier-schema.sh` et `verifier-migrations.sh` **au vert tous les deux**.
 `master` synchronisé sur Gitea.
 
 ---
@@ -39,9 +37,10 @@ En parallèle, un **dossier de présentation** est monté de bout en bout dans
 **Le lot 3 — sécurité et isolation — est clos.** C3 : l'isolation entre comptes
 n'avait aucun test, elle en a 18, chacun **vu échouer** en cassant le code qu'il
 protège. É8 : les exercices « personnels » le sont vraiment (`FiltreExercice`,
-règle « public **OU** le mien »). M-01, M-03 : faits. M-02 : **partiel** — la
-fenêtre du jeton de rafraîchissement passe d'un an à 90 jours glissants, mais ce
-qui manquait vraiment, la *visibilité* des sessions, reste à faire.
+règle « public **OU** le mien »). M-01, M-03 : faits. M-02 : **complet depuis le
+15 septembre** — la fenêtre était passée à 90 jours glissants, et la *visibilité*
+existe désormais : `GET /api/mes-sessions`, `DELETE /api/mes-sessions/{id}`, avec
+un 404 identique pour « n'existe pas » et « pas à toi ».
 
 **Le lot 4 — base reproductible — est clos.** `verifier-schema.sh` disait 280
 lignes d'écart entre base neuve et base migrée ; il dit maintenant
@@ -94,8 +93,8 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 548 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 158 tests, 508 assertions
+cd front && npm test                                                  # 548 + 2 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 201 tests, 577 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
@@ -156,7 +155,7 @@ presque. Ce qui suit est du confort, ou attend une décision.
 
 | | Quoi | Effort |
 |---|---|---|
-| **Les trois agents de contrôle** | `revue-fitcarnet`, `verification-bout-en-bout`, `verite-documentaire` — jamais lancés sur l'ensemble. À faire **avant la démonstration** : ils sont tous en lecture seule, donc lançables en parallèle | 1 h |
+| **Les trois agents de contrôle** (sur les cinq de `.claude/agents/`, les deux hexagonaux étant sans objet) | `revue-fitcarnet`, `verification-bout-en-bout`, `verite-documentaire` — jamais lancés sur l'ensemble. À faire **avant la démonstration** : ils sont tous en lecture seule, donc lançables en parallèle | 1 h |
 | **F2 côté écran** | `carteRepas.tsx` affiche `assiette` gonflée pour un aliment non cuit. Il n'a aucune notion de cuisson : la corriger demande de faire descendre le choix sur trois niveaux, et rien ne dit que cet écran doive le connaître | à trancher |
 | **`choixRatio.tsx`** | dernier morceau du lot 6, et **il était mal rangé dans l'audit** : il appartient à `editeurAliment.tsx` (section 7), pas à l'écran de séance | 1 h |
 | **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 22 témoins ; les hooks React restent hors de portée faute de bibliothèque de rendu | ~4 h |
@@ -190,7 +189,7 @@ tomber dans le mauvais fichier ; corriger M7 aurait dépassé le mandat.
   étendu le glob dans trois lanceurs le 14 et oublié le quatrième. Son ✓ vert ne
   prouvait rien — et masquait une vraie divergence, de moi aussi.
 
-**Trois agents ont été créés**, nés de fautes réelles de la session :
+**Trois agents ont été créés** — le dossier en compte cinq, les deux hexagonaux datant d'avant et restant sans objet. Les trois nouveaux sont nés de fautes réelles de la session :
 `revue-fitcarnet` (les huit motifs de défaut du projet),
 `verification-bout-en-bout` (543 tests au vert ne disaient pas si l'API
 répondait) et `verite-documentaire` (quatre affirmations fausses trouvées par
@@ -245,17 +244,18 @@ de 50,7 à 63,3 kg sur neuf semaines. Compte `demo@fitcarnet.local`.
 inventaire de surface en voyait 57. Il a aussi montré que **la documentation
 mentait sur deux points** :
 
-- **`front/src/calcul/texte.ts` n'existe pas.** `CLAUDE.md` l'annonçait comme le
-  seul porteur de la suppression des accents : c'était la *correction prévue* au
-  lot 6 (constat D4), présentée comme faite. `sansAccent` est toujours recopié
-  quatre fois. Corrigé dans `CLAUDE.md` et dans la skill `front-fitcarnet`.
-- **`front/src/solveur/periode.ts` n'existe pas** — seul son fichier de test
-  existe, il éprouve une fonction qui vit dans `composer.ts`.
+- ~~`front/src/calcul/texte.ts` n'existe pas~~ — **créé le 15 septembre 2026.**
+  `sansAccent` n'a plus qu'**une** définition, et les six copies qui traînaient
+  utilisaient toutes `normalize('NFD')`, que Hermes n'implémente pas toujours :
+  six `TypeError` en puissance.
+- ~~`front/src/solveur/periode.ts` n'existe pas~~ — **il existe**, sorti du
+  découpage de `composer.ts` (rang 6).
 
 **Trois pistes ouvertes, à trancher un jour :**
 
-- `front/src/composants/inventaire.tsx` semble être du **code mort** — aucun
-  écran ne l'importe, `frigo.tsx` réimplémente le mode inventaire.
+- ~~`front/src/composants/inventaire.tsx` semble être du code mort~~ —
+  **confirmé et supprimé** le 15 septembre : 187 lignes, aucun import, son
+  unique export sans usage.
 - `Invitation::domaineAccepteDuCourrier()` — vérification DNS complète et
   documentée — **n'a aucun appelant** dans l'API.
 - **Aucun appel à OpenFoodFacts** n'existe côté back, alors que le champ
@@ -329,10 +329,11 @@ redirection. Les deux ceintures de sécurité restantes (le bouton de déconnexi
 rendu avant l'écran d'erreur dans `compte.tsx`, le portier de `_layout.tsx`)
 demandent une bibliothèque de test de composants que le projet n'a pas.
 
-**M1 et M4 du lot 2** ne sont pas faits : deux formules Atwater encore recopiées
-(`solveur.ts:340`, `objectifs.tsx:78`) qui comptent les fibres à 4 kcal/g en mode
-« glucides totaux », et l'`EPSILON` absolu d'`algebre.ts` qui ne détecte jamais un
-système singulier.
+~~**M1 et M4 du lot 2**~~ — **faits le 15 septembre 2026.** M1 n'était pas qu'une
+duplication : en mode « glucides totaux », la cible comprend les fibres à 2 kcal/g
+et non 4, si bien que **7,5 g de fibres suffisaient** à faire accuser une cible
+parfaitement atteignable. M4 a reçu un seuil **relatif**, choisi après mesure de
+134 860 pivots — le rapport vaut soit 0, soit ≥ 0,484, rien entre les deux.
 
 ---
 
@@ -358,9 +359,11 @@ relancé.**
 - **Le glob des migrations s'arrête à `3[0-9]-*.sql`.** Une migration numérotée
   40 ne serait jouée nulle part. Trois fichiers à étendre : `installer.sh`,
   `docker/entrypoint-prod.sh`, `db/manuel/verifier-migrations.sh`.
-- **8 erreurs PHPStan sont attendues.** Aucune sur les fichiers corrigés. Deux
-  méritent un coup d'œil au lot 3 : `JetonRafraichissement::$empreinte` et
-  `$creeLe` sont « écrites mais jamais relues ».
+- **7 erreurs PHPStan sont attendues** (c'était 8). `$creeLe` a disparu de la
+  liste : M-02 lui a donné un accesseur, la date d'ouverture était en base et
+  inaccessible au code. `JetonRafraichissement::$empreinte` **reste, et doit
+  rester** — lui donner un accesseur pour faire taire l'analyse irait contre la
+  raison même de ne stocker qu'un SHA-256.
 - **`superpowers-symfony` ne s'installe pas seul** — manifeste pointant sur
   l'ancien nom d'organisation, clone SSH refusé. `installer-outils.sh` s'en
   charge ; à relancer après un `claude plugin marketplace update`.

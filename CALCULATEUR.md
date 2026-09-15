@@ -29,7 +29,7 @@ jour à un autre.
 de temps de cuisson. Il produit une liste d'aliments avec leurs quantités —
 « 120 g de riz sec, 150 g de poulet cru, 200 g de brocolis, 10 g d'huile » —
 et les macros correspondantes. C'est une liste de pesées, et c'est
-exactement ce que le solveur sait faire depuis ses 47 tests.
+exactement ce que le solveur sait faire depuis ses 157 tests.
 
 **Aucun stock n'est décrémenté** : c'est l'inventaire du frigo qui fait foi,
 et lui seul.

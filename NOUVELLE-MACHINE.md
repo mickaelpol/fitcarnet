@@ -137,7 +137,7 @@ données. Tu auras :
 
 | Présent d'emblée | Absent |
 |---|---|
-| le schéma et les 20 migrations | tes **séances** et ton historique |
+| le schéma et les 23 migrations | tes **séances** et ton historique |
 | le référentiel commun — exercices, emplacements, modes de cuisson | le **stock** de ton frigo |
 | — | **tous les aliments** : il n'y a plus de catalogue de départ (voir plus bas) |
 | le catalogue de 1 338 exercices (téléchargé par `installer.sh`) | tes **aliments personnels** |
@@ -182,21 +182,25 @@ Chaque commande doit donner **au moins** ce résultat — ce sont les chiffres d
 7 septembre 2026 ; ils ne peuvent que monter.
 
 ```bash
-cd front && npm test                    # 362 tests, 0 échec
+cd front && npm test                    # 548 tests, puis 2 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
-                                        # 102 tests, 422 assertions
+                                        # 201 tests, 577 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
-                                        # 8 erreurs connues, aucune régression
+                                        # 7 erreurs connues, aucune régression
 db/manuel/verifier-migrations.sh        # ✓ garde-fous posés
 ```
 
 Et dans Claude Code : `/graphify .` pour construire le graphe (~5 min). Le cache
 sémantique étant versionné, **il ne coûtera aucun token de modèle**.
 
-⚠️ `db/manuel/verifier-schema.sh` signale encore **280 lignes de divergence**
-entre base neuve et base migrée. Ce n'est pas une erreur d'installation : c'est
-le constat C2 de l'audit, corrigé au lot 4. Voir
-[docs/audit-2026-09/](docs/audit-2026-09/README.md).
+✅ `db/manuel/verifier-schema.sh` doit répondre **« Base neuve et base migrée
+sont identiques »**. C'était 280 lignes de divergence jusqu'au 14 septembre
+2026 — constat C2, corrigé au lot 4.
+
+> **S'il signale une divergence aujourd'hui, c'est une régression, pas un
+> défaut connu.** Ce paragraphe a longtemps dit l'inverse et invitait à passer
+> outre : il apprenait à ignorer le seul contrôle capable de détecter une
+> évolution de schéma écrite d'un seul côté.
 
 ---
 

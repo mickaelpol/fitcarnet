@@ -77,12 +77,12 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 362 tests node:test
+cd front && npm test        # tsc --noEmit + 548 tests, puis 2 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 
 docker compose -f compose.dev.yml up          # environnement de développement
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 102 tests API
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 201 tests API
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
 
 db/manuel/verifier-schema.sh      # base neuve == base migrée ?
@@ -95,10 +95,10 @@ db/manuel/verifier-migrations.sh  # les migrations tiennent-elles sur des donné
 
 ```
 api/          Symfony — 18 entités, contrôleurs, services, extensions Doctrine
-front/        Expo — 27 écrans, le solveur de repas, les modules de calcul
+front/        Expo — 16 écrans, le solveur de repas, les modules de calcul
   src/solveur/    composition de repas : algèbre, garanties, tests de propriété
   src/calcul/     nutrition, cuisson, performance, plausibilité
-db/           01-schema.sql (le schéma complet) + manuel/ (20 migrations)
+db/           01-schema.sql (le schéma complet) + manuel/ (23 migrations)
 docker/       Dockerfile, Caddyfile, point d'entrée de production
 docs/         audit-2026-09/ — 84 constats classés
 .claude/      outillage : skills du projet, agents, hooks, réglages
@@ -108,7 +108,7 @@ docs/         audit-2026-09/ — 84 constats classés
 
 ## Qualité
 
-**464 tests** — 362 côté front, 102 côté API — et quatre garde-fous automatiques
+**751 tests** — 550 côté front, 201 côté API — et quatre garde-fous automatiques
 qui tournent sans qu'on y pense :
 
 - **PHPStan** niveau 5 sur l'API ;

@@ -109,7 +109,7 @@ savoir ce qui reste à relire.
 
 **Ne signale pas comme défauts les choix délibérés du projet.** La skill
 `revue-de-code` en liste une poignée — `front/dist/` versionné, la table manuelle
-de `cleDHabitude`, l'ordre des arrondis du solveur, les 8 erreurs PHPStan
+de `cleDHabitude`, l'ordre des arrondis du solveur, les 7 erreurs PHPStan
 attendues. Un relecteur qui les découvre les prend pour des bugs.
 
 **Ne propose pas de correctif détaillé.** Une ligne sur la direction suffit

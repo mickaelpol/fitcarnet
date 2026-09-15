@@ -13,7 +13,7 @@ le métier.**
 ## Les commandes, dans cet ordre
 
 ```bash
-cd front && npm test          # tsc --noEmit + compilation des tests + 362 tests node:test
+cd front && npm test          # tsc --noEmit + 548 tests, puis 2 de rendu
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, servi par Caddy)
 ```
@@ -66,7 +66,7 @@ de l'audit y vivaient. Ne jamais revenir à une liste.
 **Conséquence à connaître** : le motif ne couvre que `src/`. Un test posé dans
 `app/` ne sera jamais exécuté, sans le moindre signal. Le code testable vit dans
 `src/`, les écrans dans `app/` — c'est aussi pour cela que le découpage de
-`repas.tsx` (2 316 lignes) consiste à **extraire vers `src/`**.
+`repas.tsx` (2 397 → 650 lignes, fait au lot 6) consiste à **extraire vers `src/`**.
 
 Convention du projet : un module pur et son `.test.ts` en regard.
 

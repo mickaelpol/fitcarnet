@@ -33,10 +33,10 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 531 tests node:test — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 548 tests, puis 2 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-cd api && bin/phpunit         # 158 tests API — sans base ni noyau, aucun effet de bord
+cd api && bin/phpunit         # 201 tests API — sans base ni noyau, aucun effet de bord
 docker compose -f compose.dev.yml up   # environnement de développement
 ```
 
