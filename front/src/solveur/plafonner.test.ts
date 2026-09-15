@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { A, CIBLES, STOCK } from './aliments.test-data';
 import { composer } from './composer';
 import { ajusterAuStock } from './plafonner';
+import type { Aliment } from './types';
 
 describe('le stock fait la loi', () => {
   const cibles = CIBLES.R2;
@@ -74,6 +75,53 @@ describe('le stock fait la loi', () => {
     assert.equal(a.variables.proteine, undefined);
     assert.equal(a.plafonnes[0]!.releve, undefined);
     assert.ok(a.resultat.diagnostics.length > 0, 'le manque est annoncé');
+  });
+
+  /**
+   * F7, 15 septembre 2026. LA SORTIE DE SECOURS RENDAIT UN PLAN INCUISINABLE
+   * EN LE PRÉSENTANT COMME BON.
+   *
+   * La boucle est bornée à douze tours — « pour qu'un cas non prévu s'arrête
+   * au lieu de figer l'écran ». Mais son `return` de fin rendait
+   * `calculer(...)` SANS reconfronter le résultat au stock : la dernière
+   * variable, celle qui n'avait pas eu le temps d'être plafonnée, sortait avec
+   * la quantité que l'algèbre demandait, `ok: true` et zéro diagnostic.
+   *
+   * REPRODUIT, et c'est ce qui manquait au constat : treize protéines à 5 g
+   * chacune. Chaque tour en consomme une et passe la main à la suivante ;
+   * au douzième la borne tombe, et l'application affiche sereinement 32 g de
+   * « Poulet 13 » quand il en reste 5. Un plan faux annoncé comme juste est
+   * exactement ce que la règle 7 interdit.
+   *
+   * Conséquence utile en amont : `resoudreAuMieux` sort immédiatement sur
+   * `base.resultat.ok`. Tant que ce plan se disait bon, aucune autre
+   * combinaison n'était même essayée.
+   */
+  it('ne présente jamais comme valide un plan que le frigo ne peut pas fournir', () => {
+    const miettes: Aliment[] = Array.from({ length: 15 }, (_, i) => ({
+      id: `p${i + 1}`, nom: `Poulet ${i + 1}`, categorie: 'prot' as const,
+      kcal100: 165, prot100: 31, gluc100: 0, lip100: 3.6, ratio: 1,
+    }));
+    const stock = [...miettes, A.riz, A.amandes];
+    const dispo = (x: { id: number | string }) =>
+      (String(x.id).startsWith('p') ? 5 : 100000);
+
+    const a = ajusterAuStock(
+      { variables: { proteine: miettes[0]!, glucide: A.riz, lipide: A.amandes }, fixes: [] },
+      cibles, dispo, stock);
+
+    assert.equal(a.plafonnes.length, 12, 'la borne des douze tours est bien atteinte');
+
+    const trop = a.resultat.quantites.filter((q) => q.aCuire > dispo(q.aliment) + 0.5);
+    assert.equal(trop.length, 1,
+      'le dernier relais sort du frigo, faute de tour pour le plafonner');
+
+    const d = a.resultat.diagnostics.find((x) => x.code === 'stock_insuffisant');
+    assert.ok(d, `aucun blocage annoncé : ${JSON.stringify(a.resultat.diagnostics)}`);
+    assert.equal(d!.gravite, 'blocage');
+    assert.match(d!.message, /Poulet 13/);
+    assert.equal(a.resultat.ok, false,
+      'un repas qu\'on ne peut pas cuisiner n\'est pas un repas réussi');
   });
 
   it('enchaîne les relèves tant qu\'il en reste', () => {

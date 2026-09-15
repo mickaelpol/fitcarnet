@@ -148,6 +148,29 @@ describe('Le riz de mars — ce qui a failli arriver dans l\'assiette', () => {
       'avertissement');
   });
 
+  /**
+   * F5, 15 septembre 2026. LA PHRASE POSAIT 88 g DE MATIÈRE SÈCHE PUIS
+   * CALCULAIT COMME S'IL Y EN AVAIT 100.
+   *
+   * `(100 / a.ratio)` au lieu de `(88 / a.ratio)` : pour un rendement de 6,
+   * elle annonçait 17 g là où son propre raisonnement en donne 15. Un
+   * avertissement dont le chiffre contredit sa propre prémisse n'apprend rien
+   * à qui le lit — il lui donne un troisième nombre à démêler.
+   *
+   * Le seuil lui-même se lit dans ce chiffre : à 5, la limite haute, un
+   * féculent cuit porterait encore 18 g de matière sèche pour 100 g, ce qu'un
+   * riz très hydraté atteint. Au-delà, plus rien de comestible n'y correspond.
+   */
+  it('le poids de matière sèche annoncé tient compte des 88 %', () => {
+    const message = (ratio: number): string =>
+      verifierAliment(base({ ratio })).find((x) => x.code === 'rendement_hors_norme')!.message;
+
+    assert.match(message(6), /15 g pour 100 g de produit cuit/,
+      '88 / 6 = 14,7, pas 16,7');
+    assert.match(message(8), /11 g pour 100 g de produit cuit/,
+      '88 / 8 = 11, pas 12,5');
+  });
+
   it('un grain sec anormalement dense est signalé sans bloquer', () => {
     const d = verifierAliment(base({ kcal100: 520, prot100: 8.1, gluc100: 84.6 }))
       .find((x) => x.code === 'grain_sec_trop_dense');

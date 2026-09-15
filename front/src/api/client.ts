@@ -34,18 +34,60 @@ const CLE_RAFRAICHISSEMENT = 'fitcarnet.rafraichissement';
  * second mécanisme de stockage à côté divergerait sur le web, où SecureStore
  * est absent : une seule porte, une seule règle.
  */
+/**
+ * LE STOCKAGE WEB PEUT JETER À L'ACCÈS, PAS SEULEMENT À L'APPEL.
+ *
+ * Constat F14, corrigé le 15 septembre 2026. Le code écrivait
+ * `globalThis.localStorage?.getItem(cle)` : l'opérateur `?.` protège d'un
+ * objet ABSENT, il ne protège de rien quand l'objet existe et que le seul
+ * fait d'y toucher lève. C'est exactement ce que font Safari en navigation
+ * privée, Firefox cookies bloqués, et tout navigateur configuré pour refuser
+ * le stockage — `SecurityError` sur la lecture de la propriété elle-même.
+ *
+ * Ce que ça donnait : `chargerJeton()` rejetait, et personne ne rattrapait.
+ * `app/_layout.tsx` laissait `pret` à faux — ÉCRAN DE CHARGEMENT INDÉFINI,
+ * sans message, sans bouton. L'application ne démarrait tout simplement pas.
+ *
+ * Le try/catch est ICI, au point de passage obligé, et pas devant chacun des
+ * appelants. `coffre` a déjà quatre consommateurs — les deux jetons, les
+ * réglages, la sonnerie — et une règle recopiée devant quatre portes finit
+ * par manquer devant la cinquième. C'est la leçon d'É1.
+ */
+function stockageWeb(): Storage | null {
+  try {
+    return (globalThis as { localStorage?: Storage }).localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const coffre = {
   async lire(cle: string): Promise<string | null> {
-    if (Platform.OS === 'web') return globalThis.localStorage?.getItem(cle) ?? null;
+    if (Platform.OS === 'web') {
+      try { return stockageWeb()?.getItem(cle) ?? null; } catch { return null; }
+    }
 
     return SecureStore.getItemAsync(cle);
   },
   async ecrire(cle: string, valeur: string): Promise<void> {
-    if (Platform.OS === 'web') { globalThis.localStorage?.setItem(cle, valeur); return; }
+    if (Platform.OS === 'web') {
+      /* Un échec d'écriture est avalé, et ce n'est pas anodin : la session
+         ne survivra pas au rechargement. On préfère une application qui
+         fonctionne le temps de la visite à une application qui refuse de
+         démarrer — mais l'utilisateur n'en est pas averti, et ça mériterait
+         un mot à l'écran (règle 7). Noté, non tranché. */
+      try { stockageWeb()?.setItem(cle, valeur); } catch { /* stockage refusé */ }
+
+      return;
+    }
     await SecureStore.setItemAsync(cle, valeur);
   },
   async effacer(cle: string): Promise<void> {
-    if (Platform.OS === 'web') { globalThis.localStorage?.removeItem(cle); return; }
+    if (Platform.OS === 'web') {
+      try { stockageWeb()?.removeItem(cle); } catch { /* stockage refusé */ }
+
+      return;
+    }
     await SecureStore.deleteItemAsync(cle);
   },
 };

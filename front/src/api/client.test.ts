@@ -523,3 +523,53 @@ describe('membres', () => {
     assert.deepEqual(client.membres<number>({ member: [1, 2] }), [1, 2]);
   });
 });
+
+describe('le stockage du navigateur peut refuser, et l\'application doit démarrer quand même', () => {
+  /* CONSTAT F14, corrigé le 15 septembre 2026.
+   *
+   * Le coffre écrivait `globalThis.localStorage?.getItem(cle)`. Le `?.` protège
+   * d'un objet ABSENT ; il ne protège de rien quand l'objet existe et que le
+   * seul fait d'y toucher lève. Safari en navigation privée, Firefox cookies
+   * bloqués, tout navigateur configuré pour refuser le stockage : `SecurityError`
+   * sur la lecture de la PROPRIÉTÉ elle-même, avant tout appel de méthode.
+   *
+   * Personne ne rattrapait ce rejet. `app/_layout.tsx` laissait `pret` à faux :
+   * écran de chargement indéfini, sans message et sans bouton. L'application ne
+   * démarrait pas du tout. */
+  const poser = (stockage: unknown): void => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true, get: () => stockage,
+    });
+  };
+  const rendre = (): void => { poser(vraiCoffre); };
+  const vraiCoffre = (globalThis as { localStorage?: unknown }).localStorage;
+
+  it('une lecture qui lève rend null au lieu de rejeter', async () => {
+    poser({ getItem: () => { throw new Error('SecurityError'); } });
+    try {
+      assert.equal(await client.coffre.lire('fitcarnet.jeton'), null,
+        'un stockage refusé ne prouve aucune session : c\'est « non », pas une panne');
+    } finally { rendre(); }
+  });
+
+  it('l\'objet lui-même peut lever à l\'ACCÈS, pas seulement à l\'appel', async () => {
+    /* Le cas que `?.` ne voyait pas : ce n'est pas `getItem` qui lève, c'est la
+       lecture de `globalThis.localStorage`. */
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => { throw new Error('SecurityError: acces au stockage refuse'); },
+    });
+    try {
+      assert.equal(await client.coffre.lire('fitcarnet.jeton'), null);
+      await client.coffre.ecrire('fitcarnet.jeton', 'x');
+      await client.coffre.effacer('fitcarnet.jeton');
+    } finally { rendre(); }
+  });
+
+  it('écrire dans un stockage refusé ne fait pas échouer la connexion', async () => {
+    poser({ getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); } });
+    try {
+      await client.coffre.ecrire('fitcarnet.jeton', 'jeton-neuf');
+    } finally { rendre(); }
+  });
+});

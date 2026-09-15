@@ -1,8 +1,12 @@
 /* Doit rester la premiere ligne : pose le filtre LogBox avant que
    `expo-notifications` n'emette son message au chargement. */
 import './silenceExpoGo';
+/* Pose LE gestionnaire de notifications, celui de toute l'application. Il y en
+   avait deux, et le second gagnait — voir `gestionnaireNotifications.ts` (F10). */
+import './gestionnaireNotifications';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { ORIGINE_REPOS } from './affichageNotification';
 import { chargerSonnerie, SONNERIES } from './sonnerie';
 
 /**
@@ -61,17 +65,12 @@ const CANAUX_PERIMES = [
 ];
 const VIBRATION = [0, 300, 120, 300, 120, 300, 120, 500];
 
-/* Ce gestionnaire n'est appelé que si la notification arrive alors que
-   l'application est au premier plan — cas où le chrono a déjà sonné tout seul.
-   On la rend silencieuse et invisible pour ne pas doubler le signal. */
-Notifications.setNotificationHandler({
-  handleNotification: () => Promise.resolve({
-    shouldShowBanner: false,
-    shouldShowList: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+/* La règle « une fin de repos ne s'affiche pas au premier plan, le chrono a
+   déjà sonné tout seul » n'est plus écrite ici : elle vit dans
+   `affichageNotification.ts`, avec celle de l'inventaire, parce qu'il n'y a
+   qu'UN gestionnaire pour toute l'application et qu'il faut bien que les deux
+   règles tiennent en même temps. Ce module se contente de SIGNER ce qu'il
+   envoie, avec `ORIGINE_REPOS` (voir `programmerAlarme`). */
 
 /**
  * CE QUE LE SYSTÈME NOUS LAISSE FAIRE, ET QUI DOIT SE VOIR.
@@ -201,6 +200,10 @@ export async function programmerAlarme(secondes: number): Promise<string | null>
            un canal. Sur Android, ce champ est ignore au profit du canal. */
         sound: `${sonnerie}.wav`,
         vibrate: VIBRATION,
+        /* LA SIGNATURE, et c'est elle qui décide de l'affichage au premier
+           plan : sans elle, `commentAfficher` ne saurait pas que le chrono a
+           déjà sonné, et poserait une bannière de trop. */
+        data: { origine: ORIGINE_REPOS },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

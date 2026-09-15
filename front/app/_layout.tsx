@@ -9,7 +9,7 @@ import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { chargerJeton, surSessionFinie } from '@/api/client';
-import { PERSISTANCE, oublierLeCacheDisque } from '@/api/persistance';
+import { PERSISTANCE, purgerLeCache } from '@/api/persistance';
 import { useConnecte } from '@/api/session';
 import { Chargement } from '@/composants/base';
 import { EnTete } from '@/composants/enTete';
@@ -40,7 +40,17 @@ export default function Racine() {
   const segments = useSegments();
   const connecte = useConnecte();
 
-  useEffect(() => { void chargerJeton().then(() => setPret(true)); }, []);
+  /* ON EST PRÊT MÊME SI LA LECTURE DU COFFRE ÉCHOUE (F14, 15 septembre 2026).
+     Sur le web le coffre est `localStorage`, et il ne se contente pas d'être
+     absent : en navigation privée, cookies bloqués, ou stockage refusé par une
+     politique, il EXISTE et JETTE. La promesse partait alors en rejet sans
+     personne pour l'attraper, `pret` restait faux, et l'écran de chargement
+     ci-dessous s'affichait indéfiniment — une application qui ne démarre pas et
+     ne dit pas pourquoi. Sans jeton lisible, on n'est pas connecté : le portier
+     enverra vers la connexion, ce qui est au moins un écran. */
+  useEffect(() => {
+    void chargerJeton().then(() => setPret(true), () => setPret(true));
+  }, []);
 
   /* --------------------------------------------------------- le portier
    *
@@ -79,12 +89,11 @@ export default function Racine() {
      réapparaîtraient une fraction de seconde à la connexion suivante. */
   useEffect(() => {
     surSessionFinie(() => {
-      client.clear();
-      /* `clear()` ne vide que la MÉMOIRE. Depuis que le cache est écrit sur le
-         disque, l'oublier là aussi n'est plus une élégance : sans cette ligne,
-         les séances et le frigo du compte précédent resteraient sur le
-         téléphone et s'afficheraient à la connexion suivante. */
-      void oublierLeCacheDisque();
+      /* LA MÉMOIRE ET LE DISQUE, dans cet ordre : `purgerLeCache` porte les
+         deux. C'était `client.clear()` suivi de l'effacement du disque, écrit à
+         la main ici comme aux deux autres endroits qui purgent — trois copies
+         d'un ordre dont dépend la confidentialité du cache (F9). */
+      void purgerLeCache(client);
       routeur.replace('/connexion');
     });
 

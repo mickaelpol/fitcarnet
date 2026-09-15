@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+/* Chemin RELATIF, jamais `@/solveur/solveur` : `kcalDesMacros` est une VALEUR
+   et `tsc -p tsconfig.tests.json` ne réécrit pas l'alias. */
+import { kcalDesMacros } from '../solveur/solveur';
 import { type PlanAmericain, convertir, fibresDouteuses } from './planCoach';
 
 /** Le plan réel, recopié tel qu'il est imprimé. */
@@ -49,6 +52,37 @@ describe('conversion d\'un plan américain', () => {
     const c = convertir({ kcal: 300, prot: 20, glucides: 30, lipides: 10, fibres: 0 });
     assert.equal(c.gluc, 30);
     assert.equal(c.kcal, 4 * 20 + 4 * 30 + 9 * 10);
+  });
+
+  /**
+   * F6, 15 septembre 2026. UNE SEULE DES QUATRE MACROS ENTRAIT ARRONDIE DANS
+   * LE TOTAL.
+   *
+   * `gluc` était arrondi au dixième puis réutilisé pour les calories, tandis
+   * que `prot`, `lipides` et `fibres` y entraient bruts. Le total ne décrivait
+   * donc ni les grammes annoncés ni les grammes du plan d'origine — un
+   * troisième nombre, celui de personne.
+   *
+   * La règle du projet tranche dans un seul sens : ce qui est affiché est ce
+   * qui sera pesé, donc les calories se comptent sur les grammes RENDUS. Les
+   * vérifier avec `kcalDesMacros`, qui porte la formule, plutôt qu'avec une
+   * copie de 4/4/2/9 écrite ici — un test qui réimplémente ce qu'il garantit
+   * ne garantit que sa propre copie.
+   */
+  it('compte ses calories sur les grammes qu\'elle annonce', () => {
+    /* Un plan saisi au centième : c'est là que l'arrondi au dixième se voit.
+       Chacune des trois macros brutes perd 0,04 g à l'arrondi, soit 0,60 kcal
+       en tout — assez pour faire basculer le total d'une unité. */
+    const c = convertir({
+      kcal: 500, prot: 30.44, glucides: 60.04, lipides: 10.44, fibres: 5.04,
+    });
+
+    assert.deepEqual(
+      [c.prot, c.gluc, c.lip, c.fibres], [30.4, 55, 10.4, 5],
+      'les grammes rendus sont arrondis au dixième');
+    assert.equal(c.kcal, Math.round(kcalDesMacros(c)),
+      'les calories doivent décrire CES grammes-là, pas ceux d\'avant l\'arrondi');
+    assert.equal(c.kcal, 445);
   });
 });
 

@@ -204,6 +204,49 @@ describe('La répartition dit quoi mettre dans chaque boîte', () => {
     assert.deepEqual(b.crus.map((x) => x.aliment.nom), ['Brocoli']);
   });
 
+  /**
+   * F2, 15 septembre 2026. LA BOÎTE ANNONÇAIT UN POIDS CUIT POUR UN ALIMENT
+   * QU'ELLE RANGEAIT ELLE-MÊME PARMI LES CRUS.
+   *
+   * `assiette` sort du solveur, où elle vaut toujours `pesé × rendement` — le
+   * rendement est une propriété de l'aliment, pas du repas, et `convertir` ne
+   * sait rien des cuissons choisies. `repartition`, elle, le sait : c'est le
+   * seul endroit de la chaîne qui ait les deux informations en main.
+   *
+   * Le cas : 100 g de flocons d'avoine à verser dans un skyr, marqués « sans
+   * cuisson ». Le solveur fait peser 100 g, la boîte en annonçait 200 — celui
+   * qui suit la boîte se sert du double.
+   *
+   * « Sans cuisson » est un CHOIX, pas une absence de réponse (règle 6) : ce
+   * qui n'est pas cuit ne gonfle pas, et son poids servi est celui de la
+   * balance. Un aliment dont personne n'a encore décidé, lui, garde le poids
+   * du catalogue — on ne répond pas à sa place, et l'écran le réclame déjà.
+   */
+  it('ce qui est marqué « sans cuisson » ne gonfle pas dans la boîte', () => {
+    const plan = [repas('0|R2',
+      { aliment: RIZ, aCuire: 100 }, { aliment: POULET, aCuire: 150 })];
+    const choisi: Cuissons = {
+      [cleDeCuisson('0|R2', RIZ)]: null,
+      [cleDeCuisson('0|R2', POULET)]: 1,
+    };
+
+    const b = repartition(plan, choisi)[0]!;
+
+    assert.equal(b.crus[0]!.assiette, 100,
+      'non cuit : on sert ce qu\'on a pesé, pas le poids que la cuisson aurait donné');
+    assert.equal(b.crus[0]!.parPersonne, 100);
+    assert.equal(b.cuits[0]!.assiette, 300, 'le poulet, lui, est bien cuit');
+  });
+
+  it('la part d\'un aliment non cuit se divise elle aussi par les convives', () => {
+    const plan = [pour(4, repas('0|R2', { aliment: RIZ, aCuire: 100 }))];
+    const choisi: Cuissons = { [cleDeCuisson('0|R2', RIZ)]: null };
+
+    const ligne = repartition(plan, choisi)[0]!.crus[0]!;
+    assert.equal(ligne.assiette, 100);
+    assert.equal(ligne.parPersonne, 25);
+  });
+
   it('rien ne disparaît : chaque aliment du repas est dans une des deux listes', () => {
     const plan = [repas('0|R2',
       { aliment: RIZ, aCuire: 100 },

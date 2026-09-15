@@ -42,6 +42,27 @@ export const ALIMENT_VIDE: AlimentSaisi = {
 type CleNombre = 'kcal100' | 'prot100' | 'gluc100' | 'lip100' | 'fibres100';
 
 /**
+ * Lecture numérique d'un champ de saisie.
+ *
+ * REMONTÉE ICI LE 15 SEPTEMBRE 2026, ET CE N'EST PAS DU RANGEMENT (F13).
+ * C'était un `const` déclaré DANS le composant, une trentaine de lignes SOUS
+ * `majNombre`, qui l'appelle. Le code ne plantait que par chance : `majNombre`
+ * n'est invoqué qu'à la frappe, donc après le premier rendu, donc après la
+ * zone morte temporelle du `const`. Le jour où ce bloc serait appelé pendant
+ * le rendu — ou extrait dans un hook, ce que le plan de l'audit prévoit —
+ * l'écran serait mort sur un `ReferenceError`.
+ *
+ * Rien ici ne dépend de l'état du composant : la fonction n'avait aucune raison
+ * d'y vivre. Au niveau du module, la zone morte est franchie au chargement et
+ * l'ordre ne peut plus se retourner contre nous.
+ */
+const nombre = (v: string): number => {
+  const x = parseFloat(v.replace(',', '.'));
+
+  return Number.isNaN(x) ? 0 : x;
+};
+
+/**
  * Texte de départ des champs numériques.
  *
  * Sur un aliment existant, un zéro est une valeur : l'huile n'a pas de
@@ -177,12 +198,6 @@ export function EditeurAliment({
     && a.kcal100 > 0
     && ratioVraisemblable(a.ratio)
     && controle.verdict !== 'incoherent';
-
-  const nombre = (v: string) => {
-    const x = parseFloat(v.replace(',', '.'));
-
-    return Number.isNaN(x) ? 0 : x;
-  };
 
   const couleurVerdict = {
     coherent: C.ok, ecart: C.vif, incoherent: C.erreur, indecidable: C.attenue,

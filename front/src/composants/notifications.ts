@@ -1,6 +1,11 @@
+/* Pose LE gestionnaire de notifications, celui de toute l'application. Ce
+   module en posait un SECOND, qui écrasait celui de l'alarme de repos : voir
+   `gestionnaireNotifications.ts` (F10). */
+import './gestionnaireNotifications';
 import * as Notifications from 'expo-notifications';
 import { AppState, Platform } from 'react-native';
 import { C } from '@/theme';
+import { ORIGINE_INVENTAIRE } from './affichageNotification';
 
 /**
  * PRÉVENIR QUAND L'APPLICATION N'EST PLUS DEVANT LES YEUX.
@@ -54,17 +59,15 @@ export async function preparerLesNotifications(): Promise<boolean> {
     if (!accorde) return false;
 
     if (!pret) {
-      /* AFFICHER MÊME AU PREMIER PLAN : c'est nous qui décidons de ne pas
-         notifier dans ce cas, pas le système. Laisser le système filtrer
-         mettrait la règle à deux endroits. */
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: false,
-          shouldSetBadge: false,
-        }),
-      });
+      /* LE GESTIONNAIRE N'EST PLUS POSÉ ICI, ET C'EST LA CORRECTION DE F10, DU
+         15 SEPTEMBRE 2026. Ces lignes appelaient `setNotificationHandler` avec
+         « afficher même au premier plan » — une règle juste pour l'inventaire,
+         mais le gestionnaire est GLOBAL ET UNIQUE : elle écrasait celle de
+         l'alarme de repos, et la garde `pret` faisait que c'était pour de bon.
+         Après le premier inventaire de la session, chaque fin de repos posait
+         donc une bannière au premier plan par-dessus le chrono qui sonnait
+         déjà. Les deux règles vivent maintenant ensemble dans
+         `affichageNotification.ts`, et ce module SIGNE ce qu'il envoie. */
 
       if (Platform.OS === 'android') {
         /* Obligatoire depuis Android 8 : sans canal, la notification est
@@ -113,6 +116,9 @@ export async function prevenirFinInventaire(
           ? `${corriges} correction${corriges > 1 ? 's' : ''} enregistrée${corriges > 1 ? 's' : ''}.`
           : `${corriges} corrigée${corriges > 1 ? 's' : ''}, ${echecs} refusée${echecs > 1 ? 's' : ''}. Ouvre le frigo pour voir lesquelles.`,
         ...(Platform.OS === 'android' ? { channelId: CANAL } : {}),
+        /* La signature : c'est elle qui autorise la bannière au premier plan,
+           là où une fin de repos l'interdit. */
+        data: { origine: ORIGINE_INVENTAIRE },
       },
       /* `null` : tout de suite. Un déclencheur daté passerait par le
          planificateur du système, qui peut le décaler de plusieurs minutes. */

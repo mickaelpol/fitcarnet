@@ -231,13 +231,31 @@ export function repartition(repas: readonly Repas[], choisi: Cuissons): Boite[] 
     for (const q of r.quantites) {
       const choix = choisi[cleDeCuisson(r.cle, q.aliment)];
       const ou = (choix === undefined || choix === null) ? crus : cuits;
+
+      /* F2, 15 septembre 2026. CE QU'ON NE CUIT PAS NE GONFLE PAS.
+       *
+       * `q.assiette` vaut `pesé × rendement`, toujours : le rendement est une
+       * propriété de l'aliment et `convertir`, dans le solveur, ne sait rien
+       * des cuissons choisies. Ce module, lui, les connaît — c'est le seul
+       * endroit de la chaîne à tenir les deux bouts.
+       *
+       * La boîte annonçait donc 200 g de flocons d'avoine pour 100 g pesés,
+       * alors même qu'elle les rangeait parmi les crus. Qui suit la boîte se
+       * sert du double.
+       *
+       * Seul le `null` corrige : « sans cuisson » est un CHOIX, et un choix se
+       * respecte. La clé absente veut dire « personne n'a encore décidé » —
+       * on ne répond pas à sa place (règle 6), et `sansCuisson` le réclame
+       * déjà à l'écran. */
+      const servi = choix === null ? q.aCuire : q.assiette;
+
       ou.push({
         aliment: q.aliment,
-        assiette: q.assiette,
+        assiette: servi,
         /* Une portion vaut TES cibles, celles de ton compte. Cuisiner pour
            trois, c'est cuisiner trois fois la même portion — la famille n'a
            pas tes besoins, mais elle ne pèse rien. */
-        parPersonne: q.assiette / Math.max(1, r.convives),
+        parPersonne: servi / Math.max(1, r.convives),
       });
     }
 

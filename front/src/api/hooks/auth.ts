@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   api, definirJeton, definirRafraichissement, lireRafraichissement,
 } from '../client';
-import { oublierLeCacheDisque } from '../persistance';
+import { purgerLeCache } from '../persistance';
 import type { Utilisateur } from '../types';
 
 export function useConnexion() {
@@ -32,8 +32,7 @@ export function useConnexion() {
        * d'abord supprime la fenêtre plutôt que de la raccourcir. Une connexion
        * qui échoue laisse alors un cache vide — sans conséquence, on est sur
        * l'écran de connexion. */
-      qc.clear();
-      await oublierLeCacheDisque();
+      await purgerLeCache(qc);
 
       const r = await api<{ token: string; jetonRafraichissement?: string }>('/connexion', {
         methode: 'POST', corps: identifiants, sansJeton: true,
@@ -71,12 +70,11 @@ export function useDeconnexion() {
       }
     }
     await Promise.all([definirJeton(null), definirRafraichissement(null)]);
-    qc.clear();
-    /* `clear()` ne vide que la mémoire. Le cache est aussi écrit sur le
-       disque : sans cette ligne, les séances, les objectifs et le frigo de
-       celui qui vient de partir resteraient sur le téléphone, et la personne
-       suivante les verrait s'afficher avant l'arrivée des siennes. */
-    await oublierLeCacheDisque();
+    /* La MÉMOIRE ET LE DISQUE, dans cet ordre — voir `purgerLeCache`. Sans le
+       disque, les séances, les objectifs et le frigo de celui qui vient de
+       partir resteraient sur le téléphone, et la personne suivante les verrait
+       s'afficher avant l'arrivée des siennes. */
+    await purgerLeCache(qc);
   };
 }
 

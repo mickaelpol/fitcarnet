@@ -17,6 +17,12 @@
  * hérite — d'où `fibresDouteuses`.
  */
 
+/* Chemin RELATIF, jamais `@/calcul/nutrition` : ce sont des VALEURS, et
+   `tsc -p tsconfig.tests.json` ne réécrit pas l'alias. */
+import {
+  KCAL_FIBRES, KCAL_GLUCIDES, KCAL_LIPIDES, KCAL_PROTEINES,
+} from './nutrition';
+
 export interface PlanAmericain {
   /** kcal telles qu'imprimées sur le plan */
   kcal: number;
@@ -41,10 +47,17 @@ export interface CibleEuropeenne {
   kcalAnnoncees: number;
 }
 
-export const KCAL_PROT = 4;
-export const KCAL_GLUC = 4;
-export const KCAL_FIBRES = 2;
-export const KCAL_LIP = 9;
+/* Les quatre coefficients viennent de `nutrition.ts`, qui fait foi. Ils
+   étaient réécrits ici — quatre nombres, mais la règle 5 ne fait pas
+   d'exception pour les petites copies : c'est ainsi qu'un Atwater américain
+   s'était glissé dans le solveur et dans l'écran des objectifs. Les noms
+   courts restent exportés, ils sont l'interface de ce module. */
+export {
+  KCAL_PROTEINES as KCAL_PROT,
+  KCAL_GLUCIDES as KCAL_GLUC,
+  KCAL_FIBRES,
+  KCAL_LIPIDES as KCAL_LIP,
+} from './nutrition';
 
 const arrondi = (v: number): number => Math.round(v * 10) / 10;
 
@@ -72,17 +85,33 @@ export function convertir(plan: PlanAmericain): CibleEuropeenne {
   /* Des fibres supérieures aux glucides totaux ne veulent rien dire : les
      fibres SONT une part des glucides dans cette convention. On préfère ne
      rien retrancher plutôt que de rendre un glucide négatif. */
-  const fibres = Math.max(0, Math.min(plan.fibres, plan.glucides));
-  const gluc = arrondi(plan.glucides - fibres);
+  const fibresRetranchees = Math.max(0, Math.min(plan.fibres, plan.glucides));
+
+  /* LES QUATRE GRAMMAGES D'ABORD, LES CALORIES ENSUITE — et sur ces
+     grammages-là.
+
+     F6, 15 septembre 2026. Seul `gluc` entrait arrondi dans le total ; `prot`,
+     `lipides` et `fibres` y entraient bruts. Le nombre affiché ne décrivait
+     donc ni les grammes rendus ni ceux du plan d'origine, mais un mélange des
+     deux que personne ne pouvait refaire à la main. Sur un plan saisi au
+     centième — 30,44 P / 60,04 G / 10,44 L / 5,04 F — il annonçait 446 kcal
+     pour des grammes qui en font 445.
+
+     Le sens du projet est écrit ailleurs et vaut ici : ce qui est affiché est
+     ce qui sera pesé, donc les calories suivent les grammes, jamais l'inverse. */
+  const prot = arrondi(plan.prot);
+  const gluc = arrondi(plan.glucides - fibresRetranchees);
+  const lip = arrondi(plan.lipides);
+  const fibres = arrondi(fibresRetranchees);
 
   return {
-    prot: arrondi(plan.prot),
+    prot,
     gluc,
-    lip: arrondi(plan.lipides),
-    fibres: arrondi(fibres),
+    lip,
+    fibres,
     kcal: Math.round(
-      KCAL_PROT * plan.prot + KCAL_GLUC * gluc
-      + KCAL_FIBRES * fibres + KCAL_LIP * plan.lipides),
+      KCAL_PROTEINES * prot + KCAL_GLUCIDES * gluc
+      + KCAL_FIBRES * fibres + KCAL_LIPIDES * lip),
     kcalAnnoncees: Math.round(plan.kcal),
   };
 }

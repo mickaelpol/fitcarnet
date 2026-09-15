@@ -213,13 +213,32 @@ export function calculer(
       x = actifs.map(() => 0);
     }
 
-    // une quantité négative n'a pas de sens : on la met à zéro et on résout
-    // le sous-système restant, l'écart se reportant sur la macro abandonnée
+    /* Une quantité négative n'a pas de sens : on écarte l'aliment, on le DIT,
+       et on résout le sous-système restant — l'écart se reportant sur la macro
+       abandonnée.
+     *
+     * F1, 15 septembre 2026. La ligne du sous-système écrivait
+     * `nouveau[v] = Math.max(0, sol[i])`. Un aliment que le SECOND tour rendait
+     * négatif était donc écrasé à zéro sur place : au tour suivant la boucle ne
+     * trouvait plus rien à écarter, sortait, et n'émettait jamais son
+     * `quantite_negative`. Reproduit sur un petit-déjeuner skyr / avoine /
+     * amandes avec 100 g d'œufs imposés — les amandes étaient annoncées, le
+     * skyr quittait la table sans un mot. Les macros restaient justes ; c'est
+     * l'explication qui manquait.
+     *
+     * Les aliments écartés s'ACCUMULENT (`abandonnes`) au lieu d'être
+     * recalculés à chaque tour. Sans cela, celui du premier tour reviendrait
+     * dans les `gardes` du second et pourrait redevenir négatif : deux
+     * variables se renverraient la balle jusqu'à épuisement de la borne. Là,
+     * chaque tour en retire au moins une, donc trois tours suffisent pour trois
+     * variables — la borne n'est plus qu'une ceinture. */
+    const abandonnes = new Set<number>();
     for (let essai = 0; essai < 3; essai++) {
       const negatifs = x.map((v, i) => (v < -1e-6 ? i : -1)).filter((i) => i >= 0);
       if (negatifs.length === 0) break;
 
       negatifs.forEach((i) => {
+        abandonnes.add(i);
         diagnostics.push({
           gravite: 'avertissement',
           code: 'quantite_negative',
@@ -229,13 +248,13 @@ export function calculer(
         });
       });
 
-      const gardes = actifs.map((_, i) => i).filter((i) => !negatifs.includes(i));
+      const gardes = actifs.map((_, i) => i).filter((i) => !abandonnes.has(i));
       const nouveau = actifs.map(() => 0);
       if (gardes.length > 0) {
         const sousA = gardes.map((eq) => gardes.map((v) => par100(variables[actifs[v]!.cle]!, actifs[eq]!.macro)));
         const sousB = gardes.map((eq) => cibles[actifs[eq]!.macro] - macrosFixes[actifs[eq]!.macro]);
         const sol = resoudre(sousA, sousB);
-        if (sol) gardes.forEach((v, i) => { nouveau[v] = Math.max(0, sol[i]!); });
+        if (sol) gardes.forEach((v, i) => { nouveau[v] = sol[i]!; });
       }
       x = nouveau;
     }
@@ -442,7 +461,12 @@ export function calculer(
     const aliment = variables[cle];
     const q = arrondis[cle];
     if (!aliment || q <= 0 || q >= 8) return;
-    const apport = macrosDe(aliment, q)[roleMacro[cle]!.m];
+    /* F3, 15 septembre 2026. `glucidesTotaux` manquait ici, et ici seulement —
+       le cinquième appel à `macrosDe` du fichier, le seul à l'oublier. Le
+       message annonçait alors les glucides à l'européenne devant une cible qui
+       les compte fibres comprises : « 3,0 g » pour un pain qui en apporte 3,8
+       dans la convention affichée juste à côté. */
+    const apport = macrosDe(aliment, q, glucidesTotaux)[roleMacro[cle]!.m];
     diagnostics.push({
       gravite: 'avertissement',
       code: 'apport_negligeable',

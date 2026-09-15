@@ -270,12 +270,23 @@ export function verifierAliment(a: Aliment): Anomalie[] {
         + 'probablement le produit CUIT, elles aussi. Ressaisis la ligne du '
         + 'paquet, pour 100 g de produit sec.');
     } else if (a.ratio > r.maxi) {
+      /* F5, 15 septembre 2026. La phrase posait 88 g de matière sèche pour
+         100 g de grain, puis divisait 100 par le rendement — c'est-à-dire
+         comme s'il y en avait eu 100. Pour un rendement de 6 elle annonçait
+         17 g quand son propre raisonnement en donne 15. Le chiffre affiché
+         contredisait la prémisse affichée deux mots plus haut.
+
+         Ce qu'il dit vraiment : la matière sèche ne se cuit pas, elle se
+         dilue. Répartie dans `ratio × 100` g de produit cuit, elle n'y pèse
+         plus que `88 / ratio` g pour 100 g — et sous la limite de 5, cela fait
+         encore 18 g, ce qu'un riz très hydraté atteint. Au-delà, plus aucun
+         féculent cuit ne correspond. */
       dire('avertissement', 'rendement_hors_norme',
         `un rendement de ${r2(a.ratio)} : le bilan de matière ne l'autorise pas. `
-        + '100 g de grain sec ne portent que 88 g de matière sèche, et il en '
-        + `faudrait ${(100 / a.ratio).toFixed(0)} g pour tenir dans le poids cuit `
-        + 'annoncé. Repèse en égouttant, et laisse tiédir avant de poser sur la '
-        + 'balance.');
+        + '100 g de grain sec ne portent que 88 g de matière sèche, et il n\'en '
+        + `resterait que ${(88 / a.ratio).toFixed(0)} g pour 100 g de produit cuit — `
+        + 'moins que n\'en contient un féculent égoutté. Repèse en égouttant, et '
+        + 'laisse tiédir avant de poser sur la balance.');
     }
   }
 

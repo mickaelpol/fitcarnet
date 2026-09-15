@@ -121,6 +121,57 @@ export function ajusterAuStock(
   const aCuireDe = (f: Fixe): number =>
     convertir(f.aliment, versReference(f.aliment, f.grammes, f.unite)).aCuire;
 
+  /**
+   * LA DERNIÈRE PORTE, ET LES DEUX SORTIES PASSENT PAR ELLE.
+   *
+   * F7, 15 septembre 2026. La sortie de secours — celle qu'on prend quand les
+   * douze tours sont épuisés — rendait `calculer(...)` sans reconfronter le
+   * résultat au stock. La dernière variable, celle qui n'avait pas eu son
+   * tour, sortait donc avec la quantité que l'algèbre réclamait, `ok: true` et
+   * aucun diagnostic.
+   *
+   * Reproduit avec treize protéines à 5 g : l'écran annonçait 32 g d'un
+   * treizième poulet dont il ne restait que 5 g, en présentant le repas comme
+   * réussi. Et `resoudreAuMieux`, qui sort immédiatement sur `resultat.ok`,
+   * n'essayait même pas une autre combinaison.
+   *
+   * Le contrôle est posé au POINT DE PASSAGE OBLIGÉ plutôt que devant la seule
+   * porte fautive : sur le chemin normal la boucle vient de vérifier que rien
+   * ne déborde, donc il n'y coûte rien et ne changera jamais un résultat — il
+   * empêche seulement qu'une troisième sortie, écrite un jour, oublie la
+   * vérification comme celle-ci l'avait oubliée.
+   */
+  const sortie = (resultat: Resultat): Ajuste => {
+    const trop = resultat.quantites.filter((q) => q.aCuire > stockDe(q.aliment) + 0.5);
+    if (trop.length === 0) return { variables, fixes, plafonnes, resultat };
+
+    const detail = trop
+      .map((q) => `${q.aliment.nom} (${Math.round(q.aCuire)} g demandés, `
+        + `${Math.round(stockDe(q.aliment))} g en stock)`)
+      .join(' ; ');
+
+    return {
+      variables,
+      fixes,
+      plafonnes,
+      resultat: {
+        ...resultat,
+        /* Les macros tombent peut-être juste — mais sur un repas qu'on ne peut
+           pas cuisiner. Un plan impossible n'est pas un plan réussi, et c'est
+           `ok` que lit l'écran. */
+        ok: false,
+        diagnostics: [...resultat.diagnostics, {
+          gravite: 'blocage',
+          code: 'stock_insuffisant',
+          message:
+            `Ce repas demande plus que ce que le frigo contient : ${detail}. `
+            + 'Les relais du stock n\'ont pas suffi à boucler le compte. '
+            + 'Complète le frigo, ou compose ce repas à la main.',
+        }],
+      },
+    };
+  };
+
   for (let tour = 0; tour < 12; tour += 1) {
     /* Les quantités IMPOSÉES passent devant, parce qu'elles ne se discutent
        pas : 200 g de brocoli quand il en reste 60, c'est une consigne qu'on
@@ -182,7 +233,7 @@ export function ajusterAuStock(
       .find((x) => x !== null);
 
     if (deborde === undefined || deborde === null) {
-      return { variables, fixes, plafonnes, resultat };
+      return sortie(resultat);
     }
 
     /* Ce qu'on a vraiment devient une quantité imposée. `unite: 'cru'` parce
@@ -201,8 +252,5 @@ export function ajusterAuStock(
     plafonnes.push({ role: deborde.cle, aliment: deborde.aliment, grammes: deborde.dispo, releve });
   }
 
-  return {
-    variables, fixes, plafonnes,
-    resultat: calculer(cibles, variables, fixes, { glucidesTotaux }),
-  };
+  return sortie(calculer(cibles, variables, fixes, { glucidesTotaux }));
 }

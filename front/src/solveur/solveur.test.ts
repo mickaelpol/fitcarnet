@@ -300,6 +300,41 @@ describe('robustesse', () => {
     }
   });
 
+  /**
+   * F1, 15 septembre 2026. UN ALIMENT ÉCARTÉ AU SECOND TOUR DISPARAISSAIT SANS
+   * UN MOT.
+   *
+   * La boucle des négatifs écrivait `nouveau[v] = Math.max(0, sol[i])` : la
+   * quantité négative rendue par le sous-système était écrasée sur place. Au
+   * tour suivant, la boucle ne trouvait donc plus rien à écarter, sortait, et
+   * n'émettait jamais le `quantite_negative` de ce second aliment.
+   *
+   * Reproduit tel quel : petit-déjeuner skyr / flocons d'avoine / amandes avec
+   * 100 g d'œufs imposés, cible 20 P / 50 G / 12 L. Les amandes étaient
+   * annoncées ; le skyr, lui, quittait la table en silence. Les macros étaient
+   * justes — c'est l'explication qui manquait, et une quantité qui s'évapore
+   * sans raison est exactement ce que la règle 6 interdit.
+   */
+  it('dit AUSSI quand un aliment est écarté au second tour', () => {
+    const r = calculer({ kcal: 388, prot: 20, gluc: 50, lip: 12 },
+      { proteine: A.skyr, glucide: A.avoine, lipide: A.amandes },
+      [{ aliment: A.oeufs, grammes: 100 }]);
+
+    assert.equal(r.quantites.some((q) => q.aliment === A.skyr), false,
+      'le skyr est bien écarté du repas');
+
+    const ecartes = r.diagnostics
+      .filter((d) => d.code === 'quantite_negative')
+      .map((d) => d.message);
+
+    assert.equal(ecartes.length, 2,
+      `deux aliments écartés, donc deux explications ; reçu ${JSON.stringify(ecartes)}`);
+    assert.ok(ecartes.some((m) => m.includes('skyr')),
+      `le skyr disparaît sans un mot : ${JSON.stringify(ecartes)}`);
+    assert.ok(ecartes.some((m) => m.includes('amandes')),
+      `les amandes aussi doivent être annoncées : ${JSON.stringify(ecartes)}`);
+  });
+
   it('ne produit jamais de quantité négative', () => {
     const r = calculer({ kcal: 200, prot: 5, gluc: 5, lip: 2 },
       { proteine: A.saumon, glucide: A.patateDouce, lipide: A.amandes },
@@ -728,6 +763,37 @@ describe('un aliment ajustable devenu inutile', () => {
     assert.ok(r.diagnostics.some((d) => d.code === 'apport_negligeable'),
       'l\'app doit prévenir que les amandes ne servent plus à rien');
     assert.equal(r.ok, true, 'les macros restent atteintes');
+  });
+
+  /**
+   * F3, 15 septembre 2026. LE MESSAGE PARLAIT UNE AUTRE LANGUE QUE LA CIBLE.
+   *
+   * `macrosDe(aliment, q)` était appelé ici SANS son troisième paramètre — le
+   * seul des cinq appels du fichier à l'oublier. En glucides totaux, la cible
+   * compte les fibres dedans, le solveur aussi ; ce diagnostic, non. Pour 5 g
+   * d'un pain à 60 g de glucides et 15 g de fibres, il annonçait « 3,0 g de
+   * glucides » là où le repas et son objectif en comptent 3,8.
+   *
+   * Aucun calcul n'en dépendait : c'est une phrase, et une phrase qui donne un
+   * chiffre dans une convention que l'écran n'utilise pas est un chiffre faux.
+   */
+  it('annonce les glucides dans la convention de la cible', () => {
+    const pain = {
+      id: 'pain', nom: 'Pain complet', categorie: 'fec' as const,
+      kcal100: 250, prot100: 8, gluc100: 60, lip100: 1, fibres100: 15, ratio: 1,
+    };
+    const cibles = { kcal: 222, prot: 30, gluc: 3.75, lip: 10 };
+    const variables = { proteine: A.poulet, glucide: pain, lipide: A.huile };
+
+    const d = (totaux: boolean) =>
+      calculer(cibles, variables, [], { glucidesTotaux: totaux })
+        .diagnostics.find((x) => x.code === 'apport_negligeable'
+          && x.message.startsWith('Pain complet'));
+
+    assert.match(d(false)!.message, /5\.0 g, soit 3\.0 g de glucides/,
+      'en convention européenne, les fibres sont hors des glucides');
+    assert.match(d(true)!.message, /5\.0 g, soit 3\.8 g de glucides/,
+      'en glucides TOTAUX, la même phrase doit compter les fibres dedans');
   });
 });
 
