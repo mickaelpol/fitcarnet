@@ -57,7 +57,26 @@ use Symfony\Component\Validator\Constraints as Assert;
         // les 1338 entrees du catalogue revenait a transporter des centaines
         // de kilooctets que personne n'affiche, a chaque chargement.
         new Get(normalizationContext: ['groups' => ['exercice:lire', 'exercice:detail']]),
-        new Post(security: "is_granted('ROLE_USER')", processor: ExerciceProcessor::class),
+        /* CREER UN EXERCICE EST UN ACTE D'ADMINISTRATION — 15 septembre 2026.
+           Cette operation portait `is_granted('ROLE_USER')`, et AUCUN ecran de
+           l'application ne l'appelait : zero appelant dans `front/`. Une porte
+           ouverte sans usage n'est pas une fonctionnalite en attente, c'est une
+           surface a defendre pour rien. Le catalogue est commun, alimente par
+           l'import et par l'administrateur.
+
+           CE QUE CE N'ETAIT PAS : une fuite. `ExerciceProcessor` posait deja
+           `creePar` et `public = false`, donc un exercice cree par un compte
+           ordinaire restait invisible des autres, exactement comme un aliment.
+           `Aliment::Post` reste d'ailleurs a ROLE_USER pour cette raison — la
+           difference entre les deux catalogues n'est pas de securite, elle est
+           d'usage : l'ecran des aliments cree, celui des exercices non.
+
+           EN SUSPENS, ET C'EST VOLONTAIRE : `ExerciceProcessor` continue de
+           poser `public = false`. Un administrateur qui cree ici obtient donc
+           un exercice PRIVE, que lui seul voit — le catalogue commun n'a
+           toujours aucun moyen d'etre alimente par l'API. Publier demande
+           d'exposer `public` en ecriture, ce qui n'est pas tranche. */
+        new Post(security: "is_granted('ROLE_ADMIN')", processor: ExerciceProcessor::class),
         // Corriger un exercice : l'administrateur pour le catalogue commun,
         // l'auteur pour le sien (F-09, voir la clause juste en dessous).
         //

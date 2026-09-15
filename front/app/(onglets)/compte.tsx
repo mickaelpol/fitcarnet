@@ -9,10 +9,20 @@ import { C, E, P, T } from '@/theme';
 
 export default function Compte() {
   const router = useRouter();
-  const { data, isLoading, isError, error, refetch } = useMoi();
+  const { data, isPending, isError, error, refetch } = useMoi();
   const deconnecter = useDeconnexion();
 
-  if (isLoading) return <Chargement />;
+  /* `isPending` ET NON `isLoading`, DEPUIS QUE `useMoi` CONNAIT LA SESSION.
+     `isLoading` vaut `isPending && isFetching` : quand `useMoi` est desactive
+     — le temps que `useConnecte` lise le coffre, a chaque montage — rien ne
+     part sur le reseau, donc `isFetching` est faux, donc `isLoading` AUSSI.
+     L'ecran passait alors les deux gardes avec `data` indefini et affichait le
+     tiret et « Gérés dans l'onglet Mon frigo » comme un fait : exactement la
+     panne decrite juste en dessous, revenue par la porte de derriere en
+     ajoutant `enabled` a `useMoi`. Relevee par la revue le 15 septembre 2026,
+     le jour meme. `isPending` dit « je n'ai pas de donnee », sans rien
+     supposer de ce qui circule. */
+  if (isPending) return <Chargement />;
 
   /* UN ECHEC DOIT SE VOIR, ET IL NE SE VOYAIT PAS.
      Seul `isLoading` etait lu. Reseau coupe ou session expiree, l'ecran

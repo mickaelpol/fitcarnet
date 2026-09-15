@@ -34,6 +34,7 @@ import {
   MODELE, NOM_REPAS, REPAS, type Repas, type Role,
   cleDuRepas, composer, roleDe, releveDe,
 } from '@/solveur/composer';
+import { lireLaCle } from '@/solveur/periode';
 import { estCoche } from '@/calcul/selectionRepas';
 /* LA CHAÎNE DE CALCUL VIT DANS `src/` DEPUIS LE 15 SEPTEMBRE 2026.
 
@@ -173,9 +174,13 @@ export default function Calculateur() {
 
   /** « Aujourd'hui · Midi » — le nom d'une boîte. */
   const nomDeLaBoite = (cle: string): string => {
-    const [rang, repas] = cle.split('|');
+    /* `lireLaCle` et non `Number(cle.split('|')[0])` : une clé malformée
+       donnait `libelleDuJour(NaN)` à l'écran, sans que rien ne le signale.
+       La lecture vit désormais dans `solveur/periode.ts`, là où la clé
+       s'écrit — relevé par la revue le 15 septembre 2026. */
+    const lu = lireLaCle(cle);
 
-    return `${libelleDuJour(Number(rang))} · ${NOM_REPAS[repas as Repas]}`;
+    return lu === null ? 'Boîte' : `${libelleDuJour(lu.jour)} · ${NOM_REPAS[lu.repas]}`;
   };
 
   /**

@@ -7,7 +7,7 @@ import { SR } from './stylesRepas';
 import {
   type Compose, ROLES, TOLERANCE, imposePour, saisieIllisible,
 } from '@/calcul/demandeRepas';
-import type { ModeCuisson } from '@/calcul/cuisson';
+import { type ChoixDeCuisson, poidsDeLaLigne } from '@/calcul/poidsServi';
 import {
   NOM_REPAS, type AuMieux, type Repas, type Role, rolesDuRepas,
 } from '@/solveur/composer';
@@ -113,28 +113,51 @@ function CruOuCuit({
  *
  * `q` absente veut dire « le solveur n'a rien servi ici » et s'écrit « — »,
  * jamais zéro : vide n'est pas zéro.
+ *
+ * ELLE NE CALCULE PLUS SES POIDS — F2, 15 septembre 2026. Les deux colonnes
+ * de droite étaient `q.assiette`, c'est-à-dire `pesé × rendement`, pour TOUS
+ * les aliments. Un riz marqué « tel quel » s'annonçait donc à 300 g pour
+ * 100 g pesés, alors que la boîte du batch — corrigée le matin même dans
+ * `repartition` — en annonçait 100. Deux écrans, deux chiffres, et c'est
+ * celui-ci qu'on lit devant la balance.
+ *
+ * `poidsDeLaLigne` porte la décision, et son test croisé la compare à celle
+ * de `repartition` sur le même repas.
+ *
+ * CE QUI N'EST TOUJOURS PAS COUVERT, ET IL FAUT LE SAVOIR : le CÂBLAGE. F2
+ * n'était pas une règle fausse — elle était juste dans `fournees.ts` pendant
+ * que ce fichier l'ignorait, et un test de la fonction pure serait resté vert
+ * tout ce temps. Seul un rendu le verrait. Il a été tenté le 15 septembre
+ * 2026 et abandonné : monter cette ligne charge tout `carteRepas.tsx`, donc
+ * `complements` → `api/hooks` → `client.ts` → `expo-secure-store`, absent du
+ * banc. Sortir `LigneAliment` dans son propre module la rendrait montable
+ * seule — un quart d'heure, non fait.
  */
 function LigneAliment({
-  nom, sousTitre, couleur, q, portions, taille, style,
+  nom, sousTitre, couleur, q, cuisson, portions, taille, style,
 }: {
   nom: string;
   sousTitre: string;
   couleur: string;
   q: { aCuire: number; assiette: number } | undefined;
+  /** la cuisson de CET aliment dans CE repas : elle décide du poids annoncé */
+  cuisson: ChoixDeCuisson;
   portions: number;
   taille: number;
   style?: StyleProp<ViewStyle>;
 }) {
+  const poids = poidsDeLaLigne(q, cuisson, portions);
+
   return (
     <View style={[s.ligne, style]}>
       <View style={{ flex: 2 }}>
         <Texte style={{ fontSize: taille }} numberOfLines={1}>{nom}</Texte>
         <Discret style={{ fontSize: T.minuscule, color: couleur }}>{sousTitre}</Discret>
       </View>
-      <Texte style={s.val}>{q ? nb(q.aCuire) : '—'}</Texte>
-      <Texte style={s.val}>{q ? nb(q.assiette) : '—'}</Texte>
+      <Texte style={s.val}>{poids ? nb(poids.aPeser) : '—'}</Texte>
+      <Texte style={s.val}>{poids ? nb(poids.servi) : '—'}</Texte>
       <Texte style={[s.val, { color: C.vif }]}>
-        {q ? nb(q.assiette / portions) : '—'}
+        {poids ? nb(poids.parPersonne) : '—'}
       </Texte>
     </View>
   );
@@ -168,7 +191,7 @@ export function CarteRepas({
    * décidé qu'il ne se cuit pas, ou « a choisir » tant que personne n'a
    * tranché. Les deux derniers ne se confondent pas.
    */
-  cuissonDe: (a: Aliment) => ModeCuisson | null | 'a choisir';
+  cuissonDe: (a: Aliment) => ChoixDeCuisson;
   onCuisson: (a: Aliment) => void;
 }) {
   /* Le résultat n'est plus calculé ici : il vient du plan, où les quatre
@@ -327,7 +350,7 @@ export function CarteRepas({
               <View key={cle} style={{ gap: 4 }}>
                 <LigneAliment
                   nom={aliment.nom} sousTitre={titre} couleur={couleurRole(cat)}
-                  q={q} portions={portions} taille={T.normal}
+                  q={q} cuisson={cuissonDe(aliment)} portions={portions} taille={T.normal}
                 />
 
                 <View style={s.actions}>
@@ -355,7 +378,7 @@ export function CarteRepas({
                     nom={q.aliment.nom}
                     sousTitre={echange?.mis.id === q.aliment.id ? 'À la place' : 'Complément'}
                     couleur={C.ok}
-                    q={q} portions={portions} taille={T.normal}
+                    q={q} cuisson={cuissonDe(q.aliment)} portions={portions} taille={T.normal}
                     style={s.renfort}
                   />
                 ))}
@@ -403,7 +426,7 @@ export function CarteRepas({
               <View key={String(a.id)} style={{ gap: 4 }}>
                 <LigneAliment
                   nom={a.nom} sousTitre="Ajouté" couleur={couleurRole(a.categorie)}
-                  q={q} portions={portions} taille={T.petit}
+                  q={q} cuisson={cuissonDe(a)} portions={portions} taille={T.petit}
                 />
 
                 <View style={s.actions}>

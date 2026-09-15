@@ -66,7 +66,7 @@ tard » que ce bouton existe pour éviter.
 `db/01-schema.sql` — **CONFIRMÉ, reproduit par diff de deux bases réelles**
 
 Deux bases ont été construites dans un PostgreSQL 16 jetable — A depuis `01-schema.sql` seul,
-B depuis A plus les 21 migrations dans l'ordre d'`installer.sh` — et leurs `pg_dump --schema-only`
+B depuis A plus les 23 migrations dans l’ordre d'`installer.sh` — et leurs `pg_dump --schema-only`
 comparés. **Le diff fait 312 lignes.**
 
 Absents du schéma initial : la table **`complement`** (séquence, PK, FK, 2 index, 4 CHECK), la table
@@ -320,17 +320,24 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **3 — sécurité et isolation** | ✅ | É1, C3, É8, M-01, M-02, M-03 · **M-02 complet le 15 septembre** : `GET /api/mes-sessions` et `DELETE /api/mes-sessions/{id}` |
 | **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
 | **5 — scripts dangereux** | ✅ | É4, É7, `sauvegarde.sh` (É9 fait le 8 sept.) · a révélé **C4**, tranché |
-| **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → 1 169 lignes · `composer.ts` 827 → 135 · `cuisson.ts` 613 → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
-| **7 — tests manquants** | 🟨 É10 fait | `client.ts` : 22 témoins, chacun prouvé par une **mutation** qui le tue (29 mutations au banc). Reste le câblage non couvert |
+| **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → **1 295** lignes · `composer.ts` **817** → 135 · `cuisson.ts` **611** → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
+| **7 — tests manquants** | ✅ | `client.ts` : 22 témoins, chacun prouvé par une **mutation** qui le tue (29 mutations au banc). `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
 | **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
-Tests au 15 septembre, au soir : **550 front** (548 + 2 de rendu, en deux passes) · **201 API · 577 assertions · 7 erreurs PHPStan**
+Tests au 15 septembre, au terme du chantier : **564 front** (562 + 2 de rendu, en deux passes) · **231 API · 617 assertions · 7 erreurs PHPStan**
 (aucune sur les fichiers corrigés).
+
+**Et une épreuve que les tests ne remplacent pas** :
+`presentation/tournage/verifier-ecrans.mjs` pilote un vrai navigateur — connexion,
+cinq écrans, portier d'administration, **zéro erreur de console, zéro requête en
+échec**. C'est ce genre de témoin qui a trouvé le `GET /api/moi` sans jeton sur
+l'écran de connexion, invisible pour jsdom comme pour `tsc`.
 
 Deux points laissés ouverts volontairement :
 - **É14** n'a reçu qu'un volet sur trois. Le premier suffit à rouvrir la session ; les deux
-  ceintures de sécurité (`compte.tsx`, `_layout.tsx`) attendent une bibliothèque de test de
-  composants, que le projet n'a pas.
+  ceintures de sécurité (`compte.tsx`, `_layout.tsx`) attendaient une bibliothèque de test de
+  composants — **`@testing-library/react` est installé depuis le 15 septembre**, le blocage a
+  sauté et il ne reste qu'à écrire les deux témoins.
 - ~~**La table des paliers du disque RM**~~ — **tranchée le 15 septembre 2026.** Une seule
   table, centrée sur **70-90 %**, la zone où l'on progresse et la seule où la formule dit vrai.
   Neuf paliers par pas de 2,5 %, donnant neuf cibles de répétitions distinctes. En dessous de

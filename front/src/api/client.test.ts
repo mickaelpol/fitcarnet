@@ -24,8 +24,11 @@ import { describe, it } from 'node:test';
  *   - un message d'erreur réseau qui ne nomme pas l'adresse, et on cherche une
  *     soirée un APK construit avec l'adresse du poste de développement.
  *
- * UN DÉFAUT CONNU EST CARACTÉRISÉ, PAS CORRIGÉ : voir « BUG CONNU (M7) » plus
- * bas. Le jour où il sera réparé, son test tombera — c'est le but.
+ * LE DÉFAUT M7 A ÉTÉ CARACTÉRISÉ ICI AVANT D'ÊTRE CORRIGÉ, et c'est le témoin
+ * qui a servi de compte à rebours : il figeait « Identifiants incorrects. »
+ * sur un 401 de données, il est tombé le 15 septembre 2026 quand le repli a
+ * cessé de mentir. Les deux témoins qui l'ont remplacé tiennent les deux
+ * moitiés — la session d'un côté, les identifiants de l'autre.
  */
 
 /* ------------------------------------------------------------------------ */
@@ -456,20 +459,24 @@ describe('le message montré vient du serveur', () => {
   });
 
   /**
-   * BUG CONNU — constat M7 de l'audit (MOYENNE · CONFIRMÉ · non corrigé).
+   * CONSTAT M7 DE L'AUDIT, CORRIGÉ LE 15 SEPTEMBRE 2026.
    *
-   * Le repli d'un 401 sans message est « Identifiants incorrects. » QUEL QUE
+   * Le repli d'un 401 sans message était « Identifiants incorrects. » QUEL QUE
    * SOIT le chemin appelé. Correct sur `/connexion` ; faux partout ailleurs :
    * un 401 sur `/mon-frigo` veut dire « session expirée », jamais « mot de
-   * passe faux ». L'utilisateur cherche une faute de frappe dans un mot de
-   * passe qu'il n'a pas tapé.
+   * passe faux ». La session tombait, on ouvrait son frigo, et on cherchait
+   * une faute de frappe dans un mot de passe qu'on n'avait pas tapé.
    *
-   * Ce test NE CORRIGE RIEN : il fige le comportement actuel pour que la
-   * correction (faire dépendre le repli de `options.sansJeton`) soit un
-   * changement VOULU ET VISIBLE. Le jour où elle arrive, ce test tombe : il
-   * faut alors changer la valeur attendue, pas le code.
+   * Ces deux témoins tiennent les DEUX moitiés de la correction. Le premier
+   * seul se satisferait d'un repli qui dirait « session expirée » partout —
+   * la même faute, retournée, sur l'écran de connexion cette fois.
+   *
+   * LE TEXTE EST CELUI DE L'API, AU CARACTÈRE PRÈS. `SessionController::refus`
+   * répond `{"detail": "Session expiree, reconnecte-toi."}`, et ce `detail`
+   * s'affiche tel quel : les accents manquants sont VOULUS des deux côtés,
+   * pour que la phrase lue soit la même quel que soit celui qui a répondu.
    */
-  it('BUG CONNU (M7) : un 401 de données sans message dit « Identifiants incorrects. »', async () => {
+  it('un 401 de données sans message parle de session, pas d\'identifiants', async () => {
     await sessionOuverte();
 
     /* Le serveur de session est en panne (500) : pas de renouvellement, pas de
@@ -479,9 +486,29 @@ describe('le message montré vient du serveur', () => {
       : json({}, 401)));
 
     await assert.rejects(client.api('/mon-frigo'), erreurApi((e) => {
-      assert.equal(e.message, 'Identifiants incorrects.',
-        'M7 corrigé ? Très bien : mettre à jour ce test, et retirer « BUG CONNU »');
+      assert.equal(e.message, 'Session expiree, reconnecte-toi.',
+        'M7 : « Identifiants incorrects. » sur l\'onglet Frigo fait chercher une '
+        + `faute de frappe dans un mot de passe jamais tapé. Reçu : « ${e.message} »`);
     }));
+  });
+
+  it('un 401 sans message sur un appel sansJeton parle bien d\'identifiants', async () => {
+    await sessionOuverte();
+
+    const journal = brancherFetch(() => json({}, 401));
+
+    await assert.rejects(
+      client.api('/connexion', {
+        methode: 'POST', corps: { email: 'a@b.c', motDePasse: 'x' }, sansJeton: true,
+      }),
+      erreurApi((e) => {
+        assert.equal(e.message, 'Identifiants incorrects.',
+          'sur /connexion, un 401 est un mot de passe faux : parler de session '
+          + 'expirée y serait la même erreur, dans l\'autre sens');
+      }),
+    );
+
+    assert.equal(journal.length, 1, 'toujours aucun renouvellement sur un appel sansJeton');
   });
 });
 

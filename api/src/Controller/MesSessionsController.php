@@ -11,6 +11,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -41,6 +42,22 @@ use Symfony\Component\Uid\Uuid;
  * et rien qui permette de reconstituer un jeton.
  */
 #[Route('/api/mes-sessions')]
+/* LE JUMEAU OUBLIE, RELEVE LE 15 SEPTEMBRE 2026.
+   Les six autres controleurs du dossier portent leur #[IsGranted] — sur la
+   classe pour Frigo, Plans, Cuissons et Comptes, sur chaque methode pour
+   Invitations. Celui-ci n'en avait aucun, ni classe ni methode : il ne tenait
+   qu'a la derniere ligne d'access_control, « ^/api → IS_AUTHENTICATED_FULLY ».
+
+   Ce n'etait pas un trou aujourd'hui — la ligne fait son travail, et
+   `$this->moi()` cadre chaque requete sur le compte courant. C'en devient un
+   le jour ou un pare-feu `security: false` attrape ce chemin : trois existent
+   deja dans security.yaml, et le commentaire d'en-tete de ce fichier met
+   justement en garde contre celui de `session`, dont le motif frole celui-ci.
+   Le garde explicite survit a ce genre de deplacement ; la ligne generique non.
+
+   `SurfaceAdministrationTest` refuse desormais toute route de controleur sans
+   garde ecrit : le prochain fichier naitra protege, ou echouera. */
+#[IsGranted('ROLE_USER')]
 final class MesSessionsController extends AbstractController
 {
     public function __construct(private readonly JetonsRafraichissement $jetons)

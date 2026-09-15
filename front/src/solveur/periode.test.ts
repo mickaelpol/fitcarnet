@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { composer } from './composer';
 import { CIBLES_PLAN, frigoAleatoire } from './frigos.test-data';
 import {
-  cleDuRepas, listeDeCourses, resoudreLaJournee, resoudreLaPeriode,
+  cleDuRepas, listeDeCourses, lireLaCle, resoudreLaJournee, resoudreLaPeriode,
 } from './periode';
 import type { DemandeDatee } from './periode';
 import { REPAS } from './repasVocabulaire';
@@ -361,5 +361,30 @@ describe('Le rang du jour n\'a pas besoin d\'être 0, 1, 2…', () => {
             + `${apresCourses(aliment).toFixed(0)} g après courses`);
       }
     });
+  });
+});
+
+describe('lireLaCle — une clé illisible n\'est pas le jour 0', () => {
+  /* Le défaut, relevé par la revue le 15 septembre 2026 : deux endroits
+     découpaient la clé à la main, aucun ne la validait. `repas.tsx` faisait
+     `Number(rang)` et affichait un libellé de jour NaN ; `planFige.ts` écrivait
+     `split('|')[1] as MomentDuRepas`, une assertion qui ment en silence.
+     Les deux lisent désormais ici, là où la clé s'écrit. */
+  it('relit ce que cleDuRepas a écrit', () => {
+    for (const jour of [0, 1, 6]) {
+      for (const repas of REPAS) {
+        assert.deepEqual(lireLaCle(cleDuRepas(jour, repas)), { jour, repas },
+          `aller-retour sur ${cleDuRepas(jour, repas)}`);
+      }
+    }
+  });
+
+  it('rend null sur tout ce qui n\'est pas une clé', () => {
+    /* Règle 6 : on ne répond pas à la place de la donnée manquante. Rendre
+       « jour 0 » sur une clé cassée ferait ranger la boîte au mauvais jour,
+       sans que rien ne le signale. */
+    for (const casse of ['', 'R2', '2', '2|', '|R2', 'x|R2', '2|R9', '2|r2', '-1|R2', '1.5|R2', '2|R2|R3']) {
+      assert.equal(lireLaCle(casse), null, `« ${casse} » ne doit pas passer`);
+    }
   });
 });

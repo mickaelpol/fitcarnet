@@ -7,6 +7,7 @@
 import type { Repas as MomentDuRepas } from '@/solveur/repasVocabulaire';
 import type { Aliment } from '@/solveur/types';
 import type { Boite, Fournee, Portion, Repas } from './fournees';
+import { lireLaCle } from '../solveur/periode';
 
 /**
  * L'INSTANTANÉ CONSERVÉ : ce qu'on a cuisiné, figé pour être relu.
@@ -125,7 +126,17 @@ export function figerLePlan(
       titre: nomDeLaBoite(b.cle),
       /* « 2|R3 » — le rang du jour, puis le repas. Le rang ne veut plus rien
          dire dans trois jours ; le repas, si. On ne garde que lui. */
-      repas: b.cle.split('|')[1] as MomentDuRepas,
+      /* `lireLaCle` et non `split('|')[1] as …` : l'assertion mentait en
+         silence sur une cle malformee. Rassemble le 15 septembre 2026, la ou
+         la cle s'ecrit (`solveur/periode.ts`).
+
+         ET SURTOUT PAS DE `?? 'R1'` — corrige le meme jour, releve par la
+         revue. Le champ est FACULTATIF, et `planRelu.tsx` sait deja lire son
+         absence : sans lui, il n'affiche pas de complements. Un repli aurait
+         ecrit « Matin » dans un plan PERSISTE, et la relecture aurait montre
+         les complements du matin sur une boite peut-etre prise le soir, sans
+         un mot. Regle 7 : un champ vide se lit, un chiffre faux se mange. */
+      repas: lireLaCle(b.cle)?.repas,
       convives: b.convives,
       cuits: b.cuits.map(ligne),
       crus: b.crus.map(ligne),

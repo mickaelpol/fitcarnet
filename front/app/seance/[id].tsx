@@ -92,6 +92,22 @@ export default function DetailSeance() {
   if (!nouvelle && seanceApi.isError) {
     return <Erreur message={seanceApi.error.message} onReessayer={() => void seanceApi.refetch()} />;
   }
+  /* SANS CATALOGUE, ON N'AFFICHE PAS LA SÉANCE — ET C'EST UNE CORRECTION DU
+     15 SEPTEMBRE 2026.
+     Seul `seanceApi.isError` était gardé ici. Quand la requête du catalogue
+     échouait pendant que la séance, elle, chargeait — un tunnel de métro
+     suffit —, `parId` restait VIDE : chaque bloc perdait son nom
+     (`?? 'cet exercice'`), retombait sur le mode « charge »
+     (`?? 'charge'`, dans `calcul/blocSeance.ts`) et le décompte de séries se
+     faisait sur ce mode inventé. La séance s'affichait FAUSSE plutôt que pas
+     du tout, sans un mot pour dire qu'il y avait une panne. Règle 7.
+     La garde existait mot pour mot dans `app/modele/[id].tsx`, écran jumeau du
+     même catalogue : le jumeau oublié, motif n° 1 de la revue.
+     `src/muscles/gardeCatalogue.test.ts` tombe si elle disparaît d'ici ou du
+     prochain écran qui indexera le catalogue par identifiant. */
+  if (exercices.isError) {
+    return <Erreur message={exercices.error.message} onReessayer={() => void exercices.refetch()} />;
+  }
   if (!seance) return <Chargement />;
 
   const avancement = avancementDe(seance.exercices, parId);

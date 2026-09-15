@@ -5,21 +5,24 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 15 septembre 2026, soir** — **les lots 0 à 7 sont
-terminés**, le lot 8 est presque bouclé. Trois agents de contrôle sont
-désormais disponibles pour éprouver l'ensemble. Le dossier de présentation client est prêt ; il ne
-reste qu'à tourner les vidéos.
+**Dernière mise à jour : 15 septembre 2026, tard** — **les 84 constats de
+l'audit sont traités, les huit lots clos**. Les trois agents de contrôle ont
+été lancés sur l'ensemble et ont trouvé trois choses qu'aucun test ne voyait
+(voir plus bas). L'application est éprouvée dans un vrai navigateur, écran par
+écran, et contre le vrai Grocy. Le dossier de présentation client est prêt ; il
+ne reste qu'à tourner les vidéos.
 
 ---
 
 ## L'essentiel en cinq lignes
 
-Un audit complet a relevé **84 constats** (3 critiques, 15 élevés). **Les lots 0 à 7 sont terminés** — garde-fous, ce qui était cassé, les chiffres
-faux, la sécurité et l'isolation, la base reproductible, les scripts dangereux,
-l'architecture front, les tests du client HTTP. Le **lot 8** est presque fini :
-les onze constats du front sont faits, les neuf de sécurité API sont en cours.
+Un audit complet a relevé **84 constats** (3 critiques, 15 élevés). **Les huit
+lots sont terminés** — garde-fous, ce qui était cassé, les chiffres faux, la
+sécurité et l'isolation, la base reproductible, les scripts dangereux,
+l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
+constats.
 
-État : **550 tests front** (548 + 2 de rendu) · **201 API · 577 assertions**, 7 erreurs PHPStan
+État : **564 tests front** (562 + 2 de rendu) · **231 API · 617 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -57,7 +60,8 @@ vivant (colonne `jeton`, migration 30). Cinq index de jointure créés, cinq
   s'arrêtaient au glob `2[0-9]-*.sql` — ni `installer.sh`, ni
   `entrypoint-prod.sh`, ni `verifier-migrations.sh`, qui aurait donc annoncé que
   tout allait bien. **Toute migration numérotée 40 et au-delà retombera dans ce
-  piège** : le glob se liste à la main, dans trois fichiers.
+  piège** : le glob se liste à la main, dans **cinq** fichiers — voir
+  « Pièges vérifiés » plus bas pour la commande qui les trouve tous.
 - **`doctrine:schema:validate` ne passera jamais sur ce projet**, et son échec ne
   veut rien dire : le schéma est écrit à la main, la base porte plus que les
   entités. Son `--dump-sql` propose `DROP TABLE invitation`. La proposition du
@@ -93,8 +97,8 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 548 + 2 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 201 tests, 577 assertions
+cd front && npm test                                                  # 562 + 2 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 231 tests, 617 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
@@ -133,18 +137,66 @@ filmer) :
 > jeu de données, et guide-moi bobine par bobine. Ne travaille pas sur une autre
 > branche que `master` sans me le demander.
 
-**Si tu reprends l'audit** :
+**Si tu reprends le code** — l'audit est clos, il reste du confort et des
+arbitrages, listés dans « Par quoi continuer » :
 
-> Lis `REPRENDRE.md`, puis attaque C4 : le catalogue commun porte des valeurs
-> de fixture de test et 44 aliments sur 50 n'ont plus de fibres. La table
-> Ciqual est sur le disque. Propose-moi les correspondances aliment → entrée
-> Ciqual avant d'écrire quoi que ce soit — je veux les valider. En TDD. Ne
-> travaille pas sur une autre branche que `master` sans me le demander.
+> Lis `REPRENDRE.md`, puis lance les trois agents de contrôle
+> (`revue-fitcarnet`, `verification-bout-en-bout`, `verite-documentaire`) en
+> parallèle pour savoir où on en est vraiment. Ensuite on prendra la suite dans
+> le tableau « Par quoi continuer ». En TDD. Ne travaille pas sur une autre
+> branche que `master` sans me le demander.
 
-Deux précisions qui évitent les allers-retours, si Claude ne les prend pas de
-lui-même : la skill à utiliser est **`superpowers:test-driven-development`**, et
-**`docs/audit-2026-09/README.md` porte déjà le scénario reproduit** — inutile de
-le redécouvrir.
+Une précision qui évite les allers-retours, si Claude ne la prend pas de
+lui-même : la skill à utiliser pour toute correction est
+**`superpowers:test-driven-development`**.
+
+**Et l'épreuve qui n'est pas dans `npm test`** — à relancer avant toute
+livraison, elle ne modifie rien :
+
+```bash
+# 1. l'outillage du script — `presentation/tournage/node_modules` est gitignore,
+#    donc absent d'un clone neuf, et Chromium ne s'installe pas tout seul
+cd presentation/tournage && npm install && npx playwright install chromium && cd ../..
+
+# 2. le bundle que le navigateur va vraiment charger
+docker compose -f compose.dev.yml up -d
+cd front && npm run build:web && cd .. && rm -rf api/front && cp -r front/dist api/front
+
+# 3. un compte jetable — le script n'en cree AUCUN, il se contente de s'y connecter
+HASH=$(docker exec fitcarnet-app-dev sh -c \
+  'cd /app && bin/console security:hash-password "MotDePasseTest123!" --no-interaction' \
+  | grep -oE '\$2y\$[^ ]+' | head -1)
+docker exec fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -c \
+  "INSERT INTO utilisateur (id, email, mot_de_passe, nom, roles, actif, cree_le)
+   VALUES (gen_random_uuid(), 'ecran-verif@test.local', '$HASH',
+           'Ecran Verif', 'ROLE_USER', true, now());"
+
+# 4. l'epreuve elle-meme — elle ne modifie rien
+cd presentation/tournage && node verifier-ecrans.mjs ecran-verif@test.local 'MotDePasseTest123!'
+
+# 5. ET ON RETIRE LE COMPTE. Pas « plus tard » : maintenant.
+docker exec fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -c \
+  "DELETE FROM utilisateur WHERE email LIKE '%-verif@test.local';"
+```
+
+> **`api/front` est un DOUBLON de `front/dist`, et il périme en silence.** Le
+> dépôt versionne `front/dist` ; le développement, lui, sert `api/front`. Un
+> `npm run build:web` seul laisse donc le navigateur sur l'ancien bundle, et on
+> vérifie alors très soigneusement du code qui n'est plus là. D'où la recopie
+> dans la même ligne, à ne pas séparer.
+>
+> **L'étape 5 n'est pas de la politesse.** Le 15 septembre 2026,
+> `ecran-verif@test.local` est resté en base une soirée entière parce que le
+> bloc s'arrêtait à l'étape 4 — trouvé par `verite-documentaire`, pas par moi.
+> Un compte oublié se met à ressembler à une donnée réelle au bout de quelques
+> jours, et plus personne n'ose le supprimer. Voir la skill `donnees-de-test`.
+
+**Pour éprouver le portier d'administration des deux côtés**, il faut un second
+compte, en `ROLE_ADMIN` cette fois (même `INSERT`, `roles` à `'ROLE_ADMIN'`) :
+sans lui, un contrôle qui refuserait *tout le monde* passerait pour une
+correction. Attendu : `ROLE_USER` → **403** sur `/api/comptes`,
+`/api/invitations` et `POST /api/exercices` mais **200** sur
+`GET /api/exercices` ; `ROLE_ADMIN` → **200, 200, 201**.
 
 **Le motif de test est désormais écrit** : `tests/Controller/InventaireProprieteTest.php`
 monte un contrôleur avec ses vrais services et une seule `Connection` doublée
@@ -161,24 +213,29 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 
 ## Par quoi continuer
 
-**Rien d'urgent ne reste dans l'audit.** Les lots 0 à 7 sont clos, le lot 8 l'est
-presque. Ce qui suit est du confort, ou attend une décision.
+**L'audit est clos, ses huit lots et ses 84 constats.** Ce qui suit est du
+confort ou attend un arbitrage — à une exception près, la première ligne du
+tableau, qui est une clé d'API à révoquer.
 
 | | Quoi | Effort |
 |---|---|---|
-| **Les trois agents de contrôle** (sur les cinq de `.claude/agents/`, les deux hexagonaux étant sans objet) | `revue-fitcarnet`, `verification-bout-en-bout`, `verite-documentaire` — jamais lancés sur l'ensemble. À faire **avant la démonstration** : ils sont tous en lecture seule, donc lançables en parallèle | 1 h |
-| **F2 côté écran** | `carteRepas.tsx` affiche `assiette` gonflée pour un aliment non cuit. Il n'a aucune notion de cuisson : la corriger demande de faire descendre le choix sur trois niveaux, et rien ne dit que cet écran doive le connaître | à trancher |
+| **Tourner les vidéos** | seul vrai reste. Tout le dossier de présentation est écrit, le plan de tournage aussi | voir `presentation/plan-de-tournage.md` |
+| **Régénérer la clé d'API Grocy** | ⚠ **À FAIRE PAR TOI, ET VITE.** Elle a été collée dans une conversation le 15 septembre 2026 pour vérifier le pont Grocy de bout en bout. Elle est à considérer comme publiée. Grocy → Paramètres → Clés d'API → révoquer puis recréer, et reporter la nouvelle dans `.env` du NAS | 5 min |
 | **`choixRatio.tsx`** | dernier morceau du lot 6, et **il était mal rangé dans l'audit** : il appartient à `editeurAliment.tsx` (section 7), pas à l'écran de séance | 1 h |
-| **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 22 témoins ; les hooks React restent hors de portée faute de bibliothèque de rendu | ~4 h |
-| **É14, deux volets sur trois** | même blocage : `@testing-library` ou `react-test-renderer` n'est pas installé. **Installer l'un des deux débloquerait É14, F13, et tous les effets React** | à trancher |
+| **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 22 témoins ; les hooks React restent partiellement hors de portée — `@testing-library/react` est désormais installé, la porte est ouverte | ~4 h |
+| **Extraire `LigneAliment` de `carteRepas.tsx`** | le module `calcul/poidsServi.ts` est testé, mais le composant qui l'appelle ne l'est pas. L'extraire vers `src/` rendrait la ligne de repas testable comme le reste | 1 h |
+| **Le second `tsconfig` des tests de rendu** | la garde qui interdisait à un test d'importer un `.tsx` a été levée pour permettre `editeurAliment.test-rendu.tsx`. Un second `tsconfig` la rendrait aux tests non-rendu, qui n'ont pas de raison d'y toucher | 1 h |
+| **Publier un exercice depuis l'admin** | `Exercice.public` n'est écrit par personne : aucun mécanisme de publication n'existe. L'exposer en écriture aux seuls administrateurs est la proposition « C » de la revue, à trancher | à trancher |
 
 ---
 
 ## Ce que la journée du 15 septembre a changé
 
 **Le lot 6 est terminé, les douze rangs.** Les trois écrans passent de 3 935 à
-1 169 lignes ; `composer.ts` de 827 à 135, `cuisson.ts` de 613 à 22, `hooks.ts`
-en dix modules. **Les dix duplications D1 à D10 sont closes.**
+**1 295** lignes (655 + 445 + 195) ; `composer.ts` de **817** à 135,
+`cuisson.ts` de **611** à 22, `hooks.ts` en dix modules. *Les chiffres « 1 169 »,
+« 827 » et « 613 » ont figuré ici : le premier était périmé, le deuxième était
+la taille de `frigo.tsx` — un chiffre transposé d'une ligne à l'autre.* **Les dix duplications D1 à D10 sont closes.**
 
 **Six agents ont travaillé en parallèle**, sur des périmètres strictement
 disjoints — c'est la condition, sans quoi ils s'écrasent. Trois ont **refusé**
@@ -208,16 +265,164 @@ accident en deux jours).
 
 ---
 
+## Ce que les trois agents de contrôle ont trouvé
+
+Lancés en parallèle sur l'ensemble du dépôt, tous les trois en lecture seule.
+**Ils ont trouvé trois choses qu'aucun test unitaire ne pouvait voir**, et c'est
+l'argument pour les relancer avant chaque livraison.
+
+- **`verification-bout-en-bout` : l'application ne se connectait plus du tout.**
+  `POST /api/connexion` répondait **HTTP 500 pour tous les comptes** en
+  développement — la migration 32 n'était pas en base. Voir l'encadré plus haut,
+  et `db/manuel/rattraper-dev.sh`, écrit pour ça.
+- **`revue-fitcarnet` : le mot de passe était écrit en clair sur le disque.**
+  Le cache de TanStack Query persistait aussi les **mutations**, dont le corps
+  de `useConnexion`. `shouldDehydrateMutation: () => false` dans
+  `src/api/persistance.ts`. Il a aussi trouvé **trois commentaires écrits le
+  jour même qui mentaient déjà** (`Exercice.php`, `Aliment.php`, `texte.ts`) et
+  un témoin de test qui éprouvait un scénario **impossible**.
+- **`verite-documentaire` : `INSTALLATION.md` renvoyait à un fichier qui
+  n'a jamais existé.**
+
+---
+
+## Ce que la fin du 15 septembre a changé
+
+**La surface d'administration est fermée, des deux côtés.** Côté API, les
+**18 portes** d'administration sont fermées, `POST /api/exercices` compris — un
+utilisateur ne peut plus créer d'exercice.
+
+> **Mais pas toutes de la même façon, et c'est à savoir avant d'auditer.**
+> Six seulement portent un `#[IsGranted('ROLE_ADMIN')]` (`ComptesController`, au
+> niveau **classe**, et `InvitationsController` ×3) ; les douze autres sont
+> fermées par `security: "is_granted('ROLE_ADMIN')"` **dans l'`#[ApiResource]`**
+> de l'entité ou du DTO, plus une ligne d'`access_control` pour `/api/docs`. Un
+> `grep '#\[IsGranted'` pour « vérifier la surface » en manquerait les deux
+> tiers et conclurait à une passoire.
+>
+> C'est exactement pour ça que l'inventaire est un **test** et pas une phrase :
+> `api/tests/Security/SurfaceAdministrationTest.php` balaie les trois sources
+> (`#[ApiResource]` de `src/Entity` et `src/Dto`, `#[Route]` de
+> `src/Controller`, `access_control` de `security.yaml`) et compare **dans les
+> deux sens** — une porte fermée non inscrite échoue autant qu'une porte
+> inscrite rouverte. Les cinq routes volontairement sans garde y sont, chacune
+> avec sa raison écrite : la dérogation muette est impossible.
+Côté écran, les quatre gardes recopiés dans les `admin-*.tsx` — déjà **dans deux
+orthographes différentes** — sont doublés par un **portier unique** dans
+`app/_layout.tsx`, qui reconnaît un écran d'administration à son préfixe de
+fichier et non à une liste. Le prochain `admin-*.tsx` naîtra protégé.
+
+*Éprouvé pour de vrai, pas seulement en test :* avec un compte `ROLE_USER`,
+`GET /api/comptes`, `GET /api/invitations` et `POST /api/exercices` répondent
+**403**, `GET /api/exercices` répond **200** (le témoin — sans lui, un contrôle
+qui refuse tout le monde ressemble à une correction) ; avec un compte
+administrateur jetable, les mêmes routes répondent **200, 200 et 201**. Et dans
+un vrai navigateur, les quatre adresses `/admin-*` tapées à la main renvoient
+sur l'onglet Compte, **sans un seul 403 au réseau** — l'écran n'est plus monté
+du tout, là où `admin-utilisateurs` lançait ses requêtes avant son garde.
+
+**M7 — le 401 qui accusait l'utilisateur.** Le repli d'un 401 était
+« Identifiants incorrects. » quel que soit le chemin appelé : la session
+expirait, on ouvrait son frigo, et l'application faisait chercher une faute de
+frappe dans un mot de passe qu'on n'avait pas tapé. Le repli distingue
+désormais `/connexion` du reste (`repli()` dans `src/api/client.ts`), avec la
+lecture de `security.yaml` qui le justifie écrite au-dessus.
+
+**F2 — les deux écrans se contredisaient devant la balance.** `carteRepas.tsx`
+affichait `pesé × rendement` pour **tous** les aliments, cuisson choisie ou non :
+100 g de riz marqués « tel quel » s'annonçaient à 300 g. La boîte de batch
+cooking, elle, disait 100 g. La règle vit maintenant dans
+`src/calcul/poidsServi.ts`, testée, et un test croisé refuse que les deux
+affichages divergent à nouveau.
+
+**Les bugs latents ont été corrigés, pas classés « inatteignables ».** J'avais
+écrit qu'aucun n'était atteignable ; c'était faux, et tu as eu raison
+d'insister. `exercices.isError` manquait dans `app/seance/[id].tsx` : un
+catalogue en échec — un tunnel de métro suffit — affichait une séance **fausse**
+plutôt que pas de séance, blocs sans nom et tous en mode « charge ».
+`src/muscles/gardeCatalogue.test.ts` interdit désormais l'oubli **sur tout écran
+présent ou futur** qui indexe le catalogue par identifiant. Et la jauge du
+catalogue vide, qui recevait `width: 'NaN%'` à la toute première installation,
+vaut 0 %.
+
+**La lecture d'une clé de repas est devenue une fonction.**
+`` `${jour}|${repas}` `` s'écrivait dans `cleDuRepas` et se relisait à deux
+endroits avec un `split('|')` nu — dont un `Number()` qui donnait
+`libelleDuJour(NaN)` à l'écran sans que rien ne le signale. `lireLaCle()` vit
+dans `src/solveur/periode.ts`, là où la clé s'écrit, et **son propre test a
+attrapé que `2|R2|R3` passait**.
+
+**L'application est vérifiée dans un vrai navigateur.**
+`presentation/tournage/verifier-ecrans.mjs` pilote Chromium : il se connecte
+comme un humain, visite les cinq écrans, éprouve le portier d'administration, et
+rapporte **toute** erreur de console et **toute** requête en échec. Il ne
+modifie rien. État actuel : tout au vert, **zéro erreur de console, zéro requête
+en échec**.
+
+> **Deux fois, ce script a été plus honnête que moi.** Son premier motif
+> reconnaissait « séances » dans le slogan de la page de connexion : trois
+> écrans sur cinq passaient au vert alors qu'aucun n'était atteint. Puis il a
+> trouvé un `GET /api/moi` **sans jeton** sur l'écran de connexion — `useMoi`
+> ne connaissait pas la session et partait sur tous les écrans. La garde est
+> allée dans le hook, point de passage obligé de ses six appelants.
+
+**Et la revue a relu le travail de la soirée, y compris mes corrections.** Elle
+a trouvé onze choses, dont trois qui comptent — la plus instructive étant une
+**régression que je venais d'introduire** :
+
+- **Garder `useMoi` a cassé l'onglet Compte.** `isLoading` vaut
+  `isPending && isFetching` : quand la requête est désactivée, rien ne part sur
+  le réseau, donc `isFetching` est faux, donc `isLoading` **aussi**. L'écran
+  passait ses deux gardes avec `data` indéfini et réaffichait le tiret et
+  « Gérés dans l'onglet Mon frigo » comme un fait — c'est-à-dire exactement la
+  panne que son propre commentaire déclare corrigée, revenue par la porte de
+  derrière. C'est `isPending` qu'il faut lire.
+- **`planFige.ts` inventait un repas.** `?? 'R1'` sur une clé illisible, dans
+  un plan **persisté** : à la relecture, les compléments du matin sur une boîte
+  peut-être prise le soir. Le champ est facultatif et `planRelu.tsx` sait déjà
+  lire son absence — le repli honnête existait, il suffisait de ne pas le
+  contourner.
+- **`lireLaCle` annonçait deux découpages à la main ; il y en avait quatre**,
+  dont un **vingt lignes au-dessus d'elle**, dans le fichier même. Les deux
+  oubliés n'avaient en fait pas besoin de lire la clé du tout. Il n'en reste
+  aucun.
+
+Elle a aussi montré que **trois des contrôles de mon script navigateur ne
+contrôlaient rien** : le motif de l'écran Modèles était satisfait par la barre
+d'onglets (donc cet écran ne pouvait jamais être rapporté cassé), le contrôle
+de connexion passait au vert sur un mauvais mot de passe à cause d'un `||`, et
+le portier était jugé sur une absence — un chargement infini passait pour un
+refus réussi. Les trois sont corrigés, et le contrôle de connexion a été
+**vérifié en lui donnant un faux mot de passe**.
+
+> **La leçon, et elle vaut pour la suite.** Sur onze défauts, sept étaient dans
+> du code écrit **le jour même**, et trois dans des commentaires écrits le jour
+> même. Ce n'est pas un accident de fatigue : c'est que la relecture par un
+> autre regard trouve ce que l'auteur ne peut structurellement pas voir. Les
+> trois agents ne sont pas une formalité d'avant-livraison.
+
+**Le pont Grocy est vérifié de bout en bout, écriture comprise.** Lecture des
+stocks, correspondance des quantités produit par produit, et une écriture réelle
+sur un seul produit (Fraises, 112 → 100 → **112 restauré**) — la valeur relevée
+**avant** d'écrire, comme l'exige `donnees-de-test`.
+
+---
+
 ## Le chantier présentation — terminé, sauf le tournage
 
 Monté du 9 au 14 septembre 2026 pour présenter fitcarnet **à un client et à une
 équipe technique dans la même salle**. Tout est dans `presentation/`.
 
+> **On versionne la matière, pas le produit** (`presentation/.gitignore`) : le
+> HTML et le MP4 sont **absents d'un clone neuf**, et se régénèrent depuis les
+> sources ci-dessous. Un ✅ dit ici « le travail est fait », pas « le fichier
+> est sur ton disque ».
+
 | Fichier | Ce que c'est | État |
 |---|---|---|
-| `fitcarnet-presentation.html` | 28 slides en quatre actes : le produit, l'architecture, les garanties, l'outillage IA. Captures embarquées, fichier autonome | ✅ fait |
+| `fitcarnet-presentation.html` | 28 slides en quatre actes : le produit, l'architecture, les garanties, l'outillage IA. Captures embarquées, fichier autonome. **Gitignoré — à régénérer** avec `construire.py` | ✅ fait, absent d'un clone |
 | `construire.py` | le génère ; **relancer après toute modification** | ✅ |
-| `fitcarnet-demonstration.mp4` | 3 min 01, muette, 8 chapitres | ✅ fait, à refaire au téléphone |
+| `fitcarnet-demonstration.mp4` | 3 min 01, muette, 8 chapitres. **Gitignoré — à remonter** avec `monter-demo.sh` | ✅ fait, absent d'un clone |
 | `tournage/tourner.mjs` | pilote l'application avec Playwright et enregistre en continu | ✅ |
 | `monter-demo.sh` | cartons, légendes, chapitres | ✅ |
 | `script-narration.md` | ce qu'il faut dire, slide par slide, vidéo minutée | ✅ |
@@ -242,9 +447,19 @@ Monté du 9 au 14 septembre 2026 pour présenter fitcarnet **à un client et à 
 tournable que si `GROCY_URL` est renseigné sur l'instance filmée, et le **partage
 d'un modèle est inopérant** (constat F-05).
 
-**Le jeu de démonstration local est en place** sur cette machine : 14 aliments,
-14 lignes de stock, 23 séances, 123 séries, 2 plans, 4 cibles, et un 1RM qui monte
-de 50,7 à 63,3 kg sur neuf semaines. Compte `demo@fitcarnet.local`.
+**Le jeu de démonstration est un FICHIER, pas un état de la base.**
+`db/manuel/jeu-demo.sql` pose neuf semaines de vie d'un compte : 14 aliments,
+14 lignes de stock, 23 séances, 123 séries, 2 plans, 4 cibles, et un 1RM qui
+monte de 50,7 à 63,3 kg — c'est cette courbe qui fait vivre la démonstration.
+
+> **Il n'est PAS en base sur cette machine**, et il ne faut pas compter dessus :
+> le volume `pgdata_dev` a été recréé depuis, et `demo@fitcarnet.local`
+> n'existe plus. `jeu-demo.sql` n'est joué ni par `installer.sh` ni par
+> `entrypoint-prod.sh` — leurs listes sont écrites à la main, et il n'y figure
+> pas, volontairement. **Le remonter est une commande**, décrite dans
+> `presentation/plan-de-tournage.md` (l. 98 pour le local, l. 415 pour la
+> remise à zéro) ; son garde-fou refuse un compte qui a déjà des séances, sauf
+> `-v ecraser=oui`.
 
 ---
 
@@ -256,9 +471,11 @@ inventaire de surface en voyait 57. Il a aussi montré que **la documentation
 mentait sur deux points** :
 
 - ~~`front/src/calcul/texte.ts` n'existe pas~~ — **créé le 15 septembre 2026.**
-  `sansAccent` n'a plus qu'**une** définition, et les six copies qui traînaient
-  utilisaient toutes `normalize('NFD')`, que Hermes n'implémente pas toujours :
-  six `TypeError` en puissance.
+  `sansAccent` n'a plus qu'**une** définition. **Cinq** des six copies qui
+  traînaient appelaient `normalize('NFD')`, que Hermes n'implémente pas
+  toujours — cinq `TypeError` en puissance. La sixième était justement la table
+  manuelle de `cleDHabitude`, écrite *contre* `normalize` : c'est sur elle que
+  le module s'est aligné, et non l'inverse.
 - ~~`front/src/solveur/periode.ts` n'existe pas~~ — **il existe**, sorti du
   découpage de `composer.ts` (rang 6).
 
@@ -325,10 +542,12 @@ granularité fine ; et sous 10 kg de 1RM, une ligne fusionnée peut perdre une
 prédiction juste à cause d'un voisin hors domaine.
 
 ~~**Les exercices personnels**~~ — tranché le 14 septembre : filtrés pour de
-vrai, règle « public OU le mien ». **Conséquence à connaître** : un exercice
-personnel mal orthographié est aujourd'hui **incorrigible**, y compris par son
-auteur — le `PATCH` est réservé à `ROLE_ADMIN`, et l'administrateur ne voit plus
-les exercices privés. C'est le constat **F-09**, en cours de traitement.
+vrai, règle « public OU le mien ». La conséquence — un exercice personnel mal
+orthographié devenu **incorrigible**, l'administrateur ne voyant plus les
+exercices privés — était le constat **F-09**, **clos depuis** :
+`api/src/Entity/Exercice.php` porte
+`security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user"` sur le
+`PATCH`. L'auteur corrige le sien, et lui seul.
 
 ---
 
@@ -336,9 +555,16 @@ les exercices privés. C'est le constat **F-09**, en cours de traitement.
 
 **É14 n'a reçu qu'un volet sur trois.** Terminer la session quand le jeton de
 rafraîchissement a disparu suffit à rouvrir la porte — vérifié jusqu'à la
-redirection. Les deux ceintures de sécurité restantes (le bouton de déconnexion
-rendu avant l'écran d'erreur dans `compte.tsx`, le portier de `_layout.tsx`)
-demandent une bibliothèque de test de composants que le projet n'a pas.
+redirection. Les deux ceintures de sécurité restantes : le bouton de déconnexion
+rendu **avant** l'écran d'erreur dans `compte.tsx` (aujourd'hui `if (isError)`
+retourne l. 24, le bouton est l. 95 — donc inatteignable quand `/moi` échoue),
+et le portier de `_layout.tsx`.
+
+**Le blocage a sauté.** Elles attendaient une bibliothèque de test de
+composants ; `@testing-library/react` est installé depuis le 15 septembre 2026,
+et `src/composants/editeurAliment.test-rendu.tsx` montre le motif — suffixe
+`.test-rendu.tsx`, seconde passe de `npm test`, `--import` de
+`src/tests/environnement.js`. Il ne reste qu'à écrire les deux témoins.
 
 ~~**M1 et M4 du lot 2**~~ — **faits le 15 septembre 2026.** M1 n'était pas qu'une
 duplication : en mode « glucides totaux », la cible comprend les fibres à 2 kcal/g
@@ -368,8 +594,19 @@ relancé.**
   14 septembre**. Il doit désormais dire « identiques ». S'il ne le dit plus,
   c'est une régression : une évolution du schéma écrite d'un seul côté.
 - **Le glob des migrations s'arrête à `3[0-9]-*.sql`.** Une migration numérotée
-  40 ne serait jouée nulle part. Trois fichiers à étendre : `installer.sh`,
-  `docker/entrypoint-prod.sh`, `db/manuel/verifier-migrations.sh`.
+  40 ne serait jouée nulle part. **CINQ fichiers à étendre**, et ce document en
+  a longtemps annoncé trois — c'est-à-dire qu'il désignait lui-même le piège en
+  en oubliant deux, dont celui qui *vérifie* :
+
+  ```bash
+  grep -rn '3\[0-9\]' installer.sh docker/entrypoint-prod.sh \
+      db/manuel/verifier-migrations.sh db/manuel/verifier-schema.sh \
+      db/manuel/rattraper-dev.sh
+  ```
+
+  Oublier `verifier-schema.sh` est le pire des cinq : il annoncerait
+  « identiques » sans avoir joué la migration, et son ✓ ne prouverait plus
+  rien. C'est arrivé le 14 septembre avec la migration 30.
 - **7 erreurs PHPStan sont attendues** (c'était 8). `$creeLe` a disparu de la
   liste : M-02 lui a donné un accesseur, la date d'ouverture était en base et
   inaccessible au code. `JetonRafraichissement::$empreinte` **reste, et doit
@@ -398,7 +635,7 @@ relancé.**
   l'ordre est écrit à la main. Le 9 septembre, la base avait 18 tables au lieu de
   20 : `inventaire_lot` manquait, et l'envoi d'un inventaire répondait
   « relation "inventaire_lot" does not exist ». Rejouer la liste dans l'ordre
-  d'`installer.sh` — les 21 migrations passent, `25-garde-fous.sql` compris.
+  d'`installer.sh` — les 23 migrations passent, `25-garde-fous.sql` compris.
 - **`bin/console` exige `api/.env`, que le clone ne fournit pas.** Sans lui :
   « Unable to read the "/app/.env" ». L'API servie par FrankenPHP s'en passe —
   ses variables viennent du conteneur. Un fichier local suffit, avec `APP_ENV`

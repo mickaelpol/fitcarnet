@@ -356,8 +356,46 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
     ok: false,
     donnees: null,
     message: d?.detail ?? d?.['hydra:description'] ?? d?.message
-      ?? (reponse.status === 401 ? 'Identifiants incorrects.' : `Erreur ${reponse.status}`),
+      ?? repli(reponse.status, sansJeton),
   };
+}
+
+/**
+ * CE QU'ON DIT QUAND LE SERVEUR, LUI, NE DIT RIEN.
+ *
+ * Constat M7 de l'audit de septembre 2026, corrigé le 15 septembre 2026. Le
+ * repli d'un 401 était « Identifiants incorrects. » QUEL QUE SOIT le chemin
+ * appelé. Sur `/connexion` c'est juste ; partout ailleurs c'est faux, et
+ * pénible : la session expire, on ouvre son frigo, l'écran répond
+ * « Identifiants incorrects. » — et on cherche une faute de frappe dans un mot
+ * de passe qu'on n'a pas tapé.
+ *
+ * `sansJeton` SUFFIT À TRANCHER, et ce n'est pas une coïncidence. Vérifié dans
+ * `security.yaml` le 15 septembre 2026, appel par appel :
+ *
+ *   - les seuls appels `sansJeton` sont `/connexion`, `/deconnexion` et
+ *     `/invitation/…`, tous HORS du pare-feu JWT. `/deconnexion` répond 204
+ *     quoi qu'il arrive, et `useDeconnexion` avale son erreur de toute façon ;
+ *     `/invitation/` est `security: false` et son contrôleur répond 404, 409
+ *     ou 422. Il ne reste que `/connexion`, où un 401 veut bel et bien dire
+ *     « mot de passe faux » ;
+ *   - tout le reste passe par le pare-feu `api` (`jwt: ~`), où un 401 ne peut
+ *     désigner qu'un jeton absent, invalide ou périmé. Jamais des identifiants.
+ *
+ * Le jour où une route publique vérifiant un mot de passe s'ajoutera — une
+ * réinitialisation, par exemple — c'est ici qu'il faudra revenir : elle serait
+ * `sansJeton` sans être `/connexion`.
+ *
+ * LE TEXTE EST CELUI DE L'API, AU CARACTÈRE PRÈS. `SessionController::refus`
+ * répond déjà `{"detail": "Session expiree, reconnecte-toi."}`, et ce `detail`
+ * s'affiche tel quel. Deux orthographes de la même phrase selon qui a répondu
+ * se liraient comme deux pannes différentes : les accents manquants sont donc
+ * VOULUS ici, et non une étourderie à corriger.
+ */
+function repli(statut: number, sansJeton: boolean): string {
+  if (statut !== 401) return `Erreur ${statut}`;
+
+  return sansJeton ? 'Identifiants incorrects.' : 'Session expiree, reconnecte-toi.';
 }
 
 function remonter<T>(r: Reponse<T>): T {

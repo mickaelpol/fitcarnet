@@ -10,7 +10,7 @@ import { SR } from './stylesRepas';
 import {
   type Boite, type Fournee, type Repas as RepasAPlat, figerLePlan,
 } from '@/calcul/cuisson';
-import type { Repas } from '@/solveur/composer';
+import { lireLaCle } from '@/solveur/periode';
 import type { Aliment } from '@/solveur/types';
 import { C, E, P, nb } from '@/theme';
 
@@ -147,7 +147,11 @@ export function EtapeBatch({
           est ce que TU te sers le jour venu pour tenir tes macros.
         </Discret>
 
-        {boites.map((b) => (
+        {boites.map((b) => {
+          /* Lu UNE fois par boîte, ici, et non deux fois dans le rendu. */
+          const repasDeLaBoite = lireLaCle(b.cle)?.repas ?? null;
+
+          return (
           <Pliant
             key={b.cle}
             titre={nomDeLaBoite(b.cle)}
@@ -192,9 +196,17 @@ export function EtapeBatch({
                 pas et ne se range pas dans une boîte cinq jours à
                 l'avance — il s'avale au moment de manger, comme le skyr
                 au-dessus. */}
-            <LigneComplements repas={b.cle.split('|')[1] as Repas} />
+            {/* `lireLaCle` et non `split('|')[1] as Repas` : l'assertion
+                mentait en silence sur une clé malformée, et on affichait
+                alors les compléments d'un repas tiré au sort. Quand la clé
+                est illisible on n'affiche RIEN — même choix que
+                `planRelu.tsx`, qui omet la ligne quand le plan ne dit pas de
+                quel repas il s'agit. Relevé par la revue le 15 septembre
+                2026 : le quatrième découpage à la main de cette clé. */}
+            {repasDeLaBoite !== null && <LigneComplements repas={repasDeLaBoite} />}
           </Pliant>
-        ))}
+          );
+        })}
       </ScrollView>
 
       <View style={[SR.pied, { paddingBottom: E.m + insets.bottom, gap: E.s }]}>

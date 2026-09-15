@@ -33,10 +33,14 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 548 tests, puis 2 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 562 tests, puis 2 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-cd api && bin/phpunit         # 201 tests API — sans base ni noyau, aucun effet de bord
+# 231 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
+# demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
+# echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
 docker compose -f compose.dev.yml up   # environnement de développement
 ```
 
@@ -101,10 +105,12 @@ table manuelle de `cleDHabitude`, et son test **retire `String.prototype.normali
 le temps de l'appel** : toute réécriture en `normalize` tombe sur le poste, et non
 sur un téléphone.
 
-Deux choses restent à faire, et elles sont notées : la table est écrite **deux
-fois**, dans `texte.ts` et dans `cuisson.ts` (`SANS_ACCENT` est exporté pour que
-la fusion tienne en une ligne), et une **sixième copie** dort dans
-`src/solveur/garanties.test.ts:394` — un test qui réimplémente ce qu'il garantit.
+Les deux restes signalés au moment de la fusion **sont réglés depuis le
+15 septembre 2026** : `habitudesCuisson.ts` importe `SANS_ACCENT` au lieu de
+réécrire la table, et la sixième copie qui dormait dans
+`src/solveur/garanties.test.ts` — un test qui réimplémentait ce qu'il garantit —
+a été remplacée par un import du module. Il n'y a plus qu'une définition de
+`sansAccent` et qu'une table dans tout le front.
 
 Exception : `cleDHabitude` utilise **volontairement** une table de correspondance manuelle plutôt
 que `normalize('NFD')`, parce que Hermes ne l'implémente pas partout. Ne pas « factoriser » celle-là.
@@ -167,7 +173,7 @@ déviation par rapport à la cible doit être expliquée à l'écran.
 
 ## Skills : laquelle, quand
 
-**Les six skills du dépôt portent ce que personne d'autre ne peut écrire.** Elles
+**Les huit skills du dépôt portent ce que personne d'autre ne peut écrire.** Elles
 sont dans `.claude/skills/`, toutes actives, et disent le métier et les pièges de
 *ce* projet :
 
@@ -178,6 +184,8 @@ sont dans `.claude/skills/`, toutes actives, et disent le métier et les pièges
 | `front-fitcarnet` | Modules de référence, `node:test`, Node 22, `front/dist/` |
 | `nutrition-fitcarnet` | Fibres à 2 kcal/g, produit tel qu'on le pèse, vide ≠ zéro |
 | `schema-base` | Double écriture du schéma, idempotence, ordre dans `installer.sh` |
+| `revue-de-code` | Les huit motifs de défaut du projet, un cas daté pour chacun |
+| `donnees-de-test` | **À charger avant toute écriture en base de dév** : compte jetable, ordre de nettoyage, et la règle « relever la valeur AVANT de l'écraser » |
 | `postgres` | Index, plan de requête, `VACUUM` |
 
 Le 9 septembre 2026, dix skills « du projet » ont été **supprimées** : génériques,
@@ -206,6 +214,7 @@ Pour l'aiguillage :
 | Toucher à `front/src` ou `front/app` | **`front-fitcarnet`** |
 | Un calcul, un import d'aliments, un chiffre affiché | **`nutrition-fitcarnet`** |
 | Table, colonne, contrainte, migration | **`schema-base`** |
+| Écrire en base de développement, monter un scénario réel | **`donnees-de-test`** — la règle « n'écris jamais sur une donnée que tu n'as pas créée » |
 | Cadrer une demande vague ou vaste | **`superpowers:brainstorming`** (celle de `superpowers`, pas celle de `superpowers-symfony`) |
 | API Platform : ressource, filtre, processeur, sérialisation | **`superpowers-symfony:api-platform-*`** — elles ciblent la v4, celle du projet |
 | Doctrine : relations, migrations, transactions, N+1 | **`superpowers-symfony:doctrine-*`** |

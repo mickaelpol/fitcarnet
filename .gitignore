@@ -146,3 +146,11 @@ pictogrammes-muscles.zip
 # laisse api/front PERIME, et le developpement sert alors silencieusement
 # l'ancien bundle. Le recopier apres chaque build.
 /api/front/
+
+# Captures de `presentation/tournage/verifier-ecrans.mjs`.
+#
+# Elles sont REGENEREES a chaque execution : versionnees, elles feraient un
+# diff binaire a chaque verification, pour un contenu qui n'apporte rien au
+# depot. Elles servent a regarder de ses yeux, sur le moment. Le script, lui,
+# est versionne — c'est lui qui porte la connaissance.
+/presentation/tournage/captures-verification/

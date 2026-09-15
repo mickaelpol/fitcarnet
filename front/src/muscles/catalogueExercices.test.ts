@@ -147,15 +147,30 @@ describe('catalogueExercices — avancement', () => {
     assert.equal(estRenseigne(ex({})), false);
   });
 
-  /* BUG CONNU, RELEVÉ LE 15 SEPTEMBRE 2026 AU DÉCOUPAGE, NON CORRIGÉ ICI.
+  /* LE BUG DU CATALOGUE VIDE, ÉPINGLÉ LE 15 SEPTEMBRE 2026 ET CORRIGÉ LE MÊME
+   * JOUR.
    *
-   * Sur un catalogue vide, `renseignes / total` vaut `0/0` = NaN, et la jauge
-   * reçoit `width: 'NaN%'`. Le découpage devait être mécanique : le
-   * comportement est donc REPRODUIT tel quel, et ce test l'épingle pour que la
-   * correction — quand elle viendra — soit un changement visible et voulu, pas
-   * un effet de bord. Le cas ne se produit pas en pratique tant que la base
-   * porte ses 1338 exercices ; il se produirait sur une base neuve. */
-  it('BUG CONNU : un catalogue vide donne un pourcentage NaN', () => {
-    assert.ok(Number.isNaN(avancementCatalogue([]).pourcentRenseignes));
+   * Ce témoin figeait la panne : `renseignes / total` valait `0/0` = NaN, et
+   * la jauge d'`app/admin-exercices.tsx` recevait `width: 'NaN%'` — une
+   * largeur que ni React Native ni le web ne savent lire, sur une base neuve,
+   * c'est-à-dire sur la toute première installation. Il dit maintenant ce que
+   * la fonction DOIT faire.
+   *
+   * ZÉRO ET NON CENT. Un catalogue vide n'a rien de renseigné ; le remplir à
+   * cent pour cent annoncerait « catalogue complet » à un administrateur qui
+   * n'a simplement pas encore de données — règle 7, un chiffre faux est pire
+   * qu'un refus. La barre reste vide, le bandeau lit « 0/0 », et les deux
+   * disent la même chose. */
+  it('un catalogue vide donne 0 %, pas NaN', () => {
+    const a = avancementCatalogue([]);
+    assert.equal(a.pourcentRenseignes, 0);
+    assert.ok(Number.isFinite(a.pourcentRenseignes),
+      'la jauge reçoit cette valeur telle quelle : `width: \'NaN%\'` ne se rend pas');
+  });
+
+  /* Le cas normal ne doit pas bouger au passage : la garde ne s'applique qu'à
+     un dénominateur nul, elle ne rabote pas le calcul réel. */
+  it('un catalogue non vide garde son pourcentage exact', () => {
+    assert.equal(avancementCatalogue(tous).pourcentRenseignes, 67);
   });
 });

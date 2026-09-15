@@ -5,6 +5,7 @@ import {
   api, definirJeton, definirRafraichissement, lireRafraichissement,
 } from '../client';
 import { purgerLeCache } from '../persistance';
+import { useConnecte } from '../session';
 import type { Utilisateur } from '../types';
 
 export function useConnexion() {
@@ -98,9 +99,44 @@ export function useDeconnexion() {
  * bonne réponse dépendait alors du nombre de comptes et de l'ordre des
  * lignes — deux choses étrangères à la question.
  */
-export const useMoi = () =>
-  useQuery({
+/*
+ * `enabled` ET PAS SEULEMENT `retry: false` — 15 septembre 2026.
+ *
+ * Ce hook partait meme deconnecte. Sur l'ecran de connexion, le tout premier
+ * ecran de l'application, un `GET /api/moi` sans jeton repondait 401 et posait
+ * une erreur rouge dans la console du navigateur. Releve par
+ * `presentation/tournage/verifier-ecrans.mjs`, seul temoin capable de le voir :
+ * aucun test unitaire ne monte l'application dans un vrai navigateur.
+ *
+ * SEPT appelants — le portier d'administration de `app/_layout.tsx`,
+ * `etatMaj`, l'onglet Compte et les QUATRE ecrans `admin-*` — et deux d'entre
+ * eux vivent a la racine, donc sur TOUS les ecrans, connexion comprise. La
+ * garde va donc ici, au point de passage obligé, et non devant chaque
+ * appelant : une regle recopiee devant sept portes manquera devant la
+ * huitieme.
+ *
+ * (Ce commentaire a d'abord annonce SIX appelants et « trois ecrans admin-* ».
+ * Il avait perdu une porte au comptage, dans la phrase meme qui explique
+ * qu'on finit toujours par en perdre une. Corrige le 15 septembre 2026, sur
+ * signalement de la revue.)
+ *
+ * `connecte === true` STRICTEMENT, car `useConnecte` rend trois valeurs et
+ * `null` veut dire « je ne sais pas encore », pas « oui ». Interroger pendant
+ * la lecture du coffre, c'est repartir pour un 401.
+ *
+ * CE QUE `enabled: false` FAIT DE `isPending` : il le laisse a `true`, pour
+ * toujours. Les appelants doivent traiter « en attente » comme « je ne sais
+ * pas », jamais comme « pas administrateur » — c'est deja ce que fait le
+ * portier de `_layout.tsx`, et c'est pour cela qu'un compte deconnecte n'y
+ * arrive jamais : `Racine` affiche son chargement avant de le monter.
+ */
+export const useMoi = () => {
+  const connecte = useConnecte();
+
+  return useQuery({
     queryKey: ['moi'],
     queryFn: () => api<Utilisateur>('/moi'),
+    enabled: connecte === true,
     retry: false,
   });
+};

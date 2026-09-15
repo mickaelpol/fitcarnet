@@ -17,8 +17,10 @@
  *
  * Constat 03-front §4 de l'audit de septembre 2026, découpage du 15 septembre
  * 2026. Rien du comportement n'a changé au passage : l'extraction était
- * mécanique, et `catalogueExercices.test.ts` en tient la preuve — dont un
- * test qui épingle un bug REPRODUIT tel quel (jauge NaN sur base vide).
+ * mécanique, et `catalogueExercices.test.ts` en tient la preuve. Le seul écart
+ * assumé est venu APRÈS : la jauge à `NaN %` sur base vide, épinglée telle
+ * quelle au découpage, a été corrigée le même jour — voir
+ * `avancementCatalogue` plus bas.
  *
  * L'écran n'est plus qu'un écran : il appelle, il affiche.
  */
@@ -161,11 +163,16 @@ export interface Avancement {
  * « combien en reste-t-il ? » — là où « 2 traduits » sur un total qui
  * comprend tes propres exercices n'était comparable à rien.
  *
- * ⚠ BUG CONNU, RELEVÉ LE 15 SEPTEMBRE 2026 ET NON CORRIGÉ ICI : sur un
- * catalogue vide, `pourcentRenseignes` vaut `NaN` (0/0), et la jauge reçoit
- * `width: 'NaN%'`. Le découpage devait être mécanique, donc le comportement
- * est reproduit tel quel ; `catalogueExercices.test.ts` l'épingle pour que la
- * correction soit un jour un changement visible et voulu.
+ * LE CATALOGUE VIDE VAUT 0 %, ET IL A FALLU L'ÉCRIRE. Jusqu'au 15 septembre
+ * 2026, `renseignes / total` valait `0/0` = `NaN` sur une base sans exercices,
+ * et la jauge d'`app/admin-exercices.tsx` recevait `width: 'NaN%'` — une
+ * largeur illisible pour le moteur de style, sur la toute première
+ * installation, c'est-à-dire au pire moment. Le défaut avait été épinglé tel
+ * quel au découpage (qui devait rester mécanique) ; il est corrigé ici.
+ *
+ * ZÉRO ET NON CENT : un catalogue vide n'a rien de renseigné. Le remplir à
+ * cent annoncerait « c'est complet » à un administrateur qui n'a pas encore de
+ * données — règle 7, un chiffre faux est pire qu'un refus de répondre.
  */
 export function avancementCatalogue(exercices: readonly Exercice[]): Avancement {
   const total = exercices.length;
@@ -178,6 +185,6 @@ export function avancementCatalogue(exercices: readonly Exercice[]): Avancement 
     importes: importes.length,
     traduits: importes.filter((e) => !aTraduire(e)).length,
     renseignes,
-    pourcentRenseignes: Math.round((renseignes / total) * 100),
+    pourcentRenseignes: total === 0 ? 0 : Math.round((renseignes / total) * 100),
   };
 }

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useExerciceDetail, useMajExercice } from '../api/hooks';
 import type { Exercice } from '../api/types';
 import {
-  basculerGroupe, type Brouillon, corpsAEnvoyer, type Ecarts, ecarts, saisieDepuis,
+  basculerGroupe, type Brouillon, corpsAEnvoyer, type Ecarts, ecarts,
+  type SaisieExercice, saisieDepuis,
 } from '../muscles/editionExercice';
 import { identifiantYoutube } from './modaleExercice';
 
@@ -24,6 +25,39 @@ import { identifiantYoutube } from './modaleExercice';
  *
  * Extrait de `app/admin-exercices.tsx` le 15 septembre 2026 (03-front §4).
  */
+
+/**
+ * LA SAISIE QUAND IL N'Y A PAS DE FICHE — LES SEPT CHAMPS, PAS SIX.
+ *
+ * LA PANNE. La remise à zéro était écrite en clair dans une branche de
+ * l'effet, et elle avait oublié `muscle` : la vignette de l'exercice précédent
+ * survivait à la disparition de sa fiche. Inatteignable en production — l'écran
+ * monte un éditeur NEUF par exercice (`key={edite.id}`) — mais la faute
+ * mordait à la seconde où quelqu'un retirait cette clé, pour éviter un
+ * remontage ou garder un scroll. Et elle mordait en silence : l'éditeur aurait
+ * proposé d'écrire les pectoraux sur un exercice de jambes, et `ecarts` aurait
+ * compté cette valeur héritée comme une modification à enregistrer.
+ *
+ * Reproduite telle quelle au découpage du 15 septembre 2026, où le commentaire
+ * la signalait lui-même ; corrigée le même jour.
+ *
+ * LE REMÈDE N'EST PAS D'AJOUTER LE SETTER MANQUANT, c'est de supprimer le
+ * jumeau : l'effet n'a plus qu'UN chemin, et le type `SaisieExercice` oblige
+ * cette constante à porter les sept champs. Retirer `muscle: null` ne produit
+ * plus un oubli silencieux mais une erreur de compilation — la garantie est
+ * dans le typage, là où aucun test ne peut atteindre un hook (le projet
+ * n'embarque pas de quoi en monter un sans réveiller la moitié d'Expo).
+ */
+const SAISIE_VIDE: SaisieExercice = {
+  brouillon: null,
+  mode: null,
+  groupes: null,
+  muscle: null,
+  zone: null,
+  secondaires: null,
+  materiel: null,
+};
+
 export function useEditeurExercice(exercice: Exercice, onFermer: () => void) {
   const detail = useExerciceDetail(exercice.id);
   const maj = useMajExercice();
@@ -44,25 +78,12 @@ export function useEditeurExercice(exercice: Exercice, onFermer: () => void) {
      zéro si l'on change d'exercice. Le pré-remplir avec la version légère
      afficherait des champs vides que l'utilisateur croirait vides en base. */
   useEffect(() => {
-    if (complet === undefined) {
-      /* ⚠ `muscle` N'EST PAS REMIS À `null` ICI, et ce n'était pas remarqué
-         avant le découpage du 15 septembre 2026. Les six autres le sont. Le
-         cas est aujourd'hui inatteignable — l'écran monte un éditeur NEUF par
-         exercice (`key={edite.id}`), donc la fiche n'a jamais le temps de
-         redevenir `undefined` sous un `muscle` déjà choisi. Le découpage
-         devait être mécanique : l'asymétrie est REPRODUITE telle quelle
-         plutôt que corrigée en passant, sans quoi personne ne saurait, dans
-         six mois, si c'était voulu. */
-      setBrouillon(null);
-      setMode(null);
-      setGroupes(null);
-      setZone(null);
-      setSecondaires(null);
-      setMateriel(null);
-
-      return;
-    }
-    const depart = saisieDepuis(complet);
+    /* UN SEUL CHEMIN, ET C'EST TOUT LE CORRECTIF. Les deux branches d'avant
+       posaient chacune leur liste de setters, et celle de la fiche absente en
+       avait oublié un — voir `SAISIE_VIDE`. Deux listes à tenir d'accord,
+       c'est le motif n° 1 de la revue : la règle recopiée devant deux portes
+       finit par manquer devant l'une des deux. Il n'y en a plus qu'une. */
+    const depart = complet === undefined ? SAISIE_VIDE : saisieDepuis(complet);
     setBrouillon(depart.brouillon);
     setMode(depart.mode);
     setGroupes(depart.groupes);

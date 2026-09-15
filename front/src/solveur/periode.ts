@@ -76,10 +76,22 @@ export function resoudreLaJournee(
   stockDe: (a: Aliment) => number,
   candidats: Aliment[],
 ): Map<Repas, AuMieux> {
+  /* ON NE RELIT PAS LA CLÉ : ON LA REDEMANDE À CELLE QUI L'ÉCRIT.
+     Ici vivait un `cle.split('|')[1] as Repas` — vingt lignes au-dessus de
+     `lireLaCle`, la fonction qui se déclare seule à savoir lire cette clé.
+     Relevé par la revue le 15 septembre 2026, le jour même où `lireLaCle` a
+     été écrite : le jumeau oublié, dans le fichier même.
+     `lireLaCle` aurait fait l'affaire, mais s'en passer vaut mieux : les
+     journées sont toutes au jour 0, donc `cleDuRepas(0, d.repas)` désigne
+     exactement l'entrée cherchée. Aucune assertion, aucun repli à choisir, et
+     un sens de lecture en moins à tenir. */
+  const parCle = resoudreLaPeriode(
+    demandes.map((d) => ({ ...d, jour: 0 })), stockDe, candidats);
+
   const sorties = new Map<Repas, AuMieux>();
-  for (const [cle, sortie] of resoudreLaPeriode(
-    demandes.map((d) => ({ ...d, jour: 0 })), stockDe, candidats)) {
-    sorties.set(cle.split('|')[1] as Repas, sortie);
+  for (const d of demandes) {
+    const sortie = parCle.get(cleDuRepas(0, d.repas));
+    if (sortie !== undefined) sorties.set(d.repas, sortie);
   }
 
   return sorties;
@@ -103,6 +115,45 @@ export interface DemandeDatee extends DemandeRepas {
 
 /** La clé d'un repas dans une période : « 2|R3 » pour le 16 h du 3e jour. */
 export const cleDuRepas = (jour: number, repas: Repas): string => `${jour}|${repas}`;
+
+/**
+ * L'INVERSE DE `cleDuRepas`, ET IL VIT ICI PARCE QUE LA CLÉ EST DÉFINIE ICI.
+ *
+ * QUATRE endroits la découpaient à la main, et aucun ne la validait. Ce
+ * commentaire en a d'abord annoncé DEUX — il mentait le jour de son écriture,
+ * et c'est la revue qui a compté :
+ *
+ *   - `app/(onglets)/repas.tsx` faisait `Number(rang)` : une clé malformée
+ *     donnait un libellé de jour `NaN` à l'écran, sans un mot ;
+ *   - `calcul/planFige.ts` écrivait `split('|')[1] as MomentDuRepas`, une
+ *     assertion qui ment sans rien dire dès que la clé change de forme ;
+ *   - `resoudreLaJournee`, VINGT LIGNES PLUS HAUT dans ce fichier même ;
+ *   - `composants/etapeBatch.tsx`, sur un chemin d'affichage vivant.
+ *
+ * Les deux derniers n'avaient pas besoin de lire la clé du tout : ils la
+ * redemandent maintenant à `cleDuRepas`, ou reçoivent le repas directement.
+ *
+ * Rassemblés ici le 15 septembre 2026. Une clé se lit là où elle s'écrit,
+ * sinon les deux règles divergent — et celle qui produit dit toujours vrai,
+ * celle qui lit se trompe en silence.
+ *
+ * Rend `null` plutôt que d'inventer : une clé illisible n'est pas le jour 0.
+ */
+export function lireLaCle(cle: string): { jour: number; repas: Repas } | null {
+  /* DEUX MORCEAUX, PAS « AU MOINS DEUX ». Sans ce compte, « 2|R2|R3 » passait :
+     le troisieme morceau etait simplement ignore, et la cle acceptee. Trouve
+     par le test avant que le code ne parte. */
+  const morceaux = cle.split('|');
+  if (morceaux.length !== 2) return null;
+
+  const [brut, repas] = morceaux as [string, string];
+  const jour = Number(brut);
+
+  if (brut === '' || !Number.isInteger(jour) || jour < 0) return null;
+  if (!REPAS.includes(repas as Repas)) return null;
+
+  return { jour, repas: repas as Repas };
+}
 
 /**
  * TOUTE LA PÉRIODE PARTAGE UN SEUL FRIGO.
