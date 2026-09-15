@@ -5,20 +5,23 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 14 septembre 2026, soir** — **les lots 3, 4 et 5 de
-l'audit sont terminés**, et le lot 5 a mis au jour un constat plus grave que
-lui : **C4**, le catalogue commun. Le dossier de présentation client est prêt ; il ne
+**Dernière mise à jour : 15 septembre 2026, soir** — **les lots 0 à 7 sont
+terminés**, le lot 8 est presque bouclé. Trois agents de contrôle sont
+désormais disponibles pour éprouver l'ensemble. Le dossier de présentation client est prêt ; il ne
 reste qu'à tourner les vidéos.
 
 ---
 
 ## L'essentiel en cinq lignes
 
-Un audit complet a relevé **84 constats** (3 critiques, 15 élevés). **Les lots 0
-à 5 sont terminés** : garde-fous automatiques, ce qui était cassé, les chiffres
-faux, la sécurité et l'isolation, la base reproductible, les scripts dangereux.
-Restent le lot 6 (architecture front, 2-3 j), le lot 7 (tests) et le lot 8.
-**Et C4, découvert en chemin, qui passe devant tout le reste.** Tout est dans
+Un audit complet a relevé **84 constats** (3 critiques, 15 élevés). **Les lots 0 à 7 sont terminés** — garde-fous, ce qui était cassé, les chiffres
+faux, la sécurité et l'isolation, la base reproductible, les scripts dangereux,
+l'architecture front, les tests du client HTTP. Le **lot 8** est presque fini :
+les onze constats du front sont faits, les neuf de sécurité API sont en cours.
+
+État : **548 tests front · 158 API · 508 assertions**, 7 erreurs PHPStan
+connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
+vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
 
 En parallèle, un **dossier de présentation** est monté de bout en bout dans
@@ -88,11 +91,11 @@ docker compose -f compose.dev.yml up -d
 ```
 
 **2. Vérifier qu'on part d'un socle sain.** Ces chiffres sont ceux du
-14 septembre au soir ; ils ne peuvent que monter :
+15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 362 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 149 tests, 491 assertions
+cd front && npm test                                                  # 548 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 158 tests, 508 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
@@ -148,34 +151,50 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 
 ## Par quoi continuer
 
-**C4 est tranché** : le catalogue d'aliments de départ n'existe plus. Décision
-du 14 septembre 2026, détaillée dans
-[docs/audit-2026-09/](docs/audit-2026-09/README.md).
+**Rien d'urgent ne reste dans l'audit.** Les lots 0 à 7 sont clos, le lot 8 l'est
+presque. Ce qui suit est du confort, ou attend une décision.
 
-En deux lignes : les 50 aliments communs semés à chaque installation portaient
-des valeurs venues d'une fixture de test. Plutôt que de les reconstituer depuis
-Ciqual, ils ont été **supprimés du seed** — les valeurs nutritionnelles ne sont
-pas une constante, deux paquets du même produit diffèrent, et l'étiquette
-française donne les fibres. Chacun saisit les siennes en rentrant de courses ;
-un compte Grocy les reçoit de Grocy, où le champ « Fibres / 100 g » est déclaré
-et créé par `FrigoGrocy`.
-
-**Rien n'a été supprimé des bases existantes**, et c'est délibéré :
-`plan_repas.contenu` est du JSON, un aliment effacé qui y figure casserait le
-plan sans la moindre erreur SQL. La suppression se fait à la main, depuis
-l'écran.
+| | Quoi | Effort |
+|---|---|---|
+| **Les trois agents de contrôle** | `revue-fitcarnet`, `verification-bout-en-bout`, `verite-documentaire` — jamais lancés sur l'ensemble. À faire **avant la démonstration** : ils sont tous en lecture seule, donc lançables en parallèle | 1 h |
+| **F2 côté écran** | `carteRepas.tsx` affiche `assiette` gonflée pour un aliment non cuit. Il n'a aucune notion de cuisson : la corriger demande de faire descendre le choix sur trois niveaux, et rien ne dit que cet écran doive le connaître | à trancher |
+| **`choixRatio.tsx`** | dernier morceau du lot 6, et **il était mal rangé dans l'audit** : il appartient à `editeurAliment.tsx` (section 7), pas à l'écran de séance | 1 h |
+| **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 22 témoins ; les hooks React restent hors de portée faute de bibliothèque de rendu | ~4 h |
+| **É14, deux volets sur trois** | même blocage : `@testing-library` ou `react-test-renderer` n'est pas installé. **Installer l'un des deux débloquerait É14, F13, et tous les effets React** | à trancher |
 
 ---
 
-## Puis, dans l'ordre
+## Ce que la journée du 15 septembre a changé
 
-| Lot | Ce que c'est | Effort |
-|---|---|---|
-| **6 — architecture front** | 🟨 **rangs 1, 2, 4, 5 faits le 15 septembre.** Restent les rangs 6 à 12 : `planRelu.tsx`/`carteRepas.tsx`, `usePlanCalcule`, le découpage de `frigo.tsx` et `admin-exercices.tsx`, `etapeBatch.tsx`. Détail dans [03-front.md](docs/audit-2026-09/03-front.md) | ~2 j |
-| **É2, reste du rang 4** | le test de non-régression n'a pas été écrit : `plafonds` survit à la passe `ALaCarte` de `listeDeCourses` (`src/solveur/composer.ts`). `demandePour` a maintenant des tests qui décrivent l'entrée du bug, donc c'est plus facile qu'avant | ~1 h |
-| **7 — tests manquants** | É10 (client HTTP), le câblage non couvert | ~6 h |
-| **8 — le reste** | ~37 constats faibles, beaucoup en 5 minutes | — |
-| **M-02, second volet** | la *visibilité* des sessions : `GET /api/mes-sessions` + `DELETE`. La fenêtre est passée à 90 j, mais rien ne permet de couper une session précise | ~2 h |
+**Le lot 6 est terminé, les douze rangs.** Les trois écrans passent de 3 935 à
+1 169 lignes ; `composer.ts` de 827 à 135, `cuisson.ts` de 613 à 22, `hooks.ts`
+en dix modules. **Les dix duplications D1 à D10 sont closes.**
+
+**Six agents ont travaillé en parallèle**, sur des périmètres strictement
+disjoints — c'est la condition, sans quoi ils s'écrasent. Trois ont **refusé**
+une partie de leur tâche, et les trois avaient raison : sortir les props
+d'`EtapeBatch` aurait donné un riz « à l'eau » sur l'écran de batch alors que
+l'utilisateur l'avait mis au four (`cuissonsChoisies` est un `useState`, une
+seconde instance a le sien, vide) ; ranger sept tests de cuisson les aurait fait
+tomber dans le mauvais fichier ; corriger M7 aurait dépassé le mandat.
+
+**Trois défauts trouvés qui n'étaient dans aucun rapport :**
+
+- **Le mot de passe était écrit en clair sur le disque.** `dehydrateMutation`
+  sauvegarde les `variables`, et celles de `useConnexion` sont
+  `{email, motDePasse}` — tenter de se connecter hors ligne suffisait.
+- **L'application ne démarrait pas en navigation privée.** `localStorage?.` ne
+  protège pas d'un objet qui *lève quand on y touche* : écran de chargement
+  indéfini, sans message.
+- **`verifier-schema.sh` ne contrôlait plus rien depuis trois migrations.** J'avais
+  étendu le glob dans trois lanceurs le 14 et oublié le quatrième. Son ✓ vert ne
+  prouvait rien — et masquait une vraie divergence, de moi aussi.
+
+**Trois agents ont été créés**, nés de fautes réelles de la session :
+`revue-fitcarnet` (les huit motifs de défaut du projet),
+`verification-bout-en-bout` (543 tests au vert ne disaient pas si l'API
+répondait) et `verite-documentaire` (quatre affirmations fausses trouvées par
+accident en deux jours).
 
 ---
 
@@ -275,14 +294,30 @@ PostgreSQL qui ne parle pas du projet.
 
 ## Ce qui attend une décision de ta part
 
-**La table des paliers du disque RM.** `disqueRM.tsx` affiche 90→40 %, le
-calculateur 100→50 %. À 40 %, la formule annonce 45 répétitions alors que
-`REPS_MAX_POUR_1RM` vaut 15 : la prédiction sort de la zone où elle veut dire
-quelque chose. La fonction dupliquée a été supprimée ; les deux tables
-subsistent. Unifier change l'affichage — c'est un choix produit.
+~~**La table des paliers du disque RM.**~~ **Tranché le 15 septembre 2026** :
+centrée sur **70-90 %**, la zone où l'on progresse — et, heureuse coïncidence,
+la seule où la formule dit vrai (13 répétitions à 70 %, 3 à 90 %, plafond à 15).
+Neuf paliers par pas de 2,5 %, donnant neuf cibles distinctes là où le pas de
+5 % laissait quatre trous. En dessous de 70 %, la charge s'affiche et **la
+prédiction disparaît** ; le seuil n'est pas écrit à la main mais dérivé de
+`REPS_MAX_POUR_1RM`, pour que la table suive si le plafond bouge.
 
-**Les exercices personnels** (É8 ci-dessus) : filtrer, ou assumer un catalogue
-commun et retirer l'étiquette mensongère.
+Les petites charges étaient la seconde exigence : à 20 kg de 1RM, onze paliers
+ne donnaient que **cinq charges distinctes** — trois lignes disaient « 15 kg »
+sans le signaler. `pasConseille` descend à 1 kg quand 2,5 kg fait tomber la zone
+de travail sous cinq charges, et les paliers confondus fusionnent en une ligne
+qui dit son étendue.
+
+**Trois points restent à ton arbitrage** : 95 % et 100 % ont été retirés (le
+maximum est déjà affiché au-dessus) ; l'échauffement est à 60/50/40 sans
+granularité fine ; et sous 10 kg de 1RM, une ligne fusionnée peut perdre une
+prédiction juste à cause d'un voisin hors domaine.
+
+~~**Les exercices personnels**~~ — tranché le 14 septembre : filtrés pour de
+vrai, règle « public OU le mien ». **Conséquence à connaître** : un exercice
+personnel mal orthographié est aujourd'hui **incorrigible**, y compris par son
+auteur — le `PATCH` est réservé à `ROLE_ADMIN`, et l'administrateur ne voit plus
+les exercices privés. C'est le constat **F-09**, en cours de traitement.
 
 ---
 
