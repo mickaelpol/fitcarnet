@@ -33,10 +33,10 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 562 tests, puis 7 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 567 tests, puis 7 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 231 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 248 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -143,6 +143,13 @@ déviation par rapport à la cible doit être expliquée à l'écran.
 
 - `entrypoint-prod.sh` rejoue `db/manuel/` à **chaque** démarrage : un fichier de migration qui
   écrit des données écrase les corrections manuelles à chaque redémarrage.
+- **Un champ d'écriture doit porter le nom d'une propriété ou d'un accesseur.**
+  `RefuserLesChampsInconnus` refuse en 400 tout corps d'écriture qui nomme un champ inexistant
+  dans la ressource visée — c'est ce qui empêche un `"partage": true` de recevoir 201 sans rien
+  faire. Exposer un jour un champ sous un autre nom (`#[SerializedName]`) ou une relation sans
+  `targetEntity` le fera refuser à tort : étendre `api/src/Serializer/ChampsInconnus.php`, et
+  surtout pas revenir à `allow_extra_attributes: false`, qui refuse aussi `id` et les `@id`
+  imbriqués que le front renvoie — essayé et retiré le 15 septembre 2026.
 - Les scripts de la racine ne sont pas des jouets : `installer.sh`, `restaurer-nas.sh`,
   `deployer-nas.sh`, `publier*.sh` déploient ou détruisent. Ne jamais les lancer pour « voir ».
 - `ciqual_vers_grocy.py --exporter-catalogue` écrit dans `db/manuel/16-catalogue-ciqual.sql`,

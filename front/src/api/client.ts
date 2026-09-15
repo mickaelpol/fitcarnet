@@ -195,8 +195,75 @@ const depotJetons: DepotJetons = {
   terminerSession,
 };
 
+/* --------------------------------------------------------- le délai de garde
+ *
+ * `fetch` N'A AUCUN DÉLAI PAR DÉFAUT, et ce client n'en posait aucun jusqu'au
+ * 15 septembre 2026. Une connexion acceptée puis muette — proxy inverse
+ * bloqué, NAS en veille, Wi-Fi de salle captif — laissait la promesse en
+ * suspens pour toujours. Chaque écran restait sur son rond qui tourne : ni
+ * erreur, ni « Réessayer », puisque React Query attend encore la première
+ * réponse. Sur l'onglet Compte, c'était la déconnexion qui devenait
+ * inaccessible (É14) ; `cadreCompte.tsx` soigne l'écran, ceci soigne la cause.
+ *
+ * TRENTE SECONDES, ET L'API EST TENUE DE RÉPONDRE AVANT. Elle appelle Grocy
+ * pendant la requête — `/mon-frigo`, `/mon-frigo/aliment`, `/mon-frigo/quantite`,
+ * `/plan_repas/{id}/cuisine`. Ces appels sont bornés côté serveur à VINGT
+ * secondes (`FrigoGrocy::DUREE_MAX_S`) : un Grocy bloqué produit donc le 502
+ * « Grocy est injoignable… » de l'API, avec le vrai diagnostic, et non ce délai
+ * de garde qui ne saurait dire que « le serveur ne répond pas ». Ce commentaire
+ * a d'abord affirmé que l'API n'appelait rien de lent : c'était faux, et la
+ * revue l'a relevé le jour même.
+ *
+ * LE RENOUVELLEMENT PASSE PAR ICI AUSSI, et c'est le plus important des deux :
+ * `uneSeuleFois` fait attendre TOUTES les requêtes derrière un seul
+ * `/jeton/rafraichir`. Muet, il les figeait toutes d'un coup. */
+const DELAI_DE_GARDE_MS = 30_000;
+let delaiDeGarde = DELAI_DE_GARDE_MS;
+
+/** Pour les tests : raccourcir le délai, puis le rendre en appelant sans argument. */
+export function definirDelaiDeGarde(ms: number = DELAI_DE_GARDE_MS): void {
+  delaiDeGarde = ms;
+}
+
+/** Le délai est dépassé : aucune réponse complète n'est arrivée à temps. */
+class DelaiDepasse extends Error {}
+
+async function fetchAvecDelai(url: string, options: RequestInit = {}): Promise<Response> {
+  const controleur = new AbortController();
+  const minuteur = setTimeout(() => { controleur.abort(); }, delaiDeGarde);
+
+  try {
+    const reponse = await fetch(url, { ...options, signal: controleur.signal });
+
+    /* LE CORPS AUSSI, DANS LE MÊME DÉLAI. Un `fetch` de navigateur résout dès
+       les EN-TÊTES ; le corps arrive ensuite. Annuler le minuteur à ce moment-là
+       laissait `text()` et `json()` attendre sans limite — une connexion qui
+       décroche au milieu d'une longue liste, et l'écran tournait pour toujours.
+       Relevé par la revue le 15 septembre 2026. On lit donc tout ici, puis on
+       rend une réponse déjà complète : ses lecteurs n'attendent plus rien. */
+    const texte = await reponse.text();
+    const sansCorps = reponse.status === 204 || reponse.status === 205 || reponse.status === 304;
+
+    return new Response(sansCorps ? null : texte, {
+      status: reponse.status,
+      statusText: reponse.statusText,
+      headers: reponse.headers,
+    });
+  } catch (e) {
+    /* On ne croit pas le TYPE de l'erreur, qui varie d'un moteur à l'autre
+       (`AbortError` sur le web, message libre sous Hermes) : on regarde si
+       c'est NOTRE minuteur qui a coupé. */
+    if (controleur.signal.aborted) throw new DelaiDepasse();
+    throw e;
+  } finally {
+    /* Sans ce `clearTimeout`, chaque requête réussie laisserait un minuteur
+       de trente secondes vivant derrière elle. */
+    clearTimeout(minuteur);
+  }
+}
+
 async function renouveler(): Promise<boolean> {
-  return renouvelerJeton(BASE, depotJetons, (url, options) => fetch(url, options));
+  return renouvelerJeton(BASE, depotJetons, (url, options) => fetchAvecDelai(String(url), options));
 }
 
 /* Une panne de réseau lève une exception : on la ramène à « pas renouvelé »
@@ -281,12 +348,29 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
    * c'est tout. */
   let reponse: Response;
   try {
-    reponse = await fetch(BASE + chemin, {
+    reponse = await fetchAvecDelai(BASE + chemin, {
       method: methode,
       headers: entetes,
       body: corps === undefined ? undefined : JSON.stringify(corps),
     });
-  } catch {
+  } catch (e) {
+    /* CE MESSAGE NE DÉSIGNE PAS DE COUPABLE, et c'est voulu. Sur Android,
+       React Native règle OkHttp sans délai de connexion : un serveur éteint ou
+       un Wi-Fi captif qui avale les paquets n'y lèvent AUCUNE erreur réseau et
+       finissent ici, comme un serveur qui s'est tu. La première version disait
+       « il a accepté la connexion » et envoyait l'enquête côté serveur à tort
+       — relevé par la revue le 15 septembre 2026. */
+    if (e instanceof DelaiDepasse) {
+      return {
+        statut: 0,
+        ok: false,
+        donnees: null,
+        message: `Le serveur ne répond pas (plus de ${Math.max(1, Math.round(delaiDeGarde / 1000))} s) : `
+          + `${BASE}. Réessaie dans un instant ; si ça dure, vérifie ta connexion `
+          + `et que le serveur est bien allumé.`,
+      };
+    }
+
     return {
       statut: 0,
       ok: false,

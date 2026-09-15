@@ -54,6 +54,28 @@ final readonly class FrigoGrocy
      */
     private const DEJA_A_JOUR = 'cannot equal the current stock amount';
 
+    /*
+     * UN APPEL A GROCY A UNE DUREE MAXIMALE, ET ELLE EST PLUS COURTE QUE LA
+     * PATIENCE DU FRONT. Pose le 15 septembre 2026, sur releve de la revue.
+     *
+     * Jusque-la, rien : l'attente suivait `default_socket_timeout`, SOIXANTE
+     * secondes, quand le front abandonne a TRENTE (`DELAI_DE_GARDE_MS`,
+     * `front/src/api/client.ts`). Un Grocy qui accepte sans repondre faisait
+     * donc lire « Le serveur ne répond pas » au lieu du 502 « Grocy est
+     * injoignable… » — le vrai diagnostic perdu, et sur `cuisine` un serveur qui
+     * continuait apres la coupure. Borne a vingt secondes, l'API repond toujours
+     * la premiere, et c'est elle qui dit ce qui ne va pas.
+     *
+     * `ATTENTE_MAX_S` coupe une connexion muette sans attendre la fin ;
+     * `DUREE_MAX_S` borne l'appel entier, lent mais bavard compris.
+     *
+     * Et le jumeau en tache de fond : `inventorierUn` tourne hors requete HTTP,
+     * et un Grocy muet y figeait un des deux travailleurs d'inventaire pour
+     * toujours. Meme borne. `FrigoGrocyDelaiTest` exige l'ordre, pas la valeur.
+     */
+    private const ATTENTE_MAX_S = 10;
+    private const DUREE_MAX_S = 20;
+
     public function __construct(
         private HttpClientInterface $http,
         private LoggerInterface $journal,
@@ -459,6 +481,8 @@ final readonly class FrigoGrocy
                 'POST',
                 \rtrim($this->url, '/') . '/api/stock/products/' . $idProduit . '/inventory',
                 [
+                    'timeout' => self::ATTENTE_MAX_S,
+                    'max_duration' => self::DUREE_MAX_S,
                     'headers' => [
                         'GROCY-API-KEY' => $this->cle,
                         'Accept' => 'application/json',
@@ -566,10 +590,14 @@ final readonly class FrigoGrocy
     private function appeler(string $chemin, string $methode = 'GET', ?array $corps = null): array
     {
         try {
-            $options = ['headers' => [
-                'GROCY-API-KEY' => $this->cle,
-                'Accept' => 'application/json',
-            ]];
+            $options = [
+                'timeout' => self::ATTENTE_MAX_S,
+                'max_duration' => self::DUREE_MAX_S,
+                'headers' => [
+                    'GROCY-API-KEY' => $this->cle,
+                    'Accept' => 'application/json',
+                ],
+            ];
             if (null !== $corps) {
                 $options['json'] = $corps;
             }

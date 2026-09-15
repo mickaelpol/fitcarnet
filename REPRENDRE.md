@@ -22,7 +22,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **569 tests front** (562 + 7 de rendu) · **231 API · 617 assertions**, 7 erreurs PHPStan
+État : **574 tests front** (567 + 7 de rendu) · **248 API · 656 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -97,8 +97,8 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 562 + 7 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 231 tests, 617 assertions
+cd front && npm test                                                  # 567 + 7 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 248 tests, 656 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
@@ -595,10 +595,115 @@ serait plus chargé.
 portaient tous `partage = false`, et le front envoyait `partage: false` en dur à
 chaque création. La colonne n'a jamais porté d'information.
 
-> **Un point à connaître.** Un client qui enverrait encore `"partage": true`
-> reçoit **201**, pas une erreur : API Platform ignore un attribut inconnu. Le
-> champ n'existe plus, donc rien n'est stocké ni lu — mais ce n'est pas un refus,
-> c'est un silence. Sans conséquence tant qu'aucun client ne le croit.
+> ~~Un client qui enverrait encore `"partage": true` reçoit 201~~ — **corrigé le
+> même jour : il reçoit 400**, « Champ(s) inconnu(s) : partage ». Voir la section
+> suivante : ce silence n'était pas propre à `Modele`, et la correction évidente
+> cassait la modification des séances.
+
+---
+
+## Un champ inexistant est refusé, et un serveur muet ne fige plus rien
+
+Deux défauts trouvés le 15 septembre 2026 en fin de journée, **corrigés, pas
+notés**.
+
+### Un 201 qui n'avait rien fait
+
+Après le retrait de `partage`, un `POST` qui le portait encore recevait **201** :
+API Platform ignore ce qu'il ne connaît pas. L'appelant croyait avoir partagé
+son modèle. Et ce n'était pas propre à `Modele` — **toute ressource** avalait en
+silence un champ mal nommé.
+
+**La correction évidente a été essayée, mesurée, et retirée.**
+`allow_extra_attributes: false` répond à « ce champ s'écrit-il ? ». Il refuse donc
+aussi `id`, `creeLe` et les `@id` imbriqués — que le front renvoie avec l'objet
+qu'il a lu. Résultat mesuré sur l'application : **modifier une séance répondait
+400**, l'écran d'administration des exercices et celui des cuissons ne pouvaient
+plus rien enregistrer.
+
+**Ce qui est en place répond à une autre question : « ce champ existe-t-il ? »**
+`api/src/Serializer/ChampsInconnus.php` lit les vraies entités par réflexion —
+propriétés, accesseurs calculés (`getAvancement`), clés JSON-LD — et descend dans
+les relations écrites en objets en suivant leur `targetEntity`.
+`api/src/EventListener/RefuserLesChampsInconnus.php` l'applique à **toute
+ressource API Platform**, après le pare-feu. Posé sur la seule `Modele`, il
+aurait été le jumeau oublié de la ressource suivante.
+
+Éprouvé sur l'application : `partage` → **400**, message dans `detail`, que le
+front affiche · séance relue et renvoyée → **200** · écrans admin (`{id, …}`) →
+**200** · ordre de modèle, plan de repas → acceptés · anonyme → **401**, pas 400.
+Sur les tests : sept pour le contrôle, dont un champ inconnu dans une série
+rapporté avec son chemin (`exercices[0].series[1].charge`), et sept pour
+l'écouteur lui-même — verbes, sous-requêtes, routes hors API Platform. Chacun des
+deux fichiers a été vu tomber sous mutation.
+
+**La revue a balayé toutes les écritures du front** — séances, modèles,
+aliments, cibles, compléments, plans, cuissons, exercices, ordre de modèle,
+fusion — en confrontant chaque clé envoyée à la classe PHP visée : **aucun
+faux positif**.
+
+### Ce que cette vérification a montré en passant — et ce n'est PAS un bug
+
+**Enregistrer une séance ou un modèle supprime et recrée tous ses blocs et
+séries**, malgré leurs `@id`. Vérifié avant de conclure, parce que ça ressemblait
+à une perte de données :
+
+- c'est **voulu et documenté** : « lu et écrit en UN SEUL objet complet » dit
+  `Modele`, et le schéma rend l'unicité `(seance_id, ordre)` différable
+  précisément parce que Doctrine insère avant de supprimer ;
+- **rien ne pointe sur ces lignes** hors leurs propres enfants ;
+- **aucun champ n'est perdu** : tous sont en lecture ET en écriture, seul `id`
+  est en lecture seule. Aller-retour réel d'une séance à deux séries : identique
+  champ par champ, cases « faite » comprises ;
+- **le front est construit autour** : `avecIdentifiantSeance` ne recopie
+  volontairement pas les identifiants des blocs — les greffer faisait perdre le
+  focus en pleine frappe. L'écran renvoie donc des identifiants périmés à chaque
+  sauvegarde automatique, et c'est sans effet : **200, un bloc, deux séries,
+  valeurs à jour**, vérifié.
+
+Il n'y avait donc rien à « nettoyer » côté front : les `@id` qu'il renvoie ne
+changent rien à l'écriture, puisque les blocs sont recréés de toute façon. (Une
+première version de ce paragraphe prétendait le contraire ; la revue l'a relevé.)
+
+### Un serveur qui accepte et ne répond jamais figeait tout
+
+`client.ts` n'avait **aucun délai de garde**, et `fetch` n'en a pas par défaut.
+Une connexion acceptée puis muette — proxy bloqué, NAS en veille, Wi-Fi captif —
+laissait chaque écran sur son rond qui tourne, sans erreur ni « Réessayer ». Et
+le renouvellement de jeton passait par le même `fetch` nu : muet, il figeait via
+`uneSeuleFois` **toutes** les requêtes qui l'attendaient.
+
+`fetchAvecDelai` coupe à **30 secondes** les deux chemins — **corps de la réponse
+compris**. La première version annulait le minuteur dès les en-têtes : sur le
+web, `fetch` résout avant que le corps n'arrive, et une connexion qui décrochait
+au milieu d'une longue liste laissait `text()` attendre pour toujours. Relevé par
+la revue, corrigé, deux témoins vus rouges avant.
+
+Le message dit « Le serveur ne répond pas », **sans désigner de coupable** : sur
+Android, OkHttp n'a pas de délai de connexion, donc un serveur éteint ou un Wi-Fi
+captif finissent ici aussi. La première version affirmait « il a accepté la
+connexion » — faux précisément dans ces cas-là.
+
+Un renouvellement muet rend la main **sans déconnecter**. Cinq témoins, chacun
+avec son chien de garde ; le témoin inverse respecte le signal, si bien qu'un
+délai retombé à zéro le fait tomber — ce qu'il ne faisait pas dans sa première
+version.
+
+**Et l'API répond toujours avant ce délai.** `FrigoGrocy` n'imposait aucune durée
+à ses appels : 60 s de `default_socket_timeout`, plus que les 30 s du front. Un
+Grocy muet faisait donc lire « le serveur ne répond pas » au lieu du 502
+« Grocy est injoignable… », et sur `/plan_repas/{id}/cuisine` le serveur
+continuait après la coupure. Les appels à Grocy sont bornés à **20 s** — y compris
+`inventorierUn`, en tâche de fond, où un Grocy muet figeait un des deux
+travailleurs d'inventaire. `FrigoGrocyDelaiTest` n'exige pas une valeur mais un
+**ordre** : l'API doit répondre avant que le front abandonne. Et quand la borne
+saute, la ligne d'inventaire **échoue en le disant** — un délai dépassé devient
+un motif lisible, pas une exception qui ferait tomber le lot ; témoin vu tomber
+en rétrécissant le `catch`.
+
+> **À savoir, sans que ce soit un défaut** : avec les deux réessais de React
+> Query, un serveur totalement muet laisse le rond tourner environ 90 s avant
+> « Réessayer ». Le bouton « Se déconnecter » reste accessible pendant ce temps.
 
 ---
 

@@ -600,3 +600,217 @@ describe('le stockage du navigateur peut refuser, et l\'application doit démarr
     } finally { rendre(); }
   });
 });
+
+/* ======================================================================== */
+/* LE DÉLAI DE GARDE                                                         */
+/* ======================================================================== */
+
+/**
+ * UN SERVEUR QUI ACCEPTE ET NE RÉPOND JAMAIS NE DOIT PAS FIGER L'APPLICATION.
+ *
+ * Trouvé le 15 septembre 2026 en corrigeant É14 : `client.ts` n'avait AUCUN
+ * délai de garde. `fetch` n'en a pas par défaut — une connexion acceptée puis
+ * muette (proxy inverse bloqué, NAS en veille, Wi-Fi de salle captif) laisse
+ * la promesse en suspens pour toujours. Chaque écran restait alors sur son rond
+ * qui tourne : ni erreur, ni bouton « Réessayer », puisque React Query attend
+ * toujours la première réponse. Sur l'onglet Compte, c'était la déconnexion
+ * elle-même qui devenait inaccessible — d'où la moitié « attente » de
+ * `cadreCompte.tsx`, qui soigne l'écran mais pas la cause.
+ *
+ * Et le renouvellement de jeton passait par le même `fetch` nu : un
+ * `/jeton/rafraichir` muet bloquait, via `uneSeuleFois`, TOUTES les requêtes
+ * qui l'attendaient.
+ */
+
+/** Un serveur qui ne répond jamais — sauf quand le client abandonne. */
+function brancherFetchQuiPend(
+  pend: (url: string) => boolean,
+  repondre: (url: string) => Response | Promise<Response>,
+): void {
+  globalThis.fetch = ((cible: unknown, options?: { signal?: AbortSignal }): Promise<Response> => {
+    const url = String(cible);
+    if (!pend(url)) return (async (): Promise<Response> => repondre(url))();
+
+    /* Sans `signal`, cette promesse ne se règle JAMAIS : c'est exactement le
+       défaut qu'on éprouve. D'où le chien de garde ci-dessous, qui transforme
+       « le test ne finit pas » en « le test échoue ». */
+    return new Promise<Response>((_, rejeter) => {
+      options?.signal?.addEventListener('abort', () => {
+        rejeter(new DOMException('The operation was aborted.', 'AbortError'));
+      });
+    });
+  }) as unknown as typeof fetch;
+}
+
+/**
+ * Un serveur qui envoie ses en-têtes et un début de corps, puis se tait.
+ *
+ * Comme un vrai `fetch`, le corps ne lève qu'à l'abandon : sans `signal`
+ * transmis, ou avec un minuteur déjà annulé, `text()` et `json()` attendent
+ * pour toujours.
+ */
+function brancherFetchQuiSeTaitApresLesEnTetes(
+  seTait: (url: string) => boolean,
+  repondre: (url: string) => Response = () => json({}),
+): void {
+  globalThis.fetch = ((cible: unknown, options?: { signal?: AbortSignal }): Promise<Response> => {
+    const url = String(cible);
+    if (!seTait(url)) return Promise.resolve(repondre(url));
+
+    const corps = new ReadableStream<Uint8Array>({
+      start(flux) {
+        flux.enqueue(new TextEncoder().encode('{"member":['));
+        options?.signal?.addEventListener('abort', () => {
+          flux.error(new DOMException('The operation was aborted.', 'AbortError'));
+        });
+      },
+    });
+
+    return Promise.resolve(new Response(corps, { status: 200 }));
+  }) as unknown as typeof fetch;
+}
+
+/**
+ * Échoue si la promesse n'a pas rendu la main à temps, au lieu de pendre avec elle.
+ *
+ * Le chien de garde est ANNULÉ dès que la course est jouée : laissé vivant, il
+ * garderait le processus de test deux secondes de plus après chaque témoin.
+ * (`.unref()` aurait suffi sous Node, mais `npm test` type aussi ce fichier
+ * avec les types du navigateur, où `setTimeout` rend un simple nombre.)
+ */
+async function avantDe<T>(ms: number, promesse: Promise<T>): Promise<T> {
+  let chien: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promesse,
+      new Promise<never>((_, rejeter) => {
+        chien = setTimeout(() => {
+          rejeter(new Error(`le client n'a pas rendu la main en ${ms} ms : aucun délai de garde`));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(chien);
+  }
+}
+
+describe('un serveur muet ne fige pas l\'application', () => {
+  it('une requête qui ne répond jamais finit en erreur, et dit pourquoi', async () => {
+    await sessionOuverte();
+    client.definirDelaiDeGarde(50);
+
+    try {
+      brancherFetchQuiPend(() => true, () => json({}));
+
+      await assert.rejects(avantDe(2000, client.api('/seances')), erreurApi((e) => {
+        assert.equal(e.statut, 0, 'zéro : le serveur n\'a rien répondu du tout');
+        assert.ok(e.message.includes(ADRESSE),
+          `le message doit nommer l'adresse muette, comme pour une panne réseau. Il dit : « ${e.message} »`);
+        assert.match(e.message, /ne répond pas/,
+          'un délai dépassé n\'est pas une coupure : le dire autrement oriente vers la mauvaise piste');
+        assert.ok(!/abort/i.test(e.message),
+          '« The operation was aborted » ne dit ni quoi, ni pourquoi, ni quoi faire');
+      }));
+    } finally {
+      client.definirDelaiDeGarde();
+    }
+  });
+
+  it('un rafraîchissement muet rend la main sans déconnecter', async () => {
+    await sessionOuverte();
+    client.definirDelaiDeGarde(50);
+    let sessionFinie = 0;
+    client.surSessionFinie(() => { sessionFinie += 1; });
+
+    try {
+      brancherFetchQuiPend(
+        (url) => url.endsWith('/jeton/rafraichir'),
+        () => json({ detail: 'Expired JWT Token' }, 401),
+      );
+
+      await assert.rejects(avantDe(2000, client.api('/moi')), /Expired JWT Token/);
+
+      assert.equal(sessionFinie, 0,
+        'un serveur muet n\'a rien refusé : déconnecter serait punir l\'utilisateur pour une panne');
+      assert.equal(await client.lireRafraichissement(), 'refresh-1',
+        'le jeton de rafraîchissement doit survivre à un serveur qui ne répond pas');
+    } finally {
+      client.definirDelaiDeGarde();
+      client.surSessionFinie(null);
+    }
+  });
+
+  it('un corps qui cesse d\'arriver après les en-têtes finit aussi en erreur', async () => {
+    /* LE JUMEAU OUBLIÉ DU PREMIER TÉMOIN, relevé par la revue le 15 septembre
+       2026. Un `fetch` de navigateur résout à la réception des EN-TÊTES : le
+       corps arrive ensuite. Le minuteur était annulé à ce moment-là, et
+       `reponse.text()` attendait sans limite — une connexion qui décroche au
+       milieu d'une longue liste d'exercices, et l'écran tournait pour toujours.
+       La doublure envoie les en-têtes et un début de corps, puis se tait ; comme
+       un vrai `fetch`, elle ne lève qu'à l'abandon. */
+    await sessionOuverte();
+    client.definirDelaiDeGarde(50);
+
+    try {
+      brancherFetchQuiSeTaitApresLesEnTetes(() => true);
+
+      await assert.rejects(avantDe(2000, client.api('/exercices')), erreurApi((e) => {
+        assert.equal(e.statut, 0);
+        assert.match(e.message, /ne répond pas/);
+      }));
+    } finally {
+      client.definirDelaiDeGarde();
+    }
+  });
+
+  it('un rafraîchissement dont le corps se tait rend la main sans déconnecter', async () => {
+    await sessionOuverte();
+    client.definirDelaiDeGarde(50);
+    let sessionFinie = 0;
+    client.surSessionFinie(() => { sessionFinie += 1; });
+
+    try {
+      brancherFetchQuiSeTaitApresLesEnTetes(
+        (url) => url.endsWith('/jeton/rafraichir'),
+        () => json({ detail: 'Expired JWT Token' }, 401),
+      );
+
+      await assert.rejects(avantDe(2000, client.api('/moi')), /Expired JWT Token/);
+      assert.equal(sessionFinie, 0);
+      assert.equal(await client.lireRafraichissement(), 'refresh-1');
+    } finally {
+      client.definirDelaiDeGarde();
+      client.surSessionFinie(null);
+    }
+  });
+
+  it('une réponse qui arrive à temps n\'est pas coupée', async () => {
+    /* LE TÉMOIN DE L'INVERSE, et sa doublure RESPECTE LE SIGNAL. Sa première
+       version l'ignorait : la réponse arrivait à 20 ms même quand le minuteur
+       avait déjà coupé, si bien qu'un délai retombé à ZÉRO — toutes les
+       requêtes de production en échec — laissait ce test au vert. Mutation
+       rejouée par la revue le 15 septembre 2026.
+
+       Ce qu'il ne garde PAS, et on le dit : un `clearTimeout` oublié. Un
+       minuteur qui coupe une requête déjà terminée n'a aucun effet visible ;
+       c'est une fuite de ressources, pas une réponse fausse. */
+    await sessionOuverte();
+    client.definirDelaiDeGarde(500);
+
+    try {
+      globalThis.fetch = ((_cible: unknown, options?: { signal?: AbortSignal }): Promise<Response> =>
+        new Promise<Response>((resoudre, rejeter) => {
+          const arrivee = setTimeout(() => { resoudre(json({ ok: true })); }, 20);
+          options?.signal?.addEventListener('abort', () => {
+            clearTimeout(arrivee);
+            rejeter(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        })) as unknown as typeof fetch;
+
+      assert.deepEqual(await avantDe(2000, client.api<{ ok: boolean }>('/etat')), { ok: true });
+    } finally {
+      client.definirDelaiDeGarde();
+    }
+  });
+});
