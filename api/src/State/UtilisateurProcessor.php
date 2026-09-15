@@ -40,6 +40,12 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  *    Toutes les sessions tombent, y compris celle qui vient de faire le
  *    changement. C'est voulu : se reconnecter une fois est le prix, et c'est
  *    la preuve que le nouveau mot de passe fonctionne.
+ *
+ * ET UN QUATRIEME, A LA CREATION : REFUSER UN COMPTE SANS MOT DE PASSE.
+ * Constat F-06, corrige le 15 septembre 2026 — voir le commentaire du garde
+ * dans `process()`. Ce n'est pas un changement de mot de passe, c'est son
+ * absence, et c'est pour cela que ca ne figurait dans aucun des trois gestes
+ * ci-dessus.
  */
 final readonly class UtilisateurProcessor implements ProcessorInterface
 {
@@ -66,6 +72,23 @@ final readonly class UtilisateurProcessor implements ProcessorInterface
 
         $changeMotDePasse = null !== $data->getMotDePasseClair();
         $changeAdresse = !$creation && $precedent->getEmail() !== $data->getEmail();
+
+        /* UN COMPTE NE NAIT PAS SANS MOT DE PASSE (constat F-06).
+           `motDePasseClair` ne porte que `Assert\Length(min: 10)`, et `Length`
+           rend zero violation sur `null` — mesure le 15 septembre 2026, pas
+           suppose. Un `POST /api/utilisateurs` sans le champ rendait donc 201 :
+           le compte existait, il etait actif, il apparaissait dans la liste
+           d'administration, et sa colonne `mot_de_passe` restait ''. Personne
+           ne pouvait s'y connecter, et rien nulle part ne disait pourquoi.
+           Les deux autres portes qui creent un compte gardaient deja cette
+           regle — `InvitationsController::accepter` via
+           `Invitation::motDePasseAcceptable()`, et `CreerUtilisateurCommand`.
+           Trois chemins, deux verifiaient. */
+        if ($creation && '' === (string) $data->getMotDePasseClair()) {
+            throw new UnprocessableEntityHttpException(
+                'Donne un mot de passe a ce compte : sans lui, personne ne pourra s\'y connecter.'
+            );
+        }
 
         if (!$creation && ($changeMotDePasse || $changeAdresse)) {
             $this->verifierLIdentite($precedent, $data->getMotDePasseActuel());

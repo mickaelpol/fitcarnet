@@ -104,7 +104,29 @@ services:
       GROCY_API_KEY: ${GROCY_API_KEY:-}
       DATABASE_URL: "postgresql://fitcarnet:${DB_PASSWORD}@fitcarnet-db:5432/fitcarnet?serverVersion=16&charset=utf8"
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?definis JWT_PASSPHRASE dans les variables de la stack}
-      CORS_ALLOW_ORIGIN: '^https?://(carnet\.mickael-pol\.fr|localhost:5173)$$'
+      # HTTPS SEUL, ET LE SEUL DOMAINE DE PRODUCTION (constat F-02, 7 sept. 2026).
+      #
+      # Le motif etait '^https?://(carnet\.mickael-pol\.fr|localhost:5173)$$' :
+      # le `?` acceptait `http://` sur le domaine de production, et
+      # `localhost:5173` laissait un poste de developpement appeler l'API du
+      # NAS depuis un navigateur. `localhost:5173` est le port de Vite — un
+      # outil que ce projet n'utilise pas : la ligne a ete recopiee d'ailleurs
+      # et personne ne s'en est jamais servi.
+      #
+      # L'exposition etait faible et le reste : l'authentification passe par
+      # l'en-tete `Authorization` et non par un cookie, et
+      # `nelmio_cors.yaml` n'active pas `allow_credentials`. CORS n'est donc
+      # pas la frontiere qui protege les donnees. Mais un motif qui autorise
+      # plus que necessaire finit par etre recopie la ou il compte.
+      #
+      # Le developpement garde son propre motif, dans `compose.dev.yml` :
+      # `^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$$`. Les deux fichiers
+      # sont distincts, il n'y a rien a partager entre eux.
+      #
+      # `$$` et non `$` : docker compose interprete `$` comme une
+      # substitution de variable, `$$` lui fait passer un `$` litteral —
+      # celui de la fin d'ancrage de l'expression reguliere.
+      CORS_ALLOW_ORIGIN: '^https://carnet\.mickael-pol\.fr$$'
       # L'adresse sous laquelle Symfony fabrique les URL absolues quand aucune
       # requete HTTP ne le renseigne : commandes en console, chauffe du cache
       # au demarrage. `config/packages/routing.yaml` l'exige SANS valeur par

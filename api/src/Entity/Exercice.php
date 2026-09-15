@@ -111,6 +111,21 @@ class Exercice
 {
     public const MODES = ['charge', 'iso', 'chrono'];
 
+    /* PLAFONDS DE LONGUEUR — CONSTAT F-08, 15 SEPTEMBRE 2026.
+       `POST /api/exercices` est ouvert a ROLE_USER et ces colonnes sont des
+       `TEXT` : rien, ni ici ni en base, n'empechait un compte de deposer
+       plusieurs mega-octets dans un catalogue servi en UNE page de 1500
+       entrees a tout le monde. Degradation de service, pas compromission.
+
+       LES CHIFFRES VIENNENT DES DONNEES, PAS DU POUCE. Pires cas mesures sur
+       les 1338 exercices importes : nom 67, nomFr 90, instructions 975,
+       musclesSecondaires 56, equipement 20, muscleCible 21, partieCorps 10,
+       formatPrescrit 18. Chaque plafond garde au moins un facteur deux de
+       marge — un plafond sous la longueur d'une ligne existante rendrait le
+       PATCH d'administration impossible sur cette ligne, en designant un
+       champ que personne n'a touche. `BornesDuCatalogueCommunTest` fige les
+       deux bouts : le refus du demesure ET l'acceptation du mesure. */
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::BIGINT)]
@@ -119,10 +134,12 @@ class Exercice
 
     #[ORM\Column(type: Types::TEXT, unique: true)]
     #[Assert\NotBlank]
+    #[Assert\Length(max: 150, maxMessage: 'Nom trop long : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:lire', 'exercice:ecrire'])]
     private string $nom = '';
 
     #[ORM\Column(name: 'format_prescrit', type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 100, maxMessage: 'Format prescrit trop long : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:lire', 'exercice:ecrire'])]
     private ?string $formatPrescrit = null;
 
@@ -133,16 +150,28 @@ class Exercice
 
     /** Nom francais facultatif ; a defaut, « nom » est affiche. */
     #[ORM\Column(name: 'nom_fr', type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 150, maxMessage: 'Nom français trop long : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:lire', 'exercice:ecrire'])]
     private ?string $nomFr = null;
 
     /** Lien YouTube de demonstration, reserve a l'administrateur. */
     #[ORM\Column(name: 'video_url', type: Types::TEXT, nullable: true)]
-    #[Assert\Url(message: 'Adresse de vidéo invalide.')]
+    /* `requireTld: true` EST POSE EXPLICITEMENT, POUR DEUX RAISONS.
+       D'abord parce que c'est la bonne regle ici : ce champ porte un lien de
+       demonstration affiche a tout le monde, `https://serveur-interne/x` n'y
+       a pas de sens. Ensuite parce que ne rien passer declenche depuis
+       Symfony 7.1 une depreciation, et `phpunit.dist.xml` porte
+       `failOnDeprecation="true"` : le simple fait de valider un AUTRE champ
+       d'`Exercice` dans un test faisait sortir toute la suite en erreur, la
+       metadonnee de classe instanciant chaque contrainte. Sans risque sur
+       l'existant : la colonne est entierement NULL au 15 septembre 2026. */
+    #[Assert\Url(message: 'Adresse de vidéo invalide.', requireTld: true)]
+    #[Assert\Length(max: 500, maxMessage: 'Adresse de vidéo trop longue : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:lire', 'exercice:ecrire'])]
     private ?string $videoUrl = null;
 
     #[ORM\Column(name: 'partie_corps', type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 100, maxMessage: 'Partie du corps trop longue : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:lire', 'exercice:ecrire'])]
     private ?string $partieCorps = null;
 
@@ -157,10 +186,12 @@ class Exercice
        toujours pouvoir corriger ces champs. */
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 100, maxMessage: 'Équipement trop long : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $equipement = null;
 
     #[ORM\Column(name: 'muscle_cible', type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 100, maxMessage: 'Muscle ciblé trop long : {{ limit }} caractères au plus.')]
     /**
      * DANS LA LISTE, ET PAS SEULEMENT DANS LA FICHE.
      *
@@ -188,10 +219,12 @@ class Exercice
        anglais et rien ne permettait de le corriger — ni de renseigner un
        exercice ajoute a la main, qui naissait sans aucune de ces donnees. */
     #[ORM\Column(name: 'muscles_secondaires', type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 255, maxMessage: 'Muscles secondaires : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $musclesSecondaires = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 4000, maxMessage: 'Instructions trop longues : {{ limit }} caractères au plus.')]
     #[Groups(['exercice:detail', 'exercice:ecrire'])]
     private ?string $instructions = null;
 

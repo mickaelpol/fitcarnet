@@ -20,6 +20,56 @@
 
 	encode zstd gzip
 
+	# ---------- en-tetes de securite ----------
+	#
+	# AUCUN N'ETAIT SERVI (constat F-03, 7 septembre 2026). Ni sur le front,
+	# ni sur l'API, ni sur `/telecharger`.
+	#
+	# ICI ET PAS DANS LES BLOCS `handle`, ET C'EST LE POINT IMPORTANT.
+	#
+	# Le rapport d'audit proposait « trois lignes dans le bloc handle du
+	# front ». Ce site en a QUATRE, de blocs : /api*, /bundles/*,
+	# /telecharger/* et le front. Poser la regle dans un seul, c'est le motif
+	# de defaut dominant de ce projet — une decision juste appliquee a un
+	# endroit et oubliee aux autres, et le cinquieme bloc naitrait sans.
+	# Au niveau du site, les quatre sont couverts et le prochain aussi.
+	#
+	# CE QUE CHACUN ACHETE :
+	#
+	#  - `X-Content-Type-Options: nosniff` — un navigateur cesse de deviner le
+	#    type d'un fichier a partir de son contenu. Sans lui, un fichier
+	#    televerse et reservi peut etre execute comme du HTML ou du script
+	#    parce que le navigateur en a decide ainsi, contre le Content-Type.
+	#
+	#  - `X-Frame-Options: DENY` — l'application ne peut pas etre encadree par
+	#    un site tiers. C'est la seule protection contre le detournement de
+	#    clic : une page qui superpose un cadre invisible de fitcarnet a ses
+	#    propres boutons, et fait cliquer chez nous ce qu'on croit cliquer
+	#    chez elle.
+	#
+	#  - `Referrer-Policy: strict-origin-when-cross-origin` — vers l'exterieur,
+	#    seul le domaine part, jamais le chemin. Une adresse d'API porte des
+	#    identifiants ; elle n'a rien a faire dans les journaux d'un tiers.
+	#
+	# CE QUI N'EST PAS POSE ICI, ET POURQUOI :
+	#
+	#  - `Strict-Transport-Security` : le HTTPS public est termine par le
+	#    proxy inverse DSM, en amont. Ce Caddy-ci ecoute en HTTP clair
+	#    (`auto_https off`, `:80`) et ne sait pas si la requete est arrivee
+	#    chiffree. Un HSTS emis d'ici serait un pari, pas une garantie. Sa
+	#    place est dans DSM, et rien de ce depot ne peut le verifier.
+	#
+	#  - `Content-Security-Policy` : le front est un bundle Expo web dont on
+	#    ne connait pas, sans mesure, les sources exactes (styles en ligne,
+	#    fontes, blob:). Une politique posee au jugé casse l'application en
+	#    silence chez l'utilisateur et pas chez soi. A faire un jour, en
+	#    `Content-Security-Policy-Report-Only` d'abord.
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
 	# ---------- API Symfony ----------
 	handle /api* {
 		root * /app/public

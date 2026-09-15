@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Operation;
 use App\Entity\ProprieteUtilisateur;
 use PHPUnit\Framework\TestCase;
 
@@ -48,16 +49,19 @@ final class ModeleExposeTest extends TestCase
             . 'Chaque operation porte son propre security: « object == user » '
             . 'ou ROLE_ADMIN.',
 
-        // A TRANCHER — constat E8 de l'audit de septembre 2026.
-        // Exercice porte les colonnes `public` et `cree_par`, mais rien ne les
-        // renseigne ni ne les lit : le catalogue est commun dans les faits,
-        // pendant que l'ecran affiche « ★ exercice personnel ». Deux colonnes
-        // qui promettent une confidentialite que personne n'applique.
-        // Deux issues : un FiltreExercice sur le modele de FiltreAliment, ou la
-        // suppression des colonnes et de l'etiquette. Tant que ce n'est pas
-        // tranche, la derogation dit au moins la verite.
-        'Exercice' => 'Catalogue commun partage entre tous les comptes. '
-            . 'Les colonnes public/cree_par sont inertes — decision en attente.',
+        // TRANCHE LE 14 SEPTEMBRE 2026 — constat E8. Ce commentaire disait
+        // encore « decision en attente » le 15 : il mentait d'une journee.
+        // `FiltreExercice` existe, `ExerciceProcessor` renseigne `creePar`,
+        // et les colonnes ne sont plus inertes.
+        //
+        // La derogation reste, et c'est normal : `Exercice` n'implemente
+        // toujours pas `ProprieteUtilisateur`, parce que la regle n'est pas
+        // « le mien » mais « public OU le mien » — un exercice peut etre
+        // publie ET attribue, ce que `FiltreProprietaire` ne sait pas dire.
+        'Exercice' => 'Proprietaire FACULTATIF, comme Aliment, mais la regle porte sur '
+            . '`public` et non sur l\'absence d\'auteur : FiltreExercice applique '
+            . '« public OU le mien », ce qui autorise un exercice publie SANS effacer '
+            . 'sa paternite. FiltreProprietaire ne saurait pas l\'exprimer.',
     ];
 
     /**
@@ -119,6 +123,108 @@ final class ModeleExposeTest extends TestCase
             . "LES DONNEES DE TOUS. Implemente l'interface, ou ajoute {$nom} aux "
             . 'DEROGATIONS de ce test en ecrivant ce qui protege cette table a la place.',
         );
+    }
+
+    /**
+     * UNE EXPRESSION DE SECURITE NE DOIT RIEN PROMETTRE QUE LE FILTRE INTERDIT.
+     *
+     * CONSTAT F-05 DE L'AUDIT DU 7 SEPTEMBRE 2026.
+     *
+     * `Modele` portait `security: "object.getUtilisateur() == user or
+     * object.isPartage()"`. L'intention se comprend : un modele marque
+     * « partage » serait lisible par les autres comptes. Elle n'a jamais pu
+     * fonctionner — `FiltreProprietaire` pose `WHERE utilisateur = :moi` dans
+     * la requete, donc AVANT que l'expression ne soit evaluee. L'objet n'est
+     * jamais trouve, la reponse est 404, et l'expression n'est jamais atteinte.
+     *
+     * Ce n'est pas un trou : c'est la fermeture qui gagne. Mais c'est une
+     * fonctionnalite morte doublee d'un mensonge, et un mensonge de ce genre
+     * finit recopie la ou il ferait effet — c'est le motif de defaut dominant
+     * de ce projet, dans l'autre sens.
+     *
+     * LA REGLE FIGEE ICI : sur une entite filtree par le proprietaire, la
+     * seule chose qu'une expression de securite peut demander a l'objet est
+     * `getUtilisateur()`. Tout autre `object.<methode>()` designe une
+     * condition que la requete SQL a deja tranchee.
+     *
+     * Ce test parcourt les entites reelles : il verra celle qu'on ajoutera
+     * apres l'avoir oublie.
+     */
+    /**
+     * Les seules entites concernees : celles que FiltreProprietaire restreint.
+     * Filtrer ici plutot que dans le test evite une branche « sans objet » qui
+     * ne peut pas echouer — l'audit en avait trouve douze.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function entitesFiltreesParLeProprietaire(): iterable
+    {
+        foreach (self::entitesExposees() as [$nom]) {
+            if ((new \ReflectionClass('App\\Entity\\' . $nom))
+                ->implementsInterface(ProprieteUtilisateur::class)) {
+                yield $nom => [$nom];
+            }
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('entitesFiltreesParLeProprietaire')]
+    public function testAucuneExpressionDeSecuriteNePrometCeQueLeFiltreInterdit(string $nom): void
+    {
+        $classe = 'App\\Entity\\' . $nom;
+
+        self::assertNotSame([], self::expressionsDeSecurite($classe),
+            "{$nom} est filtree par le proprietaire mais ne porte AUCUNE expression "
+            . 'de securite : la defense en profondeur du projet en demande deux.');
+
+        foreach (self::expressionsDeSecurite($classe) as $operation => $expression) {
+            \preg_match_all('/object\.(\w+)\s*\(/', $expression, $trouves);
+
+            foreach ($trouves[1] as $methode) {
+                self::assertSame(
+                    'getUtilisateur', $methode,
+                    "{$nom}, operation {$operation} : l'expression de securite interroge "
+                    . "object.{$methode}(), mais FiltreProprietaire pose "
+                    . '« WHERE utilisateur = :moi » AVANT qu\'elle ne soit evaluee. '
+                    . "L'objet n'est jamais trouve : la condition est morte et la reponse "
+                    . 'est 404. Retire la clause, ou sors cette entite du filtre — '
+                    . "expression complete : « {$expression} »",
+                );
+            }
+        }
+    }
+
+    /**
+     * Les expressions `security:` de chaque operation, indexees par operation.
+     *
+     * @param class-string $classe
+     *
+     * @return array<string, string>
+     */
+    private static function expressionsDeSecurite(string $classe): array
+    {
+        $expressions = [];
+
+        foreach ((new \ReflectionClass($classe))->getAttributes(ApiResource::class) as $attribut) {
+            $arguments = $attribut->getArguments();
+
+            if (\is_string($arguments['security'] ?? null)) {
+                $expressions['<ressource>'] = $arguments['security'];
+            }
+
+            foreach ($arguments['operations'] ?? [] as $operation) {
+                if (!$operation instanceof Operation) {
+                    continue;
+                }
+
+                $securite = $operation->getSecurity();
+
+                if (\is_string($securite) && '' !== $securite) {
+                    $expressions[(new \ReflectionClass($operation))->getShortName()] = $securite;
+                }
+            }
+        }
+
+        return $expressions;
     }
 
     /**

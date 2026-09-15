@@ -73,6 +73,15 @@ class Aliment
      */
     #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank]
+    /* PLAFONDS DE LONGUEUR — CONSTAT F-08, 15 SEPTEMBRE 2026.
+       `POST /api/aliments` est ouvert a ROLE_USER, `nom` et `codeBarres` sont
+       des `TEXT` : aucune borne, ni ici ni en base. Les deux plafonds sont
+       tires des donnees reelles — pire cas mesure sur les 50 aliments de
+       reference : nom 24 caracteres. Un code-barres EAN-13 en fait 13, un
+       GTIN-14 quatorze ; 64 laisse la place aux formats exotiques sans
+       laisser passer un fichier. Un plafond sous ce que la base porte deja
+       rendrait la ligne existante inenregistrable au PATCH. */
+    #[Assert\Length(max: 150, maxMessage: 'Nom trop long : {{ limit }} caractères au plus.')]
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $nom = '';
 
@@ -124,6 +133,7 @@ class Aliment
     private ?string $peseeApres = null;
 
     #[ORM\Column(name: 'code_barres', type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 64, maxMessage: 'Code-barres trop long : {{ limit }} caractères au plus.')]
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private ?string $codeBarres = null;
 

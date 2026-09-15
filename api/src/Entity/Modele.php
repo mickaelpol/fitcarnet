@@ -24,7 +24,31 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     operations: [
         new GetCollection(),
-        new Get(security: "object.getUtilisateur() == user or object.isPartage()"),
+        // `or object.isPartage()` A ETE RETIRE ICI (constat F-05, 15 sept. 2026).
+        //
+        // La clause n'a jamais pu s'appliquer : `FiltreProprietaire` pose
+        // « WHERE utilisateur = :moi » dans la requete, donc AVANT que cette
+        // expression ne soit evaluee. Un modele partage d'un autre compte
+        // n'etait jamais trouve — la reponse etait 404, et l'expression
+        // n'etait jamais atteinte. Ce n'etait pas un trou : la fermeture
+        // gagnait. C'etait une fonctionnalite morte qui affirmait le
+        // contraire, et ce genre d'affirmation finit recopie la ou elle
+        // ferait effet.
+        //
+        // Ouvrir vraiment le partage demanderait de sortir `Modele` du filtre
+        // en lecture d'item et de laisser le `security:` decider seul. C'est
+        // une decision de produit — la fonctionnalite n'a jamais ete
+        // demandee — et elle deplacerait l'isolation d'une extension Doctrine
+        // vers une expression de securite : le contraire de ce que ce projet
+        // a decide. Tant qu'elle n'est pas prise, l'expression dit la verite.
+        //
+        // `ModeleExposeTest::testAucuneExpressionDeSecuriteNePrometCeQueLeFiltreInterdit`
+        // interdit desormais la rechute, sur cette entite comme sur les autres.
+        //
+        // LA COLONNE `partage` RESTE EN BASE, et le champ avec : la retirer
+        // demande une migration, donc une modification sous `db/`, hors du
+        // perimetre de cette correction. Elle n'est lue par personne.
+        new Get(security: "object.getUtilisateur() == user"),
         new Post(processor: ProprietaireProcessor::class),
         new Patch(security: "object.getUtilisateur() == user", processor: ProprietaireProcessor::class),
         new Delete(security: "object.getUtilisateur() == user"),
@@ -58,6 +82,21 @@ class Modele implements ProprieteUtilisateur
     #[Groups(['modele:lire', 'modele:ecrire'])]
     private ?string $type = null;
 
+    /**
+     * CE DRAPEAU N'A AUCUN EFFET (constat F-05, 15 septembre 2026).
+     *
+     * Il se lit et s'ecrit, mais plus rien ne le CONSULTE : la seule
+     * expression qui s'en servait — le `security:` de l'operation `Get` —
+     * ne pouvait pas s'appliquer, `FiltreProprietaire` ayant deja pose
+     * « WHERE utilisateur = :moi » avant elle. Un modele « partage » restait
+     * introuvable pour les autres comptes, et le reste.
+     *
+     * IL EST CONSERVE, ET CE N'EST PAS UN OUBLI : le front l'envoie a chaque
+     * creation (`front/src/api/hooks/seances.ts`) et son type le declare. Le
+     * retirer des groupes casserait l'ecran ; retirer la colonne demanderait
+     * une migration. Les deux sont a faire ENSEMBLE le jour ou l'on tranche,
+     * pas a moitie aujourd'hui.
+     */
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     #[Groups(['modele:lire', 'modele:ecrire'])]
     private bool $partage = false;
