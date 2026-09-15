@@ -24,15 +24,21 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * personnel — « Reeducation epaule Dr X » — et l'etiquette le promettait sans
  * le tenir. C'est ici que la promesse devient vraie.
  *
- * `creePar` n'est dans aucun groupe de denormalisation : le client ne peut pas
- * le transmettre, il vient du jeton. `public` en revanche EST ecrivable, parce
- * que le PATCH d'administration s'en sert pour publier — on l'ecrase donc a la
- * creation, sans quoi la confidentialite dependrait de ce que le client envoie.
+ * NI `creePar` NI `public` NE SONT ECRIVABLES : aucun des deux n'a de groupe de
+ * denormalisation. Le client ne peut donc transmettre ni l'un ni l'autre, et la
+ * confidentialite ne depend pas de ce qu'il envoie.
  *
- * PUBLIER SANS EFFACER L'AUTEUR. Sur un PATCH, l'exercice arrive charge depuis
- * la base avec son `creePar` : le garde `null ===` fait que rien n'est touche,
- * et le `public: true` de l'administrateur passe. Le catalogue commun
- * s'enrichit, la paternite reste.
+ * CE COMMENTAIRE A DIT LE CONTRAIRE, ET C'ETAIT FAUX. Il annoncait « `public`
+ * en revanche EST ecrivable, parce que le PATCH d'administration s'en sert pour
+ * publier ». Verifie le 15 septembre 2026 : `public` n'a aucun `#[Groups]`.
+ * CE MECANISME DE PUBLICATION N'EXISTE PAS. Un exercice cree depuis
+ * l'application reste prive, et rien dans l'API ne peut le verser au catalogue
+ * commun — il faudrait pour cela exposer `public` en ecriture, ce qui demande
+ * d'abord de decider QUI a le droit de publier. Non tranche, donc non fait.
+ *
+ * `FiltreExercice` dit « public OU le mien » et sait donc lire un exercice
+ * publie-mais-attribue. Cette troisieme possibilite est prevue par la lecture ;
+ * elle n'a simplement aucun moyen de naitre aujourd'hui.
  */
 final readonly class ExerciceProcessor implements ProcessorInterface
 {

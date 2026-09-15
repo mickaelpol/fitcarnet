@@ -6,6 +6,8 @@ namespace App\Tests;
 
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Operation;
+use App\Entity\Aliment;
+use App\Entity\Exercice;
 use App\Entity\ProprieteUtilisateur;
 use PHPUnit\Framework\TestCase;
 
@@ -225,6 +227,42 @@ final class ModeleExposeTest extends TestCase
         }
 
         return $expressions;
+    }
+
+    /**
+     * CE QU'ON CREE, ON DOIT POUVOIR LE CORRIGER.
+     *
+     * CONSTAT F-09, tranche le 15 septembre 2026.
+     *
+     * E8 a rendu les exercices personnels vraiment prives : `public = false`,
+     * et `FiltreExercice` les rend introuvables pour tout autre compte --
+     * l'ADMINISTRATEUR COMPRIS, puisqu'un filtre Doctrine ne connait pas les
+     * roles. Le `Patch` etant reserve a ROLE_ADMIN, l'engrenage etait complet :
+     * l'auteur voyait son exercice mal orthographie sans pouvoir le modifier,
+     * l'administrateur avait le droit mais recevait un 404. PERSONNE ne pouvait
+     * le corriger, et la ligne restait telle quelle jusqu'a un UPDATE en SQL.
+     *
+     * C'est le prix d'une bonne correction mal terminee : E8 a ferme une
+     * promesse mensongere et ouvert un blocage, faute d'avoir regarde le
+     * chemin d'ECRITURE en meme temps que celui de lecture.
+     *
+     * La regle retenue est celle d'`Aliment`, qui vit ainsi depuis toujours --
+     * pas un motif invente pour l'occasion.
+     */
+    public function testUnAuteurPeutCorrigerCeQuIlACree(): void
+    {
+        foreach ([Aliment::class, Exercice::class] as $classe) {
+            $nom = (new \ReflectionClass($classe))->getShortName();
+            $expressions = self::expressionsDeSecurite($classe);
+            $patch = $expressions['Patch'] ?? null;
+
+            self::assertNotNull($patch, "{$nom} : aucune regle de securite sur le Patch.");
+            self::assertStringContainsString(
+                'object.getCreePar() == user', $patch,
+                "{$nom} : l'auteur d'une donnee doit pouvoir la corriger. Sans cela, "
+                . 'un catalogue filtre la rend inmodifiable par tout le monde -- son '
+                . "auteur n'a pas le droit, et l'administrateur ne la voit plus.");
+        }
     }
 
     /**

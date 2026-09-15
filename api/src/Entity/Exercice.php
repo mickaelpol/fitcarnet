@@ -64,7 +64,16 @@ use Symfony\Component\Validator\Constraints as Assert;
         // C'est aussi par ici qu'un exercice personnel rejoint le catalogue :
         // `public: true`. Le processeur ne touche pas un exercice qui a déjà
         // un auteur, donc publier n'en efface pas la paternité.
-        new Patch(security: "is_granted('ROLE_ADMIN')", processor: ExerciceProcessor::class),
+        new Patch(
+            /* L'AUTEUR PEUT CORRIGER CE QU'IL A CREE — constat F-09, 15 septembre 2026.
+               E8 avait rendu les exercices personnels vraiment prives ; le Patch etant
+               reserve a ROLE_ADMIN, plus personne ne pouvait les corriger : l'auteur
+               n'avait pas le droit, et l'administrateur ne les voyait plus, `FiltreExercice`
+               etant une extension Doctrine qui ignore les roles. Meme regle qu'`Aliment`,
+               qui vit ainsi depuis toujours. */
+            security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user",
+            processor: ExerciceProcessor::class,
+        ),
     ],
     normalizationContext: ['groups' => ['exercice:lire']],
     denormalizationContext: ['groups' => ['exercice:ecrire']],

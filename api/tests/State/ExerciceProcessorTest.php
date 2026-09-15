@@ -62,16 +62,25 @@ final class ExerciceProcessorTest extends TestCase
     }
 
     /**
-     * LE MECANISME DE PUBLICATION. Sur un PATCH, le processeur ne touche a
-     * rien : c'est ainsi qu'un administrateur verse au catalogue commun
-     * l'exercice bien redige de quelqu'un, sans en effacer la paternite.
+     * SUR UN PATCH, LE PROCESSEUR NE TOUCHE A RIEN.
      *
-     * Ce test passait autrefois une operation `Post` en pretendant decrire un
-     * PATCH. Il passait quand meme, parce que le processeur regardait alors
-     * l'etat du champ et non l'operation — et c'est precisement ce qui
-     * masquait M-01. Un test qui ment sur son scenario protege le defaut.
+     * Ce test s'intitulait « un administrateur peut publier un exercice
+     * existant » et decrivait un scenario IMPOSSIBLE. Verifie le 15 septembre
+     * 2026 : `public` n'a aucun groupe de denormalisation, un administrateur ne
+     * peut donc pas l'envoyer. Le mecanisme de publication n'existe pas — le
+     * commentaire du processeur l'affirmait, a tort, et il a ete corrige.
+     *
+     * Ce que ce test garantit reellement, et qui compte : un PATCH ne
+     * reattribue pas l'exercice a celui qui le modifie. Depuis que F-09 ouvre
+     * le Patch a l'auteur ET a l'administrateur, c'est la seule chose qui
+     * empeche une correction d'emporter la paternite avec elle.
+     *
+     * Il passait autrefois une operation `Post` en pretendant decrire un PATCH,
+     * et passait quand meme parce que le processeur regardait l'etat du champ
+     * au lieu de l'operation : c'est ce qui masquait M-01. Un test qui ment sur
+     * son scenario protege le defaut.
      */
-    public function testUnAdministrateurPeutPublierUnExerciceExistant(): void
+    public function testUnPatchNeReattribuePasLExerciceACeluiQuiLeModifie(): void
     {
         $alice = new Utilisateur();
         $exercice = (new Exercice())->setNom('Souleve de terre roumain')
@@ -81,10 +90,10 @@ final class ExerciceProcessorTest extends TestCase
         $recus = [];
         self::processeur(new Utilisateur(), $recus)->process($exercice, new Patch());
 
-        self::assertTrue($exercice->isPublic(),
-            'le processeur ne doit pas defaire la publication decidee par un administrateur');
         self::assertSame($alice, $exercice->getCreePar(),
-            'publier un exercice ne doit pas en changer l\'auteur');
+            'corriger l\'exercice d\'un autre ne doit pas se l\'approprier');
+        self::assertTrue($exercice->isPublic(),
+            'et ne doit pas non plus le retirer du catalogue ou il se trouve');
     }
 
     /**
