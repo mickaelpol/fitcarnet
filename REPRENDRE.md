@@ -99,13 +99,24 @@ db/manuel/verifier-schema.sh                                          # ✓ iden
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
 
-**Si la base de développement date d'avant le 14 septembre**, joue les deux
-migrations du jour, sans quoi l'inventaire tombera sur une colonne absente :
+**Après tout `git pull` qui apporte une migration** :
 
 ```bash
-docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -q < db/manuel/30-jeton-de-lot.sql
-docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -q < db/manuel/31-index-de-jointure.sql
+db/manuel/rattraper-dev.sh
 ```
+
+> **LE DÉVELOPPEMENT NE REJOUE JAMAIS `db/manuel/`, et c'est le piège le plus
+> coûteux du projet.** `compose.dev.yml` ne monte `./db` que dans
+> `docker-entrypoint-initdb.d`, que PostgreSQL ne joue qu'à la **création du
+> volume**. La production, elle, guérit seule au redémarrage.
+>
+> Le 15 septembre 2026, l'agent de vérification bout en bout a trouvé
+> `POST /api/connexion` en **HTTP 500 pour tous les comptes** : la migration 32
+> n'était pas en base, l'insertion du jeton de rafraîchissement échouait, et
+> **l'application était entièrement inutilisable**. Les 750 tests étaient au
+> vert. Le message était un 500 opaque, jamais « il manque la migration 32 ».
+>
+> Le script est idempotent : le lancer sans raison ne coûte rien.
 
 Si l'un des deux est rouge **avant** d'avoir touché à quoi que ce soit, c'est
 que l'environnement est en cause, pas le code : le régler d'abord.

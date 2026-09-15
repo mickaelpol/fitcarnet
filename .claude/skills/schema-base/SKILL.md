@@ -86,3 +86,27 @@ Une divergence déclarative subsiste et reste **sans effet** : les entités
 déclarent `datetime_immutable` là où la base est `TIMESTAMPTZ`. Doctrine lit et
 écrit correctement ; changer le mapping ferait courir plus de risque que la
 divergence n'en pose.
+
+## Le développement ne rejoue JAMAIS `db/manuel/`
+
+`compose.dev.yml` ne monte `./db` que dans `docker-entrypoint-initdb.d`, que
+PostgreSQL ne joue qu'à la **création du volume**. Une migration écrite après
+n'atteint donc jamais la base locale. La production, elle, guérit seule :
+`entrypoint-prod.sh` les rejoue à chaque démarrage.
+
+**Après avoir écrit une migration, joue-la :**
+
+```bash
+db/manuel/rattraper-dev.sh
+```
+
+Ce que coûte l'oubli, mesuré le 15 septembre 2026 : `POST /api/connexion` en
+**HTTP 500 pour tous les comptes**, l'application entièrement inutilisable, et
+750 tests au vert. Le message était `SQLSTATE[42703]: Undefined column "vu_le"`
+— jamais « il manque la migration 32 ».
+
+**Et le glob vit dans CINQ fichiers.** `installer.sh`, `docker/entrypoint-prod.sh`,
+`db/manuel/verifier-migrations.sh`, `db/manuel/verifier-schema.sh` et
+`rattraper-dev.sh` s'arrêtent tous à `3[0-9]-*.sql`. Une migration **40** ne
+serait jouée nulle part — et `verifier-schema.sh` annoncerait « identiques »
+sans l'avoir jouée, ce qui est exactement ce qui est arrivé à la migration 30.
