@@ -7,7 +7,7 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
-    "test": "tsc --noEmit && node -e \"require('fs').rmSync('dist-tests',{recursive:true,force:true})\" && tsc -p tsconfig.tests.json && node --test \"dist-tests/**/*.test.js\"",
+    "test": "tsc --noEmit && node -e \"require('fs').rmSync('dist-tests',{recursive:true,force:true})\" && tsc -p tsconfig.tests.json && node --test \"dist-tests/**/*.test.js\" && node --import ./dist-tests/tests/environnement.js --test \"dist-tests/**/*.test-rendu.js\"",
     "verif": "tsc --noEmit"
   },
   "dependencies": {
@@ -49,9 +49,12 @@
     "@babel/plugin-transform-class-properties": "^7.29.7",
     "@babel/plugin-transform-private-methods": "^7.29.7",
     "@babel/plugin-transform-private-property-in-object": "^7.29.7",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.10.0",
     "@types/react": "~19.1.10",
     "babel-preset-expo": "^54.0.12",
+    "global-jsdom": "^29.0.0",
+    "jsdom": "^29.1.1",
     "typescript": "~5.9.2"
   },
   "private": true

@@ -14,6 +14,13 @@
     "module": "CommonJS",
     "strict": true,
     "esModuleInterop": true,
+    // `jsx` etait absent, et son absence servait de garde-fou : un module pur
+    // ne pouvait RIEN importer d'un .tsx, meme un type (TS6142). Il faut
+    // l'activer pour compiler un test de rendu — voir src/tests/environnement.ts.
+    // CE QUE ÇA COUTE : plus rien n'empeche un .test.ts d'importer une VALEUR
+    // depuis un .tsx, et ca ne se verra plus au typage mais a l'execution, en
+    // erreur de syntaxe Flow au fond de react-native.
+    "jsx": "react-jsx",
     "skipLibCheck": true,
     "types": [
       "node"
@@ -28,6 +35,17 @@
     "rootDir": "src"
   },
   "include": [
-    "src/**/*.test.ts"
+    "src/**/*.test.ts",
+    // LES TESTS DE RENDU PORTENT UN AUTRE SUFFIXE, ET CE N'EST PAS COSMETIQUE.
+    // `npm test` lance DEUX fois `node --test` : les tests purs nus, les tests
+    // de rendu derriere `--import .../environnement.js`. Le motif `*.test.js`
+    // ne peut pas attraper `*.test-rendu.js`, et c'est exactement ce qu'on veut :
+    // donner un `window` aux 548 tests purs ferait basculer TanStack Query en
+    // mode navigateur (gcTime 5 min au lieu d'Infinity) et api/persistance.test.ts
+    // ne rendrait plus jamais la main. Mesure du 15 septembre 2026.
+    "src/**/*.test-rendu.tsx",
+    // l'environnement de rendu : precharge par `node --import`, donc importe
+    // par aucun test, donc invisible des motifs ci-dessus.
+    "src/tests/**/*.ts"
   ]
 }
