@@ -23,13 +23,12 @@
  * de quinze lettres qui ne dépend d'aucun moteur. La fusion s'aligne sur elle,
  * pas sur `normalize`.
  *
- * DEUX TABLES IDENTIQUES POUR L'INSTANT. `cuisson.ts` garde la sienne : la
- * fusion des quatre copies et la réécriture de `cleDHabitude` sont deux
- * chantiers, et `cleDHabitude` est le seul identifiant partagé par les deux
- * frigos — on n'y touche pas dans le même geste. Tant que les deux tables
- * coexistent, toute lettre ajoutée ici doit l'être là-bas, et
- * `texte.test.ts` vérifie que les deux fonctions rendent la même chose sur un
- * nom sans ponctuation.
+ * UNE SEULE TABLE, ET C'EST ACQUIS. `cuisson.ts` avait la sienne, identique ;
+ * elle a ete fusionnee le 15 septembre 2026 apres verification que les 29
+ * entrees concordaient. `habitudesCuisson.ts` importe `SANS_ACCENT` d'ici.
+ *
+ * Ce bandeau annoncait « DEUX TABLES IDENTIQUES POUR L'INSTANT » et demandait
+ * de reporter toute lettre ajoutee des deux cotes. C'etait vrai une heure.
  */
 export const SANS_ACCENT: Record<string, string> = {
   à: 'a', â: 'a', ä: 'a', á: 'a', ã: 'a', å: 'a',

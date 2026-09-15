@@ -52,9 +52,9 @@ quatre `TypeError` en puissance, Hermes ne l'implémentant pas partout. Le modul
 s'aligne sur la **table manuelle**, jamais sur `normalize` — et son test retire
 `String.prototype.normalize` du prototype pour qu'une rechute tombe ici.
 
-Deux restes notés : la table est écrite deux fois (`texte.ts` et `cuisson.ts` ;
-`SANS_ACCENT` est exporté pour que la fusion tienne en une ligne), et une
-**sixième copie** vit dans `src/solveur/garanties.test.ts:394`.
+Les deux restes signalés le 15 au matin **sont réglés** : la table ne vit plus
+qu'ici (`cuisson.ts` l'importe), et la sixième copie de `garanties.test.ts` a été
+remplacée par un import. Vérifié : une seule définition dans tout le front.
 
 ## Les tests
 

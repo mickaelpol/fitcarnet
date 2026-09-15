@@ -58,12 +58,20 @@ use Symfony\Component\Validator\Constraints as Assert;
         // de kilooctets que personne n'affiche, a chaque chargement.
         new Get(normalizationContext: ['groups' => ['exercice:lire', 'exercice:detail']]),
         new Post(security: "is_granted('ROLE_USER')", processor: ExerciceProcessor::class),
-        // renseigner une vidéo ou un nom français relève de l'administration :
-        // le catalogue est commun, une erreur s'afficherait pour tout le monde.
+        // Corriger un exercice : l'administrateur pour le catalogue commun,
+        // l'auteur pour le sien (F-09, voir la clause juste en dessous).
         //
-        // C'est aussi par ici qu'un exercice personnel rejoint le catalogue :
-        // `public: true`. Le processeur ne touche pas un exercice qui a déjà
-        // un auteur, donc publier n'en efface pas la paternité.
+        // CE COMMENTAIRE DISAIT TROIS CHOSES FAUSSES, relevees par la revue le
+        // 15 septembre 2026. Il annoncait que le Patch « releve de
+        // l'administration » -- la clause l'ouvre a l'auteur depuis F-09 ; qu'un
+        // exercice rejoint le catalogue « par ici, `public: true` » -- `public`
+        // n'a aucun groupe de serialisation, CE MECANISME N'EXISTE PAS ; et que
+        // « le processeur ne touche pas un exercice qui a deja un auteur », qui
+        // est la formulation exacte du bug M-01, remplace par
+        // `$operation instanceof Post`.
+        //
+        // Le processeur voisin a ete corrige et celui-ci oublie : le jumeau
+        // oublie, applique aux commentaires.
         new Patch(
             /* L'AUTEUR PEUT CORRIGER CE QU'IL A CREE — constat F-09, 15 septembre 2026.
                E8 avait rendu les exercices personnels vraiment prives ; le Patch etant

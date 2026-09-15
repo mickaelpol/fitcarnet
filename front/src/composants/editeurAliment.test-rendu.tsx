@@ -26,9 +26,8 @@ import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { EditeurAliment, type AlimentSaisi } from './editeurAliment';
 
-/** Le skyr tel que l'écran le reçoit : fibres inconnues, à corriger. */
-const skyr = (): AlimentSaisi => ({
-  id: 7, nom: 'Skyr nature', categorie: 'prot',
+/** Un aliment tel que l'écran le reçoit : fibres inconnues, à corriger. */
+const alimentNomme = (nom: string): AlimentSaisi => ({ nom, categorie: 'prot',
   kcal100: 63, prot100: 11, gluc100: 4, lip100: 0.2, fibres100: null,
   ratio: 1, peseeAvant: null, peseeApres: null,
 });
@@ -36,8 +35,15 @@ const skyr = (): AlimentSaisi => ({
 /**
  * Un parent qui se comporte comme le vrai : il RECONSTRUIT l'objet `aliment`
  * à chaque rendu, au lieu de le mémoïser. C'est tout le piège.
+ *
+ * ON DISTINGUE LES ALIMENTS PAR LEUR NOM, ET C'EST VOULU. Ce parent passait
+ * un `id` numérique — un scénario que l'écran ne peut PAS produire : le seul
+ * appelant réel, `versSaisie`, construit son objet depuis un
+ * `AlimentDisponible`, qui porte une `reference` (« grocy:12 ») et jamais
+ * d'`id`. Le témoin prouvait donc quelque chose d'inatteignable. Relevé par la
+ * revue le 15 septembre 2026.
  */
-function Parent({ id }: { id: number }) {
+function Parent({ nom }: { nom: string }) {
   const [, redessiner] = useState(0);
 
   return (
@@ -47,7 +53,7 @@ function Parent({ id }: { id: number }) {
       </button>
       <EditeurAliment
         visible
-        aliment={{ ...skyr(), id }}
+        aliment={alimentNomme(nom)}
         onEnregistrer={() => undefined}
         onFermer={() => undefined}
       />
@@ -63,7 +69,7 @@ const champFibres = () => screen.getByPlaceholderText('—') as HTMLInputElement
    lieu d'échouer sur ce qu'il mesure. Une cascade masque toujours la cause. */
 test('la saisie survit à un rendu du parent qui reconstruit l’aliment', (t: TestContext) => {
   t.after(cleanup);
-  const { rerender } = render(<Parent id={7} />);
+  const { rerender } = render(<Parent nom="Skyr nature" />);
 
   fireEvent.change(champFibres(), { target: { value: '3,2' } });
   assert.equal(champFibres().value, '3,2');
@@ -71,7 +77,7 @@ test('la saisie survit à un rendu du parent qui reconstruit l’aliment', (t: T
   // le parent se redessine tout seul : c'est le battement de l'inventaire
   fireEvent.click(screen.getByText('rendu du parent'));
   // et il se redessine aussi parce qu'on le lui demande d'au-dessus
-  rerender(<Parent id={7} />);
+  rerender(<Parent nom="Skyr nature" />);
 
   assert.equal(champFibres().value, '3,2',
     'la saisie en cours a été écrasée par un simple rendu du parent');
@@ -79,7 +85,7 @@ test('la saisie survit à un rendu du parent qui reconstruit l’aliment', (t: T
 
 test('un autre aliment repart bien de ses propres valeurs', (t: TestContext) => {
   t.after(cleanup);
-  const { rerender } = render(<Parent id={7} />);
+  const { rerender } = render(<Parent nom="Skyr nature" />);
 
   fireEvent.change(champFibres(), { target: { value: '3,2' } });
   assert.equal(champFibres().value, '3,2');
@@ -88,7 +94,7 @@ test('un autre aliment repart bien de ses propres valeurs', (t: TestContext) => 
      formulaire DOIT se recharger. Sans ce second témoin, « ne pas écraser la
      saisie » se corrigerait en supprimant l'effet — et l'écran garderait les
      valeurs de l'aliment précédent, ce qui est bien pire. */
-  rerender(<Parent id={8} />);
+  rerender(<Parent nom="Fromage blanc" />);
 
   assert.equal(champFibres().value, '',
     'changer d’aliment doit repartir des valeurs du nouveau');

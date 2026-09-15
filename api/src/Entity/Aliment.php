@@ -34,8 +34,13 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Post(security: "is_granted('ROLE_USER')", processor: AlimentProcessor::class),
         // Chacun corrige ses propres aliments ; l'administrateur reste seul
         // a pouvoir toucher aux 50 de reference, qui n'appartiennent a personne.
-        // Meme processeur qu'a la creation : il ne pose le proprietaire que
-        // s'il manque, et rattrape le doublon de nom pour les deux operations.
+        // Meme processeur qu'a la creation, mais il regarde l'OPERATION et non
+        // l'etat du champ : `$operation instanceof Post`. Ce commentaire disait
+        // « il ne pose le proprietaire que s'il manque » -- la formulation exacte
+        // du bug M-01, ou corriger un aliment commun se l'appropriait et le
+        // retirait a tout le monde. Corrige le 14 septembre 2026, commentaire
+        // rectifie le 15. Il rattrape aussi le doublon de nom, aux deux
+        // operations.
         new Patch(
             security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user",
             processor: AlimentProcessor::class,

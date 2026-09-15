@@ -134,3 +134,15 @@ Table_Ciqual_2025.xlsx
 noms-exercices.txt
 carnet*.json
 pictogrammes-muscles.zip
+
+# Copie du build web servie par Caddy en developpement : compose.dev.yml monte
+# ./api:/app, et le Caddyfile sert le front depuis /app/front. Ce dossier est un
+# DOUBLON de front/dist -- 8,5 Mo -- pose pour faire tourner le dev.
+#
+# Il ne doit JAMAIS etre commite : le depot versionne front/dist, et lui seul.
+# Un `git add -A` sans cette ligne y verse 8,5 Mo de build en double.
+#
+# Piege releve par la revue le 15 septembre 2026 : un `npm run build:web`
+# laisse api/front PERIME, et le developpement sert alors silencieusement
+# l'ancien bundle. Le recopier apres chaque build.
+/api/front/

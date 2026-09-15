@@ -13,6 +13,13 @@ import {
 } from '@/solveur/composer';
 import type { Aliment } from '@/solveur/types';
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
+/* KCAL_FIBRES ET NON 2 -- releve par la revue le 15 septembre 2026.
+   Le coefficient etait ecrit a la main ici, cinquieme copie d'un nombre que F6
+   venait justement de rapatrier dans nutrition.ts le meme jour. Il a voyage tel
+   quel de repas.tsx vers ce fichier au moment de l'extraction. La valeur etait
+   juste ; c'est la copie qui pouvait diverger, et la convention europeenne des
+   fibres est precisement le genre de chiffre qu'on ne veut pas voir diverger. */
+import { KCAL_FIBRES } from '@/calcul/nutrition';
 
 /**
  * LA CARTE D'UN REPAS — ce qu'on pèse, ce qu'on sert, ce qu'on corrige.
@@ -243,7 +250,7 @@ export function CarteRepas({
               dont {nb(fibres / portions)} g de fibres
               {cible.glucidesTotaux === true
                 ? ', comprises dans la cible en glucides'
-                : `, soit ${nb((fibres * 2) / portions)} kcal hors cible`}
+                : `, soit ${nb((fibres * KCAL_FIBRES) / portions)} kcal hors cible`}
             </Discret>
           )}
 

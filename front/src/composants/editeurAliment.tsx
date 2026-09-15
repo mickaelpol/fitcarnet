@@ -145,11 +145,20 @@ export function EditeurAliment({
      n'héritera pas du piège. C'est la leçon d'É1 — le contrôle va au point de
      passage obligé, pas devant chaque porte.
 
-     `id` suffit à dire « c'est un autre aliment ». Un contenu qui change sans
-     que l'identité change, c'est justement le rechargement dont il ne faut
-     PAS écraser la saisie ; et à l'ouverture, `visible` passe à vrai, donc le
-     formulaire part bien des données fraîches. */
-  const identite = aliment?.id ?? null;
+     CE QUI IDENTIFIE UN ALIMENT ICI, ET POURQUOI PAS SEULEMENT `id`.
+     Relevé le 15 septembre 2026 par la revue : `versSaisie`, le seul appelant
+     réel, ne renseigne PAS `id` — un `AlimentDisponible` porte une `reference`
+     (« grocy:12 », « base:47 »), pas un identifiant numérique. `aliment?.id`
+     valait donc toujours `null` en production, et cette dépendance était
+     inerte : seul `visible` faisait rejouer l'effet.
+
+     Ça marchait, parce que `frigo.tsx` remet `edite` à `null` avant toute
+     réouverture. Mais rien ne l'impose : un écran qui passerait de A à B sans
+     repasser par `null` afficherait le titre de B et les valeurs de A, en
+     silence. Le nom sert donc de repli — il identifie l'aliment aussi bien, il
+     est toujours présent, et il ne change pas pendant la saisie puisque c'est
+     la PROP, pas l'état local du formulaire. */
+  const identite = aliment?.id ?? aliment?.nom ?? null;
 
   useEffect(() => {
     if (visible) {
