@@ -5,12 +5,18 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 15 septembre 2026, tard** — **les 84 constats de
-l'audit sont traités, les huit lots clos**. Les trois agents de contrôle ont
-été lancés sur l'ensemble et ont trouvé trois choses qu'aucun test ne voyait
-(voir plus bas). L'application est éprouvée dans un vrai navigateur, écran par
-écran, et contre le vrai Grocy. Le dossier de présentation client est prêt ; il
-ne reste qu'à tourner les vidéos.
+**Dernière mise à jour : 16 septembre 2026** — l'inventaire des fonctionnalités
+écrit par le propriétaire a été passé en revue, **quinze fiches** et **deux
+agents** en sont nés, et l'épreuve sur émulateur Android a trouvé que le
+sélecteur de mode tout juste ajouté au modèle **ne commandait rien** (voir
+« Le mode de travail se choisit aussi dans un modèle », plus bas). Corrigé.
+
+**Avant cela, le 15 septembre au soir** : **les 84 constats de l'audit sont
+traités, les huit lots clos**. Les trois agents de contrôle ont été lancés sur
+l'ensemble et ont trouvé trois choses qu'aucun test ne voyait (voir plus bas).
+L'application est éprouvée dans un vrai navigateur, écran par écran, et contre
+le vrai Grocy. Le dossier de présentation client est prêt ; il ne reste qu'à
+tourner les vidéos.
 
 ---
 
@@ -22,7 +28,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **600 tests front** (577 + 23 de rendu) · **252 API · 661 assertions**, 7 erreurs PHPStan
+État : **605 tests front** (577 + 28 de rendu) · **252 API · 661 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -97,7 +103,7 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 577 + 23 tests, 0 echec
+cd front && npm test                                                  # 577 + 28 tests, 0 echec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 252 tests, 661 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
@@ -889,6 +895,48 @@ s'enregistre bien `iso` ; un mode inconnu reçoit **422**.
 > cette version de react-native-web. Seule la forme `aria-checked={…}` en clair
 > sort dans le rendu — et React Native 0.71+ la retraduit côté natif. **Lire le
 > HTML réellement rendu** plutôt que supposer : c'est ce qui a tranché.
+
+#### Et l'épreuve Android a montré que ce sélecteur ne commandait rien
+
+**C'est le meilleur argument pour l'agent `verification-android` : tout était au
+vert sans lui.** Le mode se choisissait, partait en base (`modele_exercice.mode
+= iso`, relu après un redémarrage à froid d'Expo Go), l'API l'acceptait, les
+tests passaient — et après bascule en « Tenue », les quatre lignes de série
+affichaient toujours **« — kg » et « 12 rép »**. Capture à l'appui. La
+justification même de la modification — « un programme de gainage prescrivait
+des kilos là où il faut des secondes » — n'était donc pas tenue :
+`ModeleSerie.secondesCible` existait dans le type et dans la table **sans être
+saisissable nulle part**.
+
+Le jumeau oublié, une fois encore : `LigneSerie` bascule depuis toujours
+(`mode === 'charge' || mode === 'chrono'` contre `mode === 'iso'`), son jumeau
+du modèle n'avait jamais reçu la règle.
+
+**Corrigé le 16 septembre 2026**, en TDD, les deux témoins vus rouges d'abord
+(« en Tenue, on prescrit des secondes » et la durée remontée dans
+`secondesCible`). Les champs sont **sortis vers `src/composants/serieModele.tsx`**
+— pas seulement pour alléger l'écran : tant qu'ils vivaient dans `app/`, aucun
+test ne pouvait les voir. Cinq tests de rendu, dont **le témoin inverse** : en
+« Chrono », les répétitions et les kilos restent, parce qu'un « for time » se
+note aussi en charge. Et **basculer de mode ne jette pas ce qui était saisi** :
+un aller-retour Charge → Tenue → Charge rend les kilos (règle 6).
+
+Le bouton « × » de ces lignes a reçu au passage le libellé que son jumeau de la
+séance avait depuis la veille — sans lui, un lecteur d'écran annonce « signe
+multiplication », ou rien.
+
+**Ce que l'épreuve a confirmé par ailleurs** : l'écran de séance bascule bien
+(colonnes `rép`/`kg` remplacées par les chronomètres en « Tenue », puis
+« Temps total · Go » en « Chrono », `mode` à jour en base à chaque fois), et le
+raccourci « ↓ 12×14 · … » reste à côté des modes dans les trois états — **sans
+devenir un décor permanent** : sur la séance la plus ancienne, qui n'a pas de
+précédente, il est absent (contre-épreuve faite).
+
+> **Et une confirmation, qui n'est pas un défaut** : chaque `PATCH /api/seances`
+> recrée les `seance_exercice` (122/123/124 → 127/128/129). C'est le
+> comportement documenté plus haut — « lu et écrit en UN SEUL objet complet ».
+> Rien ne référence ces identifiants dans la durée. À savoir avant de croire
+> à une perte de données.
 
 ---
 

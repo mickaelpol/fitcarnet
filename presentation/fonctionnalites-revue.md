@@ -58,15 +58,15 @@ debout.
 | Ta ligne | Verdict | Précision |
 |---|---|---|
 | Modèles réutilisables | ✓ | `modele/[id].tsx` |
-| Type Push / Pull / Legs et nom libre | ✓ | le type filtre le catalogue proposé. `modele/[id].tsx:196` |
+| Type Push / Pull / Legs et nom libre | ✓ | le type filtre le catalogue proposé. `modele/[id].tsx:206` |
 | Ordre et réagencement | ✓ | poignée ou flèches, aide affichée dès 2 exercices |
-| Plusieurs modes de travail (charge / tenue / chrono) | ✗ | **à trancher.** Le modèle STOCKE bien un mode, mais il est repris du mode par défaut de l'exercice au moment de l'ajout (`mode: ex.modeDefaut`, `modele/[id].tsx:86`). **Aucun sélecteur n'existe dans l'écran du modèle** : le sélecteur Charge/Tenue/Chrono ne vit que dans la séance (`exerciceSeance.tsx:14,168`). Soit on l'ajoute au modèle, soit on retire la ligne. |
+| Plusieurs modes de travail (charge / tenue / chrono) | ✓ **depuis le 16 septembre 2026** | ~~À trancher : le modèle stockait bien un mode, mais repris du mode par défaut de l'exercice au moment de l'ajout, et aucun sélecteur n'existait dans son écran.~~ **Tranché : ajouté.** Le sélecteur de la séance est extrait dans `src/composants/choixMode.tsx` et partagé par les deux écrans. Et, l'épreuve sur Android l'ayant montré muet, **les champs de série suivent maintenant le mode** : des secondes en « Tenue », des répétitions et des kilos en « Charge » et « Chrono » (`src/composants/serieModele.tsx`). |
 
 ### Ce qui manque dans ton document, onglet Modèles
 
-- **Séries cibles par exercice** dans le modèle : répétitions et charge, ajout et suppression — ce sont elles qui pré-remplissent la séance. `modele/[id].tsx:141`
+- **Séries cibles par exercice** dans le modèle : répétitions et charge — ou une durée en mode « Tenue » —, ajout et suppression : ce sont elles qui pré-remplissent la séance. `front/src/composants/serieModele.tsx:31-86`, appelé en `modele/[id].tsx:160-175`
 - **Propager l'ordre aux séances** : on annonce d'abord combien de séances l'adopteraient, « y compris les anciennes. Seul l'affichage change ». `OrdreModeleProcessor.php:32`
-- **Suppression d'un modèle** : « Tes séances passées ne sont pas touchées. » `modele/[id].tsx:247`
+- **Suppression d'un modèle** : « Tes séances passées ne sont pas touchées. » `modele/[id].tsx:310`
 - **Le partage d'un modèle n'existe pas** — décision du 15 septembre 2026, le champ a été retiré. Un modèle n'appartient qu'à son compte.
 
 ---
@@ -226,7 +226,11 @@ sans lire le contexte.
    à corriger.
 2. **Le mode de travail devient choisissable dans un modèle.** Le sélecteur
    Charge / Tenue / Chrono de la séance est extrait dans un composant partagé et
-   rendu aussi dans l'éditeur de modèle — plutôt que recopié.
+   rendu aussi dans l'éditeur de modèle — plutôt que recopié. **Et il commande
+   ce qu'on prescrit** : l'épreuve sur émulateur Android a trouvé qu'après
+   bascule en « Tenue », les lignes de série affichaient encore « — kg » et
+   « 12 rép ». Les champs sont sortis vers `src/composants/serieModele.tsx`,
+   testables, et donnent des secondes en « Tenue ».
 3. **Les fiches suivent le découpage en 15 fonctionnalités**, une par fonction
    perçue, pour des captures vidéo courtes et ciblées.
 

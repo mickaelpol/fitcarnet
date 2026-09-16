@@ -6,7 +6,7 @@ import {
 } from '@/api/hooks';
 import type { Exercice, Modele, ModeleExercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
-import { ChampNombre } from '@/composants/champNombre';
+import { SerieModele } from '@/composants/serieModele';
 import { ChoixMode, type ModeTravail } from '@/composants/choixMode';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
@@ -123,6 +123,10 @@ export default function DetailModele() {
 
   const carte = (bloc: ModeleExercice, i: number, poignee: ReactNode) => {
     const ex = parId.get(idDe(bloc.exercice));
+    /* Un seul endroit où se lit le mode : il commande à la fois le sélecteur et
+       ce que les lignes de série prescrivent. Deux lectures séparées, c'est déjà
+       deux chances de diverger. */
+    const mode = (bloc.mode ?? ex?.modeDefaut ?? 'charge') as ModeTravail;
 
     return (
       <Carte style={{ gap: E.s }}>
@@ -145,45 +149,29 @@ export default function DetailModele() {
             programme de gainage restait en « Charge » et son modèle prescrivait
             des kilos là où il faut des secondes. Le sélecteur est celui de la
             séance, partagé et non recopié. */}
-        <ChoixMode
-          mode={(bloc.mode ?? ex?.modeDefaut ?? 'charge') as ModeTravail}
-          onChange={(m) => majBloc(i, { ...bloc, mode: m })}
-        />
+        <ChoixMode mode={mode} onChange={(m) => majBloc(i, { ...bloc, mode: m })} />
 
+        {/* LES CHAMPS DE SÉRIE SUIVENT LE MODE DEPUIS LE 16 SEPTEMBRE 2026, et
+            ils sont sortis vers `src/` pour cela : l'éprouve sur émulateur
+            Android a montré qu'après bascule en « Tenue », ces lignes
+            affichaient encore « — kg » et « 12 rép ». Le mode partait en base,
+            la prescription qu'il commande ne suivait pas. Un test posé ici, dans
+            `app/`, n'aurait jamais été exécuté (voir `tsconfig.tests.json`). */}
         {bloc.series.map((serie, j) => (
-          <View key={j} style={s.serie}>
-            <Discret style={{ width: 22 }}>{j + 1}</Discret>
-            {/* Les jumeaux des champs de `LigneSerie`, et le même défaut : la
-                virgule effacée pendant la frappe, `|| 0` pour l'illisible — et
-                ici en plus `nb()`, qui arrondissait 42,25 en « 42.3 » dans le
-                champ même. Corrigés ensemble le 15 septembre 2026. */}
-            <ChampNombre
-              valeur={serie.repsCible}
-              onChange={(n) => majBloc(i, {
-                ...bloc,
-                series: bloc.series.map((x, k) => (k === j ? { ...x, repsCible: n } : x)),
-              })}
-              entier
-              placeholder="—" unite="rép" style={{ flex: 1 }}
-            />
-            <ChampNombre
-              valeur={serie.poidsCible}
-              onChange={(n) => majBloc(i, {
-                ...bloc,
-                series: bloc.series.map((x, k) => (k === j ? { ...x, poidsCible: n } : x)),
-              })}
-              placeholder="—" unite="kg" style={{ flex: 1 }}
-            />
-            <Pressable
-              onPress={() => majBloc(i, {
-                ...bloc,
-                series: bloc.series.filter((_, k) => k !== j).map((x, k) => ({ ...x, ordre: k })),
-              })}
-              style={s.sup}
-            >
-              <Discret style={{ fontSize: T.grand }}>×</Discret>
-            </Pressable>
-          </View>
+          <SerieModele
+            key={j}
+            serie={serie}
+            mode={mode}
+            index={j}
+            onChange={(s) => majBloc(i, {
+              ...bloc,
+              series: bloc.series.map((x, k) => (k === j ? s : x)),
+            })}
+            onSupprimer={() => majBloc(i, {
+              ...bloc,
+              series: bloc.series.filter((_, k) => k !== j).map((x, k) => ({ ...x, ordre: k })),
+            })}
+          />
         ))}
 
         <View style={{ flexDirection: 'row', gap: E.s }}>
@@ -355,8 +343,6 @@ const s = StyleSheet.create({
   },
   typeTexte: { fontFamily: P.chiffre, fontSize: T.grand, textTransform: 'uppercase', color: C.attenue },
   tete: { flexDirection: 'row', alignItems: 'center', gap: E.xs, minHeight: TOUCHE },
-  serie: { flexDirection: 'row', alignItems: 'center', gap: E.s },
-  sup: { width: 32, minHeight: TOUCHE, alignItems: 'center', justifyContent: 'center' },
   ajouterSerie: {
     borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.ligne, borderRadius: R.s, flex: 1,
   },
