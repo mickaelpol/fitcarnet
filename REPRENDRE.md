@@ -1076,6 +1076,43 @@ Il a aussi trouvé **quatorze renvois `fichier:ligne` faux** dans
 
 ---
 
+## Le graphe relie enfin les constats au code qui les porte
+
+**16 septembre 2026.** `FiltreExercice` avait dix arêtes, **toutes vers du code**,
+et aucune vers le constat que son propre en-tête nomme en clair (« POURQUOI CETTE
+CLASSE EXISTE — constat E8 / F-04 »). Deux passes ont comblé ça :
+
+1. **`api/src` passe désormais par l'extraction sémantique**, pas seulement l'AST
+   (règle inscrite dans `CLAUDE.md`). 61 fichiers, 233 nœuds, dont 58 de
+   *rationale*. **Relancer l'AST dans la même passe est obligatoire** : sans lui,
+   la fusion remplace les nœuds structurels par les seuls nœuds sémantiques et
+   `api/src` perd ses méthodes et ses appels.
+2. **Une passe déterministe relie les codes de constat cités en commentaire au
+   nœud correspondant** — 67 arêtes `references`, sans LLM, gratuite.
+
+### Le piège, et il coûtera à qui le refera
+
+**Le projet emploie DEUX numérotations qui se recouvrent.** Le graphe les
+distingue par un suffixe que le code n'écrit jamais :
+
+| Écrit dans le code | Peut désigner | Ce qui tranche |
+|---|---|---|
+| `E1` | `E1` (inventaire, README) **ou** `E1 front` (deux 1RM) | le **sujet de la ligne**, rien d'autre |
+| `E2` | `E2` (25-garde-fous.sql) **ou** `E2 front` (liste de courses) | idem |
+| `F4` vs `F-04` | séries différentes | le **trait d'union** |
+| `E-01`, `M-0N`, `C2`, `D1`–`D10` | une seule cible | sans ambiguïté |
+
+Deux heuristiques ont été essayées et **sont fausses** : « fichier sous `front/`
+→ nœud *front* » (`client.ts` et `editeurAliment.tsx` citent « la leçon d'É1 » en
+parlant du **contrôle au point de passage obligé**, donc de l'inventaire), et
+« accent É → série README » (`demandeRepas` écrit `É2` pour la liste de courses,
+donc pour `E2 front`). Les six cas ambigus ont été résolus **en lisant leur ligne
+une par une** ; ils sont inscrits en dur dans la passe.
+
+Résultat : 7 065 arêtes, et `E8 → FiltreExercice.php → FiltreExercice`.
+
+---
+
 ## Le tri de la documentation — ce qui a disparu, et pourquoi
 
 **16 septembre 2026.** 76 fichiers de documentation passés en revue, compteurs
