@@ -188,9 +188,9 @@ Chaque commande doit donner **au moins** ce résultat — ce sont les chiffres d
 7 septembre 2026 ; ils ne peuvent que monter.
 
 ```bash
-cd front && npm test                    # 588 tests, puis 29 de rendu, 0 échec
+cd front && npm test                    # 591 tests, puis 29 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
-                                        # 252 tests, 661 assertions
+                                        # 257 tests, 671 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
                                         # 7 erreurs connues, aucune régression
 docker pull postgres:16                 # l'image des deux scripts ci-dessous (451 Mo),

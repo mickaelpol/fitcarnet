@@ -249,8 +249,8 @@ Slides 18 à 23. Les chiffres, tels quels :
 
 | | |
 |---|---|
-| Tests front | **617** (588 purs + 29 de rendu) |
-| Tests API | **252**, 661 assertions, sans base ni noyau |
+| Tests front | **620** (591 purs + 29 de rendu) |
+| Tests API | **257**, 671 assertions, sans base ni noyau |
 | Audit de septembre 2026 | **84 constats** (3 critiques, 15 élevés), **8 lots, tous clos** |
 | Catalogue d'exercices | ~1 338 entrées |
 | Inventaire des capacités | **288**, chacune avec fichier et ligne |

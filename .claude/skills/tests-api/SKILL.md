@@ -6,7 +6,7 @@ description: Comment on teste l'API de fitcarnet — PHPUnit sans base ni noyau,
 # Tester l'API de fitcarnet
 
 `cd api && bin/phpunit` — ou `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'`
-si `vendor/` n'est pas installé côté hôte. **252 tests, 661 assertions** au
+si `vendor/` n'est pas installé côté hôte. **257 tests, 671 assertions** au
 15 septembre 2026 au soir ; ce chiffre ne peut que monter.
 
 **La suite tourne sans base de données et sans noyau Symfony, et doit le rester.**

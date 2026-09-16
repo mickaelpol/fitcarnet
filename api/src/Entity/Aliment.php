@@ -12,12 +12,14 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Service\RendementPlausible;
 use App\State\AlimentProcessor;
 use App\State\AlimentSuppressionProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
  * Referentiel COMMUN. Valeurs pour 100 g DU PRODUIT TEL QU'ON LE PESE — riz sec,
@@ -217,4 +219,37 @@ class Aliment
     public function getCreePar(): ?Utilisateur { return $this->creePar; }
     public function setCreePar(?Utilisateur $u): self { $this->creePar = $u; return $this; }
     public function getCreeLe(): \DateTimeImmutable { return $this->creeLe; }
+
+    /**
+     * LE RENDEMENT VA-T-IL DANS LE BON SENS ? — pose sur l'ENTITE depuis le
+     * 16 septembre 2026, et plus seulement sur l'ecran.
+     *
+     * `POST /api/aliments` avec un feculent a 0,8 rendait un HTTP 500 portant
+     * la requete SQL et la ligne entiere, UUID du proprietaire compris : la
+     * contrainte `aliment_ratio_sens` faisait son travail, mais en derniere
+     * ligne et sans un mot pour l'appelant. Le correctif pose le matin meme
+     * avait grise le bouton cote front — ce qui protege l'application, et rien
+     * d'autre : curl, un autre client ou une version en retard le
+     * declenchaient encore. Mesure sur l'application qui tourne par l'agent de
+     * verification bout en bout, qui a repondu franchement a la question.
+     *
+     * LA REGLE N'EST PAS REECRITE ICI, ELLE EST APPELEE. `RendementPlausible`
+     * la porte depuis le 14 septembre, et `AlimentDisponible` en etait le seul
+     * appelant — c'est-a-dire la LECTURE du frigo. Quatre endroits la
+     * connaissaient ; le seul branche sur l'ecriture ne la consultait pas.
+     * C'est le motif dominant du projet : une decision juste appliquee a un
+     * endroit et oubliee a l'autre.
+     *
+     * `atPath('ratio')` designe le champ fautif et non l'objet entier, pour que
+     * le front sache quoi souligner.
+     */
+    #[Assert\Callback]
+    public function verifierLeSensDuRendement(ExecutionContextInterface $contexte): void
+    {
+        $motif = RendementPlausible::sens($this->categorie, (float) $this->ratio);
+
+        if (null !== $motif) {
+            $contexte->buildViolation($motif)->atPath('ratio')->addViolation();
+        }
+    }
 }

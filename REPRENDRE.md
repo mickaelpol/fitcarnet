@@ -28,7 +28,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **617 tests front** (588 + 29 de rendu) · **252 API · 661 assertions**, 7 erreurs PHPStan
+État : **620 tests front** (591 + 29 de rendu) · **257 API · 671 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -103,8 +103,8 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 588 + 29 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 252 tests, 661 assertions
+cd front && npm test                                                  # 591 + 29 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 257 tests, 671 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
@@ -1074,6 +1074,43 @@ démonstration. Corrigé là et ici (voir plus bas, « Le jeu de démonstration 
 Il a aussi trouvé **quatorze renvois `fichier:ligne` faux** dans
 `presentation/fonctionnalites-revue.md`, tous hérités d'avant le lot 6 —
 `composer.ts` est passé de 817 lignes à 135, `repas.tsx` de 2 316 à 655. Recalés.
+
+---
+
+## Le 500 de l'API est fermé — la règle était écrite, personne ne l'appelait
+
+**16 septembre 2026, au soir.** L'agent de vérification bout en bout a répondu
+franchement à la question qu'on lui posait : **oui, le 500 subsistait.**
+
+`POST /api/aliments` avec un féculent à 0,8 rendait :
+
+```
+HTTP 500 — SQLSTATE[23514]: Check violation: aliment_ratio_sens
+DETAIL: Failing row contains (65, …, 2869f386-…, 2026-09-16 22:40:50+00)
+```
+
+Deux défauts dans une seule réponse : le message n'apprend rien, et la ligne
+brute expose l'**UUID du propriétaire**.
+
+**Le correctif du matin ne suffisait pas, et c'est le point à retenir.**
+`rendementPossible` grise le bouton d'enregistrement : plus personne ne
+provoque ce 500 *depuis l'application*. Le serveur seul, lui, n'avait rien
+gagné — curl, un autre client, une version d'application en retard le
+déclenchaient encore. Corriger l'écran n'est pas corriger l'API.
+
+**La règle existait pourtant depuis le 14 septembre.** `RendementPlausible::sens`
+la porte, mot pour mot celle de la contrainte `aliment_ratio_sens` — mais son
+seul appelant était `AlimentDisponible`, c'est-à-dire la **lecture** du frigo.
+`Aliment::$ratio` ne portait qu'un `Assert\Positive`. Quatre endroits
+connaissaient la règle ; le seul branché sur l'écriture ne la consultait pas.
+
+Un `#[Assert\Callback]` sur l'entité **appelle** le service — il ne le recopie
+pas. `atPath('ratio')` désigne le champ fautif, pour que le front sache quoi
+souligner. Cinq tests, trois vus rouges d'abord, et les témoins qui comptent :
+l'épinard à 0,32 (500 g crus → 160 g cuits) et le riz à 4,68 restent acceptés —
+sans eux, une contrainte qui refuserait tout passerait pour une correction.
+
+**257 tests API, 671 assertions. PHPStan à ses 7 erreurs connues.**
 
 ---
 
