@@ -387,7 +387,7 @@ SELECT ordre, count(*) FROM mode_cuisson GROUP BY ordre HAVING count(*) > 1; -- 
 ## La capture pour la démonstration
 
 `presentation/captures/administration/` — reprend la **bobine 8** de
-`presentation/plan-de-tournage.md` (~3 min), **état de départ : session
+`presentation/demonstration.md` (~3 min), **état de départ : session
 administrateur**.
 
 | Fichier | Déroulé | Durée | Ce qu'on doit voir |

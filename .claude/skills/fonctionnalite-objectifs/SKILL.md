@@ -220,7 +220,7 @@ prouve le critère 9. `glucides_totaux` est un booléen, faux par défaut
 
 ## La capture pour la démonstration
 
-Reprend la **bobine 2** de `presentation/plan-de-tournage.md` (« On règle ses
+Reprend la **bobine 2** de `presentation/demonstration.md` (« On règle ses
 objectifs », ~1 min 30), corrigée sur deux points signalés en fin de fiche.
 
 `presentation/captures/objectifs/01-quatre-cibles.webm` — **~50 s**
@@ -263,8 +263,8 @@ pas les vidéos.
 ## Limites connues
 
 - **Il n'y a PAS de cible de fibres, et il n'y en aura pas.** Décision du
-  **16 septembre 2026** (`presentation/fonctionnalites-revue.md`, « Décisions
-  prises »). Une cible porte `kcal`, `prot`, `gluc`, `lip` et le drapeau
+  **16 septembre 2026**, reportée dans `presentation/demonstration.md`
+  (partie II·B). Une cible porte `kcal`, `prot`, `gluc`, `lip` et le drapeau
   `glucides_totaux` — `api/src/Entity/Cible.php:55-92` ; la table `cible` n'a
   aucune colonne de fibres. **La case « Glucides fibres comprises » suffit** :
   elle dit dans quelle convention les glucides sont écrits, et le calculateur

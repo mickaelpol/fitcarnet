@@ -305,7 +305,7 @@ curl -s http://localhost:8080/api/modeles -H "Authorization: Bearer $JETON_DE_B"
 ## La capture pour la démonstration
 
 `presentation/captures/programmes/` — reprend la **bobine 6** de
-`presentation/plan-de-tournage.md` (~2 min 30), état de départ : session
+`presentation/demonstration.md` (~2 min 30), état de départ : session
 ordinaire avec le jeu de démonstration chargé.
 
 | Fichier | Déroulé | Durée | Ce qu'on doit voir |

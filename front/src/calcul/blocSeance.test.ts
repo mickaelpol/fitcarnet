@@ -2,6 +2,22 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Exercice, Modele, Seance, SeanceExercice } from '@/api/types';
+/*
+ * LE FORMATEUR DE L'ÉCRAN, ET PAS UN SOSIE.
+ *
+ * Ces tests injectaient leur propre `nb` — `String(v).replace('.', ',')` —
+ * pendant que l'écran (`exerciceSeance.tsx:113`) passait celui de `@/theme`.
+ * Les deux ne rendaient pas la même chose : le sosie écrivait « 42,5 », le vrai
+ * « 42.5 ». L'assertion « 12×42,5 » plus bas décrivait donc un affichage que
+ * l'application ne produisait nulle part — un test vert qui garantissait le
+ * rendu d'une fonction que personne n'exécute. Relevé le 17 septembre 2026, en
+ * même temps que la virgule rendue à `nb`.
+ *
+ * On importe désormais le vrai. En relatif : `tsc -p tsconfig.tests.json` ne
+ * réécrit pas l'alias `@/`, et le `require` partirait tel quel dans
+ * `dist-tests/`.
+ */
+import { nb } from '../theme';
 import {
   apercuDerniereFois, avancementDe, avecIdentifiantSeance, blocDepuisExercice,
   blocsDepuisModele,
@@ -23,9 +39,6 @@ import {
  *   - la réponse du serveur ne rend QUE l'identifiant de la séance, jamais le
  *     reste : ce qui a été tapé pendant l'attente ne doit pas disparaître.
  */
-
-/* Le formateur de l'écran, en deux lignes : le module n'en dépend pas. */
-const nb = (v: number): string => String(v).replace('.', ',');
 
 /**
  * LE RACCOURCI « ↓ DERNIÈRE FOIS » ÉTAIT ÉTEINT POUR TOUT UN MODE.

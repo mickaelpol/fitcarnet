@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Utilisateur;
+use App\Service\JetonsRafraichissement;
 use App\Service\ProtectionDuCompte;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -48,8 +49,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_ADMIN')]
 final class ComptesController extends AbstractController
 {
-    public function __construct(private readonly Connection $cnx)
-    {
+    public function __construct(
+        private readonly Connection $cnx,
+        private readonly JetonsRafraichissement $jetons,
+    ) {
     }
 
     /**
@@ -146,10 +149,12 @@ final class ComptesController extends AbstractController
             );
 
             if (!$actif) {
-                $this->cnx->executeStatement(
-                    'DELETE FROM jeton_rafraichissement WHERE utilisateur_id = :id',
-                    ['id' => $id],
-                );
+                /* LA REGLE N'EST PAS RECOPIEE ICI, ELLE EST APPELEE.
+                   Ce `DELETE` etait ecrit a la main, et son jumeau l'etait
+                   aussi dans `UtilisateurProcessor` : deux copies d'une meme
+                   decision, qui divergeaient deja. Depuis le 17 septembre 2026
+                   les deux appellent le service qui connait les jetons. */
+                $this->jetons->revoquerTout($id);
             }
         });
 

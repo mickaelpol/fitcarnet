@@ -390,7 +390,7 @@ docker exec fitcarnet-app-dev sh -c 'pkill -f "inventaire:traiter"'
 
 ## La capture pour la démonstration
 
-Reprend **la bobine 5**, plans 5.4 à 5.6, de `presentation/plan-de-tournage.md`.
+Reprend **la bobine 5**, plans 5.4 à 5.6, de `presentation/demonstration.md`.
 Dossier : `presentation/captures/inventaire/`.
 
 > **État de départ** : frigo garni, **aucun inventaire en cours**, et **le

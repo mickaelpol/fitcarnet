@@ -409,7 +409,7 @@ SELECT count(*) FROM plan_repas p
 ## La capture pour la démonstration
 
 Reprend **la bobine 4.11** (enregistrer) et **la bobine 5**, plans 5.1 à 5.3 et
-5.7, de `presentation/plan-de-tournage.md`. Dossier :
+5.7, de `presentation/demonstration.md`. Dossier :
 `presentation/captures/plans-repas/`.
 
 > **État de départ** : un plan **composé dans l'application** et enregistré, non

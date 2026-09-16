@@ -353,7 +353,7 @@ curl -s -X POST "$BASE/jeton/rafraichir" -H 'Content-Type: application/json' \
 
 ## La capture pour la démonstration
 
-Reprend la **bobine 1** de `presentation/plan-de-tournage.md` (« On arrive »,
+Reprend la **bobine 1** de `presentation/demonstration.md` (« On arrive »,
 ~2 min), et lui ajoute un scénario pour les deux comportements du 15 septembre.
 
 `presentation/captures/acces/01-invitation.webm` — **~1 min 15**

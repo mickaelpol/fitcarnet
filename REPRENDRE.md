@@ -5,7 +5,14 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 16 septembre 2026** — l'inventaire des fonctionnalités
+**Dernière mise à jour : 17 septembre 2026** — la présentation tient enfin dans
+**un seul fichier** (`presentation/demonstration.md`) derrière **un seul
+script** (`preparer-demonstration.sh`), et les **23 captures existent pour de
+vrai** : elles sont prises par Playwright sur l'application qui tourne, et
+quatre d'entre elles mentaient jusqu'à ce soir (voir « Les captures de la
+démonstration », plus bas).
+
+**Le 16 septembre** — l'inventaire des fonctionnalités
 écrit par le propriétaire a été passé en revue, **quinze fiches** et **deux
 agents** en sont nés, et l'épreuve sur émulateur Android a trouvé que le
 sélecteur de mode tout juste ajouté au modèle **ne commandait rien** (voir
@@ -28,7 +35,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **620 tests front** (591 + 29 de rendu) · **257 API · 671 assertions**, 7 erreurs PHPStan
+État : **625 tests front** (596 + 29 de rendu) · **302 API · 797 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -103,8 +110,8 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 591 + 29 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 257 tests, 671 assertions
+cd front && npm test                                                  # 596 + 29 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 302 tests, 797 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
@@ -137,7 +144,7 @@ prends celui que tu veux, la phrase est écrite pour être collée telle quelle.
 **Si tu reprends la présentation client** (le plus avancé, il ne reste qu'à
 filmer) :
 
-> Lis `REPRENDRE.md` et `presentation/plan-de-tournage.md`. Je veux tourner les
+> Lis `REPRENDRE.md` et `presentation/demonstration.md`. Je veux tourner les
 > vidéos de démonstration depuis mon téléphone sur l'application de production.
 > Aide-moi à créer les deux comptes de démonstration sur le NAS, à y charger le
 > jeu de données, et guide-moi bobine par bobine. Ne travaille pas sur une autre
@@ -225,7 +232,7 @@ tableau, qui est une clé d'API à révoquer.
 
 | | Quoi | Effort |
 |---|---|---|
-| **Tourner les vidéos** | seul vrai reste. Tout le dossier de présentation est écrit, le plan de tournage aussi | voir `presentation/plan-de-tournage.md` |
+| **Tourner les vidéos** | seul vrai reste. Tout le dossier de présentation est écrit, les huit bobines aussi | `./presentation/preparer-demonstration.sh`, et `presentation/demonstration.md` |
 | **Régénérer la clé d'API Grocy** | ⚠ **À FAIRE PAR TOI, ET VITE.** Elle a été collée dans une conversation le 15 septembre 2026 pour vérifier le pont Grocy de bout en bout. Elle est à considérer comme publiée. Grocy → Paramètres → Clés d'API → révoquer puis recréer, et reporter la nouvelle dans `.env` du NAS | 5 min |
 | **`choixRatio.tsx`** | dernier morceau du lot 6, et **il était mal rangé dans l'audit** : il appartient à `editeurAliment.tsx` (section 7), pas à l'écran de séance | 1 h |
 | **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 22 témoins ; les hooks React restent partiellement hors de portée — `@testing-library/react` est désormais installé, la porte est ouverte | ~4 h |
@@ -424,21 +431,31 @@ Monté du 9 au 14 septembre 2026 pour présenter fitcarnet **à un client et à 
 > sources ci-dessous. Un ✅ dit ici « le travail est fait », pas « le fichier
 > est sur ton disque ».
 
+> **Un seul point d'entrée depuis le 17 septembre 2026** :
+> `./presentation/preparer-demonstration.sh` enchaîne prérequis, captures,
+> slides et dossier — et dit ce qui manque au lieu de s'arrêter à moitié.
+> Quatre documents ont été fusionnés ce jour-là dans `demonstration.md`
+> (`plan-de-tournage.md`, `script-narration.md`, `demo-30-minutes.md`,
+> `fonctionnalites-revue.md`) : ils se contredisaient, et l'un d'eux envoyait en
+> salle avec un frigo vide.
+
 | Fichier | Ce que c'est | État |
 |---|---|---|
-| `fitcarnet-presentation.html` | 28 slides en quatre actes : le produit, l'architecture, les garanties, l'outillage IA. Captures embarquées, fichier autonome. **Gitignoré — à régénérer** avec `construire.py` | ✅ fait, absent d'un clone |
-| `construire.py` | le génère ; **relancer après toute modification** | ✅ |
+| `preparer-demonstration.sh` | **le point d'entrée unique** : prérequis, images, slides, dossier, vidéo en option | ✅ |
+| `demonstration.md` | **la matière, et la seule source** : l'inventaire exhaustif de ce qu'il faut montrer (le document du propriétaire fusionné avec la revue du 16 septembre), les huit bobines, le montage en trente minutes, ce qui reste à arbitrer | ✅ |
+| `fitcarnet-presentation.html` | **33 slides** en quatre actes : le produit, l'architecture, les garanties, l'outillage IA — dont la carte de *tout* ce que l'application sait faire, et ce qu'on ne promet pas. Captures embarquées, fichier autonome. **Gitignoré — à régénérer** avec `construire.py` | ✅ fait, absent d'un clone |
+| `fitcarnet-dossier.html` | ce qu'on dit, dans quel ordre — **rendu de `demonstration.md`**, projetable et imprimable. **Gitignoré — à régénérer** avec `dossier.py` | ✅ fait, absent d'un clone |
+| `captures/*.jpg` | les images des slides et du dossier — **21 écrans**, 23 avec `DEMO_ECRIRE=1` (les deux de l'inventaire écrivent en base). **Gitignorées — à refaire** avec `tournage/capturer.mjs`, qui **vérifie chaque écran avant d'écrire l'image** : sans cela on repart avec vingt photos du formulaire de connexion | ✅ l'outil ; les images sont à refaire |
 | `fitcarnet-demonstration.mp4` | 3 min 01, muette, 8 chapitres. **Gitignoré — à remonter** avec `monter-demo.sh` | ✅ fait, absent d'un clone |
 | `tournage/tourner.mjs` | pilote l'application avec Playwright et enregistre en continu | ✅ |
 | `monter-demo.sh` | cartons, légendes, chapitres | ✅ |
-| `script-narration.md` | ce qu'il faut dire, slide par slide, vidéo minutée | ✅ |
-| `features.md` | **288 capacités**, chacune avec fichier et ligne | ✅ |
-| `plan-de-tournage.md` | le script de tournage en 8 bobines, pour filmer au téléphone | ✅ |
+| `features.md` | **288 capacités**, chacune avec fichier et ligne. Daté du 14 septembre, et il reste à reprendre | ✅ |
+| `fonctionnalites-par-onglet.md` | **la référence du besoin, écrite par le propriétaire** — à ne modifier sous aucun prétexte | ✅ |
 
 **Ce qui reste à faire**, et c'est la suite naturelle :
 
 1. Créer les **deux comptes de démonstration sur la production** — un ordinaire,
-   un administrateur. Les commandes sont dans `plan-de-tournage.md`, partie I.3.
+   un administrateur. Les commandes sont dans `presentation/demonstration.md`, partie I.2.
    Sans le compte admin, les bobines 1 et 8 sont impossibles : les quatre écrans
    d'administration ne s'affichent pas pour un compte ordinaire.
 2. Y charger le jeu de données (`jeu-essai.sql` puis `jeu-demo.sql`). **Relire
@@ -473,8 +490,10 @@ cette courbe qui fait vivre la démonstration.
 > n'existe plus. `jeu-demo.sql` n'est joué ni par `installer.sh` ni par
 > `entrypoint-prod.sh` — leurs listes sont écrites à la main, et il n'y figure
 > pas, volontairement. **Le remonter est une commande**, décrite dans
-> `presentation/plan-de-tournage.md` (l. 98 pour le local, l. 415 pour la
-> remise à zéro) ; son garde-fou refuse un compte qui a déjà des séances, sauf
+> `presentation/demonstration.md`, **partie I.1 — « Le jeu de données se charge
+> EN DEUX TEMPS »**, qui donne les commandes pour le local comme pour le NAS, et
+> la remise à zéro entre deux bobines ; son garde-fou refuse un compte qui a
+> déjà des séances, sauf
 > `-v ecraser=oui`.
 
 ---
@@ -854,7 +873,9 @@ fonctionnalités telles qu'un utilisateur les vit. **C'est la référence du
 besoin** : le code ne peut pas la donner.
 
 Elle a été confrontée ligne à ligne au code dans
-`presentation/fonctionnalites-revue.md` (son document n'a pas été touché) :
+`presentation/fonctionnalites-revue.md` (son document n'a pas été touché) —
+**cette revue a été absorbée dans `presentation/demonstration.md` le
+17 septembre 2026, partie II, et le fichier supprimé** :
 **41 lignes confirmées**, quatre écarts, et des pans entiers absents — toute
 l'administration, les invitations, Grocy, le catalogue d'exercices, les
 avertissements du calculateur.
@@ -1067,12 +1088,14 @@ macros sur les poids *servis*, on obtiendrait **1 207 kcal au lieu de 801** —
 
 **`jeu-demo.sql` ne pose NI aliments NI stock** — c'est `jeu-essai.sql`, qu'il
 exige en prérequis. La liste « avant d'entrer dans la salle » de
-`presentation/demo-30-minutes.md` ne citait que le premier : en la suivant à la
+`presentation/demo-30-minutes.md` (supprimé depuis, absorbé dans
+`presentation/demonstration.md`) ne citait que le premier : en la suivant à la
 lettre, on arrive avec un **frigo vide**, et le frigo est le premier tiers de la
 démonstration. Corrigé là et ici (voir plus bas, « Le jeu de démonstration »).
 
 Il a aussi trouvé **quatorze renvois `fichier:ligne` faux** dans
-`presentation/fonctionnalites-revue.md`, tous hérités d'avant le lot 6 —
+`presentation/fonctionnalites-revue.md` (absorbé depuis dans
+`presentation/demonstration.md`), tous hérités d'avant le lot 6 —
 `composer.ts` est passé de 817 lignes à 135, `repas.tsx` de 2 316 à 655. Recalés.
 
 ---
@@ -1249,6 +1272,15 @@ adresses vérifiées une par une et qui corrigent `features.md`. Dans le dossier
 `fonctionnalites-par-onglet.md` est la source brute du propriétaire — la toucher
 invaliderait la revue qui affirme ne pas l'avoir modifiée.
 
+> **Ce paragraphe a été rattrapé le 17 septembre 2026.** Garder les six, c'était
+> garder six documents qui se contredisaient — et préparer une démonstration
+> demandait d'en ouvrir huit. Quatre ont été fusionnés dans
+> `presentation/demonstration.md` : `plan-de-tournage.md` (dont les **seize**
+> skills qui s'y adossaient — et non douze — ont vu leur renvoi réécrit),
+> `script-narration.md`, `demo-30-minutes.md` et `fonctionnalites-revue.md`.
+> Les deux qui restent à côté sont bien ceux que ce paragraphe disait
+> intouchables : `features.md` et `fonctionnalites-par-onglet.md`.
+
 **Bilan : les `.md` suivis par git passent de 75 à 73**, plus une archive et une
 capture en doublon retirées. Le gain n'est pas le compte, c'est que plus aucun
 document ne commande un outil interdit ni n'annonce cinquante aliments qui
@@ -1311,6 +1343,78 @@ publié — sain au `docker ps`, injoignable. **Keycloak a été supprimé pour 
 14 septembre, et il n'en veut plus. Constaté le 16 septembre : ni conteneur, ni
 image, ni volume, et plus aucun fichier compose sous `/home/micka` qui le
 déclare. **Ne jamais le relancer ni le réinstaller.**
+
+---
+
+## Les captures de la démonstration, et les quatre images qui mentaient
+
+**Le 17 septembre 2026.** La préparation d'une démonstration demandait d'ouvrir
+huit documents et de lancer plusieurs commandes dans le bon ordre, dont deux se
+contredisaient. Elle tient désormais dans **un seul fichier de matière**,
+`presentation/demonstration.md` (1 015 lignes : préparer · l'inventaire par
+domaine A→M · les huit bobines · le montage en 30 min · ce qui reste à
+arbitrer), et **un seul point d'entrée**, `presentation/preparer-demonstration.sh`
+(`--captures --slides --dossier --video --tout --aide`). Quatre documents
+narratifs ont disparu, leur contenu absorbé ; les sections « ce qui manque dans
+ton document » de la revue sont devenues les lignes marquées **`+`** de la
+partie II, et ce sont elles qui garantissent la couverture.
+
+**Les treize captures prises à la main ont été retirées et refaites.** Elles
+dataient d'un état de la base que personne ne savait plus reconstituer, ne
+couvraient que neuf écrans sur seize, et l'une d'elles était un doublon au nom
+vide. `presentation/tournage/capturer.mjs` en produit **23**, chacune vérifiée
+avant d'être écrite : sans le motif `attendu`, on repart avec vingt-trois
+photos du formulaire de connexion et on s'en aperçoit en réunion.
+
+**Quatre défauts n'ont été trouvés qu'en regardant les images produites**, et
+aucun n'aurait levé la moindre erreur :
+
+- **Deux paires d'images identiques au bit près.** `14-garde-fou-donnees.jpg`
+  sortait avec le md5 exact de `08-repas-cuissons.jpg`, et
+  `10-repas-courses.jpg` avec celui de `11-batch-cooking.jpg`. La cause est la
+  même deux fois : **un `wheel()` qui ne défile pas ne lève rien**, il rend la
+  même image sous un autre nom. Le garde-fou des valeurs ne vit pas sur l'écran
+  Repas mais dans l'éditeur d'aliment (seul appelant de `rendementPossible`),
+  et la liste de courses est un **panneau repliable**, pas un bas de page.
+- **Le batch cooking annonçait « 3 fournées » et n'en montrait aucune.** Pour
+  débloquer le bouton, le script cliquait « Les N autres se mangent tels
+  quels » — ce qui enregistre « sans cuisson » **comme habitude** pour tout le
+  frigo. Plus rien ne cuisait, définitivement. Les habitudes du compte de
+  démonstration portent désormais de vraies cuissons (vapeur, eau bouillante,
+  poêle) ; l'image montre trois fournées réelles, poids en sec.
+- **La bascule vers le compte administrateur attendait un formulaire absent.**
+  La session ordinaire était encore ouverte, donc l'accueil affichait
+  l'application. Les quatre écrans d'administration tombaient d'un coup sur
+  « Timeout 20000ms exceeded », un message qui ne parle ni de session ni de
+  connexion. On purge `localStorage` avant de se reconnecter.
+- **L'inventaire en tâche de fond ne s'appliquait jamais en développement.**
+  `TraiterInventaires` n'y tourne pas : le lot restait « en attente 0/3 », et
+  la règle « un seul inventaire à la fois » bloquait tout dépôt suivant. La
+  capture « appliqué » photographiait donc le stock **inchangé**. Il faut
+  lancer `bin/console app:inventaire:traiter --boucle` pendant la passe —
+  c'est ce que fait la production, avec deux exemplaires.
+
+**Contrôle qui doit rester vrai** : 23 images, et **aucune paire de md5
+identiques**. C'est le seul test qui attrape ces quatre défauts d'un coup.
+
+```bash
+cd presentation/captures && md5sum *.jpg | awk '{print $1}' | sort | uniq -d
+# doit ne rien afficher
+```
+
+**Deux comptes jetables ont été créés pour cela, et ils sont restés** — sans
+eux, plus aucune capture n'est reproductible :
+
+```bash
+# demo-verif@test.local et demo-admin-verif@test.local, mot de passe DemoFitcarnet2026!
+# jeu-essai.sql PUIS jeu-demo.sql posés dessus, adresse réécrite au passage.
+# Pour les retirer (l'ordre compte : l'aliment AVANT son auteur) :
+docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet <<'SQL'
+DELETE FROM stock   WHERE utilisateur_id IN (SELECT id FROM utilisateur WHERE email LIKE '%-verif@test.local');
+DELETE FROM aliment WHERE cree_par       IN (SELECT id FROM utilisateur WHERE email LIKE '%-verif@test.local');
+DELETE FROM utilisateur WHERE email LIKE '%-verif@test.local';
+SQL
+```
 
 ---
 
@@ -1399,7 +1503,7 @@ déclare. **Ne jamais le relancer ni le réinstaller.**
   `/dev/bus/usb` n'y contient que les deux hubs racine. L'affichage, lui, marche
   (WSLg est présent). Installer scrcpy **sur Windows** — le zip des *releases*
   GitHub est autonome, `adb` compris. Les voies de repli sont dans
-  `presentation/plan-de-tournage.md`.
+  `presentation/demonstration.md`.
 - **Le graphe se périme.** `graphify update .` après du code, `/graphify . --update`
   après de la documentation.
 

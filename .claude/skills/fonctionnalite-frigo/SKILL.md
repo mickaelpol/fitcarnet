@@ -301,7 +301,7 @@ Dans l'ordre de `donnees-de-test` — stock, **puis** aliments, **puis** compte
 
 ## La capture pour la démonstration
 
-Reprend **la bobine 3** de `presentation/plan-de-tournage.md` (~3 min), découpée
+Reprend **la bobine 3** de `presentation/demonstration.md` (~3 min), découpée
 en scénarios courts. Dossier :
 `presentation/captures/frigo/` (ignoré par git).
 

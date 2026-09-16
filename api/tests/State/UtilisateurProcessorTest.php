@@ -8,8 +8,9 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Utilisateur;
+use App\Service\JetonsRafraichissement;
 use App\State\UtilisateurProcessor;
-use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -171,7 +172,11 @@ final class UtilisateurProcessorTest extends TestCase
             $persistance,
             $hacheur,
             self::createStub(Security::class),
-            self::createStub(Connection::class),
+            /* Le VRAI service, autour d'un EntityManager double : aucun de ces
+               tests ne change de mot de passe sur un compte existant, donc
+               aucun ne coupe de session. Ce qui se passe quand on en change,
+               c'est `RevocationDeSessionTest` qui le tient. */
+            new JetonsRafraichissement(self::createStub(EntityManagerInterface::class)),
         );
     }
 }

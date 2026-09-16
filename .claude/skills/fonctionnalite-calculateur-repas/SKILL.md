@@ -354,7 +354,7 @@ cd /home/micka/perso/fitcarnet/front && npm test
 
 ## La capture pour la démonstration
 
-Reprend la **bobine 4** de `presentation/plan-de-tournage.md` (« On planifie la
+Reprend la **bobine 4** de `presentation/demonstration.md` (« On planifie la
 semaine », ~5 min, *la bobine décisive*), découpée en prises courtes. Les plans
 4.6 (cuissons), 4.9 (batch), 4.10 (courses) appartiennent à
 `fonctionnalite-batch-cooking`.

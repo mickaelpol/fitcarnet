@@ -308,7 +308,7 @@ cd /home/micka/perso/fitcarnet/front && npm test
 ## La capture pour la démonstration
 
 Reprend les plans **4.6**, **4.9**, **4.10** et **4.11** de la **bobine 4** de
-`presentation/plan-de-tournage.md`.
+`presentation/demonstration.md`.
 
 `presentation/captures/batch-cooking/01-les-cuissons.webm` — **~45 s**
 : sur un plan composé, montrer le bandeau **« 6 aliments dont on ne sait pas

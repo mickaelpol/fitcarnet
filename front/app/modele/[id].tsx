@@ -12,7 +12,7 @@ import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { lireFormat } from '@/composants/exerciceSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
-import { C, E, P, R, T, TOUCHE, nb } from '@/theme';
+import { C, E, P, R, T, TOUCHE } from '@/theme';
 import { idDe } from '@/api/types';
 
 const TYPES = ['Push', 'Pull', 'Legs'] as const;

@@ -201,7 +201,7 @@ pièges propres à cette fonctionnalité.
 
 ## La capture pour la démonstration
 Un ou plusieurs scénarios : nom de fichier, déroulé, durée visée, ce qu'on doit
-voir à l'image. Reprend la bobine correspondante de `presentation/plan-de-tournage.md`
+voir à l'image. Reprend la bobine correspondante de `presentation/demonstration.md`
 quand elle existe.
 
 ## Limites connues

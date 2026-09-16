@@ -321,7 +321,7 @@ docker exec fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -c \
 
 ## La capture pour la démonstration
 
-Complète la **bobine 2** de `presentation/plan-de-tournage.md` (« On règle ses
+Complète la **bobine 2** de `presentation/demonstration.md` (« On règle ses
 objectifs »), dont les points 2.1 et 2.4 relèvent de cette fiche — les objectifs
 eux-mêmes sont dans `fonctionnalite-objectifs`.
 
@@ -372,10 +372,11 @@ pas les vidéos.
   16 septembre 2026 : ni `motDePasseActuel`, ni `motDePasseClair`, ni
   `/utilisateurs/` n'apparaissent dans `front/src` ou `front/app`. La capacité
   est complète et testée côté API (`UtilisateurProcessor.php`), mais **elle ne
-  s'éprouve qu'au `curl` et ne se filme pas**. `presentation/features.md:59-60` et
-  `presentation/fonctionnalites-revue.md:85` la présentent sous « onglet
-  Compte » sans dire qu'il n'y a pas d'interface : c'est l'écart le plus
-  trompeur de cette fiche.
+  s'éprouve qu'au `curl` et ne se filme pas**. `presentation/features.md:59-60`
+  la présente sous « onglet Compte » sans dire qu'il n'y a pas d'interface :
+  c'est l'écart le plus trompeur de cette fiche.
+  `presentation/demonstration.md` la marque désormais `✗` — « l'API sait faire,
+  aucun écran ne l'appelle », partie II·B.
 - **Voir et couper ses sessions n'a pas d'écran non plus.**
   `GET`/`DELETE /api/mes-sessions` existent, sont testées
   (`api/tests/Controller/MesSessionsProprieteTest.php`), et la colonne `vu_le`

@@ -8,8 +8,11 @@
 #  MUETTE, ET C'EST VOULU. Elle se commente en direct devant le client :
 #  une voix off enfermerait le rythme et on ne pourrait plus s'arrêter sur
 #  une question. Les cartons annoncent, les parcours montrent, la légende du
-#  bas rattrape celui qui a décroché deux secondes, et script-narration.md
+#  bas rattrape celui qui a décroché deux secondes, et demonstration.md
 #  donne le texte à dire.
+#
+#  (`script-narration.md` a porté ce texte jusqu'au 17 septembre 2026, où il a
+#  été absorbé dans `presentation/demonstration.md` avec trois autres documents.)
 #
 #  Usage :  ./presentation/monter-demo.sh
 # =====================================================================

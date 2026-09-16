@@ -1,10 +1,20 @@
 # Régénérables en une commande, et lourds : on versionne la matière, pas le produit.
-#   python3 presentation/construire.py   → fitcarnet-presentation.html
+# Tout se refait d'un geste :  ./presentation/preparer-demonstration.sh
+#   tournage/capturer.mjs               → captures/*.jpg
+#   python3 presentation/construire.py  → fitcarnet-presentation.html
+#   python3 presentation/dossier.py     → fitcarnet-dossier.html
 #   ./presentation/monter-demo.sh       → fitcarnet-demonstration.mp4
 fitcarnet-presentation.html
+fitcarnet-dossier.html
 fitcarnet-demonstration.mp4
 
-# Les captures vidéo des fonctionnalités (agent `verification-fonctionnalites`).
-# Une par scénario, régénérables en relançant l'épreuve, et lourdes : même règle,
-# on versionne les fiches et les scripts, pas les vidéos.
+# Les images de la démonstration ET les captures vidéo des fonctionnalités
+# (agent `verification-fonctionnalites`). Régénérables, et lourdes : même règle,
+# on versionne les fiches et les scripts, pas les images.
+#
+# LES TREIZE .jpg QUI VIVAIENT ICI ÉTAIENT SUIVIS PAR GIT MALGRÉ CETTE LIGNE —
+# un fichier déjà indexé ignore le .gitignore. Ils ont été retirés le
+# 17 septembre 2026 : pris à la main un jour de septembre, sur un état de la
+# base que personne ne savait plus reconstituer, ils couvraient neuf écrans sur
+# seize et l'un d'eux était un doublon au nom vide. `capturer.mjs` les refait.
 captures/

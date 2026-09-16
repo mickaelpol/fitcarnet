@@ -283,7 +283,7 @@ n'est **pas** sur Grocy.
 
 **Si elles ne sont pas renseignées, s'arrêter là et le dire** : rien de cette
 fiche ne s'éprouve, et la plupart des critères ne peuvent pas être simulés. C'est
-exactement l'impasse notée en fin de `presentation/plan-de-tournage.md` (« la
+exactement l'impasse notée en fin de `presentation/demonstration.md` (« la
 source Grocy n'est tournable que si `GROCY_URL` est renseigné sur l'instance
 filmée »).
 
@@ -383,7 +383,7 @@ curl -s -X POST "$BASE/mon-frigo/aliment" -H "Authorization: Bearer $JETON_BASE"
 
 ## La capture pour la démonstration
 
-`presentation/plan-de-tournage.md` classe cette source en **impasse connue**
+`presentation/demonstration.md` classe cette source en **impasse connue**
 (bobine 8) : ces plans ne se tournent que sur une instance où `GROCY_URL` est
 renseigné. Si ce n'est pas le cas, **le dire dans le rapport plutôt que de
 filmer l'écran « non configuré »**, qui ne démontre rien.
@@ -447,9 +447,10 @@ pas les vidéos.
   épreuve doit être retiré à la main dans Grocy.**
 - **Cette fonctionnalité n'a pas de test de bout en bout**, et ne peut pas en
   avoir sans instance : les témoins simulent les réponses HTTP de Grocy
-  (`MockResponse`). `presentation/fonctionnalites-revue.md:198` le dit déjà —
-  « le frigo Grocy en fonctionnement : il demande une instance configurée » n'a
-  **pas** été vérifié lors de la revue du 16 septembre 2026.
+  (`MockResponse`). `presentation/demonstration.md` le dit déjà, en fin de
+  partie V (« Ce qui n'a pas été vérifié ») — « le frigo Grocy en fonctionnement :
+  il demande une instance configurée » n'a **pas** été vérifié lors de la revue
+  du 16 septembre 2026.
 - **La détection de doublon est la seule barrière contre les homonymes.** Grocy
   accepte deux produits de même nom sans broncher, et le frigo afficherait deux
   lignes identiques dont une seule porte les macros

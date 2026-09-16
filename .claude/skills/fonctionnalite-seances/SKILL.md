@@ -6,8 +6,8 @@ description: Noter sa séance pendant qu'on la fait — liste des séances, cré
 # Noter sa séance pendant qu'on la fait
 
 > **Toutes les lignes ci-dessous ont été vérifiées dans le code le 16 septembre
-> 2026.** Les `fichier:ligne` de `presentation/features.md` (section E) et de
-> `presentation/fonctionnalites-revue.md` sont **périmés** pour cet écran :
+> 2026.** Les `fichier:ligne` de `presentation/features.md` (section E) sont
+> **périmés** pour cet écran :
 > `app/seance/[id].tsx` a été refactorisé le 15 septembre (extraction de
 > `useSeanceEditable.ts` et de `calcul/blocSeance.ts`), et toutes les lignes ont
 > glissé d'environ 15 à 40 rangs. Ce sont les lignes de cette fiche qui font foi.
@@ -61,7 +61,8 @@ rien.
 > (les clés sont `charge`, `iso`, `chrono` ; les libellés affichés sont
 > **Charge**, **Tenue**, **Chrono**) et il est rendu à `:167-191`. **Il est en
 > cours d'extraction vers un composant partagé** pour servir aussi dans
-> l'éditeur de modèle (décision 2 de `presentation/fonctionnalites-revue.md`).
+> l'éditeur de modèle (décision du 16 septembre 2026, reportée dans
+> `presentation/demonstration.md`, partie II·J).
 > **Éprouve le comportement, jamais le fichier** : les trois libellés, la
 > bascule, et le fait qu'une mesure en cours continue de tourner pendant la
 > bascule (`front/src/composants/etatMesure.ts:1-17`). Revérifie le chemin avant
@@ -223,7 +224,7 @@ npm --prefix /home/micka/perso/fitcarnet/front test
 
 ## La capture pour la démonstration
 
-Reprend la **bobine 7** de `presentation/plan-de-tournage.md` (plans 7.1, 7.2,
+Reprend la **bobine 7** de `presentation/demonstration.md` (plans 7.1, 7.2,
 7.3, 7.6, 7.9, 7.10, 7.11 ; les plans 7.4, 7.5 et 7.8 appartiennent à
 `fonctionnalite-progression`, le plan 7.7 à `fonctionnalite-minuteur`).
 
@@ -245,11 +246,12 @@ Reprend la **bobine 7** de `presentation/plan-de-tournage.md` (plans 7.1, 7.2,
 
 ## Limites connues
 
-- **Le plan 7.4 de `plan-de-tournage.md` décrit un « bandeau ambre en haut de
-  l'exercice » qui n'existe pas.** Ce qu'on voit est une **puce bordée d'ambre**
-  portant « ↓ 12×25 · 12×27,5 » (`exerciceSeance.tsx:180-190`) — un bouton, pas
-  un bandeau, et il **applique** les valeurs quand on le touche. Filmer en le
-  sachant, ou corriger le script.
+- **Le plan 7.4 a longtemps décrit un « bandeau ambre en haut de l'exercice »
+  qui n'existe pas.** Ce qu'on voit est une **puce bordée d'ambre** portant
+  « ↓ 12×25 · 12×27,5 » (`exerciceSeance.tsx:180-190`) — un bouton, pas un
+  bandeau, et il **applique** les valeurs quand on le touche. **Corrigé dans
+  `presentation/demonstration.md` le 17 septembre 2026** : le plan 7.4 dit
+  désormais « touche la puce ambre », et porte l'encadré qui raconte l'erreur.
 - **`presentation/features.md` est daté du 14 septembre** : ses `fichier:ligne`
   de la section E ne correspondent plus (voir l'encadré en tête de fiche), et il
   annonce encore « zone 70–80 % » (faux, c'est 70 à 90 %).

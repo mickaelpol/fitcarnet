@@ -131,6 +131,38 @@ export const couleurRole = (categorie: string): string => {
   return C.ligne;
 };
 
-/** Formatage court : 154 g, 12,5 g — jamais « 154.00 ». */
+/**
+ * Formatage court : 154 g, 12,5 g — jamais « 154.00 », et jamais « 12.5 ».
+ *
+ * LA VIRGULE EST VRAIMENT LÀ DEPUIS LE 17 SEPTEMBRE 2026. Ce commentaire
+ * promettait « 12,5 g » depuis toujours pendant que `toFixed(1)` rendait
+ * « 12.5 », à un utilisateur français, dans une application écrite en
+ * français. La revue l'a relevé le 16 septembre 2026.
+ *
+ * C'EST LE CODE QUI A ÉTÉ CORRIGÉ, PAS LE COMMENTAIRE, et pas par goût :
+ * l'application écrivait DÉJÀ la virgule ailleurs. `texteDuNombre`
+ * (`calcul/saisieNombre.ts`) rend « 42,25 » dans tout champ modifiable. Le même
+ * poids s'affichait donc « 42,25 » là où on pouvait le corriger et « 42.5 » là
+ * où on ne le pouvait pas : c'est cette incohérence qui était le défaut, le
+ * commentaire disait juste.
+ *
+ * SANS DANGER POUR LA SAISIE — vérifié appelant par appelant, les quatorze, le
+ * 17 septembre 2026. `nb` ne produit QUE du texte affiché : enfants JSX, ou
+ * gabarits suivis d'une unité (« g », « kcal », « kg », « % »). Aucune de ses
+ * sorties n'alimente un champ, n'est relue par `parseFloat`, ni ne sert de
+ * coordonnée — la courbe de `sparkline.tsx` calcule ses hauteurs sur les
+ * nombres bruts et ne confie à `nb` que le texte de son pied. Un champ passe
+ * par `ChampNombre`, jamais par `nb` : la panne du 15 septembre 2026 — « 42,5 »
+ * tapé, 425 kg enregistrés — vivait dans les champs et reste hors d'atteinte.
+ *
+ * Ne pas « simplifier » en `toLocaleString('fr-FR')` : le projet s'est déjà
+ * fait mordre par une API que Hermes n'embarque pas partout (`normalize`, d'où
+ * la table manuelle de `cleDHabitude`). Un séparateur suspendu à la présence
+ * des données de locale sur le téléphone n'est pas un séparateur sûr.
+ *
+ * @see charte.test.ts — « nb, le formatage court »
+ */
 export const nb = (v: number): string =>
-  Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1);
+  (Math.abs(v - Math.round(v)) < 0.05
+    ? String(Math.round(v))
+    : v.toFixed(1).replace('.', ','));

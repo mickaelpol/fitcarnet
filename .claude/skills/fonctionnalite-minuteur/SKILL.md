@@ -222,7 +222,7 @@ npm --prefix /home/micka/perso/fitcarnet/front test
 
 ## La capture pour la démonstration
 
-Reprend le plan **7.7** de la bobine 7 de `presentation/plan-de-tournage.md`,
+Reprend le plan **7.7** de la bobine 7 de `presentation/demonstration.md`,
 qui ne prévoit que 25 secondes de minuteur. **C'est trop peu pour montrer ce qui
 fait la valeur de cette fonctionnalité** : ce sont les scénarios 02 et 03
 ci-dessous qui la portent, et ils **doivent être tournés sur un téléphone**
@@ -248,7 +248,8 @@ maintenant, sur le flux alarme.
 ## Limites connues
 
 - **La notification téléphone fermé n'est pas éprouvable dans Expo Go.** C'est
-  l'angle mort connu, déjà signalé par `fonctionnalites-revue.md` : **il faut
+  l'angle mort connu, déjà signalé par `presentation/demonstration.md`
+  (partie II·I, et « ce qui reste hors champ ») : **il faut
   l'APK**. Tant qu'on n'en a pas, les critères 10 et 11 restent **non vérifiés**,
   et un rapport qui les coche est faux.
 - **La sonnerie choisie ne s'entend pas hors de l'application** tant que les cinq

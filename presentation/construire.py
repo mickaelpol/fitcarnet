@@ -141,9 +141,86 @@ SLIDES = [
     """),
 
     ("produit", "Le carnet de séances", f"""
-      {visuel('03-seance-detail-1rm.jpg', "Séance en cours : séries prescrites, charges, minuteur, et 1RM estimé")}
+      {visuel('18-seance-detail-1rm.jpg', "Séance en cours : séries prescrites, charges, minuteur, et 1RM estimé")}
       <p class="chute">63,3 kg de 1RM estimé, <strong>+3,1 kg</strong> depuis la séance précédente, dont les
          charges sont rappelées en haut. Neuf semaines de données derrière ce chiffre.</p>
+    """),
+
+    ("produit", "Les objectifs, repas par repas", f"""
+      {visuel('03-objectifs.jpg', "Une cible par moment de repas — Matin, Midi, 16 h, Soir")}
+      <p class="chute">Pas un total pour la journée : une cible par repas. C'est ce qui permet de composer
+         un petit-déjeuner qui ne ressemble pas à un dîner. La case « <strong>glucides fibres comprises</strong> »
+         porte la convention européenne — 2 kcal par gramme, comptées à part.</p>
+    """),
+
+    ("produit", "Les programmes", f"""
+      {visuel('15-modeles-liste.jpg', "Les patrons d'où partent les séances : Push, Pull, Legs")}
+      <p class="chute">Les séries prescrites d'un programme pré-remplissent la séance. Le mode de travail
+         s'y choisit — et il commande ce qu'on prescrit : des secondes en « Tenue », des kilos en « Charge ».</p>
+    """),
+
+    # LA CARTE DES FONCTIONNALITÉS — AJOUTÉE LE 17 SEPTEMBRE 2026.
+    #
+    # Les 28 slides racontaient bien le produit, mais un client qui demandait
+    # « et sinon, qu'est-ce que ça fait ? » n'avait aucune réponse d'ensemble :
+    # il fallait ouvrir `features.md` et ses ~288 lignes. Ces deux slides
+    # donnent la carte au bon niveau. Le détail vit dans `demonstration.md`.
+    ("produit", "Tout ce que l'application sait faire · 1", """
+      <div class="deux">
+        <div>
+          <h3>Entrer, et rester</h3>
+          <p>Invitation par lien à usage unique, révocable · aucune inscription libre ·
+             session d'une heure renouvelée par un jeton révocable · compte désactivé bloqué
+             à la requête suivante.</p>
+          <h3>Le frigo</h3>
+          <p>Stock par emplacement · recherche sans accents · catalogue commun de 50 aliments
+             vérifiés · création d'un aliment privé · contrôle de cohérence bloquant et
+             détection des kilojoules · rendement cru/cuit mesurable · source Grocy en option.</p>
+          <h3>L'inventaire</h3>
+          <p>Saisie <em>en écarts</em> · un champ vide n'est pas un zéro · dépôt en lot appliqué
+             en tâche de fond, reprise exacte après coupure, échecs nommés ligne par ligne.</p>
+        </div>
+        <div>
+          <h3>Les repas</h3>
+          <p>Une cible par repas · plusieurs jours, plusieurs convives · composition sous contrainte
+             du stock réel · les grammes <em>à peser, avant cuisson</em> · remplacer, verrouiller,
+             déclarer un reste · avertissements chiffrés sur les données douteuses.</p>
+          <h3>Cuisiner, puis ranger</h3>
+          <p>Fournées groupées par façon de cuire (on pèse sec) · boîtes en cuit · liste de courses ·
+             plans enregistrés, figés, en toutes lettres · « J'ai cuisiné » décrémente le frigo.</p>
+        </div>
+      </div>
+    """),
+
+    ("produit", "Tout ce que l'application sait faire · 2", """
+      <div class="deux">
+        <div>
+          <h3>Les séances</h3>
+          <p>Trois modes — charge, tenue, chrono · saisie et cochage des séries · pré-remplissage
+             par la dernière fois · notes · réordonnancement · sauvegarde automatique ·
+             passage en modèle.</p>
+          <h3>Ce que l'application déduit</h3>
+          <p>1RM par la formule d'Epley, <strong>avec ses deux garde-fous</strong> · écart depuis
+             la dernière fois · courbe de progression · table des paliers (zone 70 à 90 %) ·
+             calculateur de charge · records antérieurs.</p>
+          <h3>Minuter</h3>
+          <p>Repos aux paliers 1:00 / 1:30 / 2:00 / 3:00, son, vibration, notification système,
+             survie au changement d'écran · chronomètre d'effort tenu par série.</p>
+        </div>
+        <div>
+          <h3>Le catalogue</h3>
+          <p>~1 338 exercices · recherche français/anglais sans accents · quinze vignettes de
+             muscles · fiche détaillée avec vidéo · <em>aucune suppression possible</em>,
+             pour ne pas effacer d'historique.</p>
+          <h3>L'administration</h3>
+          <p>Catalogue d'exercices · fusion de deux exercices avec report de l'historique ·
+             façons de cuire · comptes et invitations — et le refus de se bloquer soi-même
+             ou de bloquer le dernier administrateur.</p>
+          <h3>Ce qui tient sans se voir</h3>
+          <p>Isolation stricte entre comptes · cache relu au démarrage à froid · tolérance
+             au hors-ligne · anti-N+1 · documentation de l'API fermée.</p>
+        </div>
+      </div>
     """),
 
     # ================================================================== ACTE 2
@@ -408,6 +485,45 @@ SLIDES = [
       </div>
       <p class="chute">La suite : des agents de relecture spécialisés — isolation des données,
          conventions nutritionnelles — déclenchés avant chaque livraison.</p>
+    """),
+
+    # CE QU'ON NE PROMET PAS — AJOUTÉE LE 17 SEPTEMBRE 2026.
+    #
+    # Cette liste vivait dans `demo-30-minutes.md`, sous « ce qu'on ne montre
+    # pas ». Elle n'était sur aucune slide, donc elle ne sortait que si le
+    # présentateur y pensait — et c'est précisément le moment où l'on promet
+    # sans le vouloir. Le partage de modèle a été promis ainsi, à un champ qui
+    # ne faisait rien.
+    ("qualite", "Ce qui n'existe pas, et qu'on ne promet donc pas", """
+      <p class="accroche">Dire ce qui manque est ce qui rend crédible le reste.</p>
+      <div class="deux">
+        <div>
+          <h3>Absent de l'application</h3>
+          <ul>
+            <li><strong>Le partage d'un modèle</strong> — le champ ne faisait rien ;
+                il a été retiré le 15 septembre 2026</li>
+            <li><strong>Créer un exercice</strong> — réservé à l'API, sans aucun écran</li>
+            <li><strong>Changer son mot de passe ou son adresse</strong> — la règle est complète
+                côté serveur, aucun écran ne l'appelle</li>
+            <li><strong>Voir et couper ses sessions</strong> — même chose</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Non démontrable ici</h3>
+          <ul>
+            <li>La <strong>source Grocy</strong>, sans instance configurée</li>
+            <li>Les <strong>notifications téléphone fermé</strong> — absentes d'Expo Go
+                depuis le SDK 53, il faut l'APK</li>
+          </ul>
+          <h3>Et en propre</h3>
+          <ul>
+            <li>Pas de date de mise en production ouverte</li>
+            <li>Pas de support, pas de reprise de données</li>
+            <li>Taillé pour un usage personnel, multi-comptes par invitation —
+                c'est un choix, pas une limite technique</li>
+          </ul>
+        </div>
+      </div>
     """),
 
     ("titre", "Démonstration", """

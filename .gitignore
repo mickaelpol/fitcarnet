@@ -154,3 +154,9 @@ pictogrammes-muscles.zip
 # depot. Elles servent a regarder de ses yeux, sur le moment. Le script, lui,
 # est versionne — c'est lui qui porte la connaissance.
 /presentation/tournage/captures-verification/
+
+# Cache bytecode Python : perime des que la source bouge, et regenere seul.
+# Il etait versionne ; un .pyc suivi par git ment sur ce que le script fait
+# vraiment. Releve le 17 septembre 2026 en assainissant test_ciqual.py.
+__pycache__/
+*.pyc

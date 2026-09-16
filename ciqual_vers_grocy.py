@@ -512,7 +512,15 @@ def candidats_pour(aliments, motifs: str, combien: int = 6):
 
 # Bande dans laquelle tombe toute cereale ou legumineuse SECHE : c'est de la
 # matiere seche, et la matiere seche fait 300 a 400 kcal aux 100 g. Toujours.
-# Meme borne que `front/src/calcul/plausibilite.ts`.
+# Meme borne que `front/src/calcul/plausibilite.ts` — si tu la changes ici,
+# change-la la-bas.
+#
+# CE COUPLE ETAIT DEFINI DEUX FOIS dans ce fichier, ici et juste avant
+# `convertir_en_pese`, avec les memes valeurs et deux commentaires differents.
+# La seconde definition est retiree le 17 septembre 2026 : c'est le motif qui
+# venait de couter les macros du riz dans `test_ciqual.py` la veille — un
+# fichier qui definit deux fois la meme constante finit par n'en corriger
+# qu'une.
 SEC_MINI, SEC_MAXI = 300, 400
 
 
@@ -571,6 +579,46 @@ def sens_du_rendement(categorie: str, ratio: float):
         return f"rendement {ratio:.2f} : hors de tout ordre de grandeur"
 
     return None
+
+
+def rendement_par_energie(kcal_sec, kcal_cuit):
+    """
+    Le rendement d'un grain sec, deduit de la conservation de l'energie.
+
+    100 g de riz sec a 350 kcal qui deviennent un produit a 155 kcal portent
+    toujours les memes 350 kcal : ils pesent donc 2,26 fois plus. L'eau
+    absorbee ne pese rien en calories. C'est vrai d'un grain, et FAUX d'un
+    legume bouilli, dont les sucres partent dans la casserole — d'ou le
+    garde-fou sur ETAT_CUIT, qui ne doit contenir que des grains secs.
+
+    CETTE FORMULE ETAIT ECRITE DEUX FOIS, mot pour mot, dans
+    `exporter_catalogue` et dans `main`, avec sa garde. Sortie ici le
+    17 septembre 2026 : regle 5, aucune formule metier recopiee — et surtout,
+    enfouie dans deux fonctions qui parlent a Grocy, elle n'etait testable
+    nulle part. `test_ciqual.py` l'eprouve maintenant directement.
+
+    Rend None quand l'un des deux etats manque : sans couple, pas de
+    rendement, et surtout pas un 1 par defaut (regle 6, vide n'est pas zero).
+    """
+    if not kcal_sec or not kcal_cuit:
+        return None
+
+    return round(kcal_sec / kcal_cuit, 2)
+
+
+def rendement_derive_credible(categorie: str, ratio) -> bool:
+    """
+    Le rendement deduit de l'energie est-il utilisable ?
+
+    Deux conditions, et la seconde n'est pas une tolerance : la bande 0,4-5
+    ecarte un appariement absurde, `sens_du_rendement` ecarte un contresens.
+    Un feculent qui RETRECIT vient d'une entree cuite mal choisie, jamais
+    d'une cuisson exotique — c'est exactement ce qu'avait produit la semoule
+    a 142 kcal. A defaut, on garde le rendement de table plutot que d'ecrire
+    un chiffre deduit d'un mauvais couple.
+    """
+    return (ratio is not None and 0.4 <= ratio <= 5
+            and sens_du_rendement(categorie, ratio) is None)
 
 
 def pesees_de(produit) -> tuple[float, float] | None:
@@ -757,8 +805,8 @@ def exporter_catalogue(aliments, chemin: str = "") -> int:
 
             cuit = chercher(aliments, ETAT_CUIT[motif])
             if cuit and cuit["kcal"]:
-                calcule = round(aliment["kcal"] / cuit["kcal"], 2)
-                if 0.4 <= calcule <= 5 and sens_du_rendement(categorie, calcule) is None:
+                calcule = rendement_par_energie(aliment["kcal"], cuit["kcal"])
+                if rendement_derive_credible(categorie, calcule):
                     ratio = calcule
 
         contresens = sens_du_rendement(categorie, ratio)
@@ -852,10 +900,36 @@ ORDER  BY categorie, nom;
 
 # -------------------------------------------------------------------- main
 
-# Bande dans laquelle tombe toute cereale ou legumineuse SECHE. C'est de la
-# matiere seche : 300 a 400 kcal aux 100 g, toujours. Meme borne que
-# `front/src/calcul/plausibilite.ts` — si tu la changes ici, change-la la-bas.
-SEC_MINI, SEC_MAXI = 300, 400
+# (SEC_MINI et SEC_MAXI etaient redefinis ici, aux memes valeurs qu'en haut du
+#  fichier. Retires le 17 septembre 2026 : la definition unique vit au-dessus
+#  de `grain_sec_credible`.)
+
+
+def valeurs_au_sec(champs, ratio) -> dict:
+    """
+    Les macros d'un produit CUIT, ramenees au produit tel qu'on le pese.
+
+    LA CONVERSION EST UNE MULTIPLICATION PAR LE RENDEMENT, et rien d'autre :
+    la cuisson n'ajoute que de l'eau, elle dilue tout dans les memes
+    proportions. 99 kcal et 22 g de glucides pour 100 g de riz cuit, avec un
+    rendement de 3,53, redonnent 350 kcal et 78 g pour 100 g de riz sec.
+
+    UN CHAMP VIDE RESTE ABSENT (regle 6) : « je ne sais pas » ne devient pas
+    zero en passant par ici, sans quoi la conversion INVENTERAIT une fibre a
+    0 g sur un produit dont on ignore les fibres.
+
+    Sortie de `convertir_en_pese` le 17 septembre 2026. Enfouie dans une
+    fonction qui interroge Grocy en HTTP, la seule formule qui relie l'etat
+    cuit a l'etat sec n'etait eprouvable nulle part.
+    """
+    converties = {}
+    for champ in ("kcal100", "prot100", "gluc100", "lip100", "fibres100"):
+        valeur = champs.get(champ)
+        if valeur is None or str(valeur).strip() == "":
+            continue          # « inconnu » ne devient pas zero
+        converties[champ] = round(nombre(valeur) * ratio, 2)
+
+    return converties
 
 
 def convertir_en_pese(appliquer: bool) -> int:
@@ -898,12 +972,7 @@ def convertir_en_pese(appliquer: bool) -> int:
             laisses.append((produit["name"], kcal, ratio, vise))
             continue
 
-        nouveaux = {}
-        for champ in ("kcal100", "prot100", "gluc100", "lip100", "fibres100"):
-            valeur = champs.get(champ)
-            if valeur is None or str(valeur).strip() == "":
-                continue      # « inconnu » ne devient pas zero
-            nouveaux[champ] = round(nombre(valeur) * ratio, 2)
+        nouveaux = valeurs_au_sec(champs, ratio)
 
         convertis.append((produit["name"], kcal, nouveaux.get("kcal100"), ratio))
         if appliquer:
@@ -1041,11 +1110,11 @@ def main() -> int:
 
             cuit = chercher(aliments, ETAT_CUIT[motif_produit])
             if cuit and cuit["kcal"]:
-                calcule = round(aliment["kcal"] / cuit["kcal"], 2)
+                calcule = rendement_par_energie(aliment["kcal"], cuit["kcal"])
                 # Le SENS ne se discute pas : un feculent ne retrecit pas. Une
                 # derivation a contresens vient d'un mauvais appariement de
                 # l'entree cuite, pas d'une cuisson exotique.
-                if 0.4 <= calcule <= 5 and sens_du_rendement(categorie, calcule) is None:
+                if rendement_derive_credible(categorie, calcule):
                     if abs(calcule - ratio) / ratio > 0.1:
                         ratios_corriges.append(
                             (produit["name"], ratio, calcule, cuit["nom"]))

@@ -253,7 +253,7 @@ SELECT id, nom, source, public, cree_par FROM exercice WHERE public = false;
 ## La capture pour la démonstration
 
 `presentation/captures/catalogue-exercices/` — cette fonctionnalité n'a **pas**
-de bobine propre dans `presentation/plan-de-tournage.md` : elle se voit dans la
+de bobine propre dans `presentation/demonstration.md` : elle se voit dans la
 **bobine 7** (« On s'entraîne ») côté utilisateur, et dans la **bobine 8.1**
 côté administrateur. Les scénarios ci-dessous sont donc à tourner en compte
 **ordinaire**.

@@ -22,40 +22,77 @@ de l'importer.
 
 import ast
 import os
+import re
 import sys
 
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "ciqual_vers_grocy.py")
 
-A_EXTRAIRE = {"sens_du_rendement",
+SOURCE = open(SCRIPT, encoding="utf-8").read()
+ARBRE = ast.parse(SOURCE)
+
+A_EXTRAIRE = {"sens_du_rendement", "rendement_par_energie",
+              "rendement_derive_credible", "grain_sec_credible",
+              "valeurs_au_sec", "nombre", "coherent", "SEC_MINI", "SEC_MAXI",
               "ETAT_CUIT", "CORRESPONDANCE", "desaccords", "normaliser",
               "MOTS_DECISIFS", "valeurs_saisies_a_la_main", "SAISIE_MANUELLE",
               "EXACTS", "CHAMPS_REQUIS"}
 
 
+def noms_poses(noeud) -> set:
+    """
+    Les noms qu'un noeud de premier niveau pose, `A, B = 1, 2` compris.
+
+    `SEC_MINI, SEC_MAXI = 300, 400` sortait d'ici les mains vides : la cible
+    n'est pas un `Name` mais un `Tuple`, et le `getattr(cible, "id", None)`
+    d'avant rendait None sans un mot. La constante etait donc declaree
+    introuvable alors qu'elle est bien dans le script. Vu le 17 septembre 2026,
+    en voulant justement l'extraire.
+    """
+    if isinstance(noeud, ast.FunctionDef):
+        return {noeud.name}
+
+    cible = noeud.targets[0]
+    if isinstance(cible, ast.Tuple):
+        return {getattr(element, "id", "") for element in cible.elts}
+
+    return {getattr(cible, "id", "")}
+
+
 def fonctions_pures():
     """Les fonctions sans effet de bord du script, sorties de leur contexte."""
-    source = open(SCRIPT, encoding="utf-8").read()
-    arbre = ast.parse(source)
-    morceaux = []
-    for noeud in arbre.body:
-        if isinstance(noeud, ast.FunctionDef) and noeud.name in A_EXTRAIRE:
-            morceaux.append(ast.get_source_segment(source, noeud))
-        elif (isinstance(noeud, ast.Assign)
-              and getattr(noeud.targets[0], "id", None) in A_EXTRAIRE):
-            morceaux.append(ast.get_source_segment(source, noeud))
+    morceaux, posees = [], set()
+    for noeud in ARBRE.body:
+        if not isinstance(noeud, (ast.FunctionDef, ast.Assign)):
+            continue
+        noms = noms_poses(noeud)
+        posees |= noms
+        if noms & A_EXTRAIRE:
+            morceaux.append(ast.get_source_segment(SOURCE, noeud))
 
-    manquantes = A_EXTRAIRE - {
-        n.name if isinstance(n, ast.FunctionDef) else getattr(n.targets[0], "id", "")
-        for n in arbre.body
-        if isinstance(n, (ast.FunctionDef, ast.Assign))
-    }
+    manquantes = A_EXTRAIRE - posees
     if manquantes:
         sys.exit(f"Introuvables dans le script : {', '.join(sorted(manquantes))}")
 
     espace = {"unicodedata": __import__("unicodedata"), "re": __import__("re")}
     exec("\n\n".join(morceaux), espace)  # noqa: S102 — code du depot, pas une entree
     return espace
+
+
+def source_de(nom):
+    """
+    Le code SOURCE d'une fonction du script, sans l'executer.
+
+    `exporter_catalogue` ecrit un fichier VERSIONNE : un test ne l'appelle
+    pas. Mais on peut lire le gabarit SQL qu'elle construit — et c'est la, et
+    nulle part ailleurs, que se decide quelle colonne a le droit de dependre
+    du rendement.
+    """
+    for noeud in ARBRE.body:
+        if isinstance(noeud, ast.FunctionDef) and noeud.name == nom:
+            return ast.get_source_segment(SOURCE, noeud)
+
+    sys.exit(f"Fonction introuvable dans le script : {nom}")
 
 
 BOITE = fonctions_pures()
@@ -99,37 +136,134 @@ def presque(a, b, marge=1e-9):
 #  l'ecrasant en silence. Retiree le 16 septembre 2026 : un fichier qui definit
 #  deux fois la meme constante finit par n'en corriger qu'une.)
 
-# LE test de la refonte.
+# LE test de la refonte, REECRIT LE 17 SEPTEMBRE 2026 parce qu'il ne pouvait
+# pas echouer.
 #
-# Il y avait ici une batterie sur `macros_depuis_le_sec`, la fonction qui
-# recalculait les macros CUITES a partir du rendement mesure. Elle verifiait,
-# entre autres, que le poids sec a peser ne bougeait pas quand le rendement
-# changeait — un invariant vrai mais fragile, qui tenait a une simplification
-# algebrique qu'il fallait surveiller a chaque modification.
+# Il y avait ici une boucle de dix assertions qui se lisaient tres bien :
+# `a_peser` etait calcule par MOT POUR MOT l'expression de `attendu`, et
+# `servi` valait `a_peser * rendement` compare a `attendu * rendement`. Aucune
+# n'appelait la moindre fonction du script. Elles passaient quoi qu'il arrive,
+# et auraient passe tout autant le jour ou l'import serait revenu a multiplier
+# les macros par le rendement — c'est-a-dire le bug meme qu'elles etaient
+# censees interdire. Onzieme du meme tonneau, `attendu * 4.68 > 2 * (attendu *
+# 1.87)` : une verite d'arithmetique, 4,68 > 3,74. Seule la douzieme, le
+# couple 350 / 155 -> 2,26, eprouvait quelque chose. Motif « test qui ne peut
+# pas echouer » ; l'audit de septembre en avait compte douze.
 #
-# Les macros exportees decrivent maintenant le grain sec. Le poids a peser se
-# lit directement dessus, et le rendement n'apparait plus dans le calcul. Ce
-# n'est plus une propriete a verifier, c'est une impossibilite d'ecriture — et
-# le test ci-dessous le constate au lieu de le surveiller.
-CIBLE_GLUCIDES = 60.0
-attendu = CIBLE_GLUCIDES * 100 / RIZ_SEC["gluc"]
+# Les trois regles a garantir n'ont pas bouge d'un pouce. Ce qui change, c'est
+# qu'elles sont desormais eprouvees sur le CODE qui les porte :
+#
+#   1. le poids A PESER ne depend pas du rendement — les macros exportees
+#      decrivent le grain SEC, et aucune colonne de macro ne passe par le
+#      rendement ;
+#   2. le poids SERVI en depend — passer d'un etat a l'autre est exactement
+#      une multiplication par le rendement, et rien d'autre ;
+#   3. le rendement se derive du couple sec / cuit.
+#
+# Cote ecran, 1 et 2 vivent dans `front/src/calcul/poidsServi.ts`, qui a ses
+# propres tests : la formule ne se recopie pas ici (regle 5). Ce fichier tient
+# le bout de la chaine qui est en Python — ce que l'import ECRIT.
+grain_sec_credible = BOITE["grain_sec_credible"]
+rendement_par_energie = BOITE["rendement_par_energie"]
+rendement_derive_credible = BOITE["rendement_derive_credible"]
+valeurs_au_sec = BOITE["valeurs_au_sec"]
+coherent = BOITE["coherent"]
+SEC_MINI, SEC_MAXI = BOITE["SEC_MINI"], BOITE["SEC_MAXI"]
 
-for rendement in (1.87, 2.26, 3.0, 4.68, 5.5):
-    a_peser = CIBLE_GLUCIDES * 100 / RIZ_SEC["gluc"]
-    servi = a_peser * rendement
-    verifier(f"poids sec a peser identique a un rendement de {rendement}",
-             presque(a_peser, attendu, 1e-9))
-    verifier(f"... et le poids servi suit le rendement de {rendement}",
-             presque(servi, attendu * rendement, 1e-9))
-
-verifier("le poids servi change du simple au double entre 1.87 et 4.68",
-         attendu * 4.68 > 2 * (attendu * 1.87))
-
-# Le rendement derive de l'energie, dans le sens qui est maintenant le bon :
-# sec / cuit. 350 kcal de riz sec pour 155 kcal de riz cuit donnent 2,26.
+# Riz blanc CUIT, Ciqual : l'autre bout du couple.
 RIZ_CUIT_KCAL = 155
-verifier("le rendement se deduit du couple sec / cuit",
-         presque(round(RIZ_SEC["kcal"] / RIZ_CUIT_KCAL, 2), 2.26, 0.01))
+
+# --------- regle 1 : le poids a peser ne depend pas du rendement
+#
+# Ce n'est plus une propriete a surveiller, c'est une impossibilite d'ecriture
+# — encore faut-il le CONSTATER quelque part. On lit donc le gabarit SQL que
+# `exporter_catalogue` construit : c'est la seule ligne de code du depot qui
+# pourrait faire entrer le rendement dans une macro.
+GABARIT = source_de("exporter_catalogue")
+COLONNES = dict(re.findall(r"^ {4}(\w+)\s*=\s*(.+)$", GABARIT, re.M))
+
+for colonne in ("kcal_100", "prot_100", "gluc_100", "lip_100", "fibres_100"):
+    verifier(f"la colonne « {colonne} » s'ecrit sans le rendement",
+             colonne in COLONNES and "ratio" not in COLONNES[colonne])
+
+verifier("le rendement, lui, a sa propre colonne et ne fait rien d'autre",
+         COLONNES.get("ratio", "").strip() == "{ratio:g}")
+
+# La colonne peut etre formellement propre et porter quand meme un chiffre de
+# produit CUIT : c'est le degat du 10 aout, 142 kcal de semoule cuite ecrits
+# comme du sec. La garde est physique, pas lexicale.
+verifier("le riz sec de Ciqual passe pour du grain sec",
+         grain_sec_credible(RIZ_SEC))
+verifier("la semoule CUITE a 142 kcal est refusee",
+         not grain_sec_credible({"kcal": 142}))
+verifier("le riz CUIT a 155 kcal est refuse lui aussi",
+         not grain_sec_credible({"kcal": RIZ_CUIT_KCAL}))
+verifier("un aliment sans kcal n'est pas du grain sec par defaut",
+         not grain_sec_credible({"kcal": None}) and not grain_sec_credible({}))
+verifier(f"les bornes {SEC_MINI} et {SEC_MAXI} sont dans la bande",
+         grain_sec_credible({"kcal": SEC_MINI})
+         and grain_sec_credible({"kcal": SEC_MAXI}))
+verifier("... et ce qui les depasse d'un seul kcal est dehors",
+         not grain_sec_credible({"kcal": SEC_MINI - 1})
+         and not grain_sec_credible({"kcal": SEC_MAXI + 1}))
+
+# Les macros du riz sec sont une donnee de CE fichier, recopiee de Ciqual :
+# rien ne les verifiait, et elles ont ete fausses jusqu'au 16 septembre. Au
+# moins doivent-elles tenir debout entre elles, a la convention EUROPEENNE
+# (regle 4, fibres a 2 kcal/g). Ce controle n'aurait PAS attrape les valeurs
+# fausses de la veille — 360 kcal calcules pour 350 annonces restent dans la
+# tolerance de 12 % — et c'est ecrit ici pour que personne ne le croie plus
+# fort qu'il n'est.
+verifier("les macros du riz sec tiennent avec son energie",
+         coherent(RIZ_SEC)[0])
+
+# --------- regle 3 : le rendement se derive du couple sec / cuit
+verifier("350 kcal de riz sec pour 155 de riz cuit donnent 2,26",
+         presque(rendement_par_energie(RIZ_SEC["kcal"], RIZ_CUIT_KCAL),
+                 2.26, 0.005))
+verifier("le couple de la semoule, 350 / 164, donne 2,13",
+         presque(rendement_par_energie(350, 164), 2.13, 0.005))
+verifier("un cuit plus dilue donne un rendement plus grand",
+         rendement_par_energie(350, 130)
+         > rendement_par_energie(350, RIZ_CUIT_KCAL)
+         > rendement_par_energie(350, 180))
+verifier("sans l'un des deux etats, pas de rendement — et surtout pas 1",
+         rendement_par_energie(350, None) is None
+         and rendement_par_energie(None, RIZ_CUIT_KCAL) is None
+         and rendement_par_energie(350, 0) is None)
+verifier("celui du riz est retenu pour l'export",
+         rendement_derive_credible("fec",
+                                   rendement_par_energie(350, RIZ_CUIT_KCAL)))
+verifier("le couple a l'envers — 142 de « sec » pour 350 de cuit — est refuse",
+         not rendement_derive_credible("fec", rendement_par_energie(142, 350)))
+verifier("5,83 est hors de la bande d'export, meme dans le bon sens",
+         not rendement_derive_credible("fec", rendement_par_energie(350, 60)))
+verifier("un legume ne tire pas son rendement de l'energie",
+         not rendement_derive_credible("leg",
+                                       rendement_par_energie(350, RIZ_CUIT_KCAL)))
+
+# --------- regle 2 : le poids servi, lui, depend du rendement
+#
+# Et le passage d'un etat a l'autre est une MULTIPLICATION, rien de plus. Les
+# valeurs sont celles du riz basmati saisi a la main dans Grocy avant la
+# refonte : 99 kcal et 22 g de glucides pour 100 g de riz cuit.
+RIZ_CUIT_GROCY = {"kcal100": "99", "gluc100": "22", "prot100": "2.4",
+                  "lip100": "", "fibres100": None}
+AU_SEC = valeurs_au_sec(RIZ_CUIT_GROCY, 3.53)
+
+verifier("99 kcal de riz cuit a 3,53 redonnent 349,47 au sec",
+         presque(AU_SEC["kcal100"], 349.47, 0.005))
+verifier("... et 22 g de glucides en redonnent 77,66",
+         presque(AU_SEC["gluc100"], 77.66, 0.005))
+verifier("... et 2,4 g de proteines, 8,47 : tout suit le rendement",
+         presque(AU_SEC["prot100"], 8.47, 0.005))
+verifier("changer le rendement change le resultat, dans les memes proportions",
+         presque(valeurs_au_sec(RIZ_CUIT_GROCY, 2)["kcal100"], 198.0, 0.005)
+         and presque(valeurs_au_sec(RIZ_CUIT_GROCY, 2)["gluc100"], 44.0, 0.005))
+verifier("un rendement de 1 ne change rien, par le meme chemin",
+         presque(valeurs_au_sec(RIZ_CUIT_GROCY, 1)["kcal100"], 99.0, 0.005))
+verifier("un champ vide reste absent : « je ne sais pas » n'est pas zero",
+         "lip100" not in AU_SEC and "fibres100" not in AU_SEC)
 
 # ------------------------------------------------- le sens du rendement
 

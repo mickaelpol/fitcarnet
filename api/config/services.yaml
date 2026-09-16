@@ -49,6 +49,22 @@ services:
             - { name: api_platform.doctrine.orm.query_extension.collection, priority: 50 }
             - { name: api_platform.doctrine.orm.query_extension.item, priority: 50 }
 
+    # Une colonne DECIMAL s'écrit en nombre comme en chaîne.
+    #
+    # `POST /api/aliments {"kcal100": 350}` répondait 400 le 16 septembre 2026 :
+    # Doctrine hydrate un DECIMAL en chaîne (décision du projet — pas de virgule
+    # flottante sur des valeurs nutritionnelles), et `property_info` en déduisait
+    # que l'API attendait « 350 ». Cette fabrique repasse derrière et déclare
+    # `float|string`, ce que les mutateurs acceptent déjà.
+    #
+    # Priorité 0 : à l'intérieur du cache (-10), donc calculée une fois, et par
+    # dessus les fabriques d'API Platform (property_info 40, attribute 35) dont
+    # elle corrige le résultat.
+    App\Metadata\DecimalesNumeriques:
+        decorates: 'api_platform.metadata.property.metadata_factory'
+        decoration_priority: 0
+        arguments: ['@.inner']
+
     # Grocy : la base d'aliments de l'administrateur.
     # Les identifiants viennent de l'environnement, jamais du dépôt.
     App\Service\FrigoGrocy:

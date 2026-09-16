@@ -7,7 +7,7 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Utilisateur;
-use Doctrine\DBAL\Connection;
+use App\Service\JetonsRafraichissement;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -54,7 +54,7 @@ final readonly class UtilisateurProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private UserPasswordHasherInterface $hasher,
         private Security $securite,
-        private Connection $cnx,
+        private JetonsRafraichissement $jetons,
     ) {
     }
 
@@ -105,11 +105,14 @@ final readonly class UtilisateurProcessor implements ProcessorInterface
         if ($changeMotDePasse && !$creation) {
             /* APRES la persistance, jamais avant : revoquer les sessions d'un
                changement qui echouerait ensuite deconnecterait quelqu'un pour
-               rien. */
-            $this->cnx->executeStatement(
-                'DELETE FROM jeton_rafraichissement WHERE utilisateur_id = :u',
-                ['u' => $data->getId()],
-            );
+               rien.
+
+               LA COUPURE ELLE-MEME VIT DANS `JetonsRafraichissement`. Elle
+               etait ecrite ici en SQL, et une seconde fois dans
+               `ComptesController::activer` : meme intention, deux copies, et
+               deja deux facons de nommer le compte. Rassemblees le
+               17 septembre 2026. */
+            $this->jetons->revoquerTout($data);
         }
 
         return $resultat;

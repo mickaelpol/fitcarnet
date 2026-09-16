@@ -176,10 +176,18 @@ class Aliment
     /*
      * Les groupes des champs decimaux vivent sur les ACCESSEURS, pas sur les
      * proprietes. Doctrine hydrate un DECIMAL en chaine : la propriete est
-     * donc typee string, et le serialiseur en deduisait « kcal100 doit etre
-     * une chaine » — refusant 150 envoye par l'application, et renvoyant des
-     * chaines la ou le front attend des nombres. Les accesseurs, eux, sont
-     * typés float : le contrat de l'API redevient numerique dans les deux sens.
+     * donc typee string, et l'API rendait des chaines la ou le front attend
+     * des nombres. Les accesseurs, eux, sont typés float : la LECTURE redevient
+     * numerique.
+     *
+     * LA LECTURE SEULEMENT. Ce commentaire disait « dans les deux sens »
+     * jusqu'au 17 septembre 2026, et c'etait faux : `POST /api/aliments`
+     * {"kcal100": 350} repondait toujours 400, « must be "string", "integer"
+     * given ». Un groupe de serialisation dit QUI est expose, pas SOUS QUEL
+     * TYPE — le type vient de `property_info`, ou l'extracteur Doctrine traduit
+     * DECIMAL en `string` avant que la reflexion n'ait son mot a dire. Ce qui
+     * corrige l'ECRITURE est `App\Metadata\DecimalesNumeriques`, qui declare
+     * `float|string` pour toute colonne decimale du modele.
      */
     public function getId(): ?int { return $this->id; }
     public function getNom(): string { return $this->nom; }

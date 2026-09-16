@@ -188,7 +188,7 @@ l'épreuve à l'écran** : le défaut historique n'était pas dans la formule, i
 ## La capture pour la démonstration
 
 Reprend les plans **7.4, 7.5 et 7.8** de la bobine 7 de
-`presentation/plan-de-tournage.md` — 7.5 y est marqué **« le moment fort »**.
+`presentation/demonstration.md` — 7.5 y est marqué **« le moment fort »**.
 
 `presentation/captures/progression/` :
 
@@ -219,8 +219,8 @@ pourquoi, se distingue de toutes celles qui affichent 79,96 kg sans broncher.
   Relevé le 16 septembre 2026, **non corrigé** — à signaler, pas à corriger dans
   une épreuve (`epreuve-fonctionnalite`, règle 3).
 - **`presentation/features.md:294` dit « zone 70–80 % »** : faux, c'est 70 à
-  90 %. Déjà signalé par `fonctionnalites-revue.md`, toujours pas corrigé dans
-  `features.md`.
+  90 %. Déjà signalé par `presentation/demonstration.md` (partie V, point 4),
+  toujours pas corrigé dans `features.md`.
 - **Le document du propriétaire ne mentionne pas les deux garde-fous**
   (`presentation/fonctionnalites-par-onglet.md`, ligne sur la formule d'Epley).
   Arbitrage rendu le 16 septembre : **ils restent tels quels**.

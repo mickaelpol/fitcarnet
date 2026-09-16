@@ -120,6 +120,49 @@ final class JetonsRafraichissement
     }
 
     /**
+     * COUPER TOUTES LES SESSIONS D'UN COMPTE.
+     *
+     * Les deux revocations « tout ou rien » qui restent passent par ici :
+     * changer son mot de passe (`UtilisateurProcessor`) et desactiver un compte
+     * (`ComptesController::activer`). La troisieme porte, la suppression d'un
+     * compte, s'en remet a la cascade de la base — et c'est la bonne reponse
+     * pour elle : la ligne `utilisateur` disparait.
+     *
+     * ELLES ECRIVAIENT CHACUNE SON PROPRE `DELETE` JUSQU'AU 17 SEPTEMBRE 2026.
+     * Deux copies, la meme intention, aucun partage — et elles divergeaient
+     * deja : l'une passait un `Uuid`, l'autre une chaine. C'est le motif de
+     * defaut dominant du projet, celui qui a coute la faille de septembre 2026
+     * entre `POST /mon-frigo/stock` et son jumeau `/mon-frigo/inventaire` : une
+     * decision juste, appliquee a un endroit et oubliee a l'autre. Le jour ou
+     * couper une session devra faire une chose de plus — inscrire une trace,
+     * prevenir l'appareil — elle se fera ici, pour les deux.
+     *
+     * ON CHARGE LES LIGNES AU LIEU D'UN `DELETE` EN MASSE, comme `revoquer()`
+     * et `revoquerPour()` a cote : une session par appareil, ca ne se compte
+     * pas en milliers, et l'unite de travail reste d'accord avec la base.
+     *
+     * Le compte accepte les trois formes que les appelants ont sous la main :
+     * l'entite, son identifiant, ou la chaine lue dans l'URL.
+     */
+    public function revoquerTout(Utilisateur|Uuid|string $compte): void
+    {
+        $proprietaire = match (true) {
+            $compte instanceof Utilisateur => $compte->getId(),
+            $compte instanceof Uuid => $compte,
+            default => Uuid::fromString($compte),
+        };
+
+        $jetons = $this->em->getRepository(JetonRafraichissement::class)
+            ->findBy(['utilisateur' => $proprietaire]);
+
+        foreach ($jetons as $jeton) {
+            $this->em->remove($jeton);
+        }
+
+        $this->em->flush();
+    }
+
+    /**
      * Les sessions ouvertes d'un compte, pour l'ecran qui les liste.
      *
      * @return list<JetonRafraichissement>
