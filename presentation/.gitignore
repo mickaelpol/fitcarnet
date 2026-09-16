@@ -6,7 +6,19 @@
 #   ./presentation/monter-demo.sh       → fitcarnet-demonstration.mp4
 fitcarnet-presentation.html
 fitcarnet-dossier.html
-fitcarnet-demonstration.mp4
+
+# LA VIDÉO, ELLE, EST VERSIONNÉE — exception décidée le 17 septembre 2026.
+#
+# Elle est régénérable comme les deux fichiers au-dessus, mais pas « d'un
+# geste » : il faut ffmpeg installé, un tournage de deux minutes et demie sur
+# une application qui tourne avec son jeu de données, et une table DECOUPE
+# recalée à la main sur decoupe.json. Le propriétaire travaille sur deux
+# machines, et ce qui doit circuler passe par git — il n'y a pas de second
+# clone ni de dossier partagé (CLAUDE.md, « une seule arborescence »).
+#
+# Si elle devient trop lourde pour Gitea, la réponse est git-lfs, pas un
+# retour silencieux à l'ignorance : une vidéo qu'on croit poussée et qui ne
+# l'est pas se découvre sur l'autre PC, un soir de démonstration.
 
 # Les images de la démonstration ET les captures vidéo des fonctionnalités
 # (agent `verification-fonctionnalites`). Régénérables, et lourdes : même règle,

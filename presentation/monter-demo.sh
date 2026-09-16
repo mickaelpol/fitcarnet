@@ -55,14 +55,14 @@ trap 'rm -rf "$TRAVAIL"' EXIT
 #  dans un lecteur serait long et faux ; le script qui pilote le navigateur,
 #  lui, sait exactement quand il a changé d'écran.
 DECOUPE=(
-    "0:7"         # 1 · connexion
-    "7:23"        # 2 · frigo, le stock
-    "23:39"       # 3 · frigo, l'inventaire
-    "39:50"       # 4 · repas, les cibles
-    "50:80"       # 5 · repas, composer
-    "80:94"       # 6 · repas, batch cooking
-    "94:126"      # 7 · séances, liste puis détail
-    "126:fin"     # 8 · modèles
+    "0:12"        # 1 · connexion
+    "12:27"       # 2 · frigo, le stock
+    "27:42"       # 3 · frigo, l'inventaire
+    "42:54"       # 4 · repas, les cibles
+    "54:83"       # 5 · repas, composer
+    "83:96"       # 6 · repas, batch cooking
+    "96:127"      # 7 · séances, liste puis détail
+    "127:fin"     # 8 · modèles
 )
 
 # ---------------------------------------------------------------------

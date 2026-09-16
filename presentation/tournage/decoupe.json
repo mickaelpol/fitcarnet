@@ -1,47 +1,47 @@
 [
   {
-    "nom": "ouverture (session memorisee)",
-    "debut": 0.241,
-    "fin": 7.077
+    "nom": "connexion",
+    "debut": 0.719,
+    "fin": 12.05
   },
   {
     "nom": "frigo — le stock",
-    "debut": 7.077,
-    "fin": 23.304
+    "debut": 12.05,
+    "fin": 27.553
   },
   {
     "nom": "frigo — inventaire",
-    "debut": 23.304,
-    "fin": 39.415
+    "debut": 27.553,
+    "fin": 42.963
   },
   {
     "nom": "repas — les cibles",
-    "debut": 39.415,
-    "fin": 50.386
+    "debut": 42.963,
+    "fin": 54.428
   },
   {
     "nom": "repas — composer",
-    "debut": 50.386,
-    "fin": 80.157
+    "debut": 54.428,
+    "fin": 83.065
   },
   {
     "nom": "repas — batch cooking",
-    "debut": 80.157,
-    "fin": 93.818
+    "debut": 83.065,
+    "fin": 96.323
   },
   {
     "nom": "séances — la liste",
-    "debut": 93.818,
-    "fin": 102.172
+    "debut": 96.323,
+    "fin": 104.611
   },
   {
     "nom": "séances — le détail, la saisie et le 1RM",
-    "debut": 102.172,
-    "fin": 126.282
+    "debut": 104.611,
+    "fin": 127.456
   },
   {
     "nom": "modèles — les programmes",
-    "debut": 126.282,
-    "fin": 142.779
+    "debut": 127.456,
+    "fin": 142.363
   }
 ]
