@@ -249,11 +249,11 @@ Slides 18 à 23. Les chiffres, tels quels :
 
 | | |
 |---|---|
-| Tests front | **605** (577 purs + 28 de rendu) |
+| Tests front | **617** (588 purs + 29 de rendu) |
 | Tests API | **252**, 661 assertions, sans base ni noyau |
 | Audit de septembre 2026 | **84 constats** (3 critiques, 15 élevés), **8 lots, tous clos** |
 | Catalogue d'exercices | ~1 338 entrées |
-| Inventaire des capacités | ~220, avec fichier et ligne |
+| Inventaire des capacités | **288**, chacune avec fichier et ligne |
 
 > « **Le test est écrit avant, et on le regarde échouer.** Sinon on ne corrige
 > pas un bug : on ajuste le test qui fige la mauvaise valeur. L'audit a trouvé

@@ -432,7 +432,7 @@ Monté du 9 au 14 septembre 2026 pour présenter fitcarnet **à un client et à 
 | `tournage/tourner.mjs` | pilote l'application avec Playwright et enregistre en continu | ✅ |
 | `monter-demo.sh` | cartons, légendes, chapitres | ✅ |
 | `script-narration.md` | ce qu'il faut dire, slide par slide, vidéo minutée | ✅ |
-| `features.md` | **les ~220 fonctionnalités**, avec fichier et ligne | ✅ |
+| `features.md` | **288 capacités**, chacune avec fichier et ligne | ✅ |
 | `plan-de-tournage.md` | le script de tournage en 8 bobines, pour filmer au téléphone | ✅ |
 
 **Ce qui reste à faire**, et c'est la suite naturelle :
@@ -482,7 +482,8 @@ cette courbe qui fait vivre la démonstration.
 ## Ce que l'inventaire des fonctionnalités a mis au jour
 
 `presentation/features.md` a été établi par exploration systématique du code —
-écrans, calculs, back-end. Il recense environ **220 capacités** là où un premier
+écrans, calculs, back-end. Il recense **288 capacités** portant chacune son
+`fichier:ligne` (294 puces au total) là où un premier
 inventaire de surface en voyait 57. Il a aussi montré que **la documentation
 mentait sur deux points** :
 
@@ -1109,7 +1110,12 @@ parlant du **contrôle au point de passage obligé**, donc de l'inventaire), et
 donc pour `E2 front`). Les six cas ambigus ont été résolus **en lisant leur ligne
 une par une** ; ils sont inscrits en dur dans la passe.
 
-Résultat : 7 065 arêtes, et `E8 → FiltreExercice.php → FiltreExercice`.
+Résultat : 7 065 arêtes, et `FiltreExercice.php --references--> E8`.
+
+> **Le sens compte, et il est l'inverse de celui qu'on voudrait parcourir.**
+> L'arête part du **code** vers le **constat** : `graphify path "E8" "FiltreExercice.php"`
+> ne trouve rien, le chemin inverse oui. Partir d'un constat pour retrouver le
+> code qui le porte demande donc une traversée non dirigée.
 
 ---
 
@@ -1142,9 +1148,10 @@ neutralisé et archivé depuis le 7 septembre, dont le clone est renommé
 `.OBSOLETE`, et dont `CLAUDE.md`, `README.md` et `NOUVELLE-MACHINE.md`
 interdisent tous les trois l'usage — **c'est la cause du bug critique C1**. Un
 document opérationnel qui prescrit la cause d'une panne connue est pire qu'un
-document absent. Quatre sections ont été rapatriées (l'ordre des cinq gestes
-quand une dépendance native change, le piège Gradle 503, le diagnostic par
-`ssh nas`, et « ce que tu ne dois jamais faire ») ; la section `fitsync` est
+document absent. Quatre sections ont été rapatriées — « l'ordre des cinq gestes
+quand une dépendance native change » (qui contient le piège Gradle 503), « si tu
+touches à la base de données », « quand quelque chose ne marche pas » et « ce que
+tu ne dois jamais faire » ; la section `fitsync` est
 restée derrière. Trois référents réécrits : `CLAUDE.md`, `README.md`, la skill
 `schema-base`.
 
@@ -1175,12 +1182,19 @@ n'existe pas · ce journal citait quatre skills hexagonales dont **aucune
 n'existe** · `features.md` et `plan-de-tournage.md` se contredisaient de 1 à 4
 sur le nombre de fonctionnalités.
 
-> **Les compteurs écrits sont les miens, mesurés le 16 septembre** : 18 écrans,
-> 43 composants, 17 modules de calcul, 17 fichiers dans le solveur,
-> 9 contrôleurs, 17 ressources API, 7 processeurs, 13 services, 19 tables,
-> 24 migrations numérotées, 1 338 exercices. Deux diffèrent du rapport de
-> l'agent (43 composants et non 54, 17 ressources et non 15) : j'ai gardé les
-> miens, comptés à la main.
+> **Compteurs mesurés le 16 septembre, après DEUX erreurs de ma part** :
+> **16 écrans** (`front/app/**.tsx` hors les deux `_layout`), **38 composants**
+> (`.tsx` de `src/composants/` hors tests), 17 modules de calcul, 17 fichiers
+> dans le solveur, 9 contrôleurs, 17 ressources API, 7 processeurs, 13 services,
+> **19 tables** (`BASE TABLE` — la base porte en plus la vue `v_performance`,
+> d'où 20 si on interroge `information_schema.tables` sans filtre),
+> 24 migrations numérotées, 1 338 exercices, 288 capacités dans `features.md`.
+>
+> *J'avais d'abord écrit « 18 écrans, 43 composants » : le premier comptait les
+> deux `_layout.tsx`, le second comptait les fichiers de test. `verite-documentaire`
+> a relevé les deux le soir même — et le README disait **16** avant que je le
+> « corrige ». Recopier un chiffre sans le compter est la faute que ce chantier
+> répare ; la commettre en la réparant valait d'être écrit ici.*
 
 ### Ce qui se garde, contre l'intuition
 
@@ -1198,7 +1212,8 @@ adresses vérifiées une par une et qui corrigent `features.md`. Dans le dossier
 `fonctionnalites-par-onglet.md` est la source brute du propriétaire — la toucher
 invaliderait la revue qui affirme ne pas l'avoir modifiée.
 
-**Bilan : 76 → 72 fichiers.** Le gain n'est pas le compte, c'est que plus aucun
+**Bilan : les `.md` suivis par git passent de 75 à 73**, plus une archive et une
+capture en doublon retirées. Le gain n'est pas le compte, c'est que plus aucun
 document ne commande un outil interdit ni n'annonce cinquante aliments qui
 n'existent pas.
 

@@ -18,7 +18,8 @@
 --    - quatre cibles nutritionnelles, une par moment de repas ;
 --    - trois programmes (Push, Pull, Legs) avec leurs séries prescrites ;
 --    - neuf séances hebdomadaires, dont une progression suivie au développé
---      (40 kg → 60 kg en neuf semaines, à répétitions constantes) : c'est elle
+--      (40 kg → 50 kg en neuf semaines, à répétitions constantes : +2,5 kg
+--      toutes les deux semaines, ce que la boucle pose ligne 209) : c'est elle
 --      qui fait vivre la courbe de 1RM et la table des paliers ;
 --    - deux plans de repas au format v3, dont un déjà cuisiné.
 --

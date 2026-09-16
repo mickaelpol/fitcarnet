@@ -1,7 +1,7 @@
 # fitcarnet — script de tournage
 
 Pour filmer les fonctionnalités recensées dans [features.md](features.md) —
-**environ 220 capacités**, réparties en huit bobines ci-dessous — **depuis ton
+**288 capacités** portant chacune son `fichier:ligne`, réparties en huit bobines ci-dessous — **depuis ton
 téléphone**, sur l'application de production.
 
 > Ce document a annoncé « 57 fonctionnalités » jusqu'au 16 septembre 2026. C'était

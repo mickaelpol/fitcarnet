@@ -51,6 +51,45 @@ const codes = (a: Aliment): string[] => verifierAliment(a).map((d) => d.code);
  *
  * `rendementPossible` dit la règle de la base et de l'API, et rien de plus.
  */
+/**
+ * LE JUMEAU DU CORRECTIF DU 16 SEPTEMBRE 2026.
+ *
+ * Ce jour-là, les deux bornes de `prot` ont été séparées : un seul message
+ * servait les deux, et il mentait sur la borne haute. Le commentaire du
+ * correctif disait « AVERTISSEMENT, comme son jumeau le légume, vingt lignes
+ * plus bas ». Ce jumeau, lui, a gardé UN message pour DEUX bornes — la revue
+ * l'a relevé le soir même.
+ *
+ * Un épinard poêlé : 500 g crus, 120 g cuits, rendement 0,24. Il s'enregistre
+ * (le `CHECK` ne refuse qu'au-dessus de 1,05), et l'écran Repas lui répond
+ * « un légume rend son eau, il n'en gagne pas » — l'inverse de ce qui s'est
+ * passé.
+ */
+describe('Un légume hors norme : les deux bornes ne disent pas la même chose', () => {
+  const legume = (ratio: number): Aliment => base({
+    nom: 'Épinard', categorie: 'leg', kcal100: 23, prot100: 2.7,
+    gluc100: 1.4, lip100: 0.4, fibres100: 2.2, ratio,
+  });
+
+  it('un légume qui a trop perdu n\'est pas accusé d\'avoir gagné de l\'eau', () => {
+    const d = verifierAliment(legume(0.24)).find((x) => x.code.startsWith('rendement')
+      || x.code.startsWith('legume'));
+
+    assert.ok(d, 'une perte des trois quarts mérite un signalement');
+    assert.doesNotMatch(d!.message, /n'en gagne pas/,
+      'c\'est le message de la borne HAUTE : il dit l\'inverse du constat');
+  });
+
+  it('un légume qui gonfle est toujours signalé, lui, pour la bonne raison', () => {
+    /* Le témoin inverse : séparer les bornes ne doit pas éteindre celle-ci. */
+    const d = verifierAliment(legume(1.5)).find((x) => x.code.startsWith('rendement')
+      || x.code.startsWith('legume'));
+
+    assert.ok(d);
+    assert.match(d!.message, /n'en gagne pas/);
+  });
+});
+
 describe('rendementPossible — ce qui est impossible, pas ce qui est inhabituel', () => {
   it('accepte la vraie mesure d\'épinard que l\'ancien garde refusait', () => {
     assert.equal(rendementPossible('leg', 0.32), true);
@@ -374,13 +413,18 @@ describe('Les pesées réelles du 8 août', () => {
     })), []);
   });
 
-  it('un épinard qui gonflerait à 1.7 est signalé', () => {
+  it('un épinard qui gonflerait à 1.7 est signalé, et pour la bonne raison', () => {
     /* Ce que donnait la dérivation par l'énergie : 119 g crus pour servir
-       200 g cuits, quand il en faut 500 à 700. */
+       200 g cuits, quand il en faut 500 à 700.
+
+       LE CODE A CHANGE DE NOM LE 16 SEPTEMBRE 2026, et c'est voulu : les deux
+       bornes de `leg` servaient le même message, comme celles de `prot` le
+       matin même. La borne haute a désormais son code à elle. Ce que ce test
+       garantissait — « c'est signalé » — est préservé. */
     assert.ok(codes(base({
       nom: 'Épinards', categorie: 'leg', kcal100: 22, prot100: 2.7,
       gluc100: 0.9, lip100: 0.4, fibres100: 2.5, ratio: 1.7,
-    })).includes('rendement_invraisemblable'));
+    })).includes('legume_qui_gonfle'));
   });
 
   it('truite 192 g crue → 102 g cuite : signalée, mais sans effet sur les macros', () => {

@@ -19,7 +19,7 @@ Contrôle : **19 tables**, et **aucun aliment** — c'est voulu, voir plus bas.
 ```bash
 docker compose -f compose.dev.yml exec db psql -U fitcarnet -d fitcarnet -c "
   SELECT 'tables' AS quoi, count(*) FROM information_schema.tables
-    WHERE table_schema = 'public'
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
   UNION ALL SELECT 'aliments', count(*) FROM aliment
   UNION ALL SELECT 'exercices', count(*) FROM exercice
   UNION ALL SELECT 'emplacements', count(*) FROM emplacement;"
@@ -66,7 +66,7 @@ docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet \
 > l'agent `verite-documentaire`. `installer.sh` faisait bien, lui, référence au
 > bon fichier : c'est la procédure manuelle qui mentait.
 
-Le fichier est numéroté 90 à dessein : il vient **après** la création du
+Le fichier vit dans `db/manuel/` à dessein : il vient **après** la création du
 compte, donc jamais au démarrage automatique. Il est idempotent.
 
 **Pourquoi `db/manuel/` et non `db/`** : le dossier `db/` est monté dans

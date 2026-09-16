@@ -294,11 +294,29 @@ export function verifierAliment(a: Aliment): Anomalie[] {
     }
   }
 
+  /* LE JUMEAU DU CORRECTIF POSÉ VINGT LIGNES PLUS HAUT, ET IL AVAIT LE MÊME
+     DÉFAUT. Le 16 septembre 2026, les deux bornes de `prot` ont été séparées
+     parce qu'un seul message servait les deux et mentait sur la borne haute.
+     Le commentaire écrit ce jour-là disait « comme son jumeau le légume » — et
+     ce jumeau, lui, testait encore `< mini || > maxi` pour servir la même
+     phrase. La revue l'a relevé le soir même.
+
+     Ce que ça donnait : un épinard poêlé, 500 g crus pour 120 g cuits, s'entend
+     répondre « un légume rend son eau, il n'en gagne pas » — l'inverse exact de
+     ce qui vient de se passer. Et c'est atteignable : `rendementPossible`
+     accepte un `leg` sous 1,05, la contrainte de la base aussi. */
   if (a.categorie === 'leg') {
     const r = RENDEMENT.leg;
-    if (a.ratio < r.mini || a.ratio > r.maxi) {
-      dire('avertissement', 'rendement_invraisemblable',
+    if (a.ratio > r.maxi) {
+      dire('avertissement', 'legume_qui_gonfle',
         `un rendement de ${r2(a.ratio)} : un légume rend son eau, il n'en gagne pas.`);
+    } else if (a.ratio < r.mini) {
+      dire('avertissement', 'rendement_hors_norme',
+        `un rendement de ${r2(a.ratio)} : ce légume aurait perdu plus des deux `
+        + `tiers de sa masse (on attend ${r.mini * 100} à ${r.maxi * 100} %). `
+        + 'C\'est beaucoup, même pour un épinard. Sans conséquence sur tes '
+        + 'macros — elles se comptent sur le poids que tu pèses — mais vérifie '
+        + 'que les deux pesées portaient bien sur la même chose.');
     }
   }
 

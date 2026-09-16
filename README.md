@@ -80,7 +80,7 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 577 tests, puis 23 de rendu
+cd front && npm test        # tsc --noEmit + 588 tests, puis 29 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 
@@ -98,7 +98,7 @@ db/manuel/verifier-migrations.sh  # les migrations tiennent-elles sur des donné
 
 ```
 api/          Symfony — 9 contrôleurs, 17 ressources API, 13 services, 7 processeurs
-front/        Expo — 18 écrans, 43 composants, le solveur de repas, 17 modules de calcul
+front/        Expo — 16 écrans, 38 composants, le solveur de repas, 17 modules de calcul
   src/solveur/    composition de repas : algèbre, garanties, tests de propriété
   src/calcul/     nutrition, cuisson, performance, plausibilité
 db/           01-schema.sql (19 tables) + manuel/ (24 migrations numérotées + 5 utilitaires)

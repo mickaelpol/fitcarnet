@@ -3,14 +3,15 @@
 Inventaire établi le 14 septembre 2026 par exploration systématique du code.
 
 **Les compteurs ci-dessous ont été re-mesurés le 16 septembre 2026** :
-18 écrans, **43 composants**, **9 contrôleurs**, 17 ressources API, 13 services,
+**16 écrans** (hors les deux `_layout`), **38 composants** (`.tsx` hors tests),
+**9 contrôleurs**, 17 ressources API, 13 services,
 **7 processeurs**, 2 commandes, **17 modules de calcul** et leurs tests.
 *(La version du 14 annonçait 40 composants, 8 contrôleurs, 6 processeurs et
 9 modules de calcul : le découpage du lot 6 est passé par là.)*
 
 > **⚠ LES `fichier:ligne` DE CE DOCUMENT SONT PÉRIMÉS** (relevé le 16 septembre
 > 2026). Il a été écrit le 14 septembre, avant le découpage du lot 6 : `repas.tsx`
-> est passé de 2 397 à 655 lignes, `composer.ts` de 827 à 135, `cuisson.ts` à 22,
+> est passé de 2 316 à 655 lignes, `composer.ts` de 817 à 135, `cuisson.ts` à 22,
 > et `front/src/api/hooks.ts` a été éclaté en dix modules. Les capacités décrites
 > restent justes ; **leurs adresses ne le sont plus**. Les adresses à jour sont
 > dans les fiches `.claude/skills/fonctionnalite-*/SKILL.md`, vérifiées une par
