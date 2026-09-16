@@ -284,3 +284,13 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- **`api/src` passe AUSSI par l'extraction sémantique, et pas seulement par l'AST.**
+  Décidé le 16 septembre 2026. L'AST ne lit que la structure — imports, appels,
+  méthodes — si bien que `FiltreExercice` avait dix arêtes, toutes vers du code, et
+  **aucune vers le constat d'audit que son propre en-tête nomme en clair**
+  (« POURQUOI CETTE CLASSE EXISTE — constat E8 / F-04 »). Or ce projet met son
+  histoire dans ses commentaires : 2 584 lignes sur 8 378 dans `api/src`. Sans
+  cela, un constat n'est relié au code que si un *document* nomme le symbole,
+  jamais quand le code nomme le constat. Concrètement : lors d'un
+  `/graphify . --update`, ajouter les `.php` de `api/src` à la liste envoyée aux
+  sous-agents (partie B), en plus de leur passage AST habituel.
