@@ -165,7 +165,23 @@ de la veille), tolérance au hors-ligne, anti-N+1, documentation de l'API fermé
 
 ---
 
-## Ce qu'il faut trancher
+## Décisions prises, le 16 septembre 2026
+
+1. **Les fibres ne deviennent pas un objectif par repas.** L'application reste
+   comme elle est : la cible porte kcal, protéines, glucides et lipides, et la
+   case « glucides fibres comprises » suffit. C'est la ligne du document qui est
+   à corriger.
+2. **Le mode de travail devient choisissable dans un modèle.** Le sélecteur
+   Charge / Tenue / Chrono de la séance est extrait dans un composant partagé et
+   rendu aussi dans l'éditeur de modèle — plutôt que recopié.
+3. **Les fiches suivent le découpage en 15 fonctionnalités**, une par fonction
+   perçue, pour des captures vidéo courtes et ciblées.
+
+Reste sans décision : les **catégories d'aliment** (huit dans l'application,
+trois dans le document — imprécision d'écriture, aucun effet), et les **deux
+garde-fous d'Epley**, qui restent tels quels.
+
+## Ce qu'il fallait trancher
 
 1. **Les fibres sont-elles un objectif par repas ?** Aujourd'hui non. Ton
    document dit oui.

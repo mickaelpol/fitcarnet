@@ -22,7 +22,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **596 tests front** (577 + 19 de rendu) · **248 API · 656 assertions**, 7 erreurs PHPStan
+État : **600 tests front** (577 + 23 de rendu) · **248 API · 656 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -97,7 +97,7 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 577 + 19 tests, 0 echec
+cd front && npm test                                                  # 577 + 23 tests, 0 echec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 248 tests, 656 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
@@ -824,6 +824,71 @@ Chacun de ces pièges a coûté un faux résultat le 15 septembre :
   `cd front && npm run build:web` a tourné à la racine, et un `rm -rf api/front`
   est parti d'un autre dossier (sans rien trouver à supprimer, vérifié). **Chemins
   absolus uniquement**, surtout pour un `rm`.
+
+---
+
+## Ce que propose l'application : l'inventaire, sa revue, et deux agents
+
+**16 septembre 2026.** Le propriétaire a écrit son propre inventaire,
+`presentation/fonctionnalites-par-onglet.md` — 45 lignes, cinq onglets, les
+fonctionnalités telles qu'un utilisateur les vit. **C'est la référence du
+besoin** : le code ne peut pas la donner.
+
+Elle a été confrontée ligne à ligne au code dans
+`presentation/fonctionnalites-revue.md` (son document n'a pas été touché) :
+**41 lignes confirmées**, quatre écarts, et des pans entiers absents — toute
+l'administration, les invitations, Grocy, le catalogue d'exercices, les
+avertissements du calculateur.
+
+**Trois décisions prises :**
+
+1. **Pas de cible de fibres par repas.** L'application reste comme elle est : la
+   case « glucides fibres comprises » suffit, et les fibres n'interviennent que
+   dans le convertisseur de plan et l'affichage du repas. C'est la ligne de
+   l'inventaire qui était en avance sur le code.
+2. **Le mode de travail se choisit désormais dans un modèle** — voir plus bas.
+3. **Les fiches de fonctionnalité suivent un découpage en 15**, une par fonction
+   perçue, pour des captures vidéo courtes et ciblées.
+
+Deux écarts restent sans suite, sciemment : l'inventaire cite **trois**
+catégories d'aliment quand l'application en a **huit** (imprécision d'écriture,
+aucun effet), et il ne mentionne pas les deux garde-fous d'Epley — plafond de
+15 répétitions, série d'une répétition prise telle quelle — qui restent tels
+quels.
+
+**Deux agents sont nés de là**, avec leurs skills :
+
+- **`verification-android`** — faire tourner l'application sur le vrai moteur
+  d'Android et y faire les gestes de l'utilisateur. Sa skill porte la procédure
+  et les pièges qui ont chacun coûté un faux résultat le 15 septembre.
+- **`verification-fonctionnalites`** — éprouver une fonctionnalité du point de
+  vue de l'utilisateur (« répond-elle au besoin ? ») et **en filmer une capture
+  vidéo par scénario**. Il s'appuie sur `epreuve-fonctionnalite` (la méthode
+  commune, et le gabarit des fiches) et sur une fiche `fonctionnalite-*` par
+  fonctionnalité. Les vidéos vont dans `presentation/captures/`, ignoré par git.
+
+### Le mode de travail se choisit aussi dans un modèle
+
+L'inventaire annonçait « plusieurs modes de travail » sur un modèle. C'était
+faux : le mode y était repris du mode par défaut de l'exercice au moment de
+l'ajout (`mode: ex.modeDefaut`) et **ne pouvait plus bouger** — un programme de
+gainage restait en « Charge » et prescrivait des kilos là où il faut des
+secondes. Seul l'écran de séance portait le sélecteur.
+
+Le sélecteur est **extrait** dans `src/composants/choixMode.tsx` et partagé par
+les deux écrans — pas recopié : la veille, quatre champs de nombre recopiés
+portaient deux lectures différentes, dont une fausse.
+
+**Éprouvé sur l'API** : un modèle créé en « charge », renvoyé avec `iso`,
+s'enregistre bien `iso` ; un mode inconnu reçoit **422**.
+
+> **Et une leçon d'accessibilité, payée de deux essais.** L'état sélectionné
+> doit s'ANNONCER, pas seulement se peindre. `accessibilityState={{ selected }}`
+> sur un `role="button"` ne produit rien (`aria-selected` n'y est pas valide), et
+> `accessibilityState={{ checked }}` sur un `role="radio"` **non plus** dans
+> cette version de react-native-web. Seule la forme `aria-checked={…}` en clair
+> sort dans le rendu — et React Native 0.71+ la retraduit côté natif. **Lire le
+> HTML réellement rendu** plutôt que supposer : c'est ce qui a tranché.
 
 ---
 

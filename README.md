@@ -77,7 +77,7 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 577 tests, puis 19 de rendu
+cd front && npm test        # tsc --noEmit + 577 tests, puis 23 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 
@@ -108,7 +108,7 @@ docs/         audit-2026-09/ — 84 constats classés
 
 ## Qualité
 
-**844 tests** — 596 côté front (577 + 19 de rendu), 248 côté API — et quatre garde-fous automatiques
+**848 tests** — 600 côté front (577 + 23 de rendu), 248 côté API — et quatre garde-fous automatiques
 qui tournent sans qu'on y pense :
 
 - **PHPStan** niveau 5 sur l'API ;

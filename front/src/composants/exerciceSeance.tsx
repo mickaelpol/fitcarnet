@@ -7,15 +7,10 @@ import { Confirmer } from './confirmer';
 import { DisqueRM, PaliersRM } from './disqueRM';
 import { ModaleExercice } from './modaleExercice';
 import { Sparkline } from './sparkline';
+import { ChoixMode } from './choixMode';
 import { LigneSerie } from './serie';
 import { performanceDe } from '@/calcul/performance';
 import { C, E, N, P, R, T, TOUCHE, nb } from '@/theme';
-
-const MODES = [
-  { cle: 'charge' as const, court: 'Charge' },
-  { cle: 'iso' as const, court: 'Tenue' },
-  { cle: 'chrono' as const, court: 'Chrono' },
-];
 
 const serieVide = (ordre: number): Serie => ({
   ordre, reps: null, poids: null, secondes: null, faite: false,
@@ -164,20 +159,14 @@ export function CarteExercice({
 
       {ouvert && (
         <View style={{ gap: E.s }}>
-          <View style={s.modes}>
-            {MODES.map((m) => (
-              <Pressable
-                key={m.cle}
-                /* Plus rien n'empêche la bascule : la mesure vit dans
-                   `etatMesure` et continue de tourner, visible dans le bandeau
-                   en haut de l'écran. */
-                onPress={() => onChange({ ...bloc, mode: m.cle })}
-                style={[s.mode, mode === m.cle && s.modeActif]}
-              >
-                <Discret style={mode === m.cle ? { color: C.encre } : undefined}>{m.court}</Discret>
-              </Pressable>
-            ))}
-            {apercuDerniereFois !== '' && (
+          {/* Le sélecteur vit dans `choixMode.tsx` depuis le 16 septembre 2026 :
+              l'éditeur de modèle le partage désormais. Le raccourci « dernière
+              fois » reste dans la même rangée, pour passer à la ligne avec les
+              modes quand la largeur manque. */}
+          <ChoixMode
+            mode={mode}
+            onChange={(m) => onChange({ ...bloc, mode: m })}
+            suite={apercuDerniereFois !== '' ? (
               <Pressable
                 onPress={rechargerDerniereFois}
                 style={s.appliquer}
@@ -187,8 +176,8 @@ export function CarteExercice({
                   ↓ {apercuDerniereFois}
                 </Discret>
               </Pressable>
-            )}
-          </View>
+            ) : undefined}
+          />
 
           {/* « for time » : un temps global au-dessus du détail des séries.
               À défaut, on récupère le temps déjà saisi sur les séries — c'est
@@ -324,13 +313,6 @@ const s = StyleSheet.create({
     width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: C.vif,
     alignItems: 'center', justifyContent: 'center',
   },
-  modes: { flexDirection: 'row', gap: 4, alignItems: 'center', flexWrap: 'wrap' },
-  mode: {
-    paddingHorizontal: E.m, minHeight: 38, borderRadius: R.s, borderWidth: 1,
-    borderColor: C.ligne, backgroundColor: C.surface2,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  modeActif: { backgroundColor: C.ligne },
   appliquer: {
     paddingHorizontal: E.m, minHeight: 38, borderRadius: R.s, borderWidth: 1,
     borderColor: C.vifBord, alignItems: 'center', justifyContent: 'center',

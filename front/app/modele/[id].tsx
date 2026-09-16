@@ -7,6 +7,7 @@ import {
 import type { Exercice, Modele, ModeleExercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { ChampNombre } from '@/composants/champNombre';
+import { ChoixMode, type ModeTravail } from '@/composants/choixMode';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { lireFormat } from '@/composants/exerciceSeance';
@@ -137,6 +138,17 @@ export default function DetailModele() {
           </View>
           {poignee}
         </View>
+
+        {/* LE MODE DE TRAVAIL SE CHOISIT ICI DEPUIS LE 16 SEPTEMBRE 2026.
+            Il était repris du mode par défaut de l'exercice au moment de l'ajout
+            (`mode: ex.modeDefaut` plus haut) et ne pouvait plus bouger : un
+            programme de gainage restait en « Charge » et son modèle prescrivait
+            des kilos là où il faut des secondes. Le sélecteur est celui de la
+            séance, partagé et non recopié. */}
+        <ChoixMode
+          mode={(bloc.mode ?? ex?.modeDefaut ?? 'charge') as ModeTravail}
+          onChange={(m) => majBloc(i, { ...bloc, mode: m })}
+        />
 
         {bloc.series.map((serie, j) => (
           <View key={j} style={s.serie}>

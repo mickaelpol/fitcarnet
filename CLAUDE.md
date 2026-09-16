@@ -33,7 +33,7 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 577 tests, puis 19 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 577 tests, puis 23 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
 # 248 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
@@ -194,6 +194,9 @@ sont dans `.claude/skills/`, toutes actives, et disent le métier et les pièges
 | `schema-base` | Double écriture du schéma, idempotence, ordre dans `installer.sh` |
 | `revue-de-code` | Les huit motifs de défaut du projet, un cas daté pour chacun |
 | `donnees-de-test` | **À charger avant toute écriture en base de dév** : compte jetable, ordre de nettoyage, et la règle « relever la valeur AVANT de l'écraser » |
+| `epreuve-fonctionnalite` | La méthode pour éprouver une fonctionnalité côté utilisateur, la filmer, et le gabarit des fiches |
+| `verification-android` | Émulateur, Expo Go, pilotage par `adb`, et les pièges qui font croire à un faux résultat |
+| `fonctionnalite-*` | Une fiche par fonctionnalité : le besoin, le parcours, les critères, la capture |
 | `postgres` | Index, plan de requête, `VACUUM` |
 
 Le 9 septembre 2026, dix skills « du projet » ont été **supprimées** : génériques,
@@ -238,6 +241,8 @@ Pour l'aiguillage :
 | **`revue-fitcarnet`** | Avant de pousser, sur une modification en cours, ou pour éprouver un pan de code. Lecture seule : il rapporte, il ne corrige pas. Il applique les **huit motifs de défaut réellement trouvés** par l'audit — le jumeau oublié, le garde qui regarde l'état au lieu de l'intention, le commentaire qui ment, le test qui ne peut pas échouer… — via la skill `revue-de-code`. Une revue générique ne trouve rien sur ce projet ; celle-ci sait où regarder. |
 | **`verification-bout-en-bout`** | Après une modification qui touche l'API ou la base, et avant une livraison ou une démonstration. Éprouve l'application **qui tourne** — connexion, appels, état en base — puis retire toute trace de son passage et le prouve. Sa règle absolue : **n'écrire jamais sur une donnée qu'il n'a pas créée** (skill `donnees-de-test`). |
 | **`verite-documentaire`** | Après un chantier, avant une passation. Confronte ce que la documentation **affirme** au dépôt réel : fichiers annoncés, revendications d'unicité, compteurs, `fichier:ligne`. Quatre affirmations fausses ont été trouvées par accident en deux jours ; il les cherche exprès. |
+| **`verification-android`** | Après une modification qui touche une saisie, le réseau ou un écran, et avant une livraison. Fait tourner l'application dans Expo Go sur l'émulateur, fait les gestes de l'utilisateur, relit l'écran et la base. C'est ainsi qu'on a vu 42,5 kg s'enregistrer 425 kg avec 577 tests au vert. Skill `verification-android`. |
+| **`verification-fonctionnalites`** | Avant une démonstration ou une livraison, ou pour dresser l'état réel de ce que propose l'application. Éprouve une fonctionnalité du point de vue de l'utilisateur — répond-elle au besoin, fonctionne-t-elle — et en filme une capture vidéo par scénario. Skills `epreuve-fonctionnalite` et `fonctionnalite-*`. |
 | `hexagonal-architect`, `hexagonal-reviewer` | Installés pour la refonte hexagonale, **non commencée**. Sans objet tant que `api/src` suit la structure Symfony classique. |
 
 **Hexagonal / DDD.** La migration vers l'architecture hexagonale reste un objectif
