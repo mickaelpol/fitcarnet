@@ -3,3 +3,8 @@
 #   ./presentation/monter-demo.sh       → fitcarnet-demonstration.mp4
 fitcarnet-presentation.html
 fitcarnet-demonstration.mp4
+
+# Les captures vidéo des fonctionnalités (agent `verification-fonctionnalites`).
+# Une par scénario, régénérables en relançant l'épreuve, et lourdes : même règle,
+# on versionne les fiches et les scripts, pas les vidéos.
+captures/
