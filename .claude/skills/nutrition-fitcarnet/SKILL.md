@@ -19,8 +19,12 @@ déclare incohérents des aliments riches en fibres dont les valeurs sont pourta
 justes. Deux constats de l'audit viennent de là — `plausibilite.ts` appliquait la
 formule américaine, et `cibles_incoherentes` comptait les fibres à 4 kcal/g.
 
-Reste ouvert (M1 et M4 du lot 2) : deux formules Atwater encore recopiées, dans
-`solveur.ts:340` et `objectifs.tsx:78`.
+~~Reste ouvert (M1 et M4 du lot 2) : deux formules Atwater encore recopiées.~~
+**Corrigé le 15 septembre 2026**, et cette phrase était périmée depuis — relevée
+le 16 en écrivant les fiches de fonctionnalité. Les deux appellent désormais
+`kcalDesMacros` (`front/src/solveur/solveur.ts:31`), qui tient ses coefficients
+de `nutrition.ts` ; `app/objectifs.tsx:87` l'importe. **Ne pas aller « corriger »
+un défaut qui n'existe plus.**
 
 ## 2. Les valeurs décrivent le produit TEL QU'ON LE PÈSE
 

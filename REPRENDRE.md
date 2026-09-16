@@ -22,7 +22,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **600 tests front** (577 + 23 de rendu) · **248 API · 656 assertions**, 7 erreurs PHPStan
+État : **600 tests front** (577 + 23 de rendu) · **252 API · 661 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -98,7 +98,7 @@ docker compose -f compose.dev.yml up -d
 
 ```bash
 cd front && npm test                                                  # 577 + 23 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 248 tests, 656 assertions
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 252 tests, 661 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```

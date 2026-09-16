@@ -36,7 +36,7 @@ lui-même se reconstruit : `/graphify .`.
 cd front && npm test          # tsc --noEmit + 577 tests, puis 23 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 248 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 252 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.

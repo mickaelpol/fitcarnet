@@ -184,7 +184,7 @@ Chaque commande doit donner **au moins** ce résultat — ce sont les chiffres d
 ```bash
 cd front && npm test                    # 577 tests, puis 23 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
-                                        # 248 tests, 656 assertions
+                                        # 252 tests, 661 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
                                         # 7 erreurs connues, aucune régression
 db/manuel/verifier-migrations.sh        # ✓ garde-fous posés

@@ -436,3 +436,54 @@ relancer avec le drapeau par réflexe.
 Tourne **chaque bobine séparément**, sans chercher l'enchaînement parfait. Le
 montage recolle. Une prise ratée sur la bobine 4 ne doit jamais t'obliger à
 refilmer les sept autres — c'est pour ça qu'elles sont découpées ainsi.
+
+---
+
+# Corrections du 16 septembre 2026 — à lire avant de filmer
+
+Relevées en écrivant les fiches `fonctionnalite-*`, chacune vérifiée dans le
+code. Le script ci-dessus n'a pas été récrit : ces points le corrigent.
+
+**Bobine 2 · plans 2.2 et 2.3 — « Glucides totaux » n'est pas sur le formulaire.**
+Les quatre champs des objectifs sont **Protéines, Glucides, Lipides, Calories**
+(`front/app/objectifs.tsx:265-273`). « Glucides totaux » et « Fibres »
+n'existent que dans le **convertisseur de plan américain** (`:219`, `:227`). Ce
+qui porte la convention à l'écran, c'est la case **« Glucides fibres comprises »**.
+Dis-le ainsi.
+
+**Bobine 4 · plan 4.5 — le message d'incohérence ne s'affiche pas sur un repas.**
+« Tes grammes représentent 612 calories, pas 580 » est émis en gravité `info`
+(`front/src/solveur/solveur.ts:437`) et la carte de repas filtre les `info`
+(`front/src/composants/carteRepas.tsx:513`). **On ne le voit que sur l'écran des
+objectifs.** Les autres avertissements — aliments trop semblables, « retire 40 g
+de riz », apport négligeable — s'affichent bien sur la carte : ce sont eux, le
+moment fort.
+
+**Bobine 5 — non tournable avec le jeu de démonstration seul.** Les deux plans de
+`db/manuel/jeu-demo.sql` portent un `consomme` **vide** : le plan non cuisiné
+affiche « · ne réserve rien » au lieu de « · à cuisiner », et « J'ai cuisiné »
+répond **422**. Pour cette bobine, **compose et enregistre un plan dans
+l'application** avant de filmer. Le commentaire du fichier se contredit d'ailleurs
+lui-même : un plan déjà cuisiné n'affiche aucun bouton (`front/src/composants/planRelu.tsx:204`).
+
+**Bobine 7 · plan 7.4 — ce n'est pas un bandeau.** Le rappel de la dernière fois
+est une **puce cliquable** bordée d'ambre, « ↓ 12×25 · 12×27,5 »
+(`front/src/composants/exerciceSeance.tsx`), posée dans la même rangée que les
+modes. **Elle applique** les valeurs quand on la touche : c'est un geste, pas une
+information.
+
+**Bobine 7 · plan 7.8 — le disque et le calculateur sont deux choses.** « ⚖ RM »
+(`front/src/composants/chrono.tsx:126`) ouvre le **calculateur de charge**, et il
+est appelé avec `rmConnu={null}` depuis la séance
+(`front/app/seance/[id].tsx:286`) : **il n'hérite pas** du 1RM de l'exercice
+ouvert, on y saisit une charge et des répétitions. Le **disque**, lui, est le
+cercle sur la carte de l'exercice, qui déplie la table des paliers.
+
+**Partout où l'on ajoute un exercice — le champ de recherche se mérite.**
+« Rechercher… » **n'apparaît qu'après avoir choisi une vignette de muscle**
+(`front/src/composants/choixAliment.tsx:93`). C'est voulu : chercher dans 1 338
+exercices sans filtre ne donnait rien d'utile. Prévois le geste dans la prise.
+
+**Et une bonne nouvelle** : l'historique et les records antérieurs, listés
+« hors champ » faute d'écran identifié, alimentent en fait le **disque de
+tendance et la courbe** de la carte d'exercice — donc filmables en bobine 7.

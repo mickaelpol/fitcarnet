@@ -4,6 +4,14 @@ Inventaire établi le 14 septembre 2026 par exploration systématique du code :
 18 écrans, 40 composants, 8 contrôleurs, 17 ressources API, 13 services,
 6 processeurs, 2 commandes, 9 modules de calcul et leurs tests.
 
+> **⚠ LES `fichier:ligne` DE CE DOCUMENT SONT PÉRIMÉS** (relevé le 16 septembre
+> 2026). Il a été écrit le 14 septembre, avant le découpage du lot 6 : `repas.tsx`
+> est passé de 2 397 à 655 lignes, `composer.ts` de 827 à 135, `cuisson.ts` à 22,
+> et `front/src/api/hooks.ts` a été éclaté en dix modules. Les capacités décrites
+> restent justes ; **leurs adresses ne le sont plus**. Les adresses à jour sont
+> dans les fiches `.claude/skills/fonctionnalite-*/SKILL.md`, vérifiées une par
+> une — ce document reste utile comme inventaire, pas comme index.
+
 **Comment lire.** Chaque ligne est une capacité vérifiée dans le code, avec son
 emplacement. Les mentions *(à confirmer)* signalent ce qui n'a pas pu être
 établi avec certitude. Les encadrés **⚠** signalent ce qu'il ne faut pas
@@ -291,7 +299,7 @@ démontrer devant un client.
 - **Écart affiché** — « ▲ +2,5 kg », « = stable », « 1re fois ». `disqueRM.tsx:84`
 - **Courbe de progression** — 1RM en mode Charge, volume dans les autres modes, à partir de 2 séances, avec « +7,5 kg sur 6 séances ». `sparkline.tsx:13`
 - **Avertissement séries longues** — « n séries de plus de 15 répétitions : comptées dans le volume, mais écartées du 1RM ». `exerciceSeance.tsx:253`
-- **Table des paliers** — 90 % à 40 % du 1RM, charge arrondie au palier réel de la salle, zone 70–80 % surlignée. `disqueRM.tsx:106`
+- **Table des paliers** — 90 % à 40 % du 1RM, charge arrondie au palier réel de la salle, zone de progression **70 à 90 %** mise en avant (corrigé le 16 septembre 2026 : ce document annonçait « 70–80 % », l'écran affiche « Zone de progression · 70 à 90 % »). `disqueRM.tsx:106`
 - **Calculateur de charge** — « J'ai soulevé … kg » × « Répétitions réussies » → 1RM, arrondi réglable 1 / 2,5 / 5 kg. `calculateurRM.tsx:37`
 - **Garde-fou au-delà du plafond** — « on mesure l'endurance : l'estimation perdrait son sens. Refais un essai plus lourd. » `calculateurRM.tsx:40`
 - **Les deux chemins vers le 1RM s'accordent** — la carte d'exercice et le calculateur donnaient 103,3 kg contre 100 kg pour la même série. `performance.test.ts:43`
@@ -449,10 +457,19 @@ Ces garanties sont **éprouvées par test de propriétés** — 250 frigos aléa
 
 Relevé pendant l'exploration, à trancher :
 
-- **`front/src/composants/inventaire.tsx` semble ne plus être utilisé** — aucun écran ne l'importe, `frigo.tsx` réimplémente le mode inventaire. Ses seules divergences visibles sont un bouton « Quitter » et un libellé « Envoyer » au lieu de « Enregistrer ». *(à confirmer)*
+- ~~**`front/src/composants/inventaire.tsx` semble ne plus être utilisé**~~ —
+  **réglé : le fichier n'existe plus** (vérifié le 16 septembre 2026). Ce qui suit
+  décrivait l'état d'alors.
+- **`front/src/composants/inventaire.tsx` semblait ne plus être utilisé** — aucun écran ne l'importe, `frigo.tsx` réimplémente le mode inventaire. Ses seules divergences visibles sont un bouton « Quitter » et un libellé « Envoyer » au lieu de « Enregistrer ». *(à confirmer)*
 - **`Invitation::domaineAccepteDuCourrier()`** — vérification DNS MX puis A, documentée comme « conseille, ne bloque jamais » — **n'a aucun appelant** dans l'API. *(à confirmer)*
 - **Aucun appel à OpenFoodFacts dans l'API**, alors que le champ `source` prévoit la valeur : l'import se fait ailleurs, ou pas du tout. *(à confirmer)*
-- **`front/src/calcul/texte.ts` n'existe pas** — `CLAUDE.md` l'annonçait comme module de référence. `sansAccent` est recopié quatre fois : `composer.ts:182`, `frigo.ts:39`, `choixAliment.tsx:49`, `admin-exercices.tsx:117`. C'est le constat **D4**, non corrigé.
-- **`front/src/solveur/periode.ts` n'existe pas** — seul son fichier de test existe, il éprouve une fonction qui vit dans `composer.ts`.
+- ~~**`front/src/calcul/texte.ts` n'existe pas**~~ — **il existe depuis le
+  15 septembre 2026** et porte `sansAccent`, seule définition du projet (constat
+  D4 clos). Ce qui suit décrivait l'état d'alors.
+- **`front/src/calcul/texte.ts` n'existait pas** — `CLAUDE.md` l'annonçait comme module de référence. `sansAccent` est recopié quatre fois : `composer.ts:182`, `frigo.ts:39`, `choixAliment.tsx:49`, `admin-exercices.tsx:117`. C'est le constat **D4**, non corrigé.
+- ~~**`front/src/solveur/periode.ts` n'existe pas**~~ — **il existe** : sorti du
+  découpage de `composer.ts`, il porte `cleDuRepas`, `lireLaCle` et
+  `listeDeCourses`. Ce qui suit décrivait l'état d'alors.
+- **`front/src/solveur/periode.ts` n'existait pas** — seul son fichier de test existe, il éprouve une fonction qui vit dans `composer.ts`.
 - **`ChargementComplet` signale lui-même un risque non vérifié** — le total de pagination sur collections jointes, « à vérifier sur des données réelles ».
 - **`notifications.ts` et `envoiSerialise.ts`** n'ont pas été lus ligne à ligne. *(à confirmer)*

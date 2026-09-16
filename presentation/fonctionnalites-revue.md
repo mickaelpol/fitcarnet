@@ -25,7 +25,7 @@ debout.
 | Ajout de série | ✓ | bouton « + Série » |
 | Notes par exercice | ✓ | repliables, avec aperçu quand elles sont remplies. `exerciceSeance.tsx:262` |
 | Ajout d'exercices par groupe musculaire | ✓ | quinze vignettes de muscles, dont « Autre ». `choixMuscle.tsx:57` |
-| Recherche textuelle | ✓ | sur le nom français **et** anglais, sans accents. `Exercice.php:96` |
+| Recherche textuelle | ◐ | sur le nom français **et** anglais, sans accents (`api/src/Entity/Exercice.php:96`). **Mais le champ « Rechercher… » n'apparaît qu'APRÈS avoir choisi une vignette de muscle** (`front/src/composants/choixAliment.tsx:93`) — c'est voulu (chercher dans 1 338 exercices sans filtre ne donnait rien d'utile), et c'est un piège pour qui écrit un script de capture. |
 | Tri par groupe musculaire | ✓ | le filtre muscle se cumule avec la recherche |
 | Le tri et la recherche se basent sur la catégorie de la séance | ◐ | c'est le **type de la séance** (Push/Pull/Legs) qui filtre la liste proposée, et la recherche s'applique par-dessus. **Un exercice sans groupe reste proposé partout** — sinon un exercice non classé deviendrait introuvable. `seance/[id].tsx:76` |
 | Agencement et ordre des exercices | ✓ | poignée à glisser **ou** flèches, mobile et web. `listeDeplacable.tsx:36` |
@@ -127,7 +127,17 @@ qui comptent :
 
 ### Ce qui manque dans ton document, onglet Repas
 
-- **Les avertissements** — c'est le moment fort de la démonstration : « Tes grammes représentent 612 calories, pas 580 », « Ces aliments se ressemblent trop pour que le calcul fonctionne », « retire 40 g de riz », « X ne pèse quasiment rien ici ». `solveur.ts:144,203,274,339`
+- **Les avertissements** — c'est le moment fort de la démonstration : « Ces
+  aliments se ressemblent trop pour que le calcul fonctionne », « retire 40 g de
+  riz », « X ne pèse quasiment rien ici ». `front/src/solveur/solveur.ts`
+
+  > **Correction du 16 septembre 2026.** Cette liste comptait aussi « Tes grammes
+  > représentent 612 calories, pas 580 ». **Ce message ne s'affiche PAS sur la
+  > carte d'un repas** : il est émis en gravité `info`
+  > (`front/src/solveur/solveur.ts:437`) et la carte filtre les `info`
+  > (`front/src/composants/carteRepas.tsx:513`). On ne le voit que sur l'écran des
+  > objectifs. Relevé en écrivant les fiches ; la bobine 4.5 ne peut pas le
+  > montrer.
 - **Les cuissons ont trois états** — cuit ainsi, se mange tel quel, ou personne n'a décidé. « Je n'en mets pas » n'est pas « je n'ai pas répondu ». Et elles sont **mémorisées d'une fois sur l'autre**. `cuisson.ts:38,581`
 - **Remplacer un aliment par rôle**, avec verrouillage : un aliment choisi par toi n'est jamais remplacé dans ton dos. `repas.tsx:2120`
 - **Les échanges automatiques sont expliqués** — « X ne permettait pas de tenir les objectifs : remplacé par Y. Tu peux revenir dessus. » `repas.tsx:2175`
@@ -162,6 +172,49 @@ suppression possible** pour ne pas effacer l'historique.
 **Ce qui tient sans se voir** — isolation stricte entre comptes, cache relu
 depuis le disque au démarrage à froid (les écrans s'affichent avec les données
 de la veille), tolérance au hors-ligne, anti-N+1, documentation de l'API fermée.
+
+---
+
+## Ce que la rédaction des fiches a mis au jour
+
+Quinze fiches écrites depuis le code, par cinq agents. Chacun a confronté ce que
+disent les documents à ce que fait l'application. Ce qu'ils ont trouvé :
+
+**Des fonctionnalités sans écran.** L'API sait faire, rien ne le propose :
+
+- **Changer son mot de passe ou son adresse** — la règle est complète côté
+  serveur (mot de passe actuel exigé, toutes les sessions révoquées,
+  `api/src/State/UtilisateurProcessor.php`), mais **aucun écran ne l'appelle** :
+  pas une occurrence de `motDePasseActuel` dans `front/`. Ce document et
+  `features.md` le rangeaient sous « onglet Compte » sans le dire.
+- **Voir et révoquer ses sessions ouvertes** (`GET`/`DELETE /api/mes-sessions`) —
+  écrit en réponse au constat M-02, **sans consommateur dans le front**.
+- **Créer un exercice** — la création est réservée à l'administrateur depuis le
+  15 septembre, et **aucun écran ne la propose, pour personne**. Un exercice créé
+  par l'API naît privé, sans moyen de le publier. La prise 8.2 du tournage n'est
+  donc pas filmable.
+
+**Un écart à la règle d'isolation, à arbitrer.** `FrigoGrocy::lire()` ne prend
+aucun utilisateur : **le frigo Grocy est global**, pas par compte. Sans
+conséquence aujourd'hui — seul l'administrateur l'utilise et une invitation crée
+toujours un compte en source `base` — mais deux comptes en Grocy liraient le même
+stock et écriraient l'un chez l'autre. Ce n'est pas dans la liste des exceptions
+documentées de la règle 2.
+
+**Un chiffre faux dans l'API, corrigé le jour même.** `SeanceExercice::getRmEstime()`
+appliquait Epley **sans le plafond de 15 répétitions ni le cas de la série
+unique** : une série de 93 répétitions à 32 kg y valait 131 kg. Le front ne lit
+pas ce champ, mais il est exposé. Aligné sur le module de référence, avec quatre
+témoins.
+
+**Et de la documentation qui mentait**, corrigée : la skill `nutrition-fitcarnet`
+annonçait deux formules Atwater recopiées, réglées depuis le 15 septembre ;
+`features.md` annonçait un jeton de rafraîchissement « d'un an » (c'est 90 jours
+glissants) et « tout utilisateur peut ajouter un exercice » (c'est faux depuis le
+15) ; et **mon propre correcteur automatique de références a abîmé des fiches**
+en « corrigeant » des numéros de ligne qu'elles citaient volontairement faux.
+Réparé — mais c'est le motif du projet en miniature : une règle juste appliquée
+sans lire le contexte.
 
 ---
 
