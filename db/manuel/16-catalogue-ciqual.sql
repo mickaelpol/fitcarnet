@@ -151,6 +151,41 @@ UPDATE aliment SET
 WHERE cree_par IS NULL
   AND fitcarnet_normaliser(nom) IN ('riz complet');
 
+-- Boulgour et pates completes, CRUS
+--
+-- Ajoutes le 16 septembre 2026, et c'est le meme defaut que le riz complet :
+-- la base portait des valeurs CUITES (boulgour 83 kcal, pates 124) avec un
+-- rendement cru->cuit. Le controle de fin de ce fichier les comptait lui-meme
+-- — « grains_hors_bande = 2 » — et personne ne le lisait. En prescrire 100 g
+-- faisait annoncer 250 g et 220 g dans l'assiette, et surtout comptait les
+-- macros du produit cuit sur un poids pese sec : c'est la regle 3 enfreinte,
+-- donc un chiffre faux dans l'assiette, pas seulement un poids mal annonce.
+--
+-- Table Ciqual 2025, colonne « Reglement UE n° 1169/2011 » :
+--   Boulgour de ble, cru 347 / cuit 131            -> rendement 2,65
+--   Pates seches au ble complet, crues 353 / cuites 179 -> rendement 1,97
+UPDATE aliment SET
+    categorie      = 'fec',
+    kcal_100       = 347,
+    prot_100       = 11.7,
+    gluc_100       = 65.8,
+    lip_100        = 1.42,
+    fibres_100     = 10.5,
+    ratio          = 2.65
+WHERE cree_par IS NULL
+  AND fitcarnet_normaliser(nom) IN ('boulgour');
+
+UPDATE aliment SET
+    categorie      = 'fec',
+    kcal_100       = 353,
+    prot_100       = 11.8,
+    gluc_100       = 67.6,
+    lip_100        = 2.2,
+    fibres_100     = 6.1,
+    ratio          = 1.97
+WHERE cree_par IS NULL
+  AND fitcarnet_normaliser(nom) IN ('pates completes');
+
 SELECT 'apres' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
        count(*) FILTER (WHERE categorie = 'fec' AND ratio > 1.3
                           AND kcal_100 NOT BETWEEN 300 AND 400) AS grains_hors_bande

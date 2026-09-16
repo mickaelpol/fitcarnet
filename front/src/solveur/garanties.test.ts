@@ -665,6 +665,12 @@ describe('Le rendement ne change PAS ce qu\'il faut peser', () => {
    * féculent SEC. Peser le poids cuit affiché quand le rendement est faux
    * fait manger jusqu'à deux fois moins de glucides que prévu.
    */
+  /* DONNEES DE TEST, PAS UNE REFERENCE. Ces quatre nombres sont ceux d'avant le
+     16 septembre 2026 ; la table Ciqual donne 350 / 7,02 / 77,5 / 0,79 pour le
+     riz blanc cru. On les garde parce que ce test éprouve un INVARIANT — les
+     macros ne bougent pas quand le rendement bouge —, pas la justesse du riz.
+     Ne pas les recopier ailleurs : c'est de fixtures comme celui-ci que les
+     valeurs fausses du catalogue étaient parties. */
   const SEC = { kcal: 350, prot: 7.12, gluc: 75, lip: 1.58 };
 
   /* Ce riz-ci ne change pas d'un rendement à l'autre : ses macros décrivent le

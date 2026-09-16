@@ -125,9 +125,14 @@ const r2 = (v: number): string => v.toFixed(2);
  *
  * La règle posée ici est **exactement celle de la base** (`aliment_ratio_sens`,
  * `db/01-schema.sql:152`) et **celle de l'API** (`RendementPlausible::sens`) :
- * un féculent absorbe de l'eau, une protéine et un légume en perdent. Trois
- * endroits, une seule règle — c'est la seule façon qu'un écran ne propose pas
- * ce que le serveur rejettera.
+ * un féculent absorbe de l'eau, une protéine et un légume en perdent. C'est la
+ * seule façon qu'un écran ne propose pas ce que le serveur rejettera.
+ *
+ * **QUATRE endroits la portent, pas trois** — ce commentaire a dit « trois »
+ * jusqu'au 16 septembre 2026. Le quatrième est `sens_du_rendement` dans
+ * `ciqual_vers_grocy.py`, et il divergeait : le cas `leg` y manquait. Aligné le
+ * même jour. Il garde en plus une bande 0,3-6 qui n'appartient qu'à lui : un
+ * garde-fou d'export, volontairement plus strict.
  *
  * Tout le reste passe : ce sont des avertissements, et `verifierAliment` les
  * dit déjà. Un rendement douteux ne fait pas mal peser — il ne déplace que le

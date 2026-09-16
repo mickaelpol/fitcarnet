@@ -540,17 +540,31 @@ def grain_sec_credible(aliment) -> bool:
 
 def sens_du_rendement(categorie: str, ratio: float):
     """
-    Le rendement va-t-il dans le bon sens ? Meme regle que l'API.
+    Le rendement va-t-il dans le bon sens ?
 
     Ce n'est pas une plage de tolerance, c'est un SENS : un feculent absorbe
     de l'eau, une viande en perd. A contresens, les deux colonnes de l'ecran
     s'inversent. Les bornes restent larges — 4,68 sur un riz tres hydrate et
     0,53 sur une truite tres cuite sont des mesures, pas des fautes.
+
+    CETTE FONCTION DISAIT « MEME REGLE QUE L'API », ET C'ETAIT FAUX sur un
+    point : le cas `leg` manquait. Un legume a 1,5 passait ici, quand l'ecran
+    (`plausibilite.ts`), l'API (`RendementPlausible::sens`) et la contrainte
+    `aliment_ratio_sens` le refusent tous les trois. Consequence, latente mais
+    grave : `--exporter-catalogue` aurait ecrit dans un fichier VERSIONNE un
+    `UPDATE` que la base rejette, dans une migration que `entrypoint-prod.sh`
+    rejoue a chaque demarrage — donc une production qui ne redemarre plus
+    (regle 1). Releve par la revue le 16 septembre 2026, ajoute le meme jour.
+
+    La bande finale 0,3-6, elle, n'existe QUE dans ce script : c'est un
+    garde-fou d'export, plus strict que l'API a dessein. Ne pas la decrire
+    comme la regle commune.
     """
     if ratio <= 0:
         return "rendement nul ou negatif"
-    if categorie == "prot" and ratio > 1.05:
-        return f"rendement {ratio:.2f} : une viande ne gagne pas de poids en cuisant"
+    if categorie in ("prot", "leg") and ratio > 1.05:
+        quoi = "une viande" if categorie == "prot" else "un legume"
+        return f"rendement {ratio:.2f} : {quoi} ne gagne pas de poids en cuisant"
     if categorie == "fec" and ratio < 1:
         return f"rendement {ratio:.2f} : un feculent ne perd pas de poids en cuisant"
     if not 0.3 <= ratio <= 6:

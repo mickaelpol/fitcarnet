@@ -144,11 +144,19 @@ export function apercuDerniereFois(
 ): string {
   return (derniereFois ?? [])
     .map((x) => {
+      /* LES RÉPÉTITIONS PASSENT AVANT LES SECONDES, et l'ordre a été corrigé le
+         16 septembre 2026. En ajoutant le cas « secondes » je l'avais placé en
+         tête : une série portant À LA FOIS des répétitions et une durée — il en
+         existe, `exerciceSeance.tsx:60` rappelle qu'avant le temps global le
+         chrono était stocké sur la première série — voyait son aperçu passer de
+         « 12 rép » à « 45 s », alors que le bouton recharge les deux. La revue
+         l'a relevé. L'ajout doit être un REPLI, pas une priorité : ainsi aucun
+         mode existant ne change d'affichage. */
       if (x.reps !== null && x.poids !== null) return `${x.reps}×${nombre(x.poids)}`;
-      if (x.secondes !== null) return `${x.secondes} s`;
       if (x.reps !== null) return `${x.reps} rép`;
+      if (x.poids !== null) return `${nombre(x.poids)} kg`;
 
-      return x.poids !== null ? `${nombre(x.poids)} kg` : '';
+      return x.secondes !== null ? `${x.secondes} s` : '';
     })
     .filter(Boolean)
     .slice(0, 4)

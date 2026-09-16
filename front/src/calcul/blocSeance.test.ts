@@ -58,6 +58,26 @@ test('l\'aperçu garde « 12×42,5 » en charge — le témoin inverse', () => {
   assert.equal(apercuDerniereFois(charge, nb), '12×42,5 · 10 rép · 60 kg');
 });
 
+/**
+ * LA COLLISION : une série qui porte des répétitions ET une durée.
+ *
+ * Elle existe pour de vrai — avant l'introduction du temps global, le chrono
+ * d'un « for time » était stocké sur la première série (`exerciceSeance.tsx:60`),
+ * et `serie.tsx:31` recopie `secondesCible → secondes` dans TOUS les modes au
+ * cochage. En plaçant le cas « secondes » en tête, l'aperçu de ces séries-là
+ * passait de « 12 rép » à « 45 s » alors que le bouton recharge les deux.
+ * Relevé par la revue le 16 septembre 2026 : l'ajout doit être un repli.
+ */
+test('répétitions et durée sur la même série : les répétitions l\'emportent', () => {
+  const melangee = [
+    { reps: 12, poids: null, secondes: 45 },
+    { reps: 10, poids: 40, secondes: 30 },
+  ];
+
+  assert.equal(apercuDerniereFois(melangee, nb), '12 rép · 10×40',
+    'aucun mode existant ne doit changer d\'affichage à cause du cas « Tenue »');
+});
+
 test('une série sans rien du tout ne laisse pas de trou dans l\'aperçu', () => {
   const trouee = [
     { reps: 12, poids: 40, secondes: null },

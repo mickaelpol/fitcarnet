@@ -65,9 +65,16 @@ EXACTS = BOITE["EXACTS"]
 
 # Riz blanc cru, Ciqual. C'est l'etiquette : une valeur stable, mesuree sur un
 # produit sec, qui ne depend d'aucune facon de cuisiner.
+#
+# LES VALEURS ETAIENT FAUSSES JUSQU'AU 16 SEPTEMBRE 2026 (7.12 / 75.0 / 1.58 /
+# 3.2) et ce bloc etait ecrit DEUX FOIS, la seconde definition ecrasant la
+# premiere. Ce sont ces chiffres-la qui avaient contamine le catalogue, et
+# `test_ecriture_grocy.py` a ete corrige le meme jour sans que son jumeau
+# suive : le jumeau oublie, encore. Table Ciqual 2025, colonne « Reglement UE
+# n° 1169/2011 » : 350 / 7,02 / 77,5 / 0,79 / 1,53.
 RIZ_SEC = {
     "nom": "Riz blanc, cru", "cle": "riz blanc cru",
-    "kcal": 350, "prot": 7.12, "gluc": 75.0, "lip": 1.58, "fibres": 3.2,
+    "kcal": 350, "prot": 7.02, "gluc": 77.5, "lip": 0.79, "fibres": 1.53,
 }
 
 ECHECS = []
@@ -88,13 +95,9 @@ def presque(a, b, marge=1e-9):
 
 # -------------------------------- ce que le rendement ne peut PLUS faire
 
-# Riz blanc CRU, Ciqual. C'est desormais ce que le script exporte pour un
-# grain : l'etiquette du produit qu'on pose sur la balance. Une valeur stable,
-# qui ne depend d'aucune facon de cuisiner.
-RIZ_SEC = {
-    "nom": "Riz blanc, cru", "cle": "riz blanc cru",
-    "kcal": 350, "prot": 7.12, "gluc": 75.0, "lip": 1.58, "fibres": 3.2,
-}
+# (La seconde definition de RIZ_SEC vivait ici, identique a celle du haut et
+#  l'ecrasant en silence. Retiree le 16 septembre 2026 : un fichier qui definit
+#  deux fois la meme constante finit par n'en corriger qu'une.)
 
 # LE test de la refonte.
 #

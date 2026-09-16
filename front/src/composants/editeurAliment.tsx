@@ -395,6 +395,26 @@ export function EditeurAliment({
               {/* ---- ratio ---- */}
               <Discret style={s.section}>Changement de poids à la cuisson</Discret>
 
+              {/* LE REFUS S'EXPLIQUE, IL NE SE CONTENTE PAS DE GRISER LE BOUTON.
+                  Le 16 septembre 2026, `rendementPossible` a remplacé un garde
+                  aveugle à la catégorie — un progrès net, mais muet : la
+                  catégorie par défaut d'un nouvel aliment est « prot », et
+                  choisir le guide « riz, pâtes : 100 g → 230 g » rendait
+                  « Enregistrer » inerte SANS un mot, pendant que la ligne
+                  au-dessus affichait tranquillement « 100 g avant cuisson
+                  donnent 230 g une fois cuits ». Règle 7 : une déviation
+                  s'explique à l'écran. Relevé par la revue le soir même. */}
+              {!rendementPossible(a.categorie, a.ratio) && (
+                <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 16 }}>
+                  {a.categorie === 'fec'
+                    ? 'Un féculent absorbe de l\'eau : il ne peut pas peser moins cuit que cru. '
+                    : 'Une viande, un poisson ou un légume PERD de l\'eau : il ne peut pas '
+                      + 'peser plus cuit que cru. '}
+                  Tant que ce rendement reste tel quel, l'aliment ne peut pas être
+                  enregistré — la base le refuserait.
+                </Discret>
+              )}
+
               {!mesurer ? (
                 <>
                   {RATIOS_GUIDES.map((g) => (
