@@ -121,6 +121,41 @@ export function blocsDepuisModele(modele: Modele): SeanceExercice[] {
 }
 
 /**
+ * L'aperçu de ce que le raccourci « ↓ dernière fois » va appliquer.
+ *
+ * IL ÉTAIT AVEUGLE À L'ISOMÉTRIE, et donc invisible en mode « Tenue ». Écrit en
+ * clair dans `exerciceSeance.tsx`, il ne gardait que les séries portant des
+ * `reps` ou un `poids` : une séance de gainage n'en produit aucune — rien que
+ * des `secondes` —, la liste devenait vide, l'aperçu valait `''`, et le
+ * raccourci n'était **jamais proposé**. `rechargerDerniereFois`, lui, savait
+ * pourtant restaurer les `secondesCible` depuis toujours. Une fonctionnalité
+ * éteinte pour un mode entier, sans le moindre signal. Trouvé par la revue le
+ * 16 septembre 2026, le jour où le mode est devenu choisissable dans un modèle.
+ *
+ * DESCENDU ICI POUR ÊTRE ÉPROUVÉ : dans un `.tsx`, aucun test ne l'atteignait.
+ *
+ * `nombre` est injecté plutôt qu'importé : le formateur du projet vit dans
+ * `@/theme`, et ce module n'a aucune raison de dépendre de l'habillage. L'écran
+ * passe le sien, le test passe le sien, et l'affichage reste celui d'ailleurs.
+ */
+export function apercuDerniereFois(
+  derniereFois: readonly SerieFaite[] | undefined,
+  nombre: (v: number) => string,
+): string {
+  return (derniereFois ?? [])
+    .map((x) => {
+      if (x.reps !== null && x.poids !== null) return `${x.reps}×${nombre(x.poids)}`;
+      if (x.secondes !== null) return `${x.secondes} s`;
+      if (x.reps !== null) return `${x.reps} rép`;
+
+      return x.poids !== null ? `${nombre(x.poids)} kg` : '';
+    })
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(' · ');
+}
+
+/**
  * Recopie le seul identifiant qui compte : celui de la séance.
  *
  * Sans lui, l'enregistrement suivant repartirait sur un POST et créerait une

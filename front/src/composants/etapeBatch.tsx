@@ -102,9 +102,12 @@ export function EtapeBatch({
             se pose — devant la balance, un riz annoncé à 80 g alors qu'on
             en servira 240 a l'air d'une erreur.
 
-            Cuire n'ajoute que de l'EAU. 80 g de riz sec deviennent 240 g de
-            riz cuit et n'ont pas gagné une calorie au passage ; le même riz
-            cuit pèse trois fois plus pour les mêmes macros. Peser cuit
+            Cuire n'ajoute que de l'EAU. 80 g de riz blanc sec deviennent
+            environ 180 g de riz cuit et n'ont pas gagné une calorie au
+            passage ; le même riz cuit pèse 2,26 fois plus pour les mêmes
+            macros — c'est le rendement que le catalogue dérive de CIQUAL
+            (350 kcal au sec, 155 une fois cuit, colonne « Règlement UE
+            n° 1169/2011 »). Peser cuit
             obligerait donc à connaître le temps de cuisson, le couvercle,
             l'altitude — tout ce qui fait varier l'eau absorbée. Peser sec ne
             dépend de rien. */}

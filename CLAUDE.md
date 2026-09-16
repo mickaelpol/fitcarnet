@@ -33,7 +33,7 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 577 tests, puis 23 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 588 tests, puis 29 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
 # 252 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
@@ -70,9 +70,20 @@ d'écriture**, pas seulement sur le principal. La faille de septembre 2026 venai
 présent sur `POST /api/mon-frigo/stock` et absent sur son jumeau `POST /api/mon-frigo/inventaire`.
 
 ### 3. Les valeurs nutritionnelles décrivent le produit TEL QU'ON LE PÈSE
-Le riz sec vaut 350 kcal/100 g, pas 130. Un légume se pèse cru. Le rendement cru/cuit se dérive des
-pesées à la lecture, il ne se stocke pas dans les valeurs. Cette règle vaut aussi pour les scripts
-d'import et pour ce qu'on écrit dans Grocy.
+Le riz blanc sec vaut 350 kcal/100 g, pas 155 — 155, c'est le même riz une fois gonflé d'eau.
+Un légume se pèse cru. Le rendement cru/cuit se dérive des pesées à la lecture, il ne se stocke pas
+dans les valeurs. Cette règle vaut aussi pour les scripts d'import et pour ce qu'on écrit dans Grocy.
+
+**Les deux chiffres viennent de `Table_Ciqual_2025.xlsx`, à la racine du dépôt** — « Riz blanc, cru »
+350 et « Riz blanc, cuit » 155, d'où le rendement 2,26 du catalogue. **Lire la colonne « Énergie,
+Règlement UE n° 1169/2011 »**, celle qui compte les fibres à 2 kcal/g comme la règle 4 ; la colonne
+voisine « N × facteur Jones » donne 348 et se trompe de convention.
+
+*Deux pièges, tombés tous les deux le 16 septembre 2026.* **Ne pas dire « 130 »** : c'est la valeur
+**USDA** du riz blanc long cuit, pas CIQUAL. **Ne pas dire « basmati »** non plus : le « Riz basmati »
+de l'application est apparié à l'entrée CIQUAL **« Riz blanc, cru »** (`ciqual_vers_grocy.py:294`,
+`:202`), et c'est de là que vient le 2,26. Le vrai basmati a ses propres valeurs — 351 cru, 148 cuit,
+soit un rendement de 2,37.
 
 ### 4. Convention EUROPÉENNE des fibres
 Fibres à **2 kcal/g**, comptées séparément des glucides. `KCAL_FIBRES` dans
@@ -181,7 +192,8 @@ déviation par rapport à la cible doit être expliquée à l'écran.
 
 ## Skills : laquelle, quand
 
-**Les huit skills du dépôt portent ce que personne d'autre ne peut écrire.** Elles
+**Les 25 skills du dépôt portent ce que personne d'autre ne peut écrire** — dix
+skills de métier et d'outillage, plus les quinze fiches `fonctionnalite-*`. Elles
 sont dans `.claude/skills/`, toutes actives, et disent le métier et les pièges de
 *ce* projet :
 

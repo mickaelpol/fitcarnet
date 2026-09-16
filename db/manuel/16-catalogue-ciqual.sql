@@ -106,16 +106,50 @@ UPDATE aliment SET
 WHERE cree_par IS NULL
   AND fitcarnet_normaliser(nom) IN ('quinoa');
 -- Riz blanc, cru
+--
+-- QUATRE DE CES SIX CHIFFRES N'ETAIENT PAS CEUX DE LA TABLE, jusqu'au
+-- 16 septembre 2026 : prot 7.12, gluc 75, lip 1.58, fibres 3.2 — la table dit
+-- 7.02, 77.5, 0.79, 1.53. Les lipides etaient au DOUBLE et les fibres a 2,1x,
+-- et comme ce fichier est rejoue a chaque demarrage, une correction a la main
+-- revenait a la suivante : exactement le piege que l'en-tete decrit plus haut.
+-- L'audit avait nomme les deux premiers (04-tests-qualite.md:144) et les avait
+-- traces jusqu'a la table factice de `test_ecriture_grocy.py`, d'ou ils
+-- venaient. Corrige ici, a la source. Le doublement des fibres deplacait une
+-- cible exprimee en glucides TOTAUX : c'etait un chiffre affiche.
+--
+-- Le rendement 2.26 reste : il vient de 350 / 155, « Riz blanc, cru » et
+-- « Riz blanc, cuit » (colonne « Reglement UE n° 1169/2011 »). C'est bien
+-- l'entree « riz blanc » que l'application apparie a son « Riz basmati »
+-- (`ciqual_vers_grocy.py:294` et `:202`) ; le vrai basmati donnerait 2.37.
 UPDATE aliment SET
     categorie      = 'fec',
     kcal_100       = 350,
-    prot_100       = 7.12,
-    gluc_100       = 75,
-    lip_100        = 1.58,
-    fibres_100     = 3.2,
+    prot_100       = 7.02,
+    gluc_100       = 77.5,
+    lip_100        = 0.79,
+    fibres_100     = 1.53,
     ratio          = 2.26
 WHERE cree_par IS NULL
   AND fitcarnet_normaliser(nom) IN ('riz basmati');
+
+-- Riz complet, cru
+--
+-- Ajoute le 16 septembre 2026. La base portait 332.40 kcal et un rendement de
+-- 3 — le rendement d'hier, celui d'avant la refonte. La table donne 350 au cru
+-- et 187 au cuit, soit 1.87 : un utilisateur qui prescrivait 100 g s'en voyait
+-- annoncer 300 dans l'assiette au lieu de 187. Aucune macro n'etait touchee,
+-- seul le poids servi l'etait — mais c'est un poids qu'on lit devant la
+-- balance.
+UPDATE aliment SET
+    categorie      = 'fec',
+    kcal_100       = 350,
+    prot_100       = 7.02,
+    gluc_100       = 71.4,
+    lip_100        = 2.8,
+    fibres_100     = 5,
+    ratio          = 1.87
+WHERE cree_par IS NULL
+  AND fitcarnet_normaliser(nom) IN ('riz complet');
 
 SELECT 'apres' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
        count(*) FILTER (WHERE categorie = 'fec' AND ratio > 1.3

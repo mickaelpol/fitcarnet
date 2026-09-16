@@ -40,7 +40,8 @@ Cinq points, dont trois bloquants. Les commandes complètes sont dans
 
 | | Quoi | Pourquoi c'est bloquant |
 |---|---|---|
-| ⚠ | **Charger `db/manuel/jeu-demo.sql`** sur le compte de démonstration | Sans lui, pas de courbe de 1RM, pas de stock, pas d'historique : la démo montre une application vide. Le jeu pose 9 semaines de vie — 14 aliments, 14 lignes de stock, 23 séances, 123 séries, 2 plans, 4 cibles, et un 1RM qui monte de 50,7 à 63,3 kg. **C'est cette courbe qui fait vivre la démonstration.** |
+| ⚠ | **Charger `db/manuel/jeu-essai.sql` EN PREMIER** | C'est lui qui pose les **aliments et le stock**. Sans lui, l'onglet « Mon frigo » est vide — et ce sont les minutes 2:00 à 6:00 de la démonstration. |
+| ⚠ | **Puis `db/manuel/jeu-demo.sql`** sur le compte de démonstration | Il pose l'historique : 23 séances, 123 séries, 2 plans, 4 cibles, et un 1RM qui monte de 50,7 à 63,3 kg. **C'est cette courbe qui fait vivre la démonstration.** Il exige le jeu d'essai en prérequis et **ne touche ni au frigo ni aux aliments** — son propre en-tête le dit. |
 | ⚠ | **Régénérer le HTML** avec `construire.py` | `fitcarnet-presentation.html` est *gitignoré* : il est absent d'un clone neuf. |
 | ⚠ | **Remonter la vidéo** avec `monter-demo.sh` | Même raison : le MP4 n'est pas versionné. |
 | | Un **second compte administrateur** | Seulement si tu montres l'administration (voir « ce qu'on ne montre pas »). |
@@ -100,8 +101,25 @@ Vidéo, chapitres 0:11 et 0:31. Deux choses à pointer du doigt, pas une de plus
 **La mention « poids cru »** sous la quantité :
 
 > « Ça a l'air d'un détail. C'en est un qui décide de la justesse de tout le
-> reste : le riz sec fait **350 kcal** pour 100 grammes, cuit il en fait **130**.
-> Si on confond les deux, tous les chiffres de l'application sont faux. »
+> reste : le riz blanc sec fait **350 kcal** pour 100 grammes ; cuit, il n'en
+> fait plus que **155**, parce qu'il pèse alors **deux fois et quart** plus
+> lourd. Si on confond les deux, tous les chiffres de l'application sont faux. »
+
+> **Deux mots à ne pas dire : « 130 » et « basmati ».**
+>
+> **130** est la valeur **USDA** du riz blanc long cuit ; elle circule partout en
+> français sans sa source, et ce document l'a portée jusqu'au 16 septembre 2026.
+>
+> **Basmati** est tout aussi faux, et c'était ma correction de la première heure.
+> La paire **350 / 155** est celle du **riz blanc** dans CIQUAL, et c'est elle qui
+> produit le rendement **2,26** du catalogue : le « Riz basmati » de l'application
+> est apparié à l'entrée « Riz blanc, cru » (`ciqual_vers_grocy.py:294`). Le vrai
+> basmati donne 351 au cru et 148 au cuit, soit 2,37.
+>
+> Et attention au **2,26 lui-même** : le riz *pèse* 2,26 fois plus, il n'a pas
+> « absorbé deux fois et demie son poids en eau » — il en a absorbé 1,26 fois son
+> poids. Dire « il pèse deux fois et quart plus lourd » est à la fois juste et
+> plus parlant devant une balance.
 
 **L'inventaire en écarts** :
 

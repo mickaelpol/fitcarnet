@@ -5,7 +5,7 @@ import { CATALOGUE } from '../solveur/frigos.test-data';
 import type { Aliment } from '@/solveur/types';
 
 import {
-  inexploitable, kcalAtwater, macrosSiDejaCuites,
+  inexploitable, kcalAtwater, macrosSiDejaCuites, rendementPossible,
   verifierAliment, verifierCatalogue,
 } from './plausibilite';
 
@@ -13,6 +13,14 @@ import {
  * Le riz basmati, dans l'unique convention de l'application : les valeurs du
  * grain SEC, celui qu'on pose sur la balance. Ce sont les 130 kcal d'hier
  * multipliées par le rendement de 3.
+ *
+ * CES DEUX NOMBRES SONT CEUX D'HIER, ET ON LES GARDE EXPRÈS — ce fichier
+ * éprouve la conversion, pas la justesse du riz. Mais qu'on ne les recopie
+ * pas ailleurs comme une référence : **130 est la valeur USDA** du riz blanc
+ * long cuit. CIQUAL 2025 (`Table_Ciqual_2025.xlsx`, à la racine, colonne
+ * « Règlement UE n° 1169/2011 ») donne 350 au riz blanc cru et 155 au riz
+ * blanc cuit — d'où le rendement 2,26 du catalogue, et non 3. Relevé le
+ * 16 septembre 2026.
  */
 const base = (p: Partial<Aliment> = {}): Aliment => ({
   id: 'x', nom: 'Test', categorie: 'fec',
@@ -27,6 +35,61 @@ const cuitesParErreur = (p: Partial<Aliment> = {}): Aliment => base({
 });
 
 const codes = (a: Aliment): string[] => verifierAliment(a).map((d) => d.code);
+
+/**
+ * CE QU'UN ÉCRAN DE SAISIE A LE DROIT DE REFUSER.
+ *
+ * Deux pannes du 16 septembre 2026, trouvées le même jour par deux agents de
+ * contrôle, et venant toutes deux de la même confusion : `ratioVraisemblable`
+ * répondait « 0,4 à 5 » sans regarder la catégorie.
+ *
+ *  - il REFUSAIT une vraie mesure d'épinard (0,32), que ce module déclare
+ *    légitime (`leg.mini = 0,30`) ;
+ *  - il ACCEPTAIT un féculent à 0,8, que la base refuse en `CHECK` : l'écran
+ *    laissait enregistrer, et l'utilisateur recevait un **HTTP 500 avec le SQL
+ *    brut** au lieu du message écrit pour lui.
+ *
+ * `rendementPossible` dit la règle de la base et de l'API, et rien de plus.
+ */
+describe('rendementPossible — ce qui est impossible, pas ce qui est inhabituel', () => {
+  it('accepte la vraie mesure d\'épinard que l\'ancien garde refusait', () => {
+    assert.equal(rendementPossible('leg', 0.32), true);
+  });
+
+  it('refuse le féculent qui rétrécit, que l\'ancien garde laissait passer', () => {
+    /* C'est celui qui produisait le 500 : la base porte la même règle. */
+    assert.equal(rendementPossible('fec', 0.8), false);
+  });
+
+  it('refuse la viande qui gonfle', () => {
+    assert.equal(rendementPossible('prot', 1.5), false);
+    assert.equal(rendementPossible('leg', 1.5), false);
+  });
+
+  it('accepte une truite très cuite à 0,53 — une pesée, pas une faute', () => {
+    assert.equal(rendementPossible('prot', 0.53), true);
+  });
+
+  it('accepte le riz à 2,26 et le riz très hydraté à 4,68', () => {
+    assert.equal(rendementPossible('fec', 2.26), true);
+    assert.equal(rendementPossible('fec', 4.68), true);
+  });
+
+  it('refuse un rendement nul ou négatif, quelle que soit la catégorie', () => {
+    for (const c of ['fec', 'prot', 'leg', 'huile'] as const) {
+      assert.equal(rendementPossible(c, 0), false);
+      assert.equal(rendementPossible(c, -1), false);
+    }
+  });
+
+  it('laisse passer ce qui n\'est qu\'inhabituel : c\'est un avertissement, pas un refus', () => {
+    /* Le témoin inverse. Sans lui, « refuser plus » passerait pour une
+       correction : un féculent à 5,5 et une huile à 3 sont douteux, pas
+       impossibles, et `verifierAliment` les signale déjà. */
+    assert.equal(rendementPossible('fec', 5.5), true);
+    assert.equal(rendementPossible('huile', 3), true);
+  });
+});
 
 describe('Ce que le rendement ne peut PLUS faire', () => {
   /* LE test de cette refonte, et le seul qui compte vraiment.
@@ -236,8 +299,27 @@ describe('Le rendement d\'une protéine ne fait qu\'annoncer un poids', () => {
     gluc100: 0, lip100: 10.2, fibres100: 0, ratio: 0.85, ...p,
   });
 
-  it('un poisson qui gagnerait du poids à la cuisson est signalé', () => {
-    assert.ok(codes(prot({ ratio: 1.4 })).includes('rendement_hors_norme'));
+  /**
+   * LES DEUX BORNES NE DISENT PLUS LA MÊME CHOSE, depuis le 16 septembre 2026.
+   *
+   * Un seul message servait les deux : pour un poisson à 1,4, il annonçait
+   * « une cuisson plus poussée que la moyenne » et « la colonne cuit sera
+   * basse ». Les deux sont faux dans ce sens-là — le poisson aurait GAGNÉ de
+   * l'eau, et la colonne serait haute. Relevé par l'agent bout en bout.
+   *
+   * Le code change donc de nom, parce que ce n'est pas le même constat. Ce que
+   * l'ancien test garantissait — « c'est signalé » — est préservé.
+   */
+  it('un poisson qui gagnerait du poids à la cuisson est signalé, et pour la bonne raison', () => {
+    const d = verifierAliment(prot({ ratio: 1.4 }))
+      .find((x) => x.code === 'proteine_qui_gonfle');
+
+    assert.ok(d, 'un poisson qui gonfle doit être signalé');
+    assert.match(d!.message, /PERD de l'eau/);
+    assert.doesNotMatch(d!.message, /cuisson plus poussée/,
+      'c\'est le message de la borne BASSE : il ment dans ce sens-ci');
+    assert.equal(d!.gravite, 'avertissement',
+      'un rendement faux n\'entre dans aucune macro : il ne bloque pas un repas');
   });
 
   it('mais ce n\'est qu\'une info, et ce sera vrai de tous désormais', () => {

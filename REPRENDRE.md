@@ -28,7 +28,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **605 tests front** (577 + 28 de rendu) · **252 API · 661 assertions**, 7 erreurs PHPStan
+État : **617 tests front** (588 + 29 de rendu) · **252 API · 661 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -103,7 +103,7 @@ docker compose -f compose.dev.yml up -d
 15 septembre au soir ; ils ne peuvent que monter :
 
 ```bash
-cd front && npm test                                                  # 577 + 28 tests, 0 echec
+cd front && npm test                                                  # 588 + 29 tests, 0 echec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 252 tests, 661 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
@@ -456,9 +456,17 @@ plus.** Voir « Le partage de modèle n'existe pas » plus bas ; il n'y a donc p
 rien à éviter de montrer.
 
 **Le jeu de démonstration est un FICHIER, pas un état de la base.**
-`db/manuel/jeu-demo.sql` pose neuf semaines de vie d'un compte : 14 aliments,
-14 lignes de stock, 23 séances, 123 séries, 2 plans, 4 cibles, et un 1RM qui
-monte de 50,7 à 63,3 kg — c'est cette courbe qui fait vivre la démonstration.
+`db/manuel/jeu-demo.sql` pose neuf semaines de vie d'un compte : 23 séances,
+123 séries, 2 plans, 4 cibles, et un 1RM qui monte de 50,7 à 63,3 kg — c'est
+cette courbe qui fait vivre la démonstration.
+
+> **Il ne pose NI aliments NI stock, et ce document a affirmé le contraire
+> jusqu'au 16 septembre 2026.** Les 14 aliments et les 14 lignes de stock
+> viennent de **`db/manuel/jeu-essai.sql`**, que `jeu-demo.sql` exige en
+> prérequis et dont l'en-tête dit : « Il ne touche ni au frigo ni aux aliments :
+> c'est le domaine du jeu d'essai. » Charger le seul jeu de démonstration avant
+> une présentation, c'est arriver avec un **frigo vide** — et le frigo, c'est le
+> premier tiers de la démonstration. Relevé par `verite-documentaire`.
 
 > **Il n'est PAS en base sur cette machine**, et il ne faut pas compter dessus :
 > le volume `pgdata_dev` a été recréé depuis, et `demo@fitcarnet.local`
@@ -937,6 +945,130 @@ précédente, il est absent (contre-épreuve faite).
 > comportement documenté plus haut — « lu et écrit en UN SEUL objet complet ».
 > Rien ne référence ces identifiants dans la durée. À savoir avant de croire
 > à une perte de données.
+
+---
+
+## Le riz cuit ne fait pas 130 kcal, et quatre chiffres du catalogue étaient faux
+
+**16 septembre 2026.** Le propriétaire a demandé de vérifier « le riz sec vaut
+350 kcal/100 g, pas 130 » — la phrase de la règle 3, répétée dans douze
+documents et dite à voix haute dans le script de présentation. **Elle était à
+moitié fausse, et la vérification a ouvert trois autres trous.**
+
+### Ce que dit la table, et où on se trompe en la lisant
+
+La source fait foi et elle est **dans le dépôt** : `Table_Ciqual_2025.xlsx`.
+
+| entrée CIQUAL | kcal | prot | gluc | lip | fibres |
+|---|---|---|---|---|---|
+| Riz blanc, **cru** | 350 | 7,02 | 77,5 | 0,79 | 1,53 |
+| Riz blanc, **cuit** | 155 | 3,15 | 33,2 | 0,7 | 1,4 |
+| Riz thaï ou basmati, cru | 351 | 7,08 | 78,4 | 0,63 | 1,06 |
+| Riz complet, cru → cuit | 350 → 187 | | | | |
+
+> **Le classeur porte DEUX colonnes d'énergie**, et elles ne disent pas la même
+> chose : « Énergie, **Règlement UE n° 1169/2011** » (350) et « N × facteur
+> Jones, avec fibres » (348). **C'est la première qu'il faut lire** — elle compte
+> les fibres à 2 kcal/g, c'est-à-dire la règle 4 du projet. J'ai d'abord lu la
+> seconde et écrit 348 partout ; la revue l'a relevé. Le contrôle qui tranche :
+> 350 ÷ 155 = **2,26**, exactement le rendement du catalogue.
+
+**Trois pièges, chacun tombé une fois :**
+
+1. **130 est une valeur USDA**, pas CIQUAL — aucun riz nature cuit n'y descend
+   sous 141 (et le riz sauvage cuit fait 102, donc ne pas affirmer de plancher).
+2. **Ne pas dire « basmati ».** Le « Riz basmati » de l'application est apparié à
+   l'entrée **« Riz blanc, cru »** (`ciqual_vers_grocy.py:294`, `:202`) : la paire
+   350 / 155 et le 2,26 sont des valeurs de **riz blanc**. Le vrai basmati
+   donnerait 351 / 148, soit 2,37. Ma première correction disait « basmati » et
+   était donc fausse aussi.
+3. **2,26 n'est pas « deux fois et demie ».** Le riz *pèse* 2,26 fois plus ; il a
+   absorbé 1,26 fois son poids en eau. Dire « il pèse deux fois et quart plus
+   lourd » est juste et plus parlant devant une balance.
+
+### Ce qui était faux dans les données, et qui revenait tout seul
+
+**`db/manuel/16-catalogue-ciqual.sql` réécrivait à chaque démarrage un riz dont
+quatre chiffres sur six n'étaient dans aucune entrée de la table** : prot 7,12,
+gluc 75, lip **1,58** (le double), fibres **3,2** (2,1 ×). Une correction à la
+main revenait au redémarrage suivant — le piège que ce fichier décrit lui-même.
+L'audit avait nommé deux des quatre et les avait tracés jusqu'à la fausse table
+de `test_ecriture_grocy.py`, d'où ils venaient : **les deux sont corrigés**, à la
+source et dans la fixture. Le doublement des fibres déplaçait une cible exprimée
+en glucides *totaux* : c'était un chiffre affiché.
+
+**Et le riz complet portait un rendement de 3** (la valeur d'avant la refonte)
+avec 332,4 kcal : 100 g prescrits s'annonçaient **300 g** dans l'assiette au lieu
+de 187. Une ligne de plus dans la même migration.
+
+> **Restent, connus et non traités** : `Boulgour 83 kcal / 2,5`,
+> `Pates completes 124 / 2,2`, `Semoule 336 / 3` en base de développement. C'est
+> le comportement **documenté** de `18-un-seul-etat.sql` (« on ne convertit que
+> ce qu'on peut prouver »), et `16-catalogue-ciqual.sql` ne couvre que cinq noms.
+> Aucune affirmation n'est fausse ; l'écart existe dans les données.
+
+### Ce que l'application calcule est juste — et c'est prouvé
+
+La question posée était : *« assure-moi que l'application dit vrai dans les
+calculs cru/cuit »*. Trois compositions du même repas, **en ne changeant que le
+rendement** :
+
+| | rendement riz | riz à peser | riz servi | macros |
+|---|---|---|---|---|
+| passe 1 | 2,26 | 105,00 g | 237,30 g | 801,75 kcal · 49,75 P · 88,52 G · 24,84 L |
+| passe 2 | **3,00** | 105,00 g | **315,00 g** | **identiques** |
+| passe 3 | 2,26 (poulet 0,75 → **0,90**) | 105,00 g | 237,30 g | **identiques** |
+
+Le rendement déplace le poids dans l'assiette et **pas un gramme de macro ni un
+gramme à peser**. Le témoin qui donne sa valeur au contrôle : en recalculant les
+macros sur les poids *servis*, on obtiendrait **1 207 kcal au lieu de 801** —
++51 %. C'est l'erreur que l'application ne commet pas.
+
+### Les trois défauts que les agents ont trouvés en chemin, tous corrigés
+
+- **Un rendement à contresens répondait HTTP 500 avec le SQL brut**, et un
+  utilisateur ordinaire pouvait l'atteindre : `ratioVraisemblable` répondait
+  « 0,4 à 5 » **sans regarder la catégorie**. Il refusait donc une vraie mesure
+  d'épinard (0,32, que `plausibilite.ts` déclare légitime à la ligne près) et
+  laissait passer un féculent à 0,8 que la base rejette en `CHECK`. La règle vit
+  désormais dans **`rendementPossible`** (`calcul/plausibilite.ts`), et elle dit
+  exactement ce que disent l'API (`RendementPlausible::sens`) et la base
+  (`aliment_ratio_sens`) : un féculent absorbe de l'eau, une protéine et un
+  légume en perdent. Trois endroits, une règle.
+- **Un message qui mentait sur le sens de l'erreur.** Pour un poisson à 1,4, le
+  front annonçait « une cuisson plus poussée » et « la colonne cuit sera basse » :
+  les deux sont faux dans ce sens — il aurait *gagné* de l'eau. Les deux bornes
+  ont maintenant deux messages. *Ma première version le passait en **blocage** :
+  le test « le rendement d'une protéine ne fait qu'annoncer un poids » est tombé
+  dessus, et il avait raison — un rendement faux ne fait pas mal peser.*
+- **Le docblock de `api/src/Entity/Aliment.php` disait l'inverse de la règle 3**
+  (« féculents : valeurs CUITES, ratio = cuit/sec (riz 3) ») : la convention
+  abolie par `18-un-seul-etat.sql`, sur l'entité que lit en premier quiconque
+  écrit un import.
+
+### Et deux défauts trouvés par la revue, hors du riz
+
+- **Le raccourci « ↓ dernière fois » était éteint pour tout le mode « Tenue ».**
+  L'aperçu ne gardait que les séries portant `reps` ou `poids` ; une séance de
+  gainage n'en produit aucune, la liste était vide, le bouton n'apparaissait
+  **jamais** — alors que `rechargerDerniereFois` savait restaurer les durées.
+  Descendu dans `calcul/blocSeance.ts` pour être éprouvé (4 tests).
+- **Mon propre test du sélecteur de mode affirmait une garantie qu'il
+  n'éprouvait pas** : il gardait `mode` figé à `iso` tout en prétendant vérifier
+  qu'« une bascule ne jette rien ». Il bascule pour de vrai maintenant, et fait
+  l'aller-retour Charge → Tenue → Charge.
+
+### Ce que `verite-documentaire` a trouvé, et qui t'aurait coûté la démonstration
+
+**`jeu-demo.sql` ne pose NI aliments NI stock** — c'est `jeu-essai.sql`, qu'il
+exige en prérequis. La liste « avant d'entrer dans la salle » de
+`presentation/demo-30-minutes.md` ne citait que le premier : en la suivant à la
+lettre, on arrive avec un **frigo vide**, et le frigo est le premier tiers de la
+démonstration. Corrigé là et ici (voir plus bas, « Le jeu de démonstration »).
+
+Il a aussi trouvé **quatorze renvois `fichier:ligne` faux** dans
+`presentation/fonctionnalites-revue.md`, tous hérités d'avant le lot 6 —
+`composer.ts` est passé de 817 lignes à 135, `repas.tsx` de 2 316 à 655. Recalés.
 
 ---
 

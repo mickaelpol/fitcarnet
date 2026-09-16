@@ -10,6 +10,7 @@ import { Sparkline } from './sparkline';
 import { ChoixMode } from './choixMode';
 import { LigneSerie } from './serie';
 import { performanceDe } from '@/calcul/performance';
+import { apercuDerniereFois } from '@/calcul/blocSeance';
 import { C, E, N, P, R, T, TOUCHE, nb } from '@/theme';
 
 const serieVide = (ordre: number): Serie => ({
@@ -103,18 +104,13 @@ export function CarteExercice({
     });
   };
 
-  /** Aperçu de ce que le bouton va appliquer : « 12×25 · 12×27,5 ». */
-  const apercuDerniereFois = (derniereFois ?? [])
-    .filter((x) => x.reps !== null || x.poids !== null)
-    .map((x) => {
-      if (x.reps !== null && x.poids !== null) return `${x.reps}×${nb(x.poids)}`;
-      if (x.reps !== null) return `${x.reps} rép`;
-
-      return x.poids !== null ? `${nb(x.poids)} kg` : '';
-    })
-    .filter(Boolean)
-    .slice(0, 4)
-    .join(' · ');
+  /* L'aperçu de ce que le bouton va appliquer — « 12×25 · 12×27,5 » — vit dans
+     `calcul/blocSeance.ts` depuis le 16 septembre 2026. Écrit ici, il ne
+     regardait que `reps` et `poids` : en « Tenue », où les séries ne portent
+     que des secondes, la liste était vide, l'aperçu valait `''`, et le
+     raccourci n'apparaissait JAMAIS — pour un mode entier, sans un signal.
+     Dans un `.tsx`, aucun test ne pouvait l'atteindre. */
+  const apercu = apercuDerniereFois(derniereFois, nb);
 
   return (
     <Carte style={s.carte}>
@@ -166,14 +162,14 @@ export function CarteExercice({
           <ChoixMode
             mode={mode}
             onChange={(m) => onChange({ ...bloc, mode: m })}
-            suite={apercuDerniereFois !== '' ? (
+            suite={apercu !== '' ? (
               <Pressable
                 onPress={rechargerDerniereFois}
                 style={s.appliquer}
                 accessibilityLabel="Recharger les valeurs de la dernière séance"
               >
                 <Discret style={{ color: C.vif, fontSize: T.petit }} numberOfLines={1}>
-                  ↓ {apercuDerniereFois}
+                  ↓ {apercu}
                 </Discret>
               </Pressable>
             ) : undefined}

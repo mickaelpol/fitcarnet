@@ -107,6 +107,48 @@ const RENDEMENT = {
 const r2 = (v: number): string => v.toFixed(2);
 
 /**
+ * CE RENDEMENT EST-IL **POSSIBLE** ? — à ne pas confondre avec « plausible ».
+ *
+ * `RENDEMENT` ci-dessus décrit ce qu'on OBSERVE : hors de ces bandes, on
+ * AVERTIT. Cette fonction-ci dit ce qui est **impossible**, donc ce qu'un écran
+ * de saisie doit refuser d'enregistrer. Les deux questions sont différentes, et
+ * les confondre a produit les deux pannes du 16 septembre 2026 :
+ *
+ *  - `ratioVraisemblable` (0,4 à 5, **toutes catégories confondues**) refusait
+ *    un épinard mesuré à 0,32 — 500 g crus, 160 g cuits — alors que ce module
+ *    déclare ce cas légitime à la ligne près (`leg.mini = 0,30`, « le refuser
+ *    reviendrait à refuser la réalité d'une poêle »). Une vraie mesure,
+ *    refusée par un message qui affirmait qu'elle n'était pas vraisemblable ;
+ *  - et il LAISSAIT PASSER un féculent à 0,8, que la base refuse par contrainte
+ *    `CHECK` : l'utilisateur recevait un **HTTP 500 avec le SQL brut** au lieu
+ *    de la phrase écrite pour lui, vingt lignes plus bas dans ce fichier.
+ *
+ * La règle posée ici est **exactement celle de la base** (`aliment_ratio_sens`,
+ * `db/01-schema.sql:152`) et **celle de l'API** (`RendementPlausible::sens`) :
+ * un féculent absorbe de l'eau, une protéine et un légume en perdent. Trois
+ * endroits, une seule règle — c'est la seule façon qu'un écran ne propose pas
+ * ce que le serveur rejettera.
+ *
+ * Tout le reste passe : ce sont des avertissements, et `verifierAliment` les
+ * dit déjà. Un rendement douteux ne fait pas mal peser — il ne déplace que le
+ * poids annoncé dans l'assiette.
+ */
+/*
+ * `categorie: string` et non l'union : l'éditeur d'aliment tient la catégorie
+ * en cours de saisie dans un `string` libre, et une catégorie que cette règle
+ * ne connaît pas n'est pas pour autant IMPOSSIBLE — elle passe, comme le fruit
+ * ou l'huile. Élargir ici évite un `as` au point d'appel, c'est-à-dire une
+ * affirmation de type que rien ne garantit.
+ */
+export function rendementPossible(categorie: string, ratio: number): boolean {
+  if (!Number.isFinite(ratio) || ratio <= 0) return false;
+  if (categorie === 'fec') return ratio >= 1;
+  if (categorie === 'prot' || categorie === 'leg') return ratio <= 1.05;
+
+  return true;
+}
+
+/**
  * Les valeurs telles qu'elles seraient si celles qu'on lit décrivaient le
  * produit CUIT.
  *
@@ -223,9 +265,26 @@ export function verifierAliment(a: Aliment): Anomalie[] {
      Il n'affiche que le poids servi, et se tromper sur le poids servi ne fait
      pas manger de travers. */
 
+  /* LES DEUX BORNES NE DISENT PAS LA MÊME CHOSE, et un seul message servait
+     les deux jusqu'au 16 septembre 2026. Pour une viande à 1,5, il annonçait
+     « une cuisson plus poussée que la moyenne » et « la colonne cuit sera
+     basse » : les deux sont faux — la viande aurait GAGNÉ de l'eau, et la
+     colonne serait haute. Pire, il le disait en gravité « info » pendant que la
+     base refuse cette valeur par contrainte. Relevé par l'agent bout en bout. */
   if (a.categorie === 'prot') {
     const r = RENDEMENT.prot;
-    if (a.ratio < r.mini || a.ratio > r.maxi) {
+    if (a.ratio > r.maxi) {
+      /* AVERTISSEMENT, pas blocage — comme son jumeau le légume, vingt lignes
+         plus bas. La première version de ce correctif bloquait, et le test
+         « Le rendement d'une protéine ne fait qu'annoncer un poids » est tombé
+         dessus : il défend une décision de ce module, écrite en haut de la
+         section, et elle tient. Ce qui refuse l'ENREGISTREMENT d'une telle
+         valeur, c'est `rendementPossible`, du côté de l'écran de saisie. */
+      dire('avertissement', 'proteine_qui_gonfle',
+        `un rendement de ${r2(a.ratio)} : une viande ou un poisson PERD de l'eau `
+        + 'à la cuisson, il n\'en gagne pas. Les deux pesées ont probablement été '
+        + 'interverties — ou elles ne portaient pas sur la même chose.');
+    } else if (a.ratio < r.mini) {
       dire('info', 'rendement_hors_norme',
         `un rendement de ${r2(a.ratio)} : c'est une cuisson plus poussée que la `
         + `moyenne (on attend ${r.mini * 100} à ${r.maxi * 100} %). Sans `

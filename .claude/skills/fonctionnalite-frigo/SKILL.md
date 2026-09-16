@@ -17,8 +17,10 @@ ce qu'il a, ajouter un produit qu'il vient d'acheter, corriger une valeur qu'il
 a mal recopiée de l'emballage.
 
 **La règle 3 du projet se joue ici** : les valeurs décrivent le produit **tel
-qu'on le pèse** — le riz sec vaut 350 kcal/100 g, pas 130. Et la règle 6 : un
-champ de fibres vide veut dire « je ne sais pas », jamais « zéro ».
+qu'on le pèse** — le riz blanc sec vaut 350 kcal/100 g, pas 155, qui est la
+valeur du même riz une fois cuit (CIQUAL 2025, colonne « Règlement UE
+n° 1169/2011 »). Et la règle 6 : un champ de fibres vide veut dire « je ne sais
+pas », jamais « zéro ».
 
 Cette fiche couvre le **mode Stock**. Le recomptage complet est dans
 `fonctionnalite-inventaire` ; les deux vivent dans le même écran, sous un

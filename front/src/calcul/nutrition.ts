@@ -224,10 +224,21 @@ export function expliquerRatio(ratio: number): string {
     + `(perte d'eau).`;
 }
 
-/** Le ratio est-il vraisemblable ? Au-delà, c'est une erreur de saisie. */
-export function ratioVraisemblable(ratio: number): boolean {
-  return ratio >= 0.4 && ratio <= 5;
-}
+/* `ratioVraisemblable` VIVAIT ICI, et il répondait « 0,4 à 5 » — sans jamais
+   regarder la catégorie de l'aliment. Deux conséquences, trouvées le même jour
+   par deux agents de contrôle, le 16 septembre 2026 :
+
+     - une vraie mesure d'épinard (500 g crus → 160 g cuits, soit 0,32) était
+       REFUSÉE par l'éditeur, avec un message affirmant qu'elle n'était pas
+       vraisemblable — alors que `plausibilite.ts` la déclare légitime ;
+     - un féculent à 0,8 était ACCEPTÉ, puis rejeté par la contrainte `CHECK` de
+       la base : l'utilisateur recevait un HTTP 500 portant le SQL brut.
+
+   La règle vit désormais dans `calcul/plausibilite.ts` sous le nom
+   `rendementPossible`, au même endroit que les bandes de rendement, et elle dit
+   exactement ce que disent l'API (`RendementPlausible::sens`) et la base
+   (`aliment_ratio_sens`) : un féculent absorbe de l'eau, une protéine et un
+   légume en perdent. Ne pas la réécrire ici. */
 
 /* `etatParDefaut()` vivait ici. Il répondait à « ces macros valent-elles pour
    le produit cru ou cuit ? » — une question que l'application ne pose plus,

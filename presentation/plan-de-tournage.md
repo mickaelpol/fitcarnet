@@ -186,7 +186,9 @@ seule chose qui sépare un compte de démonstration de ton compte personnel.
 **3.2 — Le détail, et le poids cru** · 30 s *(B2, B4)*
 *Geste* : ouvre « Blanc de poulet ».
 *À l'écran* : macros, et **« 100 g → 75 g »** à la cuisson.
-*Tu dis* : « Et la mention qui décide de tout : poids cru. Le riz sec vaut 350 kilocalories aux cent grammes, cuit il en vaut 130. Si on confond les deux, tous les chiffres de l'application sont faux. Ici on pèse toujours cru, et le rendement de cuisson est écrit. »
+*Tu dis* : « Et la mention qui décide de tout : poids cru. Le riz blanc sec vaut 350 kilocalories aux cent grammes ; cuit, il n'en vaut plus que 155, parce qu'il pèse deux fois et quart plus lourd. Si on confond les deux, tous les chiffres de l'application sont faux. Ici on pèse toujours cru, et le rendement de cuisson est écrit. »
+
+> **Ce plan disait « 130 » jusqu'au 16 septembre 2026**, une valeur USDA et non CIQUAL. Il a ensuite dit « basmati » pendant une heure, ce qui était faux aussi : la paire 350 / 155 est celle du **riz blanc**, et c'est d'elle que le catalogue tire son rendement 2,26 (le « Riz basmati » de l'application est apparié à « Riz blanc, cru »). Le basmati donnerait 351 / 148, soit 2,37. Dire **riz blanc**.
 
 **3.3 — Chercher** · 15 s *(B3)*
 *Geste* : tape « poul » dans le champ de recherche.

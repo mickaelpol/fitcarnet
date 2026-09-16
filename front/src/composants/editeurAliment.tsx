@@ -5,8 +5,14 @@ import {
 import { Bouton, Champ, Discret, Texte } from './base';
 import {
   CATEGORIES, RATIOS_GUIDES, controler, expliquerRatio,
-  provenanceRatio, ratioDepuisPesees, ratioVraisemblable, soupconKilojoules,
+  provenanceRatio, ratioDepuisPesees, soupconKilojoules,
 } from '@/calcul/nutrition';
+/* `rendementPossible` et non plus `ratioVraisemblable` : celui-ci répondait
+   « 0,4 à 5 » sans regarder la catégorie, si bien qu'il refusait une vraie
+   mesure d'épinard (0,32) et laissait passer un féculent à 0,8 que la base
+   rejette — l'utilisateur recevait alors un 500 avec le SQL brut. Voir
+   `plausibilite.ts`, qui porte désormais la règle, la même que l'API et la base. */
+import { rendementPossible } from '@/calcul/plausibilite';
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 import { nombreSaisi } from '@/calcul/saisieNombre';
 
@@ -220,7 +226,7 @@ export function EditeurAliment({
   const valide = a.nom.trim() !== ''
     && macrosLisibles
     && a.kcal100 > 0
-    && ratioVraisemblable(a.ratio)
+    && rendementPossible(a.categorie, a.ratio)
     && controle.verdict !== 'incoherent';
 
   const couleurVerdict = {
@@ -437,12 +443,12 @@ export function EditeurAliment({
                         });
                         setMesurer(false);
                       }}
-                      desactive={!ratioVraisemblable(ratioMesure)}
+                      desactive={!rendementPossible(a.categorie, ratioMesure)}
                       style={{ marginTop: E.s }}
                     >
-                      {ratioVraisemblable(ratioMesure)
+                      {rendementPossible(a.categorie, ratioMesure)
                         ? `Utiliser ce résultat (${nb(ratioMesure)})`
-                        : 'Ces deux poids ne sont pas vraisemblables'}
+                        : 'Ces deux poids sont inversés : ce produit ne peut pas varier ainsi'}
                     </Bouton>
                   )}
                   <Bouton variante="discret" onPress={() => setMesurer(false)}>

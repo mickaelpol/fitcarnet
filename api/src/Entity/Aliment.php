@@ -20,9 +20,21 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Referentiel COMMUN. Valeurs pour 100 g dans l'etat de reference :
- *  - proteines : valeurs CRUES,  ratio = cuit/cru (0.85 poisson, 0.75 volaille)
- *  - feculents : valeurs CUITES, ratio = cuit/sec (riz 3, patate douce 1)
+ * Referentiel COMMUN. Valeurs pour 100 g DU PRODUIT TEL QU'ON LE PESE — riz sec,
+ * viande crue, legume cru. C'est la regle 3 du projet, et il n'y a plus d'autre
+ * etat : `ratio` n'annonce qu'un POIDS SERVI et n'entre dans aucune macro.
+ *
+ *  - riz blanc : 350 kcal/100 g au sec, ratio 2.26 (155 kcal une fois cuit)
+ *  - volaille  : valeurs crues, ratio 0.75 ; poisson 0.85 — ils PERDENT de l'eau
+ *
+ * CE COMMENTAIRE A DIT L'INVERSE JUSQU'AU 16 SEPTEMBRE 2026 : « feculents :
+ * valeurs CUITES, ratio = cuit/sec (riz 3) ». C'etait la convention abolie par
+ * `db/manuel/18-un-seul-etat.sql` — trois champs pour un seul fait, donc trois
+ * facons de se contredire, et un compte qui mangeait jusqu'a trois fois trop de
+ * glucides. Le code avait ete refait, pas ce docblock : celui que lit en
+ * premier quiconque ecrit un import. Trouve par deux agents de controle le
+ * meme jour.
+ *
  * Tout le monde peut en creer ; personne ne peut en supprimer (integrite du stock).
  */
 #[ORM\Entity]

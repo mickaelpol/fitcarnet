@@ -28,7 +28,24 @@ un défaut qui n'existe plus.**
 
 ## 2. Les valeurs décrivent le produit TEL QU'ON LE PÈSE
 
-Le riz sec vaut **350 kcal/100 g**, pas 130. Un légume se pèse **cru**.
+Le riz blanc sec vaut **350 kcal/100 g**, pas 155 — 155, c'est le même riz une
+fois cuit, gonflé d'eau (rendement **2,26**). Un légume se pèse **cru**.
+
+> **Les chiffres viennent de `Table_Ciqual_2025.xlsx`**, la table ANSES, à la
+> racine du dépôt. **Deux colonnes d'énergie y cohabitent** : prendre « Énergie,
+> Règlement UE n° 1169/2011 », qui compte les fibres à 2 kcal/g comme la règle 1
+> de cette skill. « N × facteur Jones » donne 348 au même riz — un écart muet de
+> 2 kcal qui suffit à faire croire à une faute de saisie.
+>
+> Valeurs utiles (colonne UE) : riz blanc cru **350** · riz blanc cuit **155** ·
+> riz complet cru **350** · riz complet cuit **187** · riz thaï ou basmati cru
+> **351** · riz basmati cuit **148** · riz sauvage cuit **102**.
+>
+> *Deux erreurs corrigées le 16 septembre 2026.* « Pas 130 » : 130 est la valeur
+> **USDA** du riz blanc long cuit, qui circule partout en français sans sa
+> source. Et « basmati » : le « Riz basmati » du catalogue est apparié à l'entrée
+> **« Riz blanc, cru »** (`ciqual_vers_grocy.py:294`) — c'est de 350 / 155 que
+> vient son 2,26, pas des valeurs du basmati, qui donneraient 2,37.
 
 Le rendement cru/cuit se **dérive des pesées à la lecture** ; il ne se stocke pas
 dans les valeurs nutritionnelles. Un aliment dont on a stocké les valeurs « cuit »

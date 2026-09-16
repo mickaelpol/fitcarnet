@@ -34,8 +34,11 @@ qu'au-delà de quinze répétitions aucune formule n'est fiable.
 ### Deux règles qui expliquent beaucoup de choix
 
 **Les valeurs nutritionnelles décrivent le produit tel qu'on le pèse.** Le riz
-sec vaut 350 kcal/100 g, pas 130. Le rendement cru/cuit se dérive des pesées à
-la lecture ; il ne se stocke pas.
+blanc sec vaut 350 kcal/100 g ; cuit à l'eau, le même riz n'en porte plus que
+155 aux 100 g, parce qu'il pèse alors **2,26 fois plus** — il a absorbé 1,26 fois
+son poids en eau (CIQUAL 2025, convention du règlement UE n° 1169/2011). Ce sont
+les valeurs du **sec** qui sont stockées. Le rendement cru/cuit se dérive des
+pesées à la lecture ; il ne se stocke pas.
 
 **Un chiffre faux est pire qu'un refus de répondre.** Ce qui s'affiche sera pesé
 et mangé. En cas de doute, l'application montre l'incertitude ou refuse.

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import type { Exercice, Modele, Seance, SeanceExercice } from '@/api/types';
 import {
-  avancementDe, avecIdentifiantSeance, blocDepuisExercice, blocsDepuisModele,
+  apercuDerniereFois, avancementDe, avecIdentifiantSeance, blocDepuisExercice,
+  blocsDepuisModele,
 } from './blocSeance';
 
 /**
@@ -22,6 +23,58 @@ import {
  *   - la réponse du serveur ne rend QUE l'identifiant de la séance, jamais le
  *     reste : ce qui a été tapé pendant l'attente ne doit pas disparaître.
  */
+
+/* Le formateur de l'écran, en deux lignes : le module n'en dépend pas. */
+const nb = (v: number): string => String(v).replace('.', ',');
+
+/**
+ * LE RACCOURCI « ↓ DERNIÈRE FOIS » ÉTAIT ÉTEINT POUR TOUT UN MODE.
+ *
+ * Écrit en clair dans `exerciceSeance.tsx`, l'aperçu ne gardait que les séries
+ * portant des `reps` ou un `poids`. Une séance en « Tenue » n'en produit
+ * aucune — rien que des `secondes` : la liste devenait vide, l'aperçu valait
+ * `''`, et le bouton n'était jamais proposé, alors que `rechargerDerniereFois`
+ * savait parfaitement restaurer les durées. Trouvé par la revue le 16 septembre
+ * 2026, le jour où le mode est devenu choisissable dans un modèle.
+ */
+test('l\'aperçu montre les durées d\'un exercice travaillé en tenue', () => {
+  const tenue = [
+    { reps: null, poids: null, secondes: 45 },
+    { reps: null, poids: null, secondes: 40 },
+  ];
+
+  assert.equal(apercuDerniereFois(tenue, nb), '45 s · 40 s');
+});
+
+test('l\'aperçu garde « 12×42,5 » en charge — le témoin inverse', () => {
+  /* Sans lui, « montrer les secondes » pourrait se corriger en cassant
+     l'affichage des charges, et le test précédent resterait vert. */
+  const charge = [
+    { reps: 12, poids: 42.5, secondes: null },
+    { reps: 10, poids: null, secondes: null },
+    { reps: null, poids: 60, secondes: null },
+  ];
+
+  assert.equal(apercuDerniereFois(charge, nb), '12×42,5 · 10 rép · 60 kg');
+});
+
+test('une série sans rien du tout ne laisse pas de trou dans l\'aperçu', () => {
+  const trouee = [
+    { reps: 12, poids: 40, secondes: null },
+    { reps: null, poids: null, secondes: null },
+    { reps: 11, poids: 40, secondes: null },
+  ];
+
+  assert.equal(apercuDerniereFois(trouee, nb), '12×40 · 11×40');
+});
+
+test('l\'aperçu s\'arrête à quatre séries, et rend « » quand il n\'y a rien', () => {
+  const huit = Array.from({ length: 8 }, () => ({ reps: 10, poids: 20, secondes: null }));
+
+  assert.equal(apercuDerniereFois(huit, nb), '10×20 · 10×20 · 10×20 · 10×20');
+  assert.equal(apercuDerniereFois([], nb), '', 'vide reste vide : le bouton ne s\'affiche pas');
+  assert.equal(apercuDerniereFois(undefined, nb), '');
+});
 
 const exercice = (id: number, modeDefaut: Exercice['modeDefaut'] = 'charge'): Exercice => ({
   '@id': `/api/exercices/${id}`,

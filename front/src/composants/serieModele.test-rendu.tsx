@@ -26,21 +26,34 @@ import type { ModeTravail } from './choixMode';
 
 const SERIE: ModeleSerie = { ordre: 0, repsCible: 12, poidsCible: 40, secondesCible: null };
 
-function Parent({ mode, depart = SERIE, recues }: {
+/**
+ * Le parent se comporte comme `app/modele/[id].tsx` : il garde la série ET le
+ * mode, et **changer de mode ne touche qu'au mode** (là-bas,
+ * `majBloc(i, { ...bloc, mode: m })`). Sans ce bouton de bascule, un test qui
+ * prétend éprouver « basculer ne jette rien » ne bascule jamais — c'est ce que
+ * la revue a relevé le 16 septembre 2026 sur la première version de ce fichier.
+ */
+function Parent({ mode: depart, serie: serieDepart = SERIE, recues }: {
   mode: ModeTravail;
-  depart?: ModeleSerie;
+  serie?: ModeleSerie;
   recues: ModeleSerie[];
 }) {
-  const [serie, setSerie] = useState<ModeleSerie>(depart);
+  const [mode, setMode] = useState<ModeTravail>(depart);
+  const [serie, setSerie] = useState<ModeleSerie>(serieDepart);
 
   return (
-    <SerieModele
-      serie={serie}
-      mode={mode}
-      index={0}
-      onChange={(s) => { recues.push(s); setSerie(s); }}
-      onSupprimer={() => undefined}
-    />
+    <>
+      {(['charge', 'iso', 'chrono'] as const).map((m) => (
+        <button key={m} type="button" onClick={() => setMode(m)}>{`vers ${m}`}</button>
+      ))}
+      <SerieModele
+        serie={serie}
+        mode={mode}
+        index={0}
+        onChange={(s) => { recues.push(s); setSerie(s); }}
+        onSupprimer={() => undefined}
+      />
+    </>
   );
 }
 
@@ -83,7 +96,36 @@ test('la durée saisie en Tenue est remontée dans secondesCible', (t: TestConte
   fireEvent.change(screen.getByPlaceholderText('—'), { target: { value: '45' } });
 
   assert.equal(recues.at(-1)?.secondesCible, 45);
-  assert.equal(recues.at(-1)?.poidsCible, 40, 'basculer de mode ne doit pas jeter ce qui était saisi');
+});
+
+/**
+ * L'ALLER-RETOUR, ET IL BASCULE POUR DE VRAI.
+ *
+ * La première version de ce test affirmait « basculer de mode ne doit pas jeter
+ * ce qui était saisi » en gardant `mode` figé à `"iso"` : il ne prouvait que la
+ * diffusion de `...serie` dans `onChange`. Relevé par la revue le 16 septembre
+ * 2026 — une assertion qui peut échouer, mais pas pour la raison qu'elle
+ * affiche (motif 4, forme douce).
+ */
+test('un aller-retour Charge → Tenue → Charge rend les kilos intacts', (t: TestContext) => {
+  t.after(cleanup);
+  const recues: ModeleSerie[] = [];
+  render(<Parent mode="charge" recues={recues} />);
+
+  const valeurs = () => (screen.getAllByPlaceholderText('—') as HTMLInputElement[])
+    .map((c) => c.value);
+
+  assert.deepEqual(valeurs(), ['12', '40'], 'au départ : 12 répétitions à 40 kg');
+
+  fireEvent.click(screen.getByText('vers iso'));
+  assert.deepEqual(valeurs(), [''], 'en Tenue, un seul champ, vide : aucune durée prescrite');
+  fireEvent.change(screen.getByPlaceholderText('—'), { target: { value: '45' } });
+
+  fireEvent.click(screen.getByText('vers charge'));
+
+  assert.deepEqual(valeurs(), ['12', '40'],
+    'les kilos saisis avant la bascule doivent être rendus tels quels (règle 6)');
+  assert.equal(recues.at(-1)?.secondesCible, 45, 'et la durée est conservée de son côté');
 });
 
 test('le bouton de suppression se nomme, au lieu d\'annoncer « signe multiplication »', (t: TestContext) => {

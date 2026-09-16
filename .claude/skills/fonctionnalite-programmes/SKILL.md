@@ -235,7 +235,7 @@ au moins un modèle (`front/app/seance/[id].tsx:209`).
 12. **Séance → modèle** — « ★ Enregistrer comme modèle » crée un modèle dont
     les `repsCible`/`poidsCible` valent ce qui a été **fait** (`s.reps`), et à
     défaut l'objectif d'origine (`s.repsCible`). Le `mode` de chaque bloc est
-    recopié (`front/src/api/hooks/seances.ts:139`).
+    recopié (`front/src/api/hooks/seances.ts:138`).
 13. **Suppression** — supprimer le modèle ne touche **aucune** séance passée :
     recompter `seance` et `serie` avant/après. La cascade ne descend que sur
     `modele_exercice` et `modele_serie` (`db/01-schema.sql:292-306`).

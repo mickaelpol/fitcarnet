@@ -43,8 +43,16 @@
 --  dilue tout dans les memes proportions. Repasser du cuit au pese est donc
 --  une multiplication par le rendement, la meme pour chaque macro :
 --
---      riz cuit  : 130 kcal, 28,2 g de glucides pour 100 g, rendement 3
---      riz sec   : 390 kcal, 84,6 g de glucides pour 100 g, rendement 3
+--      riz cuit  : 155 kcal, 33,2 g de glucides pour 100 g, rendement 2,26
+--      riz sec   : 350 kcal, 75,0 g de glucides pour 100 g, rendement 2,26
+--
+--  (Cet exemple portait « 130 / 390, rendement 3 » jusqu'au 16 septembre 2026 :
+--  des nombres ronds, mais aucun des deux n'etait dans CIQUAL. Les valeurs
+--  ci-dessus sont celles de `Table_Ciqual_2025.xlsx`, colonne « Reglement UE
+--  n° 1169/2011 » — « Riz blanc, cru » 350 et « Riz blanc, cuit » 155, la paire
+--  dont le catalogue tire son 2,26. Les glucides suivent le meme facteur :
+--  33,2 x 2,26 = 75,0. La migration elle-meme n'a jamais utilise ces nombres :
+--  ils n'illustrent que le calcul.)
 --
 --  C'est le MEME riz, decrit a l'autre bout de la casserole. Le solveur
 --  cherchait 33,3 g a peser, il cherche toujours 33,3 g. Pas une portion ne

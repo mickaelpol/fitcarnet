@@ -13,7 +13,7 @@ le métier.**
 ## Les commandes, dans cet ordre
 
 ```bash
-cd front && npm test          # tsc --noEmit + 577 tests, puis 23 de rendu
+cd front && npm test          # tsc --noEmit + 588 tests, puis 29 de rendu
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, servi par Caddy)
 ```
@@ -157,7 +157,9 @@ l'exemple : trois lignes de décision noyées dans sept dépendances natives.
 
 Voir la skill **`nutrition-fitcarnet`** pour le détail. En deux lignes : les fibres
 comptent **2 kcal/g** et séparément des glucides (`KCAL_FIBRES`), et les valeurs
-décrivent le produit **tel qu'on le pèse** — le riz sec vaut 350 kcal/100 g.
+décrivent le produit **tel qu'on le pèse** — le riz blanc sec vaut
+350 kcal/100 g, contre 155 une fois cuit (CIQUAL 2025, colonne « Règlement UE
+n° 1169/2011 »).
 
 ## Vide ≠ zéro
 

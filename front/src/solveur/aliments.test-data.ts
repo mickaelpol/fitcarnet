@@ -31,7 +31,15 @@ export const A = {
   /* Grains secs : les valeurs cuites d'hier multipliees par leur rendement.
      Boulgour 131 x 2,5, riz 130 x 3, quinoa 120 x 2,75. Toutes retombent
      entre 300 et 400 kcal, la bande de la matiere seche — c'est le controle
-     que `plausibilite.ts` applique desormais a ces trois-la. */
+     que `plausibilite.ts` applique desormais a ces trois-la.
+
+     CE SONT DES DONNEES DE TEST, PAS UNE REFERENCE. Le « 130 x 3 » du riz
+     vient d'une valeur USDA ; CIQUAL 2025 (colonne « Reglement UE n° 1169
+     2011 ») donne 350 au riz blanc cru et 155 au riz blanc cuit, soit un
+     rendement de 2,26. Le catalogue reel (`db/manuel/16-catalogue-ciqual.sql`)
+     porte 350 et 2,26 ; ces fixtures gardent l'ancienne paire parce que les
+     tests s'appuient dessus, et que ce qu'ils eprouvent est la conversion, pas
+     la valeur du riz. Note du 16 septembre 2026. */
   boulgour:    a('Boulgour', 'fec', 327.5, 10.75, 60.25, 2.5, 2.5),
   /* La patate douce ne gonfle pas : rendement 1, valeurs inchangees, et la
      bande des grains secs ne la concerne pas. */

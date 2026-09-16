@@ -45,8 +45,18 @@ Trois piliers. Nomme-les, ne les détaille pas — les slides suivantes le font.
 Montre l'écran. Puis pointe la mention « poids cru » sous la quantité :
 
 > « Ça a l'air d'un détail. C'en est un qui décide de la justesse de tout le
-> reste : le riz sec fait 350 kcal pour 100 grammes, cuit il en fait 130. Si on
-> confond les deux, tous les chiffres de l'application sont faux. »
+> reste : le riz blanc sec fait 350 kcal pour 100 grammes ; cuit, il n'en fait
+> plus que 155, parce qu'il pèse deux fois et quart plus lourd — il a bu son
+> poids en eau et un quart. Si on confond les deux, tous les chiffres de
+> l'application sont faux. »
+
+> **Ce passage a porté deux chiffres faux, corrigés le 16 septembre 2026.**
+> D'abord « 130 » pour le riz cuit : c'est la valeur **USDA**, pas CIQUAL. Puis,
+> une heure durant, « basmati » : la table donne bien 350 au cru et 155 au cuit
+> pour le **riz blanc**, et c'est cette paire-là qui produit le rendement 2,26 du
+> catalogue (`ciqual_vers_grocy.py:294` apparie le « Riz basmati » de
+> l'application à l'entrée « Riz blanc, cru »). Le basmati a ses propres valeurs,
+> 351 et 148, soit 2,37. **Dire « riz blanc » et rien d'autre.**
 
 ### 5. L'inventaire en écarts
 > « On ne ressaisit pas trente aliments. On corrige les trois qui ont bougé.

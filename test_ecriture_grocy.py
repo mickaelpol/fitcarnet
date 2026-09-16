@@ -184,7 +184,12 @@ class FauxGrocy(BaseHTTPRequestHandler):
 
 CIQUAL_FACTICE = [
     # (libelle, kcal, proteines, glucides, lipides, fibres)
-    ("Riz blanc, cru", 350, 7.12, 75.0, 1.58, 3.2),
+    # Les vraies valeurs de la table (colonne « Reglement UE n° 1169/2011 »).
+    # Cette ligne a porte 7.12 / 75.0 / 1.58 / 3.2 jusqu'au 16 septembre 2026 :
+    # les lipides au double et les fibres a 2,1x. L'audit avait trace jusqu'ici
+    # les valeurs fausses du catalogue (04-tests-qualite.md:144) — une fausse
+    # table qui ment sur les chiffres qu'elle imite ne prouve plus rien.
+    ("Riz blanc, cru", 350, 7.02, 77.5, 0.79, 1.53),
     ("Riz blanc, cuit, sans sel ajouté", 155, 3.15, 33.2, 0.70, 1.4),
     ("Brocoli, cru", 31.9, 2.9, 2.1, 0.40, 2.6),
     # LE piege du 10 aout, rejoue sur le boulgour. En production c'etait la
@@ -353,8 +358,8 @@ def main():
     # exactement celles de Ciqual, sans recalcul intermediaire.
     verifier("riz : les valeurs du grain SEC (350 kcal), pas du riz cuit",
              abs(nombre(riz, "kcal100") - 350) < 0.5)
-    verifier("riz : 75 g de glucides pour 100 g SECS",
-             abs(nombre(riz, "gluc100") - 75.0) < 0.3)
+    verifier("riz : 77,5 g de glucides pour 100 g SECS",
+             abs(nombre(riz, "gluc100") - 77.5) < 0.3)
     verifier("riz : SA pesée ne déplace plus une seule macro",
              abs(nombre(riz, "kcal100") - 350) < 0.5)
     verifier("riz : le rendement retenu est SA mesure (4,68)",
