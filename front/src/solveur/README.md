@@ -7,10 +7,21 @@ Il tourne côté client : le calcul est instantané et fonctionne hors ligne.
 front/src/solveur/
 ├─ types.ts                 Aliment, Cibles, Resultat, Diagnostic…
 ├─ algebre.ts               résolution linéaire (Gauss, pivot partiel)
-├─ solveur.ts               le calcul
-├─ solveur.test.ts          68 tests
-└─ aliments.test-data.ts    jeu d'aliments de référence
+├─ solveur.ts               le calcul d'un repas
+├─ composer.ts              composition : choix des aliments par rôle
+├─ periode.ts               plusieurs jours sur un stock qui décroît, liste de courses
+├─ plafonner.ts             ce que le frigo permet vraiment, et les relais
+├─ auMieux.ts               que faire quand la cible est hors d'atteinte
+├─ repasVocabulaire.ts      les clés de repas et leurs libellés
+├─ garanties.test.ts        tests de propriété (5 000 combinaisons)
+└─ *.test.ts, *.test-data.ts
 ```
+
+> **Cet arbre annonçait cinq fichiers jusqu'au 16 septembre 2026 ; le dossier en
+> contient dix-sept.** Les absents étaient nés du découpage du lot 6 —
+> `composer.ts` est sorti d'un `composer.ts` de 817 lignes, `periode.ts` et
+> `plafonner.ts` avec lui. Qui cherchait `composer.ts` dans ce README concluait
+> qu'il n'existait pas.
 
 ---
 
@@ -147,10 +158,14 @@ porte `aCuire` (ce qu'on pèse en cuisinant : riz sec, viande crue) et
 ## Les tests
 
 ```bash
-cd front && npx tsc && node --test dist/solveur.test.js
+cd front && npm test
 ```
 
-68 tests : algèbre (systèmes simples, singuliers, pivot), cas nominal des
+*(La commande de ce document était `npx tsc && node --test dist/solveur.test.js`,
+qui ne correspond plus à rien : les tests se compilent par `tsconfig.tests.json`
+vers `dist-tests/`, et `npm test` fait les deux passes.)*
+
+Les tests du solveur : algèbre (systèmes simples, singuliers, pivot), cas nominal des
 quatre repas, conversions cru/cuit/sec, restes en unités cuites, invariance des
 macros sur 36 substitutions, calcul avec moins de trois variables, aliment
 devenu négligeable, cible inatteignable, arrondis, robustesse — plus un test de

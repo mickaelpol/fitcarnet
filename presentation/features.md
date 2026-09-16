@@ -1,8 +1,12 @@
 # fitcarnet — tout ce que l'application sait faire
 
-Inventaire établi le 14 septembre 2026 par exploration systématique du code :
-18 écrans, 40 composants, 8 contrôleurs, 17 ressources API, 13 services,
-6 processeurs, 2 commandes, 9 modules de calcul et leurs tests.
+Inventaire établi le 14 septembre 2026 par exploration systématique du code.
+
+**Les compteurs ci-dessous ont été re-mesurés le 16 septembre 2026** :
+18 écrans, **43 composants**, **9 contrôleurs**, 17 ressources API, 13 services,
+**7 processeurs**, 2 commandes, **17 modules de calcul** et leurs tests.
+*(La version du 14 annonçait 40 composants, 8 contrôleurs, 6 processeurs et
+9 modules de calcul : le découpage du lot 6 est passé par là.)*
 
 > **⚠ LES `fichier:ligne` DE CE DOCUMENT SONT PÉRIMÉS** (relevé le 16 septembre
 > 2026). Il a été écrit le 14 septembre, avant le découpage du lot 6 : `repas.tsx`

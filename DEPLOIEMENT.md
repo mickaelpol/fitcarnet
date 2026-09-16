@@ -434,6 +434,84 @@ L'APK lui-même n'est **pas** dans git : des dizaines de mégaoctets à chaque
 version, et il vit déjà sur le NAS. Son `version.json`, si — il doit rester en
 face du `versionCode`.
 
+### L'ordre des cinq gestes, quand une dépendance native change
+
+`publier.sh` **refuse de partir** dans ce cas, et c'est voulu : une mise à jour
+JavaScript ne livre pas de code natif, et du JavaScript qui appelle un module
+absent fait planter l'application au démarrage — sur tous les téléphones, sans
+possibilité d'y pousser le correctif.
+
+1. `./publier.sh "ce qui change" --sans-mobile` — le site et l'API d'abord.
+   Sans cette étape, tes changements d'API resteraient sur ton disque pendant
+   toute la construction de l'APK.
+2. `deployer-nas.sh` puis `docker logs fitcarnet-app --tail 30` — **avant, pas
+   après** : une construction EAS coûte vingt minutes et incrémente le
+   `versionCode` de façon irréversible. Autant savoir que le serveur répond
+   avant de les dépenser.
+3. `./publier-android.sh --notes "ce qui change"`.
+4. Déposer l'APK renommé `fitcarnet.apk` sur le NAS.
+5. Commiter `front/app.json` et `telecharger/version.json`.
+
+**Si la construction échoue sans que tu aies rien fait de mal**, regarde *où*.
+Un journal EAS qui s'arrête sur `Downloading …gradle-X.Y.Z-bin.zip` avec un
+`SocketException` ou un `503` signifie qu'**aucune ligne de fitcarnet n'a été
+lue** : Gradle n'a pas pu être téléchargé sur les machines d'Expo. Ne cherche
+pas dans ton code, relance une heure plus tard. C'est arrivé quatre fois de
+suite le 12 août avant de passer tout seul.
+
+---
+
+## Si tu touches à la base de données
+
+1. Écris la migration dans `db/manuel/`, numérotée à la suite des autres. Elle
+   doit pouvoir être rejouée sans casse : le conteneur les rejoue **toutes**, à
+   chaque démarrage.
+2. Sauvegarde d'abord, sur le NAS : `/volume1/docker/fitcarnet/sauvegarde-nas.sh`.
+   La sauvegarde automatique date de 4 h du matin ; une migration destructive
+   passée à 14 h s'appliquerait sur des données dont la dernière copie a dix
+   heures.
+3. `./publier.sh "ce qui change"`.
+
+---
+
+## Quand quelque chose ne marche pas
+
+```bash
+# le déploiement a-t-il eu lieu ?
+ssh nas 'tail -20 /volume1/docker/fitcarnet/deploiement.log'
+
+# où en est le NAS par rapport à Gitea ?
+ssh nas '/volume1/docker/fitcarnet/deployer-nas.sh --etat'
+
+# pourquoi l'application ne démarre pas
+ssh nas 'docker logs fitcarnet-app --tail 40'
+```
+
+Une erreur 500 côté site est toujours une exception PHP : le détail est dans
+ces journaux, jamais dans la réponse HTTP.
+
+---
+
+## Ce que tu ne dois jamais faire
+
+- **`git clean -xdf` sur le NAS.** Le clone git contient `pgdata/` — ta base de
+  données. Elle est dans le `.gitignore`, mais ne tente pas le diable.
+- **Supprimer `api/config/jwt/`** « pour repartir propre ». Les clés y sont
+  générées une fois ; les régénérer déconnecte tout le monde.
+- **Changer `JWT_PASSPHRASE`** dans le `.env` du NAS. Même effet, en pire : les
+  clés existantes deviennent illisibles.
+- **`doctrine:schema:update --force`.** Jamais sur ce projet. Les migrations
+  sont écrites à la main, dans `db/manuel/`, et dans un ordre qui compte.
+
+> **Ces quatre sections viennent de `MISE-A-JOUR.md`, fondu ici le 16 septembre
+> 2026.** Une section n'a **pas** été reprise, et c'est la raison de la fusion :
+> « Quand je te livre des fichiers » prescrivait `fitsync`, l'outil de
+> synchronisation Windows → WSL qui est neutralisé et archivé depuis le
+> 7 septembre, dont le clone est renommé `.OBSOLETE`, et dont `CLAUDE.md`,
+> `README.md` et `NOUVELLE-MACHINE.md` interdisent tous les trois l'usage —
+> c'est la cause du bug critique C1. Un document opérationnel qui commande la
+> cause d'une panne connue est pire qu'un document absent.
+
 ---
 
 ## L'identité visuelle

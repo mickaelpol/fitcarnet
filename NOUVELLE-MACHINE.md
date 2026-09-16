@@ -103,9 +103,15 @@ claude plugin list        # expo, php-lsp, context7, superpowers, superpowers-sy
 ```
 
 Le dépôt porte déjà, sans rien à faire : `CLAUDE.md` et les sept règles du
-projet, les hooks de vérification, les **6 skills du projet** — isolation des
-données, tests API, front, nutrition, schéma, postgres — et 2 agents,
+projet, les hooks de vérification, les **25 skills du projet** — dix de métier
+et d'outillage (isolation des données, tests API, front, nutrition, schéma,
+postgres, revue de code, données de test, épreuve de fonctionnalité,
+vérification Android) et les quinze fiches `fonctionnalite-*` —, **7 agents**,
 `.graphifyignore`, et le cache sémantique de graphify.
+
+*Ce paragraphe annonçait « 6 skills et 2 agents » jusqu'au 16 septembre 2026 :
+il cachait dix-neuf skills et cinq agents à celui qui arrive. Compté à la main
+dans `.claude/skills/` et `.claude/agents/`.*
 
 ---
 
@@ -182,7 +188,7 @@ Chaque commande doit donner **au moins** ce résultat — ce sont les chiffres d
 7 septembre 2026 ; ils ne peuvent que monter.
 
 ```bash
-cd front && npm test                    # 577 tests, puis 23 de rendu, 0 échec
+cd front && npm test                    # 588 tests, puis 29 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
                                         # 252 tests, 661 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'

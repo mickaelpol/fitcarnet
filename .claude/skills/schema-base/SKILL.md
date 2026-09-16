@@ -128,7 +128,9 @@ une semaine plus tôt manquait encore les migrations 30 à 33 après un pull.
 
 `installer.sh`, `restaurer-nas.sh`, `deployer-nas.sh`, `publier*.sh` **déploient ou
 détruisent**. `installer.sh --repartir-de-zero` avale les erreurs de `down -v`
-(constat 19). Lire `DEPLOIEMENT.md` et `MISE-A-JOUR.md` avant, jamais après.
+(constat 19). Lire `DEPLOIEMENT.md` avant, jamais après — il porte depuis le
+16 septembre 2026 la section « Si tu touches à la base de données », venue de
+`MISE-A-JOUR.md`.
 
 ## Ne JAMAIS lancer `doctrine:schema:update`
 

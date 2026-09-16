@@ -513,8 +513,12 @@ Elles ne se déduisent ni du code ni des commits. **Ne pas les rouvrir sans
 raison.**
 
 **L'architecture hexagonale est un objectif assumé, mais n'a pas commencé.** Les
-skills sont installées (`symfony-hexagonal-architecture`, `-domain-modeling`,
-`-ports-adapters`, `-cqrs-handlers`). `api/src` suit toujours la structure
+skills utilisables sont celles du plugin : `superpowers-symfony:ports-and-adapters`,
+`:cqrs-and-handlers`, `:value-objects-and-dtos`, plus les deux agents
+`hexagonal-architect` et `hexagonal-reviewer`. *Ce paragraphe a cité jusqu'au
+16 septembre 2026 quatre skills — `symfony-hexagonal-architecture`,
+`-domain-modeling`, `-ports-adapters`, `-cqrs-handlers` — dont **aucune n'existe** :
+ce sont les quatre skills projet supprimées le 9 septembre.* `api/src` suit toujours la structure
 Symfony classique. La refonte ne doit **jamais** se mélanger à une correction de
 bug dans un même commit. À noter : le domaine riche du projet — le solveur de
 repas — est déjà isolé, pur et testé… côté front, en TypeScript.
@@ -1069,6 +1073,97 @@ démonstration. Corrigé là et ici (voir plus bas, « Le jeu de démonstration 
 Il a aussi trouvé **quatorze renvois `fichier:ligne` faux** dans
 `presentation/fonctionnalites-revue.md`, tous hérités d'avant le lot 6 —
 `composer.ts` est passé de 817 lignes à 135, `repas.tsx` de 2 316 à 655. Recalés.
+
+---
+
+## Le tri de la documentation — ce qui a disparu, et pourquoi
+
+**16 septembre 2026.** 76 fichiers de documentation passés en revue, compteurs
+re-mesurés en lançant les tests plutôt qu'en croyant les documents.
+
+### La question tranchée : pas de fichier unique
+
+Le propriétaire hésitait entre « un seul `.md` » et « supprimer les périmés ».
+**C'est le second, plus deux fusions.** Trois raisons, pas un avis :
+
+1. **Une partie du corpus est exécutée, pas lue.** 25 skills, 7 agents,
+   `CLAUDE.md`, `.graphifyignore` sont chargés par l'outillage — Claude Code lit
+   `.claude/skills/<nom>/SKILL.md`, pas un chapitre. Les fondre les désactive.
+2. **Le fichier unique ferait ~7 400 lignes.** `REPRENDRE.md` en fait 1 200 et
+   c'est déjà la limite du tenable. Un document que personne ne relit en entier
+   ne se corrige jamais : c'est le mécanisme qui a produit les treize faussetés
+   ci-dessous.
+3. **Les durées de vie sont opposées.** Ce journal change tous les jours ;
+   `DEPLOIEMENT.md` n'avait pas bougé depuis le 11 août **sans une seule
+   erreur**. Les fusionner ferait vieillir le stable au rythme du volatil.
+
+### Les deux fusions
+
+**`MISE-A-JOUR.md` → `DEPLOIEMENT.md`**, et c'était **urgent** : ses lignes
+128-152 commandaient encore `fitsync`, l'outil de synchronisation Windows → WSL
+neutralisé et archivé depuis le 7 septembre, dont le clone est renommé
+`.OBSOLETE`, et dont `CLAUDE.md`, `README.md` et `NOUVELLE-MACHINE.md`
+interdisent tous les trois l'usage — **c'est la cause du bug critique C1**. Un
+document opérationnel qui prescrit la cause d'une panne connue est pire qu'un
+document absent. Quatre sections ont été rapatriées (l'ordre des cinq gestes
+quand une dépendance native change, le piège Gradle 503, le diagnostic par
+`ssh nas`, et « ce que tu ne dois jamais faire ») ; la section `fitsync` est
+restée derrière. Trois référents réécrits : `CLAUDE.md`, `README.md`, la skill
+`schema-base`.
+
+**`db/manuel/INSTALLATION.md` → `INSTALLATION.md`** : même titre, 93 lignes
+identiques sur 115. Celui de `db/manuel/` n'avait pas bougé depuis le 11 août et
+gardait, lui seul, la justification du répertoire (« pourquoi `db/manuel/` et
+non `db/` ») et le chapitre « Août 2026 ». Les deux sont rapatriés.
+
+### Les deux suppressions sèches
+
+`docs/archives/fitsync.sh.archive` — **zéro référent** dans tout le dépôt, et
+son histoire est déjà racontée ici et dans `NOUVELLE-MACHINE.md`.
+`presentation/captures/.jpg` — nom vide, **md5 identique** à
+`02-seances-liste.jpg`, et `construire.py` balaie le dossier.
+
+### Les treize faussetés corrigées
+
+La pire après `fitsync` : **`INSTALLATION.md` annonçait « 12 tables, 50 aliments »**
+et donnait la requête pour les compter. Le schéma en a **19**, et
+`db/02-donnees.sql` n'insère **aucun** aliment depuis le 14 septembre — celui
+qui suivait le contrôle obtenait 0 et croyait avoir raté son installation.
+
+Les autres : `NOUVELLE-MACHINE.md` annonçait **6 skills et 2 agents** (il y en a
+25 et 7 — dix-neuf skills cachées à l'arrivant) · `README.md` disait 852 tests
+(869) · `front/src/solveur/README.md` décrivait un dossier de **5 fichiers** qui
+en contient **17**, si bien que chercher `composer.ts` y faisait conclure qu'il
+n'existe pas · ce journal citait quatre skills hexagonales dont **aucune
+n'existe** · `features.md` et `plan-de-tournage.md` se contredisaient de 1 à 4
+sur le nombre de fonctionnalités.
+
+> **Les compteurs écrits sont les miens, mesurés le 16 septembre** : 18 écrans,
+> 43 composants, 17 modules de calcul, 17 fichiers dans le solveur,
+> 9 contrôleurs, 17 ressources API, 7 processeurs, 13 services, 19 tables,
+> 24 migrations numérotées, 1 338 exercices. Deux diffèrent du rapport de
+> l'agent (43 composants et non 54, 17 ressources et non 15) : j'ai gardé les
+> miens, comptés à la main.
+
+### Ce qui se garde, contre l'intuition
+
+**`docs/audit-2026-09/` reste.** Aucune skill ne cite son *chemin*, mais quinze
+citent ses constats **par leur code** — `M-02`, `É8`, `C3`, `F-09`. Le dossier
+est le seul **dictionnaire de ces codes** : le supprimer rendrait quinze renvois
+de skills indéchiffrables. Ses deux mentions de `db/manuel/INSTALLATION.md`
+n'ont pas été réécrites : un constat d'audit décrit l'état d'alors, pas celui
+d'aujourd'hui.
+
+**Les six documents de `presentation/` restent**, tous. L'autorité n'est pas
+dans ce dossier mais dans les quinze fiches `fonctionnalite-*`, qui ont leurs
+adresses vérifiées une par une et qui corrigent `features.md`. Dans le dossier :
+`plan-de-tournage.md` est l'opératoire (douze skills s'y adossent),
+`fonctionnalites-par-onglet.md` est la source brute du propriétaire — la toucher
+invaliderait la revue qui affirme ne pas l'avoir modifiée.
+
+**Bilan : 76 → 72 fichiers.** Le gain n'est pas le compte, c'est que plus aucun
+document ne commande un outil interdit ni n'annonce cinquante aliments qui
+n'existent pas.
 
 ---
 

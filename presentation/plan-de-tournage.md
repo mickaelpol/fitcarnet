@@ -1,7 +1,13 @@
 # fitcarnet — script de tournage
 
-Pour filmer les 57 fonctionnalités de [features.md](features.md) **depuis ton
+Pour filmer les fonctionnalités recensées dans [features.md](features.md) —
+**environ 220 capacités**, réparties en huit bobines ci-dessous — **depuis ton
 téléphone**, sur l'application de production.
+
+> Ce document a annoncé « 57 fonctionnalités » jusqu'au 16 septembre 2026. C'était
+> le compte d'un premier inventaire de surface ; `features.md` en recense environ
+> **220** depuis le 14 septembre, et `REPRENDRE.md` dit le même chiffre. Un écart
+> de 1 à 4 entre deux documents du même dossier.
 
 Chaque plan donne : le **geste** exact, ce qu'on doit **voir** à l'écran, ce que
 tu **dis** si tu commentes, et une **durée**. Les durées sont des minimums : à

@@ -244,7 +244,7 @@ Pour l'aiguillage :
 | Écran, navigation, données | **`expo:expo-router`**, **`expo:expo-data-fetching`** |
 | Après un `eas update` : est-il arrivé sur les téléphones | **`expo:eas-update-insights`** — aucune skill ne couvre la publication elle-même, c'est `publier.sh` |
 | Index, plan de requête, VACUUM | **`postgres`** |
-| Déployer, publier, restaurer | **rien d'automatique** : lire `DEPLOIEMENT.md` et `MISE-A-JOUR.md` |
+| Déployer, publier, restaurer | **rien d'automatique** : lire `DEPLOIEMENT.md`, qui couvre aussi la livraison quotidienne depuis le 16 septembre 2026 |
 
 ## Agents
 

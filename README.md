@@ -97,11 +97,11 @@ db/manuel/verifier-migrations.sh  # les migrations tiennent-elles sur des donné
 ## Structure
 
 ```
-api/          Symfony — 18 entités, contrôleurs, services, extensions Doctrine
-front/        Expo — 16 écrans, le solveur de repas, les modules de calcul
+api/          Symfony — 9 contrôleurs, 17 ressources API, 13 services, 7 processeurs
+front/        Expo — 18 écrans, 43 composants, le solveur de repas, 17 modules de calcul
   src/solveur/    composition de repas : algèbre, garanties, tests de propriété
   src/calcul/     nutrition, cuisson, performance, plausibilité
-db/           01-schema.sql (le schéma complet) + manuel/ (24 migrations)
+db/           01-schema.sql (19 tables) + manuel/ (24 migrations numérotées + 5 utilitaires)
 docker/       Dockerfile, Caddyfile, point d'entrée de production
 docs/         audit-2026-09/ — 84 constats classés
 .claude/      outillage : skills du projet, agents, hooks, réglages
@@ -111,7 +111,7 @@ docs/         audit-2026-09/ — 84 constats classés
 
 ## Qualité
 
-**852 tests** — 600 côté front (577 + 23 de rendu), 252 côté API — et quatre garde-fous automatiques
+**869 tests** — 617 côté front (588 + 29 de rendu), 252 côté API — et quatre garde-fous automatiques
 qui tournent sans qu'on y pense :
 
 - **PHPStan** niveau 5 sur l'API ;
@@ -138,8 +138,7 @@ valeur.
 | [REPRENDRE.md](REPRENDRE.md) | **où en est le chantier** : ce qui reste, les décisions prises, celles qui attendent |
 | [NOUVELLE-MACHINE.md](NOUVELLE-MACHINE.md) | monter un poste de développement de zéro |
 | [INSTALLATION.md](INSTALLATION.md) | installer les données pas à pas |
-| [DEPLOIEMENT.md](DEPLOIEMENT.md) | mettre en production sur le NAS |
-| [MISE-A-JOUR.md](MISE-A-JOUR.md) | livrer une nouvelle version |
+| [DEPLOIEMENT.md](DEPLOIEMENT.md) | mettre en production sur le NAS **et livrer une nouvelle version** |
 | [CALCULATEUR.md](CALCULATEUR.md) | le calculateur de repas : parcours et décisions |
 | [CLAUDE.md](CLAUDE.md) | les sept règles non négociables du projet |
 | [docs/audit-2026-09/](docs/audit-2026-09/README.md) | audit complet, 84 constats et leur plan de correction |
