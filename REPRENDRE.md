@@ -1120,11 +1120,13 @@ D'où l'échec de `composer install` dans le conteneur, contourné en installant
 `vendor` depuis l'hôte (le dossier est monté). C'est du NAT Docker sous WSL2,
 pas le dépôt — **réparation à faire**, elle n'a pas été tentée.
 
-**Le port 8080 se dispute avec `gestion-interne-api`.** Son Keycloak le tenait ;
-`fitcarnet-app-dev` refusait de démarrer, puis a tourné sans port publié — sain
-au `docker ps`, injoignable. Le recréer (`up -d --force-recreate app`) après
-avoir libéré le port. **Keycloak a été arrêté le 9 septembre et n'a pas été
-relancé.**
+**Le port 8080 ne se dispute plus.** Le Keycloak de `gestion-interne-api` le
+tenait ; `fitcarnet-app-dev` refusait de démarrer, puis a tourné sans port
+publié — sain au `docker ps`, injoignable. **Keycloak a été supprimé pour de bon
+à la demande du propriétaire** (conteneur, image, volume), entre le 9 et le
+14 septembre, et il n'en veut plus. Constaté le 16 septembre : ni conteneur, ni
+image, ni volume, et plus aucun fichier compose sous `/home/micka` qui le
+déclare. **Ne jamais le relancer ni le réinstaller.**
 
 ---
 
@@ -1195,10 +1197,15 @@ relancé.**
   donc `npm test` répondait « Could not find dist-tests/**/*.test.js » — un
   message qui ne parle pas de version. `nvm install 22 && nvm alias default 22`.
   Attention, un terminal déjà ouvert garde l'ancien PATH.
-- **Le port 8080 se dispute avec les autres projets.** Le Keycloak de
-  `gestion-interne-api` le tenait ; `fitcarnet-app-dev` refusait de démarrer.
-  `docker stop gestion-intenre-api-keycloak-1` le temps de la session — **et le
-  redémarrer après**.
+- **Si `fitcarnet-app-dev` tourne sans port publié**, c'est qu'un autre
+  conteneur tenait le 8080 à sa création : sain au `docker ps`, injoignable.
+  Libérer le port, puis `docker compose -f compose.dev.yml up -d
+  --force-recreate app`. Le coupable d'origine, Keycloak, est supprimé et ne
+  doit pas revenir (voir plus haut).
+- **`verifier-schema.sh` et `verifier-migrations.sh` exigent l'image
+  `postgres:16`**, pas l'alpine du dev et de la prod : `docker pull postgres:16`
+  (451 Mo) sur une machine neuve. On adapte la machine, pas les scripts —
+  décision du 16 septembre 2026, détail dans la skill `schema-base`.
 - **Le réseau sortant des conteneurs est cassé sur cette machine.** Ni DNS ni
   routage : même vers une IP brute, `curl` rend `000`. D'où l'échec de
   `composer install` dans le conteneur. Contourné en installant `vendor` depuis

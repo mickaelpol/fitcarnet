@@ -187,6 +187,8 @@ docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
                                         # 252 tests, 661 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
                                         # 7 erreurs connues, aucune régression
+docker pull postgres:16                 # l'image des deux scripts ci-dessous (451 Mo),
+                                        # pas l'alpine du dev — voir la skill schema-base
 db/manuel/verifier-migrations.sh        # ✓ garde-fous posés
 ```
 
