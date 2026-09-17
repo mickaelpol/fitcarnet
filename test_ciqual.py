@@ -79,22 +79,6 @@ def fonctions_pures():
     return espace
 
 
-def source_de(nom):
-    """
-    Le code SOURCE d'une fonction du script, sans l'executer.
-
-    `exporter_catalogue` ecrit un fichier VERSIONNE : un test ne l'appelle
-    pas. Mais on peut lire le gabarit SQL qu'elle construit — et c'est la, et
-    nulle part ailleurs, que se decide quelle colonne a le droit de dependre
-    du rendement.
-    """
-    for noeud in ARBRE.body:
-        if isinstance(noeud, ast.FunctionDef) and noeud.name == nom:
-            return ast.get_source_segment(SOURCE, noeud)
-
-    sys.exit(f"Fonction introuvable dans le script : {nom}")
-
-
 BOITE = fonctions_pures()
 sens_du_rendement = BOITE["sens_du_rendement"]
 normaliser = BOITE["normaliser"]
@@ -105,7 +89,7 @@ EXACTS = BOITE["EXACTS"]
 #
 # LES VALEURS ETAIENT FAUSSES JUSQU'AU 16 SEPTEMBRE 2026 (7.12 / 75.0 / 1.58 /
 # 3.2) et ce bloc etait ecrit DEUX FOIS, la seconde definition ecrasant la
-# premiere. Ce sont ces chiffres-la qui avaient contamine le catalogue, et
+# premiere. Ce sont ces chiffres-la qui avaient contamine les valeurs, et
 # `test_ecriture_grocy.py` a ete corrige le meme jour sans que son jumeau
 # suive : le jumeau oublie, encore. Table Ciqual 2025, colonne « Reglement UE
 # n° 1169/2011 » : 350 / 7,02 / 77,5 / 0,79 / 1,53.
@@ -153,7 +137,7 @@ def presque(a, b, marge=1e-9):
 # Les trois regles a garantir n'ont pas bouge d'un pouce. Ce qui change, c'est
 # qu'elles sont desormais eprouvees sur le CODE qui les porte :
 #
-#   1. le poids A PESER ne depend pas du rendement — les macros exportees
+#   1. le poids A PESER ne depend pas du rendement — les macros ecrites
 #      decrivent le grain SEC, et aucune colonne de macro ne passe par le
 #      rendement ;
 #   2. le poids SERVI en depend — passer d'un etat a l'autre est exactement
@@ -175,23 +159,9 @@ RIZ_CUIT_KCAL = 155
 
 # --------- regle 1 : le poids a peser ne depend pas du rendement
 #
-# Ce n'est plus une propriete a surveiller, c'est une impossibilite d'ecriture
-# — encore faut-il le CONSTATER quelque part. On lit donc le gabarit SQL que
-# `exporter_catalogue` construit : c'est la seule ligne de code du depot qui
-# pourrait faire entrer le rendement dans une macro.
-GABARIT = source_de("exporter_catalogue")
-COLONNES = dict(re.findall(r"^ {4}(\w+)\s*=\s*(.+)$", GABARIT, re.M))
-
-for colonne in ("kcal_100", "prot_100", "gluc_100", "lip_100", "fibres_100"):
-    verifier(f"la colonne « {colonne} » s'ecrit sans le rendement",
-             colonne in COLONNES and "ratio" not in COLONNES[colonne])
-
-verifier("le rendement, lui, a sa propre colonne et ne fait rien d'autre",
-         COLONNES.get("ratio", "").strip() == "{ratio:g}")
-
-# La colonne peut etre formellement propre et porter quand meme un chiffre de
-# produit CUIT : c'est le degat du 10 aout, 142 kcal de semoule cuite ecrits
-# comme du sec. La garde est physique, pas lexicale.
+# Un chiffre de produit CUIT ne doit pas passer pour du sec : c'est le degat du
+# 10 aout, 142 kcal de semoule cuite ecrits comme du sec. La garde est
+# physique, pas lexicale.
 verifier("le riz sec de Ciqual passe pour du grain sec",
          grain_sec_credible(RIZ_SEC))
 verifier("la semoule CUITE a 142 kcal est refusee",
@@ -231,12 +201,12 @@ verifier("sans l'un des deux etats, pas de rendement — et surtout pas 1",
          rendement_par_energie(350, None) is None
          and rendement_par_energie(None, RIZ_CUIT_KCAL) is None
          and rendement_par_energie(350, 0) is None)
-verifier("celui du riz est retenu pour l'export",
+verifier("celui du riz est retenu",
          rendement_derive_credible("fec",
                                    rendement_par_energie(350, RIZ_CUIT_KCAL)))
 verifier("le couple a l'envers — 142 de « sec » pour 350 de cuit — est refuse",
          not rendement_derive_credible("fec", rendement_par_energie(142, 350)))
-verifier("5,83 est hors de la bande d'export, meme dans le bon sens",
+verifier("5,83 est hors de la bande retenue, meme dans le bon sens",
          not rendement_derive_credible("fec", rendement_par_energie(350, 60)))
 verifier("un legume ne tire pas son rendement de l'energie",
          not rendement_derive_credible("leg",

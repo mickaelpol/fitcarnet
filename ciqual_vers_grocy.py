@@ -17,11 +17,6 @@ Usage :
     GROCY_URL=... GROCY_API_KEY=... python3 ciqual_vers_grocy.py Table_Ciqual.xlsx
     GROCY_URL=... GROCY_API_KEY=... python3 ciqual_vers_grocy.py Table_Ciqual.xlsx --appliquer
 
-    # la migration du catalogue commun, dans db/manuel/16-catalogue-ciqual.sql
-    python3 ciqual_vers_grocy.py Table_Ciqual.xlsx --exporter-catalogue
-    # ... ou ailleurs, ce que tout test DOIT faire
-    python3 ciqual_vers_grocy.py Table_Ciqual.xlsx --exporter-catalogue --sortie /tmp/essai.sql
-
 Le script cherche chaque produit Grocy dans Ciqual a partir d'une table de
 correspondance ci-dessous, verifie la coherence energetique de chaque valeur
 retenue, et n'ecrit qu'apres ton accord.
@@ -48,33 +43,7 @@ API_KEY = os.environ.get("GROCY_API_KEY", "")
 APPLIQUER = "--appliquer" in sys.argv
 
 
-def _valeur_option(nom: str) -> str:
-    """La valeur qui suit une option, ou une chaine vide si l'option est absente."""
-    if nom not in sys.argv:
-        return ""
-    i = sys.argv.index(nom) + 1
-    if i >= len(sys.argv) or sys.argv[i].startswith("--"):
-        sys.exit(f"{nom} attend un chemin de fichier juste apres.")
-
-    return sys.argv[i]
-
-
-# `--sortie` : ou ecrire la migration du catalogue. Ajoute le 14 septembre 2026,
-# apres avoir compris que `test_ecriture_grocy.py` lancait
-# `--exporter-catalogue` sans destination et ecrasait donc
-# `db/manuel/16-catalogue-ciqual.sql`, un fichier VERSIONNE. Le 10 aout 2026,
-# a 19 h 59, le commit c0f6f10 a ainsi emporte la migration : 53 UPDATE
-# ramenes aux 4 aliments de la table factice du banc d'essai. Comme
-# `entrypoint-prod.sh` rejoue db/manuel/ a chaque demarrage, la production a
-# perdu 49 aliments du catalogue commun sans qu'aucune alerte ne le dise.
-SORTIE_CATALOGUE = _valeur_option("--sortie")
-
-# La valeur de `--sortie` n'est pas un tableur Ciqual : on l'ecarte PAR SA
-# POSITION, pas par sa valeur — deux arguments identiques resteraient sinon
-# tous les deux ecartes.
-_POSITION_SORTIE = sys.argv.index("--sortie") + 1 if SORTIE_CATALOGUE else -1
-FICHIERS = [a for i, a in enumerate(sys.argv)
-            if i >= 1 and i != _POSITION_SORTIE and not a.startswith("--")]
+FICHIERS = [a for a in sys.argv[1:] if not a.startswith("--")]
 
 if not GROCY_URL or not API_KEY:
     sys.exit(
@@ -134,17 +103,16 @@ EXACTS = {
     # Le libelle SEC existe bel et bien, et c'est « Semoule de blé dur, crue »
     # a 350 kcal. Mais il n'est pas COMPLET, et Ciqual n'a aucune entree de
     # semoule complete crue — seulement des cuites. On decrit donc ce qu'on
-    # peut prouver, une semoule de ble dur, et la migration 19 renomme la
-    # ligne du catalogue commun en consequence. Garder le nom « complète » sur
-    # des valeurs de semoule blanche serait remettre un mensonge a la place
-    # d'un autre.
+    # peut prouver, une semoule de ble dur. Garder le nom « complète » sur des
+    # valeurs de semoule blanche serait remettre un mensonge a la place d'un
+    # autre.
     "semoule":          "Semoule de blé dur, crue",
     # Ces deux-la visaient l'entree CUITE, comme la semoule et pour la meme
     # raison : ecrites du temps ou les feculents portaient leurs valeurs
-    # cuites. L'audit du catalogue commun les a mises en evidence, et je les
-    # ai d'abord ecartees en disant « normal pour un tubercule ». Elles ne
-    # l'etaient pas : le catalogue annoncait 95 kcal pour une pomme de terre
-    # qu'on pese crue a 80. Une erreur de 19 %, sur tous les comptes.
+    # cuites. Un audit les a mises en evidence, et je les ai d'abord ecartees
+    # en disant « normal pour un tubercule ». Elles ne l'etaient pas : on
+    # annoncait 95 kcal pour une pomme de terre qu'on pese crue a 80. Une
+    # erreur de 19 %.
     "pommes de terre":  "Pomme de terre, sans peau, crue",
     "patate douce":     "Patate douce, crue",
     "pates completes":  "Pâtes sèches, au blé complet, crues",
@@ -239,12 +207,10 @@ ETIQUETTES = {
 CORRESPONDANCE = {
     # produit Grocy (mots-cles)   : (mots-cles Ciqual, categorie, ratio)
 
-    # Ces cinq-la ne sont pas dans MON Grocy : ils viennent du catalogue
-    # COMMUN, celui dont part tout nouveau compte. Ils y restaient sans
-    # fibres — donc faux des qu'une cible est exprimee en glucides totaux —
-    # simplement parce que cette table ne decrivait que mes produits a moi.
-    # Les mots-cles sont un pari : si l'un ne trouve rien, l'export le dit et
-    # l'aliment reste intact. « --chercher » donnera alors le bon libelle.
+    # Ces cinq-la ne sont pas encore dans mon Grocy : ils sont prets pour le
+    # jour ou ils y entrent. Les mots-cles sont un pari : si l'un ne trouve
+    # rien, le script le dit et le produit reste intact. « --chercher »
+    # donnera alors le bon libelle.
     "fromage blanc":        ("fromage blanc, nature",       "lait", 1),
     "asperge":              ("asperge, crue",               "leg",  1),
     "champignon":           ("champignon de paris, cru",    "leg",  1),
@@ -558,14 +524,11 @@ def sens_du_rendement(categorie: str, ratio: float):
     CETTE FONCTION DISAIT « MEME REGLE QUE L'API », ET C'ETAIT FAUX sur un
     point : le cas `leg` manquait. Un legume a 1,5 passait ici, quand l'ecran
     (`plausibilite.ts`), l'API (`RendementPlausible::sens`) et la contrainte
-    `aliment_ratio_sens` le refusent tous les trois. Consequence, latente mais
-    grave : `--exporter-catalogue` aurait ecrit dans un fichier VERSIONNE un
-    `UPDATE` que la base rejette, dans une migration que `entrypoint-prod.sh`
-    rejoue a chaque demarrage — donc une production qui ne redemarre plus
-    (regle 1). Releve par la revue le 16 septembre 2026, ajoute le meme jour.
+    `aliment_ratio_sens` le refusent tous les trois. Releve par la revue le
+    16 septembre 2026, ajoute le meme jour.
 
     La bande finale 0,3-6, elle, n'existe QUE dans ce script : c'est un
-    garde-fou d'export, plus strict que l'API a dessein. Ne pas la decrire
+    garde-fou d'ecriture, plus strict que l'API a dessein. Ne pas la decrire
     comme la regle commune.
     """
     if ratio <= 0:
@@ -591,11 +554,9 @@ def rendement_par_energie(kcal_sec, kcal_cuit):
     legume bouilli, dont les sucres partent dans la casserole — d'ou le
     garde-fou sur ETAT_CUIT, qui ne doit contenir que des grains secs.
 
-    CETTE FORMULE ETAIT ECRITE DEUX FOIS, mot pour mot, dans
-    `exporter_catalogue` et dans `main`, avec sa garde. Sortie ici le
-    17 septembre 2026 : regle 5, aucune formule metier recopiee — et surtout,
-    enfouie dans deux fonctions qui parlent a Grocy, elle n'etait testable
-    nulle part. `test_ciqual.py` l'eprouve maintenant directement.
+    Sortie de `main` le 17 septembre 2026 : regle 5, aucune formule metier
+    recopiee — et surtout, enfouie dans une fonction qui parle a Grocy, elle
+    n'etait testable nulle part. `test_ciqual.py` l'eprouve maintenant directement.
 
     Rend None quand l'un des deux etats manque : sans couple, pas de
     rendement, et surtout pas un 1 par defaut (regle 6, vide n'est pas zero).
@@ -738,166 +699,6 @@ def coherent(a) -> tuple[bool, float]:
     return abs(calcul - a["kcal"]) / a["kcal"] <= 0.12, calcul
 
 
-# ------------------------------------------------- le catalogue commun
-
-#  Les 50 aliments de reference sont le point de depart de TOUT nouveau
-#  compte. Ils portaient encore des valeurs tapees a la main, en partie
-#  d'origine americaine — l'amande y etait a 21,5 g de glucides, fibres
-#  comprises, contre 8,8 en Ciqual — sans aucune fibre renseignee, et avec
-#  des legumes references cuits.
-#
-#  Plutot que de retaper cinquante lignes, on les GENERE depuis la table
-#  Ciqual, avec exactement les memes regles que pour Grocy. Aucun chiffre
-#  n'est invente : ils viennent tous du fichier de l'Anses.
-#
-#  La migration ne touche QUE le commun (`cree_par IS NULL`). Un aliment cree
-#  par un utilisateur lui appartient, meme s'il porte le meme nom.
-
-# Relatif au SCRIPT et non au dossier courant : on le lance souvent depuis
-# ailleurs, et un fichier ecrit au hasard du `cd` est un fichier perdu.
-#
-# CE FICHIER EST VERSIONNE ET RELU A LA MAIN. Il n'est ecrit ici que sur une
-# commande tapee expressement. Pour un essai, passe `--sortie`.
-CHEMIN_CATALOGUE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "db", "manuel",
-    "16-catalogue-ciqual.sql")
-
-# Les accents, sans extension PostgreSQL a installer.
-ACCENTS = "àâäéèêëïîôöùûüçÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ"
-SANS_ACCENT = "aaaeeeeiioouuucAAAEEEEIIOOUUUC"
-
-
-def _sql(v) -> str:
-    """Un nombre pour SQL, ou NULL quand la valeur est inconnue."""
-    return "NULL" if v is None else f"{v:g}"
-
-
-def exporter_catalogue(aliments, chemin: str = "") -> int:
-    # Sans `--sortie`, on ecrit la migration versionnee : c'est l'usage normal,
-    # fait a la main et relu avant commit. Un test, lui, passe TOUJOURS un
-    # chemin temporaire.
-    chemin = chemin or CHEMIN_CATALOGUE
-    lignes, introuvables = [], []
-
-    for motif, (motifs_ciqual, categorie, ratio) in sorted(CORRESPONDANCE.items()):
-        aliment = None
-        if motif in EXACTS:
-            vise = normaliser(EXACTS[motif])
-            aliment = next((a for a in aliments if a["cle"] == vise), None)
-        if aliment is None:
-            aliment = chercher(aliments, motifs_ciqual)
-        if aliment is None or not aliment["kcal"]:
-            introuvables.append((motif, motifs_ciqual))
-            continue
-
-        # `aliment` porte deja les valeurs du produit PESE — c'est ce que
-        # CORRESPONDANCE vise desormais. L'entree CUITE ne sert qu'a deduire
-        # le rendement, et seulement pour un grain sec : l'energie s'y
-        # conserve, l'eau absorbee ne pesant rien en calories.
-        if motif in ETAT_CUIT:
-            # Un grain doit avoir ete apparie a son entree SECHE. Sinon on
-            # ecrirait des valeurs de produit cuit en les declarant seches.
-            if not grain_sec_credible(aliment):
-                introuvables.append(
-                    (motif, f"{motifs_ciqual} — « {aliment['nom']} » a "
-                            f"{aliment['kcal']:.0f} kcal, ce n'est pas du grain sec"))
-                continue
-
-            cuit = chercher(aliments, ETAT_CUIT[motif])
-            if cuit and cuit["kcal"]:
-                calcule = rendement_par_energie(aliment["kcal"], cuit["kcal"])
-                if rendement_derive_credible(categorie, calcule):
-                    ratio = calcule
-
-        contresens = sens_du_rendement(categorie, ratio)
-        if contresens is not None:
-            ratio = 1
-
-        ou = " AND ".join(
-            f"fitcarnet_normaliser(nom) LIKE '%{mot}%'" for mot in motif.split())
-
-        lignes.append(f"""
--- {aliment['nom']}
-UPDATE aliment SET
-    categorie      = '{categorie}',
-    kcal_100       = {_sql(aliment['kcal'])},
-    prot_100       = {_sql(aliment['prot'] or 0)},
-    gluc_100       = {_sql(aliment['gluc'] or 0)},
-    lip_100        = {_sql(aliment['lip'] or 0)},
-    fibres_100     = {_sql(aliment['fibres'])},
-    ratio          = {ratio:g}
-WHERE cree_par IS NULL AND {ou};""")
-
-    entete = f"""-- =====================================================================
---  Le catalogue COMMUN, aligne sur Ciqual.
---
---  GENERE par `ciqual_vers_grocy.py --exporter-catalogue`. Ne pas modifier
---  a la main : relance la commande.
---
---  Les 50 aliments de reference sont le point de depart de tout nouveau
---  compte. Ils portaient des valeurs tapees a la main, en partie d'origine
---  americaine — l'amande a 21,5 g de glucides fibres comprises contre 8,8 en
---  Ciqual — sans fibres renseignees, ce qui rend une cible exprimee en
---  glucides TOTAUX silencieusement fausse. Et des legumes references cuits,
---  alors qu'on les pese crus.
---
---  Aucun chiffre n'est invente ici : tous viennent de la table de l'Anses.
---  Le rendement d'un grain sec est derive de la conservation de l'energie ;
---  celui d'un legume ou d'une viande reste a 1 faute de mesure — il n'affiche
---  que le poids servi et ne touche aucune macro.
---
---  NE TOUCHE QUE LE COMMUN (`cree_par IS NULL`). Un aliment cree par un
---  utilisateur lui appartient, meme s'il porte le meme nom.
---
---  A jouer APRES 15-legumes-peses-crus.sql. Idempotent.
---
---  Source : Anses, Table Ciqual de composition nutritionnelle des aliments.
--- =====================================================================
-
-BEGIN;
-
--- Comparer des noms accentues sans installer d'extension.
-CREATE OR REPLACE FUNCTION fitcarnet_normaliser(t text) RETURNS text AS $$
-    SELECT lower(translate(t, '{ACCENTS}', '{SANS_ACCENT}'));
-$$ LANGUAGE sql IMMUTABLE;
-
-SELECT 'avant' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
-       count(*) FILTER (WHERE categorie = 'fec' AND ratio > 1.3
-                          AND kcal_100 NOT BETWEEN 300 AND 400) AS grains_hors_bande
-FROM   aliment WHERE cree_par IS NULL;
-"""
-
-    pied = """
-SELECT 'apres' AS quand, count(*) FILTER (WHERE fibres_100 IS NULL) AS sans_fibres,
-       count(*) FILTER (WHERE categorie = 'fec' AND ratio > 1.3
-                          AND kcal_100 NOT BETWEEN 300 AND 400) AS grains_hors_bande
-FROM   aliment WHERE cree_par IS NULL;
-
-COMMIT;
-
--- Ce qui reste sans fibres apres coup : ces aliments faussent une cible
--- exprimee en glucides totaux, et rien ne le signale a l'ecran.
-SELECT nom, categorie FROM aliment
-WHERE  cree_par IS NULL AND fibres_100 IS NULL
-ORDER  BY categorie, nom;
-"""
-
-    os.makedirs(os.path.dirname(os.path.abspath(chemin)), exist_ok=True)
-    with open(chemin, "w", encoding="utf-8") as f:
-        f.write(entete + "".join(lignes) + "\n" + pied)
-
-    print(f"{len(lignes)} aliment(s) ecrits dans {chemin}")
-    if introuvables:
-        print(f"\n{len(introuvables)} sans equivalent Ciqual, laisses tels quels :")
-        for motif, motifs in introuvables:
-            print(f"  - {motif:24} (cherche : « {motifs} »)")
-    print("\nRelis le fichier, puis joue-le :")
-    print("  docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet"
-          f" -f - < {chemin}")
-
-    return 0
-
-
 # -------------------------------------------------------------------- main
 
 # (SEC_MINI et SEC_MAXI etaient redefinis ici, aux memes valeurs qu'en haut du
@@ -1012,10 +813,6 @@ def main() -> int:
 
     aliments = lire_ciqual(CIQUAL)
 
-    # --exporter-catalogue : écrit la migration du catalogue COMMUN
-    if "--exporter-catalogue" in sys.argv:
-        return exporter_catalogue(aliments, SORTIE_CATALOGUE)
-
     # --chercher « amande » : liste les libellés Ciqual disponibles
     if "--chercher" in sys.argv:
         terme = sys.argv[sys.argv.index("--chercher") + 1]
@@ -1097,8 +894,7 @@ def main() -> int:
                 "cuisson, et le calcul rend une portion cinq fois trop petite.")
 
         if motif_produit in ETAT_CUIT:
-            # Meme controle que pour l'export, et pour la meme raison : une
-            # entree cuite prise pour de la matiere seche ecrit deux valeurs
+            # Une entree cuite prise pour de la matiere seche ecrit deux valeurs
             # fausses d'un coup, les macros ET le rendement qui s'en deduit.
             if not grain_sec_credible(aliment):
                 introuvables.append(

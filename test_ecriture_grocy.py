@@ -22,11 +22,9 @@ libellés nécessaires.
 
 Aucune dépendance au-delà d'openpyxl, que le script principal exige déjà.
 Rien n'est écrit dans ton vrai Grocy : le serveur tourne sur 127.0.0.1.
-Rien n'est écrit dans le dépôt non plus : tout part dans un dossier temporaire,
-et une vérification finale le prouve. Voir le commentaire de l'export, plus bas.
+Rien n'est écrit dans le dépôt non plus : tout part dans un dossier temporaire.
 """
 
-import hashlib
 import json
 import os
 import subprocess
@@ -186,9 +184,8 @@ CIQUAL_FACTICE = [
     # (libelle, kcal, proteines, glucides, lipides, fibres)
     # Les vraies valeurs de la table (colonne « Reglement UE n° 1169/2011 »).
     # Cette ligne a porte 7.12 / 75.0 / 1.58 / 3.2 jusqu'au 16 septembre 2026 :
-    # les lipides au double et les fibres a 2,1x. L'audit avait trace jusqu'ici
-    # les valeurs fausses du catalogue (04-tests-qualite.md:144) — une fausse
-    # table qui ment sur les chiffres qu'elle imite ne prouve plus rien.
+    # les lipides au double et les fibres a 2,1x. Une fausse table qui ment sur
+    # les chiffres qu'elle imite ne prouve plus rien.
     ("Riz blanc, cru", 350, 7.02, 77.5, 0.79, 1.53),
     ("Riz blanc, cuit, sans sel ajouté", 155, 3.15, 33.2, 0.70, 1.4),
     ("Brocoli, cru", 31.9, 2.9, 2.1, 0.40, 2.6),
@@ -242,24 +239,6 @@ def nombre(champs, cle):
         return float(champs.get(cle, "nan"))
     except (TypeError, ValueError):
         return float("nan")
-
-
-# La migration versionnee du catalogue commun. Ce banc ne doit JAMAIS l'ecrire :
-# on releve son empreinte avant de lancer quoi que ce soit, et on la revérifie.
-MIGRATION_VERSIONNEE = os.path.join(os.path.dirname(SCRIPT), "db", "manuel",
-                                    "16-catalogue-ciqual.sql")
-
-
-def empreinte_migration_versionnee():
-    """Le contenu du fichier versionne, ou None s'il n'existe pas."""
-    try:
-        with open(MIGRATION_VERSIONNEE, "rb") as f:
-            return hashlib.sha256(f.read()).hexdigest()
-    except FileNotFoundError:
-        return None
-
-
-VERSIONNEE_AVANT = empreinte_migration_versionnee()
 
 
 def main():
@@ -380,84 +359,6 @@ def main():
     verifier("aucune pesée n'a été réécrite : le script ne mesure rien",
              all("pesee_avant" not in c and "pesee_apres" not in c
                  for c in ecrites.values()))
-
-    # ------------------------------------ l'export du catalogue commun
-
-    # Les 50 aliments de reference sont le point de depart de tout nouveau
-    # compte. Ils sont GENERES depuis Ciqual, avec les memes regles que pour
-    # Grocy — aucun chiffre tape a la main, donc aucun a corriger deux fois.
-    #
-    # CE BANC N'ECRIT PAS DANS LE DEPOT. Jusqu'au 14 septembre 2026 il lancait
-    # `--exporter-catalogue` sans destination, et le script ecrivait donc dans
-    # `db/manuel/16-catalogue-ciqual.sql`, migration VERSIONNEE que
-    # `entrypoint-prod.sh` rejoue a chaque demarrage. Le commit c0f6f10 du
-    # 10 aout 2026 a 19 h 59 en porte la trace : la migration y passe de 53
-    # UPDATE a 4 — exactement les quatre aliments de CIQUAL_FACTICE ci-dessus.
-    # 49 aliments du catalogue commun ont disparu de la production ce jour-la,
-    # emportes par un commit intitule « Batch cooking ».
-    #
-    # Un test ecrit dans un fichier temporaire. Toujours.
-    with tempfile.TemporaryDirectory() as dossier:
-        table = os.path.join(dossier, "ciqual-factice.xlsx")
-        ecrire_table(table)
-        chemin = os.path.join(dossier, "16-catalogue-ciqual.sql")
-
-        export = subprocess.run(
-            [sys.executable, SCRIPT, table, "--exporter-catalogue",
-             "--sortie", chemin],
-            env=dict(os.environ,
-                     GROCY_URL="http://127.0.0.1:1",
-                     GROCY_API_KEY="factice"),
-            capture_output=True, text=True)
-
-        if export.returncode != 0:
-            print("--- export stdout ---"); print(export.stdout[-1500:])
-            print("--- export stderr ---"); print(export.stderr[-1500:])
-
-        verifier("l'export se termine sans erreur", export.returncode == 0)
-        verifier("l'export a bien ecrit la ou on le lui a demande",
-                 os.path.exists(chemin))
-        sql = (open(chemin, encoding="utf-8").read()
-               if os.path.exists(chemin) else "")
-
-    # La garde qui manquait : si quelqu'un retire `--sortie`, ce test doit
-    # tomber AVANT que le fichier versionne ne parte dans un commit.
-    verifier("la migration versionnee n'a pas ete touchee par ce banc",
-             VERSIONNEE_AVANT == empreinte_migration_versionnee())
-
-    verifier("la migration est écrite", len(sql) > 500)
-    verifier("elle est dans une transaction",
-             "BEGIN;" in sql and "COMMIT;" in sql)
-
-    # Chaque UPDATE est examiné SÉPARÉMENT. Compter les occurrences dans tout
-    # le fichier ne prouvait rien : les SELECT de contrôle contiennent déjà
-    # « cree_par IS NULL », et le test passait même en retirant la clause de
-    # tous les UPDATE.
-    mises_a_jour = [m.split(";")[0] for m in sql.split("UPDATE aliment SET")[1:]]
-
-    verifier("la migration met bien des aliments à jour", len(mises_a_jour) >= 3)
-    verifier("CHAQUE mise à jour ne touche que le catalogue commun",
-             all("cree_par IS NULL" in m for m in mises_a_jour))
-    verifier("CHAQUE mise à jour renseigne les fibres",
-             all("fibres_100" in m for m in mises_a_jour))
-    verifier("PLUS AUCUNE mise à jour ne parle d'état de référence",
-             not any("etat_reference" in m for m in mises_a_jour))
-
-    # Les valeurs viennent de Ciqual, pas d'une table americaine.
-    verifier("les amandes passent aux glucides européens (8,8 et non 21,5)",
-             "gluc_100       = 8.8" in sql)
-    verifier("... avec leurs fibres, jusqu'ici absentes",
-             "fibres_100     = 10.4" in sql)
-    verifier("le brocoli passe en valeurs CRUES",
-             "kcal_100       = 31.9" in sql)
-    verifier("le riz du catalogue commun porte les valeurs du SEC",
-             "kcal_100       = 350" in sql)
-    verifier("le rendement du riz est dérivé de l'énergie",
-             "ratio          = 2.26" in sql)
-
-    # Une catégorie sans mesure garde un rendement de 1 : on n'invente pas.
-    verifier("aucun rendement inventé pour un légume",
-             "ratio          = 1" in sql)
 
     # ------------------------------------------ la conversion, une seule fois
 
