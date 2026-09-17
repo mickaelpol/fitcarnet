@@ -100,18 +100,21 @@ final class FrigoController extends AbstractController
         return $this->json(['produits' => $this->grocy->produitsIncomplets()]);
     }
 
-    /** Fixe la quantite d'un aliment. Reserve aux comptes lisant la base. */
     /**
-     * CET ALIMENT EST-IL LE MIEN, OU CELUI DE TOUT LE MONDE ?
+     * Fixe la quantite d'un aliment. Reserve aux comptes lisant la base.
+     *
+     * CET ALIMENT EST-IL LE MIEN ?
      *
      * `alimentId` vient du CORPS DE LA REQUETE. On ne verifiait que `> 0` :
-     * la seule barriere restante etait la cle etrangere, qui accepte
-     * n'importe quel aliment existant — y compris l'aliment PRIVE d'un autre
-     * compte.
+     * la seule barriere restante etait la cle etrangere, qui acceptait
+     * n'importe quel aliment existant — y compris celui d'un autre compte.
+     * Depuis le 17 septembre 2026, la base le refuse aussi (cle composite
+     * `stock_aliment_du_meme_compte_fkey`, migration 35) ; le controle ci-dessous
+     * reste, pour repondre 404 plutot que de laisser tomber une erreur SQL.
      *
      * Ce n'etait pas une fuite : `FrigoBase::lire` filtre a la lecture, la
      * victime ne voit jamais cette ligne. C'etait pire a sa facon — un blocage
-     * qu'elle ne peut pas defaire. Bob pose 1 g de stock sur l'aliment prive
+     * qu'elle ne peut pas defaire. Bob pose 1 g de stock sur l'aliment
      * d'Alice ; Alice essaie de supprimer son aliment et recoit « il est
      * encore dans un frigo, mets sa quantite a zero » — une quantite qui
      * n'est pas dans son frigo a elle. Son aliment devient indelebile.
@@ -163,7 +166,7 @@ final class FrigoController extends AbstractController
      * Ecrit les valeurs nutritionnelles d'un aliment du frigo.
      *
      * Reserve aux comptes lisant Grocy. Le pendant pour la table « aliment »
-     * passera par /api/aliments, qui pose deja proprietaire et confidentialite.
+     * est /api/aliments, qui pose le proprietaire a la creation.
      */
     #[Route('/mon-frigo/aliment', methods: ['POST'])]
     public function enregistrerAliment(Request $requete): JsonResponse

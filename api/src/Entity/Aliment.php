@@ -89,8 +89,9 @@ class Aliment implements ProprieteUtilisateur
     #[Assert\NotBlank]
     /* PLAFONDS DE LONGUEUR — CONSTAT F-08, 15 SEPTEMBRE 2026.
        `POST /api/aliments` est ouvert a ROLE_USER, `nom` et `codeBarres` sont
-       des `TEXT` : aucune borne, ni ici ni en base. Les deux plafonds sont
-       tires des donnees reelles — pire cas mesure : nom 24 caracteres. Un code-barres EAN-13 en fait 13, un
+       des `TEXT` : aucune borne, ni ici ni en base. 150 laisse un facteur
+       cinq au plus long nom connu, « Skyr d'essai (compte ordinaire) »
+       (31 caracteres, `jeu-essai.sql`). Un code-barres EAN-13 en fait 13, un
        GTIN-14 quatorze ; 64 laisse la place aux formats exotiques sans
        laisser passer un fichier. Un plafond sous ce que la base porte deja
        rendrait la ligne existante inenregistrable au PATCH. */

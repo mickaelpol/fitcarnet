@@ -33,7 +33,7 @@ use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
  * appartient cet aliment.
  *
  * Ce n'est pas une fuite — la victime ne voit jamais la ligne posee chez elle.
- * C'est pire a sa facon : Bob pose 1 g sur l'aliment prive d'Alice, et Alice ne
+ * C'est pire a sa facon : Bob pose 1 g sur l'aliment d'Alice, et Alice ne
  * peut plus supprimer son aliment. `AlimentSuppressionProcessor` compte les
  * lignes de stock TOUS COMPTES CONFONDUS ; l'application ne lui offre aucun
  * moyen de defaire ce blocage.

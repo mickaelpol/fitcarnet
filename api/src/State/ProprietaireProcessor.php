@@ -31,8 +31,8 @@ final readonly class ProprietaireProcessor implements ProcessorInterface
            Ici le garde `null === getUtilisateur()` ne cachait AUCUN bug : la
            colonne est NOT NULL, une entite rechargee a toujours son
            proprietaire. Il est aligne malgre tout, parce que le meme motif a
-           mordu deux fois a cote (M-01 sur AlimentProcessor, puis sur
-           ExerciceProcessor le jour de sa naissance) et que la lecon de
+           mordu deux fois a cote (sur AlimentProcessor le 14 septembre 2026,
+           puis sur ExerciceProcessor le jour de sa naissance) et que la lecon de
            l'audit est celle-la : une decision juste appliquee a un endroit et
            oubliee a un autre. Trois processeurs, une seule regle. */
         if ($data instanceof ProprieteUtilisateur && $operation instanceof Post) {

@@ -77,7 +77,7 @@ final class ExerciceProcessorTest extends TestCase
      *
      * Il passait autrefois une operation `Post` en pretendant decrire un PATCH,
      * et passait quand meme parce que le processeur regardait l'etat du champ
-     * au lieu de l'operation : c'est ce qui masquait M-01. Un test qui ment sur
+     * au lieu de l'operation : c'est ce qui masquait le defaut ci-dessous. Un test qui ment sur
      * son scenario protege le defaut.
      */
     public function testUnPatchNeReattribuePasLExerciceACeluiQuiLeModifie(): void
@@ -112,7 +112,8 @@ final class ExerciceProcessorTest extends TestCase
     }
 
     /**
-     * CONSTAT M-01, REPRODUIT ICI LE JOUR MEME OU IL A ETE CORRIGE AILLEURS.
+     * LE GARDE « SEULEMENT S'IL MANQUE », REPRODUIT ICI LE JOUR MEME OU IL
+     * AVAIT ETE CORRIGE AILLEURS.
      *
      * Le garde `null === getCreePar()` est juste a la creation et faux partout
      * ailleurs : un exercice du CATALOGUE COMMUN a precisement `creePar = NULL`.
@@ -124,7 +125,8 @@ final class ExerciceProcessorTest extends TestCase
      * nom francais. Le geste le plus normal de l'administration cassait le
      * catalogue, en silence.
      *
-     * Meme defaut que `AlimentProcessor` (M-01) : une decision juste appliquee
+     * Meme defaut que celui d'`AlimentProcessor`, corrige le 14 septembre
+     * 2026 (motif 2 de `revue-de-code`) : une decision juste appliquee
      * a un endroit et recopiee sans son contexte. Le remede est le meme —
      * se fier a l'operation, pas a l'etat du champ.
      */

@@ -15,7 +15,9 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  *
  * CONSTAT F-08 DE L'AUDIT DU 7 SEPTEMBRE 2026.
  *
- * `POST /api/exercices` et `POST /api/aliments` sont ouverts a `ROLE_USER`.
+ * `POST /api/aliments` est ouvert a `ROLE_USER`, et `POST /api/exercices` l'etait
+ * aussi jusqu'au 15 septembre 2026 — il est reserve a l'administrateur depuis,
+ * ce qui ne rend pas la borne inutile : un copier-coller rate reste possible.
  * Aucun des champs texte ecrits par ces deux routes n'avait de longueur
  * maximale : ce sont des colonnes `TEXT`, donc sans borne cote base non plus.
  * Un seul appel pouvait deposer plusieurs mega-octets dans `instructions` —
@@ -30,11 +32,14 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * sur un exercice importe echouerait sur un champ que personne n'a touche, en
  * designant un champ sans rapport avec le geste. C'est pourquoi les plafonds
  * ont ete tires des donnees REELLES, mesurees le 15 septembre 2026 sur les
- * 1338 exercices importes et sur les aliments en base :
+ * 1338 exercices importes :
  *
  *   nom 67 · nomFr 90 · instructions 975 · musclesSecondaires 56
  *   equipement 20 · muscleCible 21 · partieCorps 10 · formatPrescrit 18
- *   aliment.nom 24
+ *
+ * Chaque aliment appartenant a son compte, il n'y a pas de catalogue a
+ * mesurer : le temoin des aliments est le plus long nom que le depot pose
+ * lui-meme, « Skyr d'essai (compte ordinaire) » (31, `jeu-essai.sql`).
  *
  * Chaque plafond garde donc au moins un facteur deux de marge, et le second
  * temoin ci-dessous fige ces valeurs mesurees : si quelqu'un resserre un
@@ -123,7 +128,7 @@ final class BornesDesChampsTexteTest extends TestCase
         yield 'exercice.muscleCible (21)' => [Exercice::class, 'muscleCible', 21];
         yield 'exercice.musclesSecondaires (56)' => [Exercice::class, 'musclesSecondaires', 56];
         yield 'exercice.instructions (975)' => [Exercice::class, 'instructions', 975];
-        yield 'aliment.nom (24)' => [Aliment::class, 'nom', 24];
+        yield 'aliment.nom (31)' => [Aliment::class, 'nom', 31];
     }
 
     /**

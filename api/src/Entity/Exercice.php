@@ -85,8 +85,8 @@ use Symfony\Component\Validator\Constraints as Assert;
         // exercice rejoint le catalogue « par ici, `public: true` » -- `public`
         // n'a aucun groupe de serialisation, CE MECANISME N'EXISTE PAS ; et que
         // « le processeur ne touche pas un exercice qui a deja un auteur », qui
-        // est la formulation exacte du bug M-01, remplace par
-        // `$operation instanceof Post`.
+        // est la formulation exacte du defaut corrige le 14 septembre 2026
+        // (motif 2 de `revue-de-code`), remplace par `$operation instanceof Post`.
         //
         // Le processeur voisin a ete corrige et celui-ci oublie : le jumeau
         // oublie, applique aux commentaires.

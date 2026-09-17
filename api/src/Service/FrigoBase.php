@@ -111,10 +111,11 @@ final readonly class FrigoBase
          * Cette methode ecrit du stock pour le compte de `POST /mon-frigo/stock`,
          * de l'inventaire differe et du bouton « J'ai cuisine ». Seule la
          * premiere posait la question de la propriete. Bob posait 1 g sur
-         * l'aliment prive d'Alice par l'inventaire, et l'aliment d'Alice
-         * devenait indelebile : `AlimentSuppressionProcessor` compte les lignes
-         * de stock tous comptes confondus, et l'application ne lui offrait
-         * aucun moyen de defaire ce blocage.
+         * l'aliment d'Alice par l'inventaire, et l'aliment d'Alice devenait
+         * indelebile : `AlimentSuppressionProcessor` compte les lignes de stock
+         * tous comptes confondus, et l'application ne lui offrait aucun moyen
+         * de defaire ce blocage. La base refuse desormais une telle ligne
+         * (migration 35) ; cette porte reste celle qui repond proprement.
          *
          * Une exception, et non un retour silencieux : l'appelant qui n'a pas
          * verifie doit s'arreter. Le travailleur de fond, lui, l'attrape deja

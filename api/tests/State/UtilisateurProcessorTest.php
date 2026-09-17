@@ -128,7 +128,7 @@ final class UtilisateurProcessorTest extends TestCase
      * Un `PATCH` qui ne change que le nom n'envoie evidemment pas de mot de
      * passe. Un refus pose sans distinguer la creation de la modification
      * aurait rendu impossible le geste le plus courant de l'ecran de compte —
-     * exactement le piege de M-01, ou un garde juste a la creation etait
+     * exactement le motif 2 de `revue-de-code`, ou un garde juste a la creation etait
      * applique partout ailleurs.
      */
     public function testModifierUnCompteExistantSansToucherAuMotDePasseResteAutorise(): void
