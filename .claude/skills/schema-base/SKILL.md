@@ -23,9 +23,9 @@ du 8 septembre 2026 (constat **C2**) ont été résorbées le 14 septembre. Tout
 écart est désormais une **régression** : une évolution écrite d'un seul côté.
 Ne jamais le classer en « écart connu ».
 
-Vérifié le 16 septembre 2026, migrations 10 à 33 comprises : les deux scripts
-passent, et une base de dev rattrapée donne un `pg_dump --schema-only`
-identique à celui d'une base neuve.
+Vérifié le 17 septembre 2026, sur toutes les migrations présentes dans
+`db/manuel/` : les deux scripts passent, et une base de dev rattrapée donne un
+`pg_dump --schema-only` identique à celui d'une base neuve.
 
 ### Ils tournent sur `postgres:16`, pas sur l'alpine
 
@@ -55,8 +55,10 @@ Deux conséquences qu'on paie cher si on les oublie :
   Les lanceurs tournent avec `ON_ERROR_STOP=1` : une erreur arrête tout, elle
   n'est plus avalée.
 - **Une migration qui écrit des données écrase les corrections manuelles à chaque
-  redémarrage.** C'est le constat 10. Une migration qui écrit des données
-  borne donc chaque écriture aux lignes qui ne l'ont pas encore reçue :
+  redémarrage.** L'audit de septembre 2026 l'a mesuré sur une migration qui
+  réécrivait des valeurs nutritionnelles à chaque démarrage. Une migration qui
+  écrit des données borne donc chaque écriture aux lignes qui ne l'ont pas
+  encore reçue :
   `29-noms-francais.sql` ne traduit un exercice que si `nom_fr IS NULL` et
   `source <> 'perso'`, si bien qu'une traduction saisie à la main n'est jamais
   écrasée. `db/02-donnees.sql` ne sème aucun aliment : chaque compte saisit les
@@ -83,8 +85,9 @@ Il en découle trois règles :
 
 - **Un fichier numéroté de 10 à 39 est joué sans rien toucher d'autre**, dans
   l'ordre de son numéro.
-- **Un fichier dont le nom commence par une lettre n'est PAS joué**, et c'est
-  voulu : `jeu-essai.sql` et `jeu-demo.sql` sont des jeux de démonstration,
+- **Un fichier dont le nom commence par une lettre n'est PAS joué** — sauf
+  `aliment-fibres.sql`, nommé en tête de la liste ci-dessus. C'est voulu :
+  `jeu-essai.sql` et `jeu-demo.sql` sont des jeux de démonstration,
   `cibles.sql` les objectifs d'un
   compte, à jouer à la main une fois le compte créé. L'ancien tri alphabétique
   jouait `jeu-essai.sql` comme une migration, sur toute installation. Un numéro
@@ -101,8 +104,11 @@ Il en découle trois règles :
   Oublier `verifier-schema.sh` est le pire des cinq : il annoncerait
   « identiques » sans avoir joué la migration, et son ✓ ne prouverait plus
   rien. C'est ce qui est arrivé à la migration 30 le 14 septembre 2026.
-  **La prochaine migration porte le numéro 34** ; il reste six numéros avant
-  d'avoir à étendre les cinq fichiers.
+  **La prochaine migration prend le numéro qui suit le plus haut présent** —
+  `ls db/manuel | grep -E '^[0-9]' | tail -1` — jamais un numéro déjà pris ni
+  un trou laissé par une migration retirée : deux fichiers de même numéro se
+  jouent dans l'ordre alphabétique de leur nom, et c'est un ordre que personne
+  n'a choisi. Au-delà de 39, étendre d'abord les cinq fichiers.
 
 ## Le développement ne rejoue JAMAIS `db/manuel/`
 
@@ -159,8 +165,8 @@ divergence n'en pose.
 Pour l'optimisation (index manquants, plan de requête, `VACUUM`), passer par la
 skill **`postgres`**.
 
-Le constat 11 (dix clés étrangères sans index) est traité par
-`31-index-de-jointure.sql`, qui en indexe **cinq, et c'est délibéré** — les
+Le constat 11 (neuf clés étrangères sans index) est traité par
+`31-index-de-jointure.sql`, qui en indexe **quatre, et c'est délibéré** — les
 chemins chauds et les `ON DELETE RESTRICT`. Les cinq autres
 (`stock.emplacement_id`, `seance.modele_id`,
 `cuisson_habituelle.mode_cuisson_id`, `invitation.invite_par`,

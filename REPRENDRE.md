@@ -77,24 +77,24 @@ d'avant passage n'ont été gardées que dans le dossier temporaire des sessions
 `jeu-essai.sql` crée désormais lui-même ses 8 aliments (valeurs CIQUAL) : le
 rejouer sur un compte d'essai si le frigo de dev paraît vide.
 
-**Trouvé en reprenant sur le second poste, et corrigé :**
-`sauvegarde.sh --catalogue` exportait encore la table `aliment` — les aliments
-de tous les comptes, sous la mention « AUCUNE donnée personnelle », dans un
-fichier qu'une autre base refuse. Il n'exporte plus que les emplacements et les
-exercices, et `verifier-migrations.sh` refuse désormais toute table exportée
-qui porte `utilisateur_id` (vu rouge avant la correction). Quatre renvois vers
-des fichiers disparus ont été redressés au passage (`BornesDuCatalogueCommunTest`
-×2, `18-un-seul-etat.sql`, `useAliments` dans l'audit).
+**Trouvé en reprenant sur le second poste, et corrigé le même jour :**
 
-**Deux points trouvés en chemin, hors de ce chantier, à trancher :**
-
-- **`exercice.cree_par` part aussi dans l'export catalogue.** Un exercice privé
-  est une donnée de compte, mais `pg_dump -t` ne filtre pas par ligne : la
-  table part entière. Aucun exercice privé en dev aujourd'hui ; le contrôle de
-  `verifier-migrations.sh` ne le voit pas, et son commentaire le dit.
-- **`import_carnet.py:167` insère encore dans `modele.partage`**, colonne
-  retirée le 15 septembre (migration 33). Le script échouerait à sa première
-  création de modèle.
+- **`sauvegarde.sh --catalogue` n'existe plus.** Il exportait les aliments et
+  les exercices privés de tous les comptes sous la mention « AUCUNE donnée
+  personnelle », et ne se rejouait pas sur une base peuplée (conflits
+  d'identifiants). `--restaurer` n'accepte plus qu'un `.dump`.
+- **« Ajouter un aliment » ouvrait les quatre macros déjà à « 0 »** : un oubli
+  partait en base comme une valeur (règles 6 et 7). L'écran passe désormais une
+  intention (`creation`) et non un aliment rempli de zéros ;
+  `editeurAlimentConnecte.test-rendu.tsx` monte l'éditeur comme l'écran.
+- **`import_carnet.py` écrivait encore `modele.partage`** : tout l'import
+  échouait, `installer.sh` compris. `test_import_carnet.py` le rejoue désormais
+  sur une base jetable (Docker et `psycopg2` requis).
+- **`schema-base` annonçait « la prochaine migration porte le numéro 34 »**
+  alors que la 34 existe : elle dit maintenant de prendre le numéro qui suit le
+  plus haut présent.
+- Quatre renvois vers des fichiers disparus redressés
+  (`BornesDuCatalogueCommunTest` ×2, `18-un-seul-etat.sql`, `useAliments`).
 
 ---
 
