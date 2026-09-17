@@ -20,7 +20,7 @@
  */
 
 export * from './auth';
-export { useAliments, useExercices, useExerciceDetail, useMajExercice, useFusionExercices }
+export { useExercices, useExerciceDetail, useMajExercice, useFusionExercices }
   from './referentiels';
 export * from './frigo';
 export * from './cuissons';

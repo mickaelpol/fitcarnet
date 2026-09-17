@@ -293,7 +293,7 @@ export default function AdminUtilisateurs() {
           `${aSupprimer.contenu.seances} séance(s), ${aSupprimer.contenu.series} série(s), `,
           `${aSupprimer.contenu.modeles} modèle(s) et ${aSupprimer.contenu.plans} plan(s) `,
           'seront effacés définitivement. Rien ne se restaure sans une sauvegarde. ',
-          'Les aliments que cette personne a créés restent, ils servent à tout le monde. ',
+          'Ses aliments et son stock partent avec lui. ',
           'Si tu veux seulement lui retirer l’accès, désactive plutôt : le carnet est conservé.',
         ].join('')}
         onConfirmer={() => {

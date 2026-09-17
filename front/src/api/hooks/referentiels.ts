@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, membres } from '../client';
-import type { Aliment, Exercice } from '../types';
+import type { Exercice } from '../types';
 
 /**
  * Les réglages de cache d'un référentiel.
@@ -13,13 +13,6 @@ import type { Aliment, Exercice } from '../types';
  * donnée » sont invisibles jusqu'au jour où l'une des deux est périmée.
  */
 export const REFERENTIEL = { staleTime: 30 * 60 * 1000, gcTime: 24 * 60 * 60 * 1000 };
-
-export const useAliments = () =>
-  useQuery({
-    queryKey: ['aliments'],
-    queryFn: async () => membres(await api<{ member: Aliment[] }>('/aliments?itemsPerPage=500')),
-    ...REFERENTIEL,
-  });
 
 export const useExercices = () =>
   useQuery({

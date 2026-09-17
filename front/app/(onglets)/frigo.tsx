@@ -2,20 +2,19 @@ import { useMemo, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  useAliments, useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
+  useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
   useEnregistrerAliment, useEnvoyerInventaire, useFrigoIncomplets, useMajAliment,
   useMonFrigo, useSuiviInventaire, useSupprimerAliment,
 } from '@/api/hooks';
 import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Champ, Chargement, Discret, Erreur, Vide } from '@/composants/base';
 import { AlertesFrigo } from '@/composants/alertesFrigo';
-import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
 import { ALIMENT_VIDE, type AlimentSaisi } from '@/composants/editeurAliment';
 import { EditeurAlimentConnecte } from '@/composants/editeurAlimentConnecte';
 import { LigneInventaire, LigneStock } from '@/composants/ligneFrigo';
 import { ecartsInventaire, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
-import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
+import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 /**
  * Champs d'inventaire préremplis avec le stock connu.
@@ -49,7 +48,6 @@ export default function MonFrigo() {
   const poserQuantite = useDefinirQuantiteGrocy();
   const envoyer = useEnvoyerInventaire();
   const suivi = useSuiviInventaire();
-  const catalogue = useAliments();
   const creer = useCreerAliment();
   const majAliment = useMajAliment();
   const supprimer = useSupprimerAliment();
@@ -64,7 +62,6 @@ export default function MonFrigo() {
   const [edite, setEdite] = useState<AlimentDisponible | null>(null);
   const [nouveau, setNouveau] = useState<AlimentSaisi | null>(null);
   const [quantiteNouvelle, setQuantiteNouvelle] = useState('');
-  const [choixModele, setChoixModele] = useState(false);
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
 
   /** Les comptes lisant Grocy gèrent leurs fiches et leurs quantités là-bas. */
@@ -127,33 +124,6 @@ export default function MonFrigo() {
      si son poids est inconnu : le kilogramme et la pièce se convertissent dès
      que Grocy porte la conversion, le litre et le pack non. */
   const sansPoids = useMemo(() => tous.filter((a) => a.grammesParUnite === null), [tous]);
-
-  /** Les noms déjà présents, pour ne pas les reproposer au catalogue. */
-  const dejaChezMoi = useMemo(
-    () => new Set(tous.map((a) => a.nom.trim().toLowerCase())),
-    [tous],
-  );
-
-  /* MEMOISE, PARCE QUE C'ETAIT ECRIT DANS LE JSX.
-     Ce filtrage porte sur les ~500 aliments du catalogue. Pose directement
-     dans les attributs de `ChoixDansListe`, il se rejouait a chaque rendu de
-     l'ecran — modale fermee comprise, donc a chaque caractere tape dans la
-     recherche. Meme motif que dans les ecrans de seance et de modele. */
-  const modelesPossibles = useMemo(() => [
-    { id: 0, nom: 'Créer de zéro', detail: 'aucune valeur préremplie' },
-    ...(catalogue.data ?? [])
-      // On écarte ce qu'on possède déjà, par le nom. Le catalogue mêle les
-      // aliments de référence et les siens ; proposer les siens ferait créer
-      // un doublon, que l'unicité par propriétaire refuse.
-      .filter((a) => !dejaChezMoi.has(a.nom.trim().toLowerCase()))
-      .map((a) => ({
-        id: a.id,
-        nom: a.nom,
-        detail: `${nb(a.kcal100)} kcal · ${nb(a.prot100)} P · ${nb(a.gluc100)} G`
-          + ` · ${nb(a.lip100)} L`,
-        couleur: couleurRole(a.categorie),
-      })),
-  ], [catalogue.data, dejaChezMoi]);
 
   const entrerInventaire = () => {
     envoyer.reset();
@@ -288,7 +258,14 @@ export default function MonFrigo() {
           que la liste ne se redimensionne au changement de mode. */}
       {mode === 'stock' && peutCreer && (
         <View style={[s.pied, { paddingBottom: E.m + insets.bottom }]}>
-          <Bouton onPress={() => { creer.reset(); definir.reset(); setChoixModele(true); }}>
+          <Bouton
+            onPress={() => {
+              creer.reset();
+              definir.reset();
+              setQuantiteNouvelle('');
+              setNouveau(ALIMENT_VIDE);
+            }}
+          >
             Ajouter un aliment
           </Bouton>
         </View>
@@ -356,35 +333,6 @@ export default function MonFrigo() {
         definir={definir}
         enregistrer={enregistrer}
         poserQuantite={poserQuantite}
-      />
-
-      {/* ---- point de départ d'une création ---- */}
-      <ChoixDansListe
-        visible={choixModele}
-        titre="Partir d'un aliment de référence"
-        elements={modelesPossibles}
-        onFermer={() => setChoixModele(false)}
-        onChoisir={(id) => {
-          // « Créer de zéro » porte l'identifiant 0, qu'aucun aliment n'a
-          const modele = (catalogue.data ?? []).find((a) => a.id === id);
-
-          setQuantiteNouvelle('');
-          // « ?? null » n'est pas cosmétique : l'API omet les champs nuls, ils
-          // arrivent donc en « undefined », que l'éditeur ne distingue pas
-          // d'une valeur absente de son formulaire.
-          setNouveau(modele === undefined ? ALIMENT_VIDE : {
-            nom: modele.nom,
-            categorie: modele.categorie,
-            kcal100: modele.kcal100,
-            prot100: modele.prot100,
-            gluc100: modele.gluc100,
-            lip100: modele.lip100,
-            fibres100: modele.fibres100 ?? null,
-            ratio: modele.ratio,
-            peseeAvant: modele.peseeAvant ?? null,
-            peseeApres: modele.peseeApres ?? null,
-          });
-        }}
       />
 
       <Confirmer

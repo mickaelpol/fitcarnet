@@ -85,8 +85,8 @@ export function useEnregistrerAliment() {
 }
 
 /**
- * Crée un aliment. Le propriétaire et la confidentialité sont posés par
- * l'API depuis le jeton, jamais transmis d'ici.
+ * Crée un aliment. Son propriétaire est posé par l'API depuis le jeton,
+ * jamais transmis d'ici.
  */
 export function useCreerAliment() {
   const qc = useQueryClient();
@@ -95,7 +95,6 @@ export function useCreerAliment() {
     mutationFn: (v: AlimentEcriture) =>
       api<Aliment>('/aliments', { methode: 'POST', corps: versDecimales(v) }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['aliments'] });
       void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
     },
   });
@@ -109,7 +108,6 @@ export function useMajAliment() {
     mutationFn: ({ id, ...v }: AlimentEcriture & { id: number }) =>
       api<Aliment>(`/aliments/${id}`, { methode: 'PATCH', corps: versDecimales(v) }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['aliments'] });
       void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
     },
   });
@@ -125,7 +123,6 @@ export function useSupprimerAliment() {
   return useMutation({
     mutationFn: (id: number) => api<null>(`/aliments/${id}`, { methode: 'DELETE' }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['aliments'] });
       void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
     },
   });
