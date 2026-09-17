@@ -163,9 +163,12 @@ def main() -> int:
         print(f"MODÈLE « {titre or '—'} » : {len(exercices)} exercice(s)")
 
         if args.appliquer:
+            # Pas de colonne `partage` : le partage de modèle n'existe pas
+            # (migration 33). L'écrire faisait échouer tout l'import —
+            # `test_import_carnet.py` le rejoue sur une base jetable.
             cur.execute(
-                "INSERT INTO modele (utilisateur_id, nom, type, partage) "
-                "VALUES (%s, %s, %s, FALSE) RETURNING id",
+                "INSERT INTO modele (utilisateur_id, nom, type) "
+                "VALUES (%s, %s, %s) RETURNING id",
                 (utilisateur, titre, type_))
             id_modele = cur.fetchone()[0]
 
