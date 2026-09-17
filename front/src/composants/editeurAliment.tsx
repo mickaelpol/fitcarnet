@@ -32,15 +32,19 @@ export interface AlimentSaisi {
 }
 
 /**
- * Point de départ d'une création : aucune valeur préremplie.
+ * État interne du formulaire quand il ne reçoit aucun aliment : une création.
  *
- * EXPORTÉ DEPUIS LE 15 SEPTEMBRE 2026, parce qu'il en existait une seconde
- * copie mot pour mot dans `app/(onglets)/frigo.tsx` (D6 de l'audit). Deux
- * objets identiques de dix champs, dont l'écran se servait pour « Créer de
- * zéro » : un champ ajouté ici et pas là-bas, et la création partait avec un
- * `undefined` que l'éditeur ne distingue pas d'une valeur absente.
+ * SES ZÉROS NE SONT NI AFFICHÉS NI ENVOYÉS. Les champs partent du texte vide
+ * (`textesDe` sans aliment), et `valide` exige un texte lisible pour chaque
+ * macro : ces 0 ne servent qu'à l'aperçu du contrôle.
+ *
+ * PLUS EXPORTÉ DEPUIS LE 17 SEPTEMBRE 2026. L'écran le passait comme `aliment`
+ * pour ouvrir une création : l'éditeur y voyait un aliment existant dont les
+ * quatre macros valent zéro, et les affichait « 0 ». Un oubli partait alors en
+ * base comme une valeur (règle 6). Une création se demande en ne passant
+ * AUCUN aliment — `EditeurAlimentConnecte` le fait sur `creation`.
  */
-export const ALIMENT_VIDE: AlimentSaisi = {
+const ALIMENT_VIDE: AlimentSaisi = {
   nom: '', categorie: 'prot', kcal100: 0, prot100: 0, gluc100: 0,
   lip100: 0, fibres100: null, ratio: 1,
   peseeAvant: null, peseeApres: null,

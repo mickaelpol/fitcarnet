@@ -41,20 +41,29 @@ const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
 });
 
 export function EditeurAlimentConnecte({
-  source, nouveau, edite, quantite,
+  source, creation, edite, quantite,
   onQuantiteChange, onFermer, onCreationEnvoyee, onEditionFaite,
   creer, majAliment, definir, enregistrer, poserQuantite,
 }: {
   /** qui tient la fiche : Grocy pour l'administrateur, la base pour les autres */
   source?: 'grocy' | 'base';
-  /** valeurs de départ d'une création ; `null` hors création */
-  nouveau: AlimentSaisi | null;
+  /**
+   * Vrai quand l'écran ouvre une CRÉATION.
+   *
+   * UN BOOLÉEN, ET NON PLUS UN ALIMENT DE DÉPART, DEPUIS LE 17 SEPTEMBRE 2026.
+   * L'écran passait `ALIMENT_VIDE`, dont chaque valeur vaut zéro : l'éditeur,
+   * qui ne laisse ses champs vides que s'il ne reçoit aucun aliment, ouvrait
+   * donc une création avec les quatre macros écrites « 0 », et un oubli
+   * partait en base comme une valeur (règle 6). Ce qu'on transmet est une
+   * intention ; l'éditeur ne reçoit alors aucun aliment.
+   */
+  creation: boolean;
   /** aliment dont on corrige les valeurs ; `null` hors correction */
   edite: AlimentDisponible | null;
   quantite: string;
   onQuantiteChange: (v: string) => void;
   onFermer: () => void;
-  /** la création est partie : l'écran vide `nouveau` et la quantité */
+  /** la création est partie : l'écran referme la création et vide la quantité */
   onCreationEnvoyee: () => void;
   /** la correction est enregistrée : l'écran vide `edite` */
   onEditionFaite: () => void;
@@ -75,9 +84,9 @@ export function EditeurAlimentConnecte({
 
   return (
     <EditeurAliment
-      visible={(surGrocy || source === 'base') && (nouveau !== null || edite !== null)}
-      titre={nouveau !== null ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment')}
-      aliment={nouveau ?? (edite !== null ? versSaisie(edite) : undefined)}
+      visible={(surGrocy || source === 'base') && (creation || edite !== null)}
+      titre={creation ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment')}
+      aliment={!creation && edite !== null ? versSaisie(edite) : undefined}
       enCours={surGrocy
         ? enregistrer.isPending || poserQuantite.isPending
         : creer.isPending || majAliment.isPending || definir.isPending}
@@ -86,11 +95,11 @@ export function EditeurAlimentConnecte({
         : (creer.error ?? majAliment.error)?.message ?? null}
       /* Côté Grocy, le nom ne se saisit qu'à la création : ensuite Grocy en est
          maître, et le changer ici ferait diverger les deux outils. */
-      nomModifiable={surGrocy ? nouveau !== null : true}
+      nomModifiable={surGrocy ? creation : true}
       // la quantité ne se saisit qu'à la création : ailleurs elle se corrige
       // dans l'inventaire, seul endroit où elle s'écrit
-      quantite={nouveau !== null ? quantite : undefined}
-      onQuantiteChange={nouveau !== null ? onQuantiteChange : undefined}
+      quantite={creation ? quantite : undefined}
+      onQuantiteChange={creation ? onQuantiteChange : undefined}
       onFermer={onFermer}
       onEnregistrer={(v) => {
         /* LE CORPS EST ÉCRIT UNE FOIS, ET C'EST TOUT L'INTÉRÊT DE CE MODULE.
@@ -109,7 +118,7 @@ export function EditeurAlimentConnecte({
         };
 
         if (surGrocy) {
-          if (nouveau === null && edite === null) return;
+          if (!creation && edite === null) return;
 
           enregistrer.mutate({
             /* Vide = création : l'API pose le produit dans Grocy avant
@@ -118,7 +127,7 @@ export function EditeurAlimentConnecte({
             ...corps,
           }, {
             onSuccess: (rendu) => {
-              if (nouveau === null) { onEditionFaite(); return; }
+              if (!creation) { onEditionFaite(); return; }
 
               const q = quantiteSaisie();
               onCreationEnvoyee();
@@ -142,7 +151,7 @@ export function EditeurAlimentConnecte({
           return;
         }
 
-        if (nouveau !== null) {
+        if (creation) {
           creer.mutate(corps, {
             onSuccess: (cree) => {
               const q = quantiteSaisie();

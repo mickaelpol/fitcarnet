@@ -10,7 +10,6 @@ import type { AlimentDisponible } from '@/api/types';
 import { Bouton, Champ, Chargement, Discret, Erreur, Vide } from '@/composants/base';
 import { AlertesFrigo } from '@/composants/alertesFrigo';
 import { Confirmer } from '@/composants/confirmer';
-import { ALIMENT_VIDE, type AlimentSaisi } from '@/composants/editeurAliment';
 import { EditeurAlimentConnecte } from '@/composants/editeurAlimentConnecte';
 import { LigneInventaire, LigneStock } from '@/composants/ligneFrigo';
 import { ecartsInventaire, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
@@ -60,7 +59,7 @@ export default function MonFrigo() {
   const [vus, setVus] = useState<Record<string, boolean>>({});
 
   const [edite, setEdite] = useState<AlimentDisponible | null>(null);
-  const [nouveau, setNouveau] = useState<AlimentSaisi | null>(null);
+  const [creation, setCreation] = useState(false);
   const [quantiteNouvelle, setQuantiteNouvelle] = useState('');
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
 
@@ -263,7 +262,7 @@ export default function MonFrigo() {
               creer.reset();
               definir.reset();
               setQuantiteNouvelle('');
-              setNouveau(ALIMENT_VIDE);
+              setCreation(true);
             }}
           >
             Ajouter un aliment
@@ -321,12 +320,12 @@ export default function MonFrigo() {
       {/* ---- création et correction des valeurs, quelle que soit la source ---- */}
       <EditeurAlimentConnecte
         source={frigo.data?.source}
-        nouveau={nouveau}
+        creation={creation}
         edite={edite}
         quantite={quantiteNouvelle}
         onQuantiteChange={setQuantiteNouvelle}
-        onFermer={() => { setNouveau(null); setEdite(null); setQuantiteNouvelle(''); }}
-        onCreationEnvoyee={() => { setNouveau(null); setQuantiteNouvelle(''); }}
+        onFermer={() => { setCreation(false); setEdite(null); setQuantiteNouvelle(''); }}
+        onCreationEnvoyee={() => { setCreation(false); setQuantiteNouvelle(''); }}
         onEditionFaite={() => setEdite(null)}
         creer={creer}
         majAliment={majAliment}
