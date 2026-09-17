@@ -3,17 +3,16 @@
 # fitcarnet — sauvegarde et restauration de la base.
 #
 #   ./sauvegarde.sh                    sauvegarde complète (développement)
-#   ./sauvegarde.sh --catalogue        n'exporte que le référentiel commun
-#   ./sauvegarde.sh --restaurer FICHIER
+#   ./sauvegarde.sh --restaurer FICHIER.dump
 #   ./sauvegarde.sh --lister
 #
-# Deux formats, deux usages :
-#   - complet   (.dump) : restauration à l'identique, y compris ton compte.
-#                         C'est ce qu'il faut pour peupler une production VIDE.
-#   - catalogue (.sql)  : exercices, emplacements — aucune donnée
-#                         personnelle. À utiliser si la production contient
-#                         déjà des comptes. Les aliments n'en sont pas :
-#                         chacun appartient à un compte.
+# Un seul format, le .dump : restauration à l'identique, comptes compris.
+# C'est aussi ce qu'il faut pour peupler une production VIDE.
+#
+# Il n'y a pas d'export « catalogue » : retiré le 17 septembre 2026. Il
+# emportait les aliments et les exercices privés de tous les comptes sous la
+# mention « aucune donnée personnelle », et ne se rejouait pas sur une base
+# déjà peuplée — ses identifiants entraient en conflit avec ceux qu'elle a.
 #
 # UN FICHIER QUI PORTE SON NOM DÉFINITIF EST COMPLET. Tout ce qui s'écrit ici
 # passe d'abord par un « .partiel », renommé seulement après relecture. Voir
@@ -108,48 +107,6 @@ sauvegarde_complete() {
     rotation
 }
 
-# -------------------------------------------------------------- catalogue
-
-sauvegarde_catalogue() {
-    mkdir -p "$DOSSIER"
-    local fichier="$DOSSIER/catalogue_$(horodatage).sql"
-    PARTIEL="$fichier.partiel"
-
-    echo "Export du référentiel commun…"
-    # --data-only : le schéma est déjà créé par db/01-schema.sql
-    # --column-inserts : lisible, et résistant à un changement d'ordre des colonnes
-    #
-    # Même « .partiel » que pour le dump complet : un export interrompu au
-    # milieu d'un INSERT reste un fichier .sql d'apparence normale, et psql le
-    # rejouera jusqu'à la ligne coupée avant d'échouer, base à moitié peuplée.
-    #
-    # AUCUNE TABLE QUI PORTE `utilisateur_id`. Le 17 septembre 2026, `-t aliment`
-    # figurait encore ici : les aliments de tous les comptes partaient sous la
-    # mention « AUCUNE donnée personnelle », dans un fichier que l'autre base
-    # refuse, faute des comptes qu'il désigne. `verifier-migrations.sh` lit la
-    # liste ci-dessous et la confronte au schéma.
-    if ! dc exec -T "$SERVICE" pg_dump -U "$UTILISATEUR" -d "$BASE" \
-        --data-only --column-inserts \
-        -t emplacement -t exercice \
-        > "$PARTIEL"; then
-        echec "pg_dump a échoué. Aucun catalogue n'a été écrit."
-    fi
-
-    # Un `--data-only` sur des tables vides réussit et ne produit qu'un
-    # en-tête : le fichier existe, pèse deux cents octets, et ne contient rien.
-    if ! grep -q '^INSERT INTO' "$PARTIEL"; then
-        echec "l'export ne contient aucune ligne INSERT — le référentiel est vide ?"
-    fi
-
-    mv "$PARTIEL" "$fichier"
-    PARTIEL=""
-
-    echo "→ $fichier ($(du -h "$fichier" | cut -f1))"
-    echo
-    echo "Ce fichier ne contient AUCUNE donnée personnelle :"
-    echo "  ni compte, ni aliment, ni séance, ni modèle, ni stock, ni objectif."
-}
-
 # ------------------------------------------------------------ restauration
 
 restaurer() {
@@ -164,17 +121,21 @@ restaurer() {
         echec "« $fichier » est une écriture interrompue, pas une sauvegarde. À supprimer."
     fi
 
+    # SEUL UN .dump SE RESTAURE, et on le dit AVANT la confirmation. Un .sql
+    # partait dans `psql` : c'était le chemin des anciens exports « catalogue »,
+    # qui n'existent plus et ne se rejouaient de toute façon pas sur une base
+    # peuplée. Un fichier SQL quelconque n'a rien à faire sur ce chemin-là.
+    if [[ "$fichier" != *.dump ]]; then
+        echec "« $fichier » n'est pas une sauvegarde de ce script (.dump attendu)."
+    fi
+
     echo "ATTENTION : la base « $BASE » va être ÉCRASÉE par $fichier."
     read -r -p "Taper « oui » pour confirmer : " reponse
     [[ "$reponse" == "oui" ]] || { echo "Annulé."; exit 0; }
 
-    if [[ "$fichier" == *.dump ]]; then
-        # --clean --if-exists : on repart d'une base propre sans la recréer
-        dc exec -T "$SERVICE" pg_restore -U "$UTILISATEUR" -d "$BASE" \
-            --clean --if-exists --no-owner --no-privileges < "$fichier"
-    else
-        dc exec -T "$SERVICE" psql -U "$UTILISATEUR" -d "$BASE" < "$fichier"
-    fi
+    # --clean --if-exists : on repart d'une base propre sans la recréer
+    dc exec -T "$SERVICE" pg_restore -U "$UTILISATEUR" -d "$BASE" \
+        --clean --if-exists --no-owner --no-privileges < "$fichier"
 
     echo "Restauration terminée."
     resume
@@ -231,7 +192,6 @@ lister() {
 # -------------------------------------------------------------------- main
 
 case "${1:-}" in
-    --catalogue) sauvegarde_catalogue ;;
     --restaurer) restaurer "${2:?Indique le fichier à restaurer}" ;;
     --lister)    lister ;;
     -h|--help)   sed -n '2,20p' "$0" | sed 's/^# \?//' ;;

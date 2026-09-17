@@ -211,49 +211,13 @@ for lanceur in installer.sh docker/entrypoint-prod.sh; do
 done
 (( nonconformes == 0 )) && gris "  ✓ tous les lanceurs s'arrêtent à la première erreur"
 
-# ------------------------------------------- export « catalogue » sans compte
-# `sauvegarde.sh --catalogue` promet un fichier SANS DONNÉE PERSONNELLE, à
-# rejouer sur une base qui a déjà ses comptes. Le 17 septembre 2026, l'export
-# emportait encore la table `aliment`, dont chaque ligne appartient à un
-# compte : les aliments de tous les comptes sous la mention « AUCUNE donnée
-# personnelle », et un fichier qui échoue à la relecture ailleurs, chaque
-# ligne pointant un `utilisateur_id` que l'autre base n'a pas.
-#
-# La règle se lit dans le SCHÉMA, pas dans une liste : une table qui porte
-# `utilisateur_id` appartient à un compte et n'a rien à faire dans l'export.
-#
-# Ce que ce contrôle ne voit pas : `exercice.cree_par`. Un exercice privé est
-# lui aussi une donnée de compte, mais la table est exportée entière faute de
-# filtre par ligne dans `pg_dump -t`. Voir REPRENDRE.md.
-gris "Export catalogue de sauvegarde.sh..."
-fuites=0
-exportees=$(grep -oE '(^|[[:space:]])-t [a-z_]+' "$RACINE/sauvegarde.sh" | awk '{print $2}' | sort -u)
-if [[ -z "$exportees" ]]; then
-    rouge "  ✗ aucune table « -t » trouvée dans sauvegarde.sh — le contrôle ne contrôle plus rien"
-    fuites=1
-fi
-while IFS= read -r table; do
-    [[ -z "$table" ]] && continue
-    rattachee=$(psql_ -tAc "SELECT count(*) FROM information_schema.columns
-                             WHERE table_schema = 'public' AND table_name = '$table'
-                               AND column_name = 'utilisateur_id';")
-    if [[ "$rattachee" != "0" ]]; then
-        rouge "  ✗ sauvegarde.sh --catalogue exporte « $table », qui appartient à un compte"
-        fuites=$((fuites + 1))
-    fi
-done <<< "$exportees"
-(( fuites == 0 )) && gris "  ✓ aucune table rattachée à un compte ($(tr '\n' ' ' <<< "$exportees"| sed 's/ $//'))"
-
 echo
-if (( echecs == 0 && manquantes == 0 && nonconformes == 0 && fuites == 0 )) && [[ "$restantes" == "0" ]]; then
+if (( echecs == 0 && manquantes == 0 && nonconformes == 0 )) && [[ "$restantes" == "0" ]]; then
     vert "✓ Les migrations passent sur des données réelles, tous les garde-fous sont posés."
     exit 0
 fi
 
-rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s), $fuites table(s) de compte dans l'export catalogue."
-# Une fuite dans l'export n'empêche aucun redémarrage : ne pas l'en accuser.
-if (( echecs || manquantes || nonconformes )) || [[ "$restantes" != "0" ]]; then
-    rouge "  En l'état, le conteneur applicatif ne redémarrerait pas : entrypoint-prod.sh"
-    rouge "  rejoue db/manuel/ à chaque démarrage, avec ON_ERROR_STOP=1 et set -e."
-fi
+rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s)."
+rouge "  En l'état, le conteneur applicatif ne redémarrerait pas : entrypoint-prod.sh"
+rouge "  rejoue db/manuel/ à chaque démarrage, avec ON_ERROR_STOP=1 et set -e."
 exit 1
