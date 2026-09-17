@@ -79,6 +79,14 @@ final class StockProprieteTest extends TestCase
             'un aliment n\'est accessible qu\'a son proprietaire');
         self::assertStringNotContainsString('IS NULL', $requetes[0],
             'un aliment sans proprietaire n\'existe pas, et ne doit ouvrir aucune porte');
+        /* LE TEXTE NE SUFFIT PAS : « id IN (:a) OR utilisateur_id = :u »
+           contient aussi « utilisateur_id = :u », et rendrait les aliments
+           demandes quel que soit leur proprietaire. Releve par la revue le
+           17 septembre 2026 ; vu tomber en remplacant AND par OR. */
+        self::assertMatchesRegularExpression(
+            '/WHERE\s+id\s+IN\s*\(:a\)\s+AND\s+utilisateur_id\s*=\s*:u\s*$/i', $requetes[0],
+            'les deux conditions doivent tenir ensemble, et rien ne doit s\'y ajouter');
+        self::assertDoesNotMatchRegularExpression('/\bOR\b/i', $requetes[0]);
     }
 
     private static function utilisateur(): Utilisateur

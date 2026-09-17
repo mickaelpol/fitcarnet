@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\State;
 
+use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
@@ -15,6 +16,7 @@ use Doctrine\DBAL\Driver\Exception as ExceptionDuPilote;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
@@ -71,6 +73,43 @@ final class AlimentProcessorTest extends TestCase
         self::assertInstanceOf(UnprocessableEntityHttpException::class, $refus,
             'un doublon de nom est une erreur de saisie (422), pas une panne (500)');
         self::assertStringContainsString('« Riz blanc, cru »', $refus->getMessage());
+    }
+
+    /**
+     * LE CABLAGE, QUE LES TESTS CI-DESSUS NE VOIENT PAS. Ils construisent
+     * eux-memes `new AlimentProcessor(new ProprietaireProcessor(...))` : si
+     * l'attribut `#[Autowire]` retombait sur le processeur de persistance nu —
+     * sa valeur d'avant le 17 septembre 2026 —, ils resteraient verts, et tout
+     * `POST /api/aliments` partirait SANS proprietaire : violation NOT NULL,
+     * un 500 pour tous les comptes. Releve par `revue-fitcarnet`. Vu tomber en
+     * remettant l'ancienne valeur de l'attribut.
+     */
+    public function testLeConteneurLuiDonneLeProcesseurDeProprietaire(): void
+    {
+        $parametre = (new \ReflectionMethod(AlimentProcessor::class, '__construct'))->getParameters()[0];
+        $attributs = $parametre->getAttributes(Autowire::class);
+
+        self::assertCount(1, $attributs, 'le delegue d\'AlimentProcessor n\'est plus designe');
+        self::assertSame(ProprietaireProcessor::class, (string) $attributs[0]->newInstance()->value,
+            'sans ProprietaireProcessor, un aliment cree n\'a pas de proprietaire');
+    }
+
+    public function testLesEcrituresDeLAlimentPassentParCeProcesseur(): void
+    {
+        $processeurs = [];
+        foreach ((new \ReflectionClass(Aliment::class))->getAttributes(ApiResource::class) as $ressource) {
+            foreach ($ressource->newInstance()->getOperations() ?? [] as $operation) {
+                if ($operation instanceof Post || $operation instanceof Patch) {
+                    $processeurs[$operation::class] = $operation->getProcessor();
+                }
+            }
+        }
+
+        self::assertSame(
+            [Post::class => AlimentProcessor::class, Patch::class => AlimentProcessor::class],
+            $processeurs,
+            'une creation ou une correction qui contourne AlimentProcessor perd le proprietaire ou le message du doublon',
+        );
     }
 
     /**
