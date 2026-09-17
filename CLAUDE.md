@@ -33,15 +33,21 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 596 tests, puis 29 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 600 tests, puis 32 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 298 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 307 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
 docker compose -f compose.dev.yml up   # environnement de développement
+# Base jetable (Docker, image postgres:16), aucune base réelle touchée :
+db/manuel/verifier-schema.sh           # base neuve = base migrée
+db/manuel/verifier-migrations.sh       # les migrations passent sur de vraies données
+db/manuel/verifier-jeux.sh             # jeu d'essai et jeu de démonstration, garde-fou compris
+python3 test_import_carnet.py          # l'import du carnet (exige psycopg2)
+python3 test_ciqual.py                 # l'import CIQUAL, sans dépendance
 ```
 
 ## Règles non négociables
@@ -62,9 +68,12 @@ de redémarrer : ne jamais écrire `SET colonne = NULL` sur une colonne `NOT NUL
 Une nouvelle entité `#[ApiResource]` avec des opérations implémente `App\Entity\ProprieteUtilisateur`,
 sans quoi `FiltreProprietaire` ne la filtre pas et **tous les comptes voient les données de tous**.
 Aucune exception pour les données d'un compte, `Aliment` compris : chacun ne voit que les siens.
-Seuls les catalogues partagés — exercices (`FiltreExercice`, « public OU le mien »), emplacements,
-modes de cuisson — dérogent, chacun avec sa raison écrite. Le test d'inventaire du modèle
-(`api/tests/ModeleExposeTest.php`) refuse toute entité non conforme absente de sa liste blanche.
+Dérogent seulement les catalogues partagés — exercices (`FiltreExercice`, « public OU le mien »),
+emplacements, modes de cuisson — et `Utilisateur`, qui est le propriétaire lui-même ; chacun avec
+sa raison écrite. Le test d'inventaire du modèle (`api/tests/ModeleExposeTest.php`) refuse toute
+entité non conforme absente de sa liste `DEROGATIONS`. La base double le contrôle là où un
+identifiant vient du client : une ligne de stock ne peut viser qu'un aliment de son propre compte
+(clé composite `stock_aliment_du_meme_compte_fkey`, migration 35).
 
 Corollaire pour les contrôleurs personnalisés : **vérifier la propriété sur CHAQUE chemin
 d'écriture**, pas seulement sur le principal. La faille de septembre 2026 venait d'un contrôle
@@ -75,7 +84,9 @@ Le riz blanc sec vaut 350 kcal/100 g, pas 155 — 155, c'est le même riz une fo
 Un légume se pèse cru. Le rendement cru/cuit se dérive des pesées à la lecture, il ne se stocke pas
 dans les valeurs. Cette règle vaut aussi pour les scripts d'import et pour ce qu'on écrit dans Grocy.
 
-**Les deux chiffres viennent de `Table_Ciqual_2025.xlsx`, à la racine du dépôt** — « Riz blanc, cru »
+**Les deux chiffres viennent de `Table_Ciqual_2025.xlsx`**, publiée par l'Anses (ciqual.anses.fr) :
+le fichier se télécharge et se pose à la racine du dépôt, mais **n'est pas versionné** (`.gitignore`) —
+un clone neuf ne l'a pas. « Riz blanc, cru »
 350 et « Riz blanc, cuit » 155, d'où le rendement 2,26 que déduit l'import. **Lire la colonne « Énergie,
 Règlement UE n° 1169/2011 »**, celle qui compte les fibres à 2 kcal/g comme la règle 4 ; la colonne
 voisine « N × facteur Jones » donne 348 et se trompe de convention.
@@ -165,6 +176,12 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   imbriqués que le front renvoie — essayé et retiré le 15 septembre 2026.
 - Les scripts de la racine ne sont pas des jouets : `installer.sh`, `restaurer-nas.sh`,
   `deployer-nas.sh`, `publier*.sh` déploient ou détruisent. Ne jamais les lancer pour « voir ».
+- **Une colonne `TIMESTAMPTZ` se déclare `Types::DATETIMETZ_IMMUTABLE`.** PHP tourne en
+  `Europe/Paris`, la session PostgreSQL en UTC : déclarée `DATETIME_IMMUTABLE`, l'heure partait
+  sans fuseau et chaque ligne écrite par l'API datait de deux heures dans le futur, jusqu'au
+  17 septembre 2026. `datetimetz_immutable` est remplacé dans `doctrine.yaml` par
+  `App\Doctrine\DateAvecFuseauType`, qui relit aussi les valeurs posées par `now()` ;
+  `DatesAvecFuseauTest` refuse toute colonne datée sans fuseau hors `jeton_rafraichissement`.
 - `tsconfig.tests.json` n'inclut plus une liste écrite à la main mais **un motif**,
   `src/**/*.test.ts` — la liste manuelle avait laissé `performance.ts` sans test
   pendant des mois. Le piège qui reste : le motif ne couvre que `src/`, donc un
@@ -178,12 +195,15 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   pas une affirmation.
 - Les commentaires de ce projet racontent **la panne réelle et sa date**. Continuer ainsi : c'est ce
   qui rend les divergences repérables des mois plus tard.
-- **Une seule arborescence, et une seule : `~/perso/fitcarnet` sous WSL2**, poussée sur Gitea.
+- **Une seule arborescence par poste, sous WSL2**, poussée sur Gitea — `~/perso/fitcarnet` sur
+  l'un, `~/fitcarnet` sur l'autre : ne pas écrire de chemin absolu dans une commande documentée,
+  partir de la racine du dépôt. Chaque poste a sa base de dev et son `node_modules` : après un
+  `git pull`, `db/manuel/rattraper-dev.sh` et, si besoin, `npm install`.
   Le projet se travaille en terminal, avec Claude Code. **Claude Cowork n'est pas utilisable
   ici** : il refuse les chemins `\\wsl.localhost\...`, et la parade — un clone Windows
   synchronisé — est précisément ce qui a coûté le bug de septembre 2026, un renommage de
-  méthode propagé à deux appelants sur trois. Ne jamais recréer de copie : ni sous Windows,
-  ni ailleurs. Ce qui doit circuler passe par git.
+  méthode propagé à deux appelants sur trois. Ne jamais recréer de seconde copie sur un même
+  poste : ni sous Windows, ni ailleurs. Ce qui doit circuler passe par git.
 
 ## Skills : laquelle, quand
 

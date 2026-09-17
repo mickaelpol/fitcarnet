@@ -29,7 +29,7 @@ docker compose -f compose.dev.yml exec db psql -U fitcarnet -d fitcarnet -c "
 > appartient à un compte, et chaque compte saisit les siens : les valeurs
 > nutritionnelles ne sont pas une constante, deux paquets de la même marque
 > diffèrent, et l'étiquette donne les bonnes. `db/02-donnees.sql` ne sème que
-> le structurel — emplacements, façons de cuire.
+> le partagé — emplacements, façons de cuire, et vingt exercices de départ.
 
 **Si la base existait déjà**, les fichiers ne sont pas rejoués. Pour repartir
 de zéro — cela **efface tout** :
@@ -102,6 +102,10 @@ python3 import_carnet.py donnees-perso/carnet.json --email ton@adresse.fr
 python3 import_carnet.py donnees-perso/carnet.json --email ton@adresse.fr --appliquer
 ```
 
+Le script exige le pilote PostgreSQL (`pip install psycopg2-binary`).
+`python3 test_import_carnet.py` le rejoue sur une base jetable : jusqu'au
+17 septembre 2026, il écrivait une colonne supprimée et n'importait rien.
+
 ---
 
 ## 6. Sauvegarder
@@ -111,7 +115,8 @@ python3 import_carnet.py donnees-perso/carnet.json --email ton@adresse.fr --appl
 ```
 
 À faire dès que l'installation est vérifiée. Le dépôt protège le code, pas
-les données.
+les données. Le seul format est le `.dump`, qui se restaure avec
+`./sauvegarde.sh --restaurer` ; il n'y a plus d'export « catalogue ».
 
 ---
 

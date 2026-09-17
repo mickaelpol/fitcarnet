@@ -80,16 +80,18 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 596 tests, puis 29 de rendu
+cd front && npm test        # tsc --noEmit + 600 tests, puis 32 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 
 docker compose -f compose.dev.yml up          # environnement de développement
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 302 tests API
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 307 tests API
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
 
 db/manuel/verifier-schema.sh      # base neuve == base migrée ?
 db/manuel/verifier-migrations.sh  # les migrations tiennent-elles sur des données réelles ?
+db/manuel/verifier-jeux.sh        # les jeux d'essai et de démonstration se chargent-ils ?
+python3 test_import_carnet.py     # l'import du carnet, sur une base jetable
 ```
 
 ---
@@ -98,10 +100,11 @@ db/manuel/verifier-migrations.sh  # les migrations tiennent-elles sur des donné
 
 ```
 api/          Symfony — 9 contrôleurs, 17 ressources API, 13 services, 7 processeurs
-front/        Expo — 16 écrans, 38 composants, le solveur de repas, 17 modules de calcul
+front/        Expo — 16 écrans, 38 composants, le solveur de repas, 18 modules de calcul
   src/solveur/    composition de repas : algèbre, garanties, tests de propriété
   src/calcul/     nutrition, cuisson, performance, plausibilité
-db/           01-schema.sql (19 tables) + manuel/ (24 migrations numérotées + 5 utilitaires)
+db/           01-schema.sql (19 tables) + manuel/ (19 migrations numérotées, aliment-fibres.sql,
+              deux jeux de données, cibles.sql, et quatre scripts de contrôle et de rattrapage)
 docker/       Dockerfile, Caddyfile, point d'entrée de production
 docs/         audit-2026-09/ — 79 constats classés
 .claude/      outillage : skills du projet, agents, hooks, réglages
@@ -111,8 +114,8 @@ docs/         audit-2026-09/ — 79 constats classés
 
 ## Qualité
 
-**877 tests** — 620 côté front (591 + 29 de rendu), 257 côté API — et quatre garde-fous automatiques
-qui tournent sans qu'on y pense :
+**939 tests** au 17 septembre 2026 — 632 côté front (600 + 32 de rendu), 307 côté API — et des
+garde-fous qui tournent sans qu'on y pense :
 
 - **PHPStan** niveau 5 sur l'API ;
 - **`ModeleExposeTest`** refuse toute entité exposée qui n'implémente pas
@@ -121,7 +124,10 @@ qui tournent sans qu'on y pense :
 - **`verifier-schema.sh`** construit une base neuve et une base migrée dans deux
   conteneurs jetables, et exige un diff vide ;
 - **`verifier-migrations.sh`** rejoue les migrations sur des données volontairement
-  aberrantes, pour qu'une migration ne casse pas le démarrage en production.
+  aberrantes, pour qu'une migration ne casse pas le démarrage en production ;
+- **`verifier-jeux.sh`** et **`test_import_carnet.py`** jouent pour de vrai, sur une
+  base jetable, ce qu'aucun test d'API ne voit : les jeux de données de la
+  démonstration et l'import du carnet.
 
 Deux hooks lancent le typage front et l'analyse PHP après chaque édition.
 

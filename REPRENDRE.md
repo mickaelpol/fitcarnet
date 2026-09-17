@@ -5,10 +5,16 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 17 septembre 2026, fin de matinée** — **chaque aliment
-appartient à un compte**, et chacun ne voit que les siens. Voir « Aliments par
-compte : ce qui reste à faire », juste en dessous : **un déploiement et un
-commit de retrait sont en attente.**
+**Dernière mise à jour : 17 septembre 2026, après-midi, second poste** —
+**chaque aliment appartient à un compte**, et la reprise sur le second poste a
+lancé les trois agents de contrôle : un défaut élevé (la création d'un aliment
+s'ouvrait avec des macros à « 0 »), des dates écrites deux heures dans le
+futur, un import et une remise à zéro qui ne marchaient pas — tout est corrigé,
+testé et poussé. **Reste : contrôler la production, puis retirer la
+migration 34.** Voir juste en dessous.
+
+**Le 17 au matin** — le chantier « aliments par compte » lui-même, sur le
+premier poste (conception, schéma, API, front, scripts, documentation).
 
 **Plus tôt le 17 septembre** — la présentation tient enfin dans
 **un seul fichier** (`presentation/demonstration.md`) derrière **un seul
@@ -40,35 +46,47 @@ Chantier du 17 septembre 2026, conception et plan dans
 
 **Fait et poussé.** `Aliment` implémente `ProprieteUtilisateur` et passe par
 `FiltreProprietaire` ; `aliment.utilisateur_id` est `NOT NULL ON DELETE
-CASCADE`, le nom est unique par compte (`aliment_nom_unique_par_compte`).
-« Ajouter un aliment » ouvre l'éditeur vide. Schéma, migrations, API, front,
-scripts Python, skills, audit (79 constats) et présentation sont alignés.
-Vérifié : 596 + 29 tests front, 298 tests API, `test_ciqual.py` 181/181,
-`test_ecriture_grocy.py` 34/34, `verifier-schema.sh` « identiques »,
-`verifier-migrations.sh` vert, et la table `aliment` de la base de dev, migrée
-deux fois, identique à celle d'une base neuve.
+CASCADE`, le nom est unique par compte (`aliment_nom_unique_par_compte`), et
+depuis la migration 35 la base refuse qu'une ligne de stock vise l'aliment d'un
+autre compte. « Ajouter un aliment » ouvre l'éditeur aux macros vides.
+Vérifié le 17 septembre après-midi : **600 + 32 tests front, 307 tests API
+(819 assertions)**, PHPStan à ses 7 erreurs connues, `verifier-schema.sh`
+« identiques », `verifier-migrations.sh`, `verifier-jeux.sh` et
+`test_import_carnet.py` verts.
+
+> **POUSSER, C'EST DÉPLOYER.** La tâche planifiée `fitcarnet — deploiement`
+> tire Gitea toutes les 5 minutes (`DEPLOIEMENT.md`). La migration 34 est donc
+> très probablement passée en production quelques minutes après le push de
+> 10 h 09 — la sauvegarde automatique de 4 h la précède. Le journal du matin
+> prévoyait « sauvegarde, puis `deployer-nas.sh` » : l'ordre n'a pas pu être
+> tenu, et ce n'était pas grave, la production n'ayant qu'un compte.
+> **Décision du propriétaire, le 17 septembre : aucun utilisateur réel hors
+> l'administrateur, on repart sur une base saine** — pas besoin de garder
+> restaurables les sauvegardes d'avant le passage.
 
 **Ce qui attend, dans cet ordre :**
 
-1. `sauvegarde-nas.sh` — la migration suivante supprime des lignes en
-   production, sans retour possible autrement.
-2. `deployer-nas.sh`. Au démarrage, `db/manuel/34-aliments-par-compte.sql`
-   amène la base : aliments sans propriétaire supprimés (avec le stock qui les
-   visait), `cree_par` renommée `utilisateur_id`, colonne `public` retirée.
-   Précondition confirmée par le propriétaire : la production tournait déjà sur
-   un `master` contenant la migration 33 — c'est ce qui permet d'avoir retiré
-   les migrations 10 et 14 à 19.
-3. Contrôler en production : `\d aliment` montre `utilisateur_id` NOT NULL et
-   l'index `aliment_nom_unique_par_compte`.
-4. **Supprimer `db/manuel/34-aliments-par-compte.sql`** dans un commit à part,
-   pousser, redéployer. C'est un passage ponctuel : une base neuve naît déjà
-   dans cet état. Une fois retiré, la prochaine migration reprend le numéro 34
-   (`schema-base` le dit déjà).
-5. Réduire alors cette section à une ligne : c'est la dernière trace, dans le
-   dépôt, du modèle précédent.
+1. **Contrôler la production** :
+   ```bash
+   ssh nas 'tail -5 /volume1/docker/fitcarnet/deploiement.log'
+   ssh nas 'docker exec fitcarnet-db psql -U fitcarnet -d fitcarnet -c "\d aliment" -c "\d stock"'
+   ```
+   Attendu : `utilisateur_id` NOT NULL, l'index `aliment_nom_unique_par_compte`,
+   la contrainte `aliment_id_utilisateur_unique`, et côté `stock` la clé
+   `stock_aliment_du_meme_compte_fkey`. Puis se connecter et ouvrir le frigo.
+2. **Supprimer `db/manuel/34-aliments-par-compte.sql`** dans un commit à part,
+   et pousser (donc déployer). C'est un passage ponctuel : une base neuve naît
+   déjà dans cet état. La 35, elle, reste. La prochaine migration prend le
+   numéro **36** — jamais le 34 libéré (voir `schema-base`).
+   *Une sauvegarde d'avant le passage ne se restaure alors plus telle quelle* :
+   elle revient avec `cree_par`. Il faudrait rejouer la 34 depuis l'historique
+   (`git show 1068054:db/manuel/34-aliments-par-compte.sql`). Accepté, voir la
+   décision ci-dessus.
+3. Réduire alors cette section à quelques lignes : c'est la dernière trace,
+   dans le dépôt, du modèle précédent.
 
 **Base de développement.** Chaque poste a la sienne, et **chacune doit passer
-par la 34** : `db/manuel/rattraper-dev.sh` après le `git pull`. Sans lui, le
+par la 34 et la 35** : `db/manuel/rattraper-dev.sh` après le `git pull`. Sans lui, le
 code attend `utilisateur_id` et la base a encore `cree_par` — le frigo de dev
 tombe. Les deux postes y sont passés le 17 septembre ; sur le second, 64
 aliments sont devenus 14 (les 50 sans propriétaire, qu'aucun stock, plan ni
@@ -77,24 +95,58 @@ d'avant passage n'ont été gardées que dans le dossier temporaire des sessions
 `jeu-essai.sql` crée désormais lui-même ses 8 aliments (valeurs CIQUAL) : le
 rejouer sur un compte d'essai si le frigo de dev paraît vide.
 
-**Trouvé en reprenant sur le second poste, et corrigé le même jour :**
+**Trouvé en reprenant sur le second poste, et corrigé le même jour.** Les
+trois agents de contrôle ont été lancés sur le chantier du matin ; tout ce
+qui suit a son test, vu rouge avant le correctif.
 
-- **`sauvegarde.sh --catalogue` n'existe plus.** Il exportait les aliments et
-  les exercices privés de tous les comptes sous la mention « AUCUNE donnée
-  personnelle », et ne se rejouait pas sur une base peuplée (conflits
-  d'identifiants). `--restaurer` n'accepte plus qu'un `.dump`.
-- **« Ajouter un aliment » ouvrait les quatre macros déjà à « 0 »** : un oubli
-  partait en base comme une valeur (règles 6 et 7). L'écran passe désormais une
-  intention (`creation`) et non un aliment rempli de zéros ;
-  `editeurAlimentConnecte.test-rendu.tsx` monte l'éditeur comme l'écran.
+- **« Ajouter un aliment » ouvrait les quatre macros déjà à « 0 »** (élevé) :
+  un oubli partait en base comme une valeur (règles 6 et 7), comptes Grocy
+  compris. L'écran passe une intention (`creation`) et non un aliment rempli
+  de zéros ; `editeurAlimentConnecte.test-rendu.tsx` monte l'éditeur comme
+  l'écran.
+- **Les dates écrites par l'API étaient deux heures dans le futur** (une en
+  hiver) : PHP en `Europe/Paris`, session PostgreSQL en UTC, colonnes
+  `TIMESTAMPTZ` déclarées sans fuseau. `App\Doctrine\DateAvecFuseauType`
+  remplace `datetimetz_immutable` (le type de DBAL lève `InvalidFormat` sur
+  les valeurs posées par `now()`). **Décision du propriétaire : on corrige pour
+  l'avenir, l'historique garde son décalage** — rien ne distingue, ligne à
+  ligne, ce que l'API a écrit de ce que la base a posé.
+- **Migration 35** : clé composite stock → aliment du même compte.
+  `POST /api/stocks` ne tenait qu'à la lecture filtrée d'un IRI, sans test.
+- **`GET /api/comptes` ne comptait ni aliments ni stock** : un compte au frigo
+  plein s'annonçait vide avant suppression. Mise en mots unique dans
+  `front/src/calcul/contenuCompte.ts`.
+- **`sauvegarde.sh --catalogue` n'existe plus** (décision du propriétaire) : il
+  exportait aliments et exercices privés de tous les comptes sous la mention
+  « AUCUNE donnée personnelle », et ne se rejouait pas sur une base peuplée.
+  `--restaurer` n'accepte plus qu'un `.dump`.
 - **`import_carnet.py` écrivait encore `modele.partage`** : tout l'import
-  échouait, `installer.sh` compris. `test_import_carnet.py` le rejoue désormais
-  sur une base jetable (Docker et `psycopg2` requis).
-- **`schema-base` annonçait « la prochaine migration porte le numéro 34 »**
-  alors que la 34 existe : elle dit maintenant de prendre le numéro qui suit le
-  plus haut présent.
-- Quatre renvois vers des fichiers disparus redressés
-  (`BornesDuCatalogueCommunTest` ×2, `18-un-seul-etat.sql`, `useAliments`).
+  échouait, `installer.sh` compris. `test_import_carnet.py` le rejoue sur une
+  base jetable (Docker et `psycopg2` requis).
+- **`psql -v ecraser=oui` ne levait pas le garde-fou de `jeu-demo.sql`** : la
+  remise à zéro de la démonstration échouait toujours. `verifier-jeux.sh`
+  rejoue désormais toute la procédure.
+- **Deux témoins de câblage** : `AlimentProcessor` bien branché sur
+  `ProprietaireProcessor`, et la requête des aliments accessibles sans `OR`.
+- **`schema-base`** annonçait « la prochaine migration porte le numéro 34 »,
+  et une divergence de dates « sans effet ».
+- Commentaires et documentation : plus d'aliment « privé », plus de renvoi aux
+  constats retirés de l'audit, renvois `fichier:ligne` recalés, compteurs à
+  jour, chemins absolus des skills retirés (le dépôt est `~/perso/fitcarnet`
+  sur un poste, `~/fitcarnet` sur l'autre).
+
+**Laissé en l'état, en connaissance de cause :**
+
+- **Un champ connu mais non inscriptible est ignoré en silence** :
+  `"utilisateur": …` dans un `POST /api/aliments` reçoit 201, sans effet (aucune
+  fuite, le propriétaire vient du jeton). `RefuserLesChampsInconnus` ne refuse
+  que les noms inexistants ; refuser aussi les propriétés en lecture seule
+  casserait les écrans qui renvoient `id` et `creeLe` — c'est l'échec du
+  15 septembre avec `allow_extra_attributes: false`. À reprendre avec une
+  liste des champs tolérés, si le besoin se présente.
+- **« J'ai cuisiné » dit « plus dans ton frigo »** d'un aliment qui n'y a
+  jamais été (cas d'un plan qui cite l'aliment d'un autre compte). Libellé
+  inexact, sans conséquence.
 
 ---
 
@@ -106,7 +158,7 @@ sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **625 tests front** (596 + 29 de rendu) · **298 API · 791 assertions**, 7 erreurs PHPStan
+État au 17 septembre après-midi : **632 tests front** (600 + 32 de rendu) · **307 API · 819 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -124,7 +176,7 @@ En parallèle, un **dossier de présentation** est monté de bout en bout dans
 **Le lot 3 — sécurité et isolation — est clos.** C3 : l'isolation entre comptes
 n'avait aucun test, elle en a 18, chacun **vu échouer** en cassant le code qu'il
 protège. É8 : les exercices « personnels » le sont vraiment (`FiltreExercice`,
-règle « public **OU** le mien »). M-01, M-03 : faits. M-02 : **complet depuis le
+règle « public **OU** le mien »). M-03 : fait. M-02 : **complet depuis le
 15 septembre** — la fenêtre était passée à 90 jours glissants, et la *visibilité*
 existe désormais : `GET /api/mes-sessions`, `DELETE /api/mes-sessions/{id}`, avec
 un 404 identique pour « n'existe pas » et « pas à toi ».
@@ -132,7 +184,7 @@ un 404 identique pour « n'existe pas » et « pas à toi ».
 **Le lot 4 — base reproductible — est clos.** `verifier-schema.sh` disait 280
 lignes d'écart entre base neuve et base migrée ; il dit maintenant
 « identiques ». É6 : un lot d'inventaire ne peut plus être volé à un travailleur
-vivant (colonne `jeton`, migration 30). Cinq index de jointure créés, cinq
+vivant (colonne `jeton`, migration 30). Quatre index de jointure créés, cinq
 écartés avec argument.
 
 **Trois choses trouvées en chemin, qu'aucun rapport ne mentionnait :**
@@ -153,7 +205,8 @@ vivant (colonne `jeton`, migration 30). Cinq index de jointure créés, cinq
 
 **Une leçon, la plus utile de la journée.** En écrivant `ExerciceProcessor`,
 j'ai recopié le garde « l'auteur est-il encore vide ? » d'un processeur voisin
-— et donc reproduit M-01 une heure après l'avoir lu. Un admin corrigeant un
+— et donc reproduit le défaut que je venais de corriger dans le processeur
+voisin, une heure après l'avoir lu. Un admin corrigeant un
 exercice du catalogue se le serait approprié. C'est **exactement le motif dominant de
 l'audit**, observé en direct : une décision juste, appliquée à un endroit et
 oubliée à un autre. Les trois processeurs suivent désormais la même règle —
@@ -178,14 +231,19 @@ docker compose -f compose.dev.yml up -d
 ```
 
 **2. Vérifier qu'on part d'un socle sain.** Ces chiffres sont ceux du
-15 septembre au soir ; ils ne peuvent que monter :
+17 septembre après-midi ; un chantier peut en retirer, un écart se compare à
+ce journal :
 
 ```bash
-cd front && npm test                                                  # 596 + 29 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 298 tests, 791 assertions
+cd front && npm test                                                  # 600 + 32 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 307 tests, 819 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
+db/manuel/verifier-jeux.sh                                            # ✓ jeux et garde-fou
 ```
+
+Si `npm test` échoue sur `Cannot find module '@testing-library/react'`, c'est
+le `node_modules` du poste qui date d'avant le 15 septembre : `npm install`.
 
 **Après tout `git pull` qui apporte une migration** :
 
@@ -298,12 +356,13 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 ## Par quoi continuer
 
 **L'audit est clos, ses huit lots et ses 79 constats.** Ce qui suit est du
-confort ou attend un arbitrage — à une exception près, la première ligne du
-tableau, qui est une clé d'API à révoquer.
+confort ou attend un arbitrage — à trois exceptions près, les trois premières
+lignes du tableau.
 
 | | Quoi | Effort |
 |---|---|---|
-| **Tourner les vidéos** | seul vrai reste. Tout le dossier de présentation est écrit, les huit bobines aussi | `./presentation/preparer-demonstration.sh`, et `presentation/demonstration.md` |
+| **Contrôler la production, puis retirer la migration 34** | voir « Aliments par compte : ce qui reste à faire », en tête de ce fichier | 15 min |
+| **Tourner les vidéos** | tout le dossier de présentation est écrit, les huit bobines aussi ; la remise à zéro entre deux bobines marche depuis le 17 septembre | `./presentation/preparer-demonstration.sh`, et `presentation/demonstration.md` |
 | **Régénérer la clé d'API Grocy** | ⚠ **À FAIRE PAR TOI, ET VITE.** Elle a été collée dans une conversation le 15 septembre 2026 pour vérifier le pont Grocy de bout en bout. Elle est à considérer comme publiée. Grocy → Paramètres → Clés d'API → révoquer puis recréer, et reporter la nouvelle dans `.env` du NAS | 5 min |
 | **`choixRatio.tsx`** | dernier morceau du lot 6, et **il était mal rangé dans l'audit** : il appartient à `editeurAliment.tsx` (section 7), pas à l'écran de séance | 1 h |
 | **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 22 témoins ; les hooks React restent partiellement hors de portée — `@testing-library/react` est désormais installé, la porte est ouverte | ~4 h |
@@ -1075,7 +1134,7 @@ La source fait foi et elle est **dans le dépôt** : `Table_Ciqual_2025.xlsx`.
 1. **130 est une valeur USDA**, pas CIQUAL — aucun riz nature cuit n'y descend
    sous 141 (et le riz sauvage cuit fait 102, donc ne pas affirmer de plancher).
 2. **Ne pas dire « basmati ».** Le « Riz basmati » de l'application est apparié à
-   l'entrée **« Riz blanc, cru »** (`ciqual_vers_grocy.py:294`, `:202`) : la paire
+   l'entrée **« Riz blanc, cru »** (`ciqual_vers_grocy.py:260`, `:170`) : la paire
    350 / 155 et le 2,26 sont des valeurs de **riz blanc**. Le vrai basmati
    donnerait 351 / 148, soit 2,37. Ma première correction disait « basmati » et
    était donc fausse aussi.
@@ -1461,8 +1520,9 @@ cd presentation/captures && md5sum *.jpg | awk '{print $1}' | sort | uniq -d
 # doit ne rien afficher
 ```
 
-**Deux comptes jetables ont été créés pour cela, et ils sont restés** — sans
-eux, plus aucune capture n'est reproductible :
+**Deux comptes jetables ont été créés pour cela, et ils sont restés** — sur la
+base de dev du premier poste, pas sur celle du second — sans eux, plus aucune
+capture n'est reproductible :
 
 ```bash
 # demo-verif@test.local et demo-admin-verif@test.local, mot de passe DemoFitcarnet2026!

@@ -463,14 +463,18 @@ suite le 12 août avant de passer tout seul.
 
 ## Si tu touches à la base de données
 
-1. Écris la migration dans `db/manuel/`, numérotée à la suite des autres. Elle
-   doit pouvoir être rejouée sans casse : le conteneur les rejoue **toutes**, à
-   chaque démarrage.
-2. Sauvegarde d'abord, sur le NAS : `/volume1/docker/fitcarnet/sauvegarde-nas.sh`.
+1. Écris la migration dans `db/manuel/`, avec le numéro qui suit le plus haut
+   présent (jamais un numéro libéré par une migration retirée). Elle doit
+   pouvoir être rejouée sans casse : le conteneur les rejoue **toutes**, à
+   chaque démarrage. Voir la skill `schema-base`.
+2. **Pousser, c'est déployer.** La tâche planifiée tire Gitea toutes les
+   5 minutes : la migration s'appliquera en production dans ce délai. Tout ce
+   qui suit se fait AVANT le `git push`, pas après.
+3. Sauvegarde d'abord, sur le NAS : `/volume1/docker/fitcarnet/sauvegarde-nas.sh`.
    La sauvegarde automatique date de 4 h du matin ; une migration destructive
    passée à 14 h s'appliquerait sur des données dont la dernière copie a dix
    heures.
-3. `./publier.sh "ce qui change"`.
+4. `./publier.sh "ce qui change"`.
 
 ---
 

@@ -173,6 +173,11 @@ scp sauvegardes/fitcarnet_*.dump  autre-pc:~/fitcarnet/sauvegardes/
 `./sauvegarde.sh --lister` montre ce qui est disponible. La restauration demande
 confirmation et **écrase** la base locale.
 
+**Une base restaurée garde le schéma de sa date.** Un dump d'août n'a ni la
+colonne `aliment.utilisateur_id` ni les contraintes posées depuis : lance
+aussitôt `db/manuel/rattraper-dev.sh`, qui joue les migrations manquantes —
+sans quoi l'API répond 500 sur le frigo, ou dès la connexion.
+
 > Attention si tu travailles depuis deux machines : **la base ne se synchronise
 > pas**. Deux bases divergentes, c'est le même piège que deux clones du code.
 > Décide laquelle fait foi, et restaure depuis elle.
@@ -181,18 +186,20 @@ confirmation et **écrase** la base locale.
 
 ## Vérifier que tout est en place
 
-Chaque commande doit donner **au moins** ce résultat — ce sont les chiffres du
-7 septembre 2026 ; ils ne peuvent que monter.
+Chaque commande doit donner ce résultat — les chiffres du 17 septembre 2026.
+Un chantier peut en retirer autant qu'en ajouter : un chiffre différent se
+compare au journal (`REPRENDRE.md`), il ne se juge pas seul.
 
 ```bash
-cd front && npm test                    # 596 tests, puis 29 de rendu, 0 échec
+cd front && npm test                    # 600 tests, puis 32 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
-                                        # 302 tests, 797 assertions
+                                        # 307 tests, 819 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
                                         # 7 erreurs connues, aucune régression
 docker pull postgres:16                 # l'image des deux scripts ci-dessous (451 Mo),
                                         # pas l'alpine du dev — voir la skill schema-base
 db/manuel/verifier-migrations.sh        # ✓ garde-fous posés
+db/manuel/verifier-jeux.sh              # ✓ jeux de données et garde-fou
 ```
 
 Et dans Claude Code : `/graphify .` pour construire le graphe (~5 min). Le cache
