@@ -18,7 +18,7 @@ une ligne qu'on n'a pas touchée n'est **pas** un zéro (règle 6).
 Et une fois envoyé, l'inventaire ne doit plus dépendre de l'écran. Le 14 août
 2026, PHP s'est arrêté à 30 s au milieu de quarante lignes pendant que Grocy
 continuait d'appliquer : **frigo à moitié corrigé, et personne pour le dire**
-(`api/src/Controller/FrigoController.php:334-341`). Une requête HTTP a une durée
+(`api/src/Controller/FrigoController.php:339-346`). Une requête HTTP a une durée
 maximale, un inventaire n'en a pas. Depuis, le dépôt répond tout de suite et un
 travailleur de fond applique.
 
@@ -42,7 +42,7 @@ et une seule liste (`front/app/(onglets)/frigo.tsx:33-39`).
 | **Les écarts se calculent sur TOUT le frigo**, pas sur ce que la recherche laisse voir | écran | `front/app/(onglets)/frigo.tsx:92-94` |
 | **Bouton à libellé variable** — « Aucun écart à envoyer » / « Enregistrer 3 corrections » / « Envoi… » / « Inventaire en cours… » | pied | `front/app/(onglets)/frigo.tsx:308-314` |
 | **Réinitialiser** — repart du stock connu et décoche tout | pied | `front/app/(onglets)/frigo.tsx:282-288` |
-| **Le dépôt répond 202 immédiatement** | API | `api/src/Controller/FrigoController.php:350`, `:430-433` |
+| **Le dépôt répond 202 immédiatement** | API | `api/src/Controller/FrigoController.php:355`, `:435-438` |
 | **Un seul inventaire à la fois par compte** — index unique partiel, 409 | API + base | `api/src/Service/InventaireLots.php:87-95`, `db/01-schema.sql:594-596` |
 | **Bannière « Tu peux quitter l'écran, ça continue tout seul »** avec le compteur venu du **serveur** | en-tête | `front/src/composants/alertesFrigo.tsx:81-88` |
 | **Résultat affiché 15 minutes** — « Inventaire appliqué : 12 correction(s). » ou « … 2 refusée(s) — motif · motif » | en-tête | `front/src/composants/alertesFrigo.tsx:90-107`, borne `front/app/(onglets)/frigo.tsx:108-120` |
@@ -128,7 +128,7 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
    (`frigo.tsx:284`).
 
 8. **Le dépôt répond 202, avec l'identifiant et le total**, sans avoir touché au
-   stock (`FrigoController.php:430-433`).
+   stock (`FrigoController.php:435-438`).
 
 9. **Refus au dépôt** — chacun observable :
    - aucune ligne ⇒ **422** « Aucune ligne à envoyer. » (`:360-362`) ;
@@ -142,7 +142,7 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
      une seule part (`:371-394`) ;
    - un inventaire tourne déjà ⇒ **409** « Un inventaire est déjà en cours pour
      ce compte. Attends qu'il finisse. » (`InventaireLots.php:93-94`,
-     `FrigoController.php:422-428`).
+     `FrigoController.php:427-433`).
 
 10. **Un seul inventaire à la fois, et c'est la BASE qui tranche.** L'index
     unique partiel `inventaire_lot_un_seul_actif` sur `(utilisateur_id)` où
@@ -158,7 +158,7 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
     et **l'aliment d'Alice devenait indélébile**.
     Le contrôle vit désormais à **deux** endroits du code, et c'est voulu :
     - **au dépôt**, pour refuser tout de suite — « un refus rendu une heure plus
-      tard n'a plus personne devant l'écran » (`FrigoController.php:396-420`) ;
+      tard n'a plus personne devant l'écran » (`FrigoController.php:401-425`) ;
     - **au point de passage obligé**, `FrigoBase::definirStock`, qui lève avant
       toute écriture quel que soit l'appelant
       (`api/src/Service/FrigoBase.php:131-133`).
@@ -170,12 +170,12 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
     `db/manuel/35-stock-et-aliment-du-meme-compte.sql`).
     **Refus attendu : 404**, « Un aliment de cet inventaire n'existe pas dans ton
     catalogue. » — **sans nommer la ligne fautive**, pour ne pas rendre
-    l'énumération confortable (`FrigoController.php:413-418`).
+    l'énumération confortable (`FrigoController.php:418-423`).
     Éprouvé sans base par `api/tests/Controller/InventaireProprieteTest.php:50`
     (refusé) et `:66` (son propre aliment passe).
     Le contrôle **ne s'applique qu'à la source `base`** : une référence `grocy:`
     désigne un produit que la table `aliment` ne connaît pas
-    (`FrigoController.php:405-407`).
+    (`FrigoController.php:410-412`).
 
 12. **Reprise exacte après coupure.** `traites` est incrémenté **après chaque
     ligne** (`AppliqueInventaire.php:101-117`), et la reprise repart de cet index

@@ -151,10 +151,10 @@ démontrer devant un client.
 
 ## Le dépôt et le traitement différé
 
-- **Le dépôt répond 202 immédiatement** — la requête HTTP ne touche plus à Grocy. Le 14 août 2026, PHP s'est arrêté à 30 s au milieu de 40 lignes pendant que Grocy continuait d'appliquer. `FrigoController.php:334`
-- **Plafond de 500 lignes**, refus des références étrangères à la source, refus des quantités négatives. `FrigoController.php:363`
-- **Dédoublonnage par référence** — deux corrections sur le même produit : la seconde annoncerait la quantité que la première vient de poser, et Grocy la refuserait. `FrigoController.php:371`
-- **Contrôle de propriété au dépôt**, sans nommer la ligne fautive — un refus rendu une heure plus tard n'a plus personne devant l'écran. `FrigoController.php:396`
+- **Le dépôt répond 202 immédiatement** — la requête HTTP ne touche plus à Grocy. Le 14 août 2026, PHP s'est arrêté à 30 s au milieu de 40 lignes pendant que Grocy continuait d'appliquer. `FrigoController.php:339`
+- **Plafond de 500 lignes**, refus des références étrangères à la source, refus des quantités négatives. `FrigoController.php:368`
+- **Dédoublonnage par référence** — deux corrections sur le même produit : la seconde annoncerait la quantité que la première vient de poser, et Grocy la refuserait. `FrigoController.php:376`
+- **Contrôle de propriété au dépôt**, sans nommer la ligne fautive — un refus rendu une heure plus tard n'a plus personne devant l'écran. `FrigoController.php:401`
 - **Un seul inventaire à la fois par compte** — l'index unique partiel tranche, l'exception devient un 409. `InventaireLots.php:86`
 - **Suivi consultable après coup** — statut, traités, échecs, date de fin ; date formatée en ISO 8601 UTC par PostgreSQL, parce que le format natif est refusé par Safari. `InventaireLots.php:216`
 - **Sondage toutes les 2 secondes** tant que le lot tourne, y compris fenêtre non focalisée ; le frigo n'est relu qu'une fois, au passage à « terminé ». `api/hooks.ts:460`

@@ -95,7 +95,7 @@ Le commit `1055cc2` (« inventaire en tâche de fond ») a remplacé `inventorie
 
 Résultat : le frigo Grocy reste au chiffre d'avant, le plan cesse de réserver son stock, et le solveur compose les repas suivants sur des quantités qui n'existent plus. Exactement le défaut que ce bouton existe pour corriger, et exactement le « bac vide une semaine plus tard » décrit dans le docblock de `DeductionDuPlan`. `DeductionDuPlanTest` teste parfaitement le calcul — mais rien ne teste qu'on sait l'appliquer.
 
-**Correction.** Remplacer par une boucle sur `inventorierUn()`, en reprenant la forme déjà écrite dans `FrigoController.php:319` et `AppliqueInventaire.php:165` (qui rendent le motif d'échec plutôt qu'une exception, ce qui alimente naturellement `$echecs`) :
+**Correction.** Remplacer par une boucle sur `inventorierUn()`, en reprenant la forme déjà écrite dans `FrigoController.php:324` et `AppliqueInventaire.php:165` (qui rendent le motif d'échec plutôt qu'une exception, ce qui alimente naturellement `$echecs`) :
 ```php
 foreach ($nouvellesQuantites as $idProduit => $quantite) {
     $motif = $this->grocy->inventorierUn($idProduit, $quantite);
@@ -217,8 +217,8 @@ Un aliment riche en fibres peut donc être déclaré **cohérent** dans l'édite
 
 ---
 
-### 9. OUVERT — **La date d'une nouvelle séance est calculée en UTC**
-**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : la fonction a déménagé dans `front/src/composants/useSeanceEditable.ts:35`, inchangée — `new Date().toISOString().slice(0, 10)`.
+### 9. ✅ corrigé le 17 septembre 2026 — **La date d'une nouvelle séance est calculée en UTC**
+**Gravité : MOYENNE — Statut : CORRIGÉ le 17 septembre 2026** : la fonction avait déménagé dans `front/src/composants/useSeanceEditable.ts`, inchangée ; elle appelle désormais `dateLocale` (`front/src/calcul/dates.ts`), testée avec le fuseau de Paris simulé (`dates.test.ts`).
 `front/app/seance/[id].tsx:24` à l'audit, utilisée en `:134`
 
 ```ts

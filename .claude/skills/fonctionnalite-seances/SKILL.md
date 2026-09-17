@@ -79,7 +79,7 @@ n'ont de quoi s'afficher.
    (`seances.tsx:25`). Sur un compte vierge : « Aucune séance pour l'instant.
    Commences-en une. » (`:37`).
 2. **« + Nouvelle séance »** (`:44`). La séance s'ouvre à la date du jour
-   (`useSeanceEditable.ts:35`, `:86`), sans type, sans exercice.
+   (`useSeanceEditable.ts:39`, `:90`), sans type, sans exercice.
 3. **Choisir un type** — `PUSH`, `PULL`, `LEGS` en capitales, le choisi prend la
    couleur du type (`seance/[id].tsx:159-173`).
 4. **« ▶ Partir d'un modèle »** si la séance est vide et qu'un modèle existe
@@ -166,11 +166,11 @@ n'ont de quoi s'afficher.
     (`sauvegardeAuto.ts:82-87`). Revenir : la valeur est là.
 17. **Une séance vide ne crée rien.** Ouvrir `/seance/nouvelle`, choisir un type,
     ressortir sans ajouter d'exercice : **aucune ligne** ne doit apparaître dans
-    `seance` (`useSeanceEditable.ts:70`).
+    `seance` (`useSeanceEditable.ts:74`).
 18. **La première sauvegarde ne fait pas perdre la saisie.** Sur une séance
     neuve, taper sans interruption pendant l'enregistrement initial : l'écran ne
     doit **pas** naviguer ni se remonter, et rien de ce qui a été tapé ne doit
-    disparaître (`useSeanceEditable.ts:65-68`, `blocSeance.ts:180-181`).
+    disparaître (`useSeanceEditable.ts:69-72`, `blocSeance.ts:180-181`).
 19. **Le passage en modèle transporte le réalisé.** « ★ Enregistrer comme
     modèle » : les répétitions et charges **faites** deviennent les cibles du
     modèle ; à défaut, les cibles d'origine (`hooks/seances.ts:143-145`).

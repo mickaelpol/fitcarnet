@@ -31,10 +31,12 @@ agents** en sont nés, et l'épreuve sur émulateur Android a trouvé que le
 sélecteur de mode tout juste ajouté au modèle **ne commandait rien** (voir
 « Le mode de travail se choisit aussi dans un modèle », plus bas). Corrigé.
 
-**Avant cela, le 15 septembre au soir** : **les neuf lots de l'audit (0 à 8)
-sont clos** — ce journal disait « les 79 constats traités » ; trois restent en
-réalité ouverts, à trancher (voir « Par quoi continuer »). Les trois agents de
-contrôle ont été lancés sur l'ensemble et ont trouvé trois choses qu'aucun test ne voyait (voir plus bas).
+**Avant cela, le 15 septembre au soir** : ce journal annonçait « les 79
+constats traités, les huit lots clos ». **C'était faux** : vérifiés un par un
+le 17 septembre, **61 sont clos et 18 ouverts** (aucun critique ni élevé), et
+les lots 4 et 8 ne sont pas terminés — voir `docs/audit-2026-09/README.md`,
+« Ce qui reste ouvert ». Les trois agents de contrôle ont été lancés sur
+l'ensemble et ont trouvé trois choses qu'aucun test ne voyait (voir plus bas).
 L'application est éprouvée dans un vrai navigateur, écran par écran, et contre
 le vrai Grocy. Le dossier de présentation client est prêt ; il ne reste qu'à
 tourner les vidéos.
@@ -52,8 +54,8 @@ Chantier du 17 septembre 2026, conception et plan dans
 CASCADE`, le nom est unique par compte (`aliment_nom_unique_par_compte`), et
 depuis la migration 35 la base refuse qu'une ligne de stock vise l'aliment d'un
 autre compte. « Ajouter un aliment » ouvre l'éditeur aux macros vides.
-Vérifié le 17 septembre au soir : **603 + 33 tests front, 329 tests API
-(862 assertions)**, PHPStan à ses 7 erreurs connues, `verifier-schema.sh`
+Vérifié le 17 septembre au soir : **606 + 33 tests front, 330 tests API
+(864 assertions)**, PHPStan à ses 7 erreurs connues, `verifier-schema.sh`
 « identiques », `verifier-migrations.sh`, `verifier-jeux.sh` et
 `test_import_carnet.py` verts.
 
@@ -159,6 +161,10 @@ qui suit a son test, vu rouge avant le correctif.
 - **Règle 5** : la somme d'Atwater n'a plus qu'une écriture (`kcalDesGrammes`),
   cinq copies retirées, `formuleUnique.test.ts` en garde.
 - **Les champs de macros vides** montrent « à saisir » et plus un « 0 » gris.
+- **Une création Grocy incomplète** laissait un produit nu dans Grocy : les
+  contrôles passaient après la création. Ils passent avant.
+- **Constat 04#9** : une séance créée entre minuit et 2 h était datée de la
+  veille (UTC). `src/calcul/dates.ts`, testé avec le fuseau de Paris simulé.
 - **La restauration** : `DEPLOIEMENT.md` renvoyait à une procédure manuelle
   (dans `sauvegarde-nas.sh`) qui laissait tourner les travailleurs
   d'inventaire (É4). Il renvoie à `restaurer-nas.sh`. Les commandes des jeux de
@@ -196,15 +202,17 @@ qui suit a son test, vu rouge avant le correctif.
 
 ## L'essentiel en cinq lignes
 
-Un audit complet a relevé **79 constats** (3 critiques, 14 élevés). **Les neuf
-lots (0 à 8) sont terminés**, et **76 constats traités** ; trois restent ouverts,
-à trancher (02#13, 02#15, 02#17 — voir « Par quoi continuer »). Les lots :
-garde-fous, ce qui était cassé, les chiffres faux, la
+Un audit complet a relevé **79 constats** (3 critiques, 14 élevés). Au
+17 septembre 2026 : **61 clos, 18 ouverts** — 12 moyens, 6 faibles, **aucun
+critique ni élevé**. Trois sont à trancher (02#13, 02#15, 02#17), quinze n'ont
+aucune décision consignée ; la liste et la preuve de chacun sont dans
+`docs/audit-2026-09/README.md`, « Ce qui reste ouvert ». Sept lots sur neuf
+sont terminés (les lots 4 et 8 restent en cours) : garde-fous, ce qui était cassé, les chiffres faux, la
 sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État au 17 septembre au soir : **636 tests front** (603 + 33 de rendu) · **329 API · 862 assertions**, 7 erreurs PHPStan
+État au 17 septembre au soir : **639 tests front** (606 + 33 de rendu) · **330 API · 864 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -282,8 +290,8 @@ docker compose -f compose.dev.yml up -d
 ce journal :
 
 ```bash
-cd front && npm test                                                  # 603 + 33 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 329 tests, 862 assertions
+cd front && npm test                                                  # 606 + 33 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 330 tests, 864 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 db/manuel/verifier-jeux.sh                                            # ✓ jeux et garde-fou
@@ -402,9 +410,10 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 
 ## Par quoi continuer
 
-**Les neuf lots de l'audit sont clos, 76 constats sur 79 traités.** Ce qui suit
-est du confort ou attend un arbitrage — la production d'abord, la clé Grocy
-ensuite, et les deux points à trancher avant de tourner.
+**61 constats d'audit sur 79 sont clos, 18 ouverts** (aucun critique ni élevé ;
+liste dans `docs/audit-2026-09/README.md`). Ce qui suit est du confort ou
+attend un arbitrage — la production d'abord, la clé Grocy ensuite, et les deux
+points à trancher avant de tourner.
 
 | | Quoi | Effort |
 |---|---|---|
@@ -412,7 +421,8 @@ ensuite, et les deux points à trancher avant de tourner.
 | **Tourner les vidéos** | tout le dossier de présentation est écrit, les huit bobines aussi ; la remise à zéro entre deux bobines marche depuis le 17 septembre | `./presentation/preparer-demonstration.sh`, et `presentation/demonstration.md` |
 | **Avant de tourner : le bandeau « Fibres inconnues »** | À TRANCHER. Le plan 4.1 et la slide 06 le montrent, mais `jeu-essai.sql` renseigne les fibres de ses huit aliments : il ne peut pas apparaître. Soit un féculent du jeu aux fibres inconnues (`NULL`), soit le retirer du plan | 15 min |
 | **Avant de tourner : les habitudes de cuisson du compte de démo** | À TRANCHER. Aucun fichier ne les pose, et `presentation/tournage/capturer.mjs` clique « se mangent tels quels » : sur un compte neuf, la capture 11 sort sans fournée. Soit `jeu-demo.sql` pose des habitudes, soit le script les choisit | 30 min |
-| **Constats d'audit ouverts** | À TRANCHER. **02#13** : ni rotation des journaux ni limites de ressources dans `docker-compose.yml` (toute modification s'y déploie au prochain push). **02#15** : `compose.dev.yml` publie `5432:5432` — `import_carnet.py` et `import_catalogue.py` visent `localhost:5432`. **02#17** : aucune purge des invitations expirées | à trancher |
+| **Les quinze constats d'audit ouverts sans décision** | 12 moyens et 3 faibles, listés avec leur preuve dans `docs/audit-2026-09/README.md` — dont M5 (jetons en clair dans `localStorage` sur le web), M6 (chargements infinis sur trois écrans), M8 (`RECORD_AUDIO` inutile et en double : le retirer demande une nouvelle compilation Android), M12 (saisie d'inventaire perdue au changement d'onglet), 02#12 (dérive entités ↔ schéma) | à planifier |
+| **Constats d'audit à trancher** | À TRANCHER. **02#13** : ni rotation des journaux ni limites de ressources dans `docker-compose.yml` (toute modification s'y déploie au prochain push). **02#15** : `compose.dev.yml` publie `5432:5432` — `import_carnet.py` et `import_catalogue.py` visent `localhost:5432`. **02#17** : aucune purge des invitations expirées | à trancher |
 | **Les hooks de `.claude/settings.json`** | appellent graphify par un chemin absolu (`/home/micka/.local/bin/graphify`) : vrai sur les deux postes aujourd'hui, faux sur un troisième. Relevé par `verite-documentaire` ; non modifié | 5 min |
 | **Régénérer la clé d'API Grocy** | ⚠ **À FAIRE PAR TOI, ET VITE.** Elle a été collée dans une conversation le 15 septembre 2026 pour vérifier le pont Grocy de bout en bout. Elle est à considérer comme publiée. Grocy → Paramètres → Clés d'API → révoquer puis recréer, et reporter la nouvelle dans `.env` du NAS | 5 min |
 | **`choixRatio.tsx`** | dernier morceau du lot 6, et **il était mal rangé dans l'audit** : il appartient à `editeurAliment.tsx` (section 7), pas à l'écran de séance | 1 h |

@@ -8,7 +8,7 @@ description: Comment on teste l'API de fitcarnet — PHPUnit sans base ni noyau,
 `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'` — **dans le
 conteneur** : le PHP de l'hôte n'a ni `dom`, ni `mbstring`, ni `xmlwriter`, et
 PHPUnit refuse de démarrer sans elles ; `cd api && bin/phpunit` échoue ici
-(vérifié le 17 septembre 2026, `php -m`). **329 tests, 862 assertions**,
+(vérifié le 17 septembre 2026, `php -m`). **330 tests, 864 assertions**,
 mesurés le 17 septembre 2026, en fin de journée.
 
 **La suite tourne sans base de données et sans noyau Symfony, et doit le rester.**

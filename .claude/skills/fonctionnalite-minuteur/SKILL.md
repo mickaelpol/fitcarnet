@@ -169,7 +169,7 @@ exercice. **Plateforme** : Android pour tout ce qui sonne (skill
     refusée en 422, pas ramenée à zéro.
 22. **Le temps mesuré part avec la séance.** Après un arrêt de mesure, la
     sauvegarde automatique doit l'enregistrer comme n'importe quelle autre
-    modification (`useSeanceEditable.ts:75-82`).
+    modification (`useSeanceEditable.ts:79-86`).
 
 ## Comment l'éprouver
 

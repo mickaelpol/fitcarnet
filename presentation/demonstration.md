@@ -946,9 +946,9 @@ la panne si on te le demande, pas avant :**
 
 | | |
 |---|---|
-| Tests front | **636** (603 purs + 33 de rendu) |
-| Tests API | **329**, 862 assertions, sans base ni noyau |
-| Audit de septembre 2026 | **79 constats** (3 critiques, 14 élevés) : **60 clos**, 19 ouverts au 17 septembre 2026 — tous moyens ou faibles, dont 3 à trancher (`docs/audit-2026-09/README.md`) |
+| Tests front | **639** (606 purs + 33 de rendu) |
+| Tests API | **330**, 864 assertions, sans base ni noyau |
+| Audit de septembre 2026 | **79 constats** (3 critiques, 14 élevés) : **61 clos**, 18 ouverts au 17 septembre 2026 — tous moyens ou faibles, dont 3 à trancher (`docs/audit-2026-09/README.md`) |
 | Catalogue d'exercices | ~1 338 entrées |
 | Inventaire des capacités | **288**, chacune avec fichier et ligne |
 

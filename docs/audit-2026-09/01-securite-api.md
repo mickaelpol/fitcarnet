@@ -52,7 +52,7 @@ pare-feu par conception (voir F-06/F-07 pour ce qui les concerne).
 - **Gravité : ÉLEVÉE**
 - **Statut : CONFIRMÉ à l'audit, corrigé le 8 septembre 2026** (É1, voir [README.md](README.md)) : le dépôt vérifie la propriété, et `FrigoBase::definirStock` la pose pour tous ses appelants. La base la double depuis le 17 septembre 2026 (clé composite `stock_aliment_du_meme_compte_fkey`, migration 35). Le constat d'origine suit, au présent de l'audit ; les renvois pointent le code d'aujourd'hui.
 - **Emplacement :**
-  - `api/src/Controller/FrigoController.php:351-434` (dépôt du lot, aucune vérification à l'audit)
+  - `api/src/Controller/FrigoController.php:356-439` (dépôt du lot, aucune vérification à l'audit)
   - `api/src/Service/AppliqueInventaire.php:146-179` (application, aucune vérification)
   - à comparer avec `api/src/Controller/FrigoController.php:125-128` et `:151-156`, qui font le contrôle sur l'autre chemin
 

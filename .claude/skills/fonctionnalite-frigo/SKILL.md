@@ -190,7 +190,7 @@ quantités décimales, et **laisse deux aliments à zéro**
     (`api/src/Service/FrigoBase.php:89-101`). Les deux routes qui écrivent du
     stock la posent aussi **en amont**, pour répondre tout de suite :
     `POST /mon-frigo/stock` (`FrigoController.php:125-128`, `:154-156`) et son
-    jumeau `POST /mon-frigo/inventaire` (`FrigoController.php:412-419`).
+    jumeau `POST /mon-frigo/inventaire` (`FrigoController.php:417-424`).
     **Refus attendu : 404**, avec le **même message** que pour « n'existe pas »,
     pour ne pas laisser énumérer les identifiants
     (`FrigoController.php:151-156`). Derrière le code, la base refuse

@@ -14,11 +14,11 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 17 septembre 2026 : 60 constats clos, 19 ouverts** — vérifiés un par un
-> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 19
-> sont 13 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
-> 17 ; 03 — 8 sur 33 ; 04 — 5 sur 17. **Trois sont à trancher** (02#13,
-> 02#15, 02#17), les seize autres n'ont aucune décision consignée. La liste,
+> **Au 17 septembre 2026 : 61 constats clos, 18 ouverts** — vérifiés un par un
+> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 18
+> sont 12 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
+> 17 ; 03 — 8 sur 33 ; 04 — 4 sur 17. **Trois sont à trancher** (02#13,
+> 02#15, 02#17), les quinze autres n’ont aucune décision consignée. La liste,
 > avec la preuve de chacun, est dans « [Ce qui reste ouvert](#ce-qui-reste-ouvert-au-17-septembre-2026) ».
 
 ## Ce que l'audit dit du projet
@@ -66,7 +66,7 @@ pas, et un second appui rend 409 « déjà cuisiné ». Le plan cesse de réserv
 compose ensuite sur des quantités qui n'existent plus — exactement le « bac vide une semaine plus
 tard » que ce bouton existe pour éviter.
 
-*Correction : boucler sur `inventorierUn()` en reprenant la forme de `FrigoController.php:319`.
+*Correction : boucler sur `inventorierUn()` en reprenant la forme de `FrigoController.php:324`.
 30 min, 1 h avec test.* **PHPStan niveau 5 l'aurait attrapé gratuitement — voir lot 0.**
 
 ### C2 — ✅ corrigé le 14 septembre 2026 — La double écriture du schéma n'était pas tenue
@@ -135,7 +135,7 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 
 ### Sécurité
 - **É1** — ✅ **corrigé le 8 septembre 2026.** L'inventaire différé n'avait aucun contrôle de
-  propriété sur l'aliment. `FrigoController.php:351-434` + `AppliqueInventaire.php:146-179`. Le
+  propriété sur l'aliment. `FrigoController.php:356-439` + `AppliqueInventaire.php:146-179`. Le
   chemin jumeau (`POST /api/mon-frigo/stock`) avait reçu `alimentAccessible()` pour corriger
   exactement cette faille ; `POST /api/mon-frigo/inventaire` ne l'avait pas eu. Un compte pouvait
   écrire une ligne de stock sur l'aliment d'un autre, qui ne pouvait alors plus le supprimer.
@@ -295,8 +295,8 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **8 — le reste** | ◐ | Les onze du front et les neuf de sécurité sont faits ; 02#14, 02#18 et 02#19 aussi. **Restent ouverts** 02#13, 02#15, 02#17 (à trancher), 04#14, 04#15, 04#19, et la permission `RECORD_AUDIO` en double (M8) que le plan y rangeait. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
 Tests au 15 septembre, au terme du chantier : **600 front** (577 + 23 de rendu, en deux passes) · **252 API · 661 assertions · 7 erreurs PHPStan**
-(aucune sur les fichiers corrigés). Au 17 septembre 2026 en fin de journée : **636 front** (603 + 33 de
-rendu) · **329 API · 862 assertions · 7 erreurs PHPStan**.
+(aucune sur les fichiers corrigés). Au 17 septembre 2026 en fin de journée : **639 front** (606 + 33 de
+rendu) · **330 API · 864 assertions · 7 erreurs PHPStan**.
 
 **Et une épreuve que les tests ne remplacent pas** :
 `presentation/tournage/verifier-ecrans.mjs` pilote un vrai navigateur — connexion,
@@ -321,7 +321,8 @@ Un point laissé ouvert volontairement :
 
 ## Ce qui reste ouvert au 17 septembre 2026
 
-Dix-neuf constats, vérifiés un par un dans le code ce jour-là. Aucun critique, aucun élevé.
+Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique, aucun élevé.
+04#9 (date d'une séance en UTC), qui y figurait, est clos le soir même : `src/calcul/dates.ts`.
 
 **À trancher — la décision appartient au propriétaire, avec son argument :**
 
@@ -347,7 +348,6 @@ Dix-neuf constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 | **03 M12** — saisie d'inventaire perdue au changement d'onglet | moyenne | `front/app/(onglets)/frigo.tsx:54-59` |
 | **03 M13** — `noUncheckedIndexedAccess` désactivé | moyenne | `front/tsconfig.json:5` |
 | **04#7** — deux juges du rendement, API et front | moyenne | l'impossible est aligné (16 septembre) ; les bandes du plausible et le seuil de 100,5 g restent écrits deux fois |
-| **04#9** — date d'une nouvelle séance calculée en UTC | moyenne | `front/src/composants/useSeanceEditable.ts:35` |
 | **04#14** — `DeductionDuPlan` : la seconde ligne écrase la première | faible | `DeductionDuPlanTest.php:143-160` affirme toujours `800` |
 | **04#15** — le bouchon de `FrigoGrocyCreationTest` répond `[]` à tout | faible | `FrigoGrocyCreationTest.php:176` |
 | **04#19** — divisions et conversions non gardées dans `ciqual_vers_grocy.py` | faible | `:914`, `:944`, `:729-731`, `:348`, `:818` |
