@@ -20,23 +20,23 @@ travailler, et le tenir à jour en repartant.**
 git clone ssh://git@gitea.mickael-pol.fr:2222/mickael/fitcarnet.git
 cd fitcarnet && ./installer-outils.sh     # graphify, intelephense, les cinq plugins
 # redémarrer Claude Code ici — c'est ce qui charge les skills
-./installer.sh                            # l'application : base, conteneurs, compte
+./installer.sh --email ton@adresse.fr     # l'application : base, conteneurs, compte
 ```
 
-Le dépôt porte **tout l'outillage** : `CLAUDE.md`, les hooks et `skillOverrides`,
+Le dépôt porte **tout l'outillage** : `CLAUDE.md`, les hooks (`.claude/settings.json`),
 la déclaration des cinq plugins (`enabledPlugins` — Claude Code les pose au
 premier démarrage, et `installer-outils.sh` vérifie qu'il l'a fait), les skills
 propres au projet, `.graphifyignore`, et le **cache sémantique de graphify** —
-480 Ko qui évitent de redépenser 125 000 tokens d'extraction. Seul le graphe
+environ 860 Ko qui évitent de redépenser 125 000 tokens d'extraction. Seul le graphe
 lui-même se reconstruit : `/graphify .`.
 
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 600 tests, puis 32 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 603 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 307 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 329 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -44,7 +44,7 @@ docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
 docker compose -f compose.dev.yml up   # environnement de développement
 # Base jetable (Docker, image postgres:16), aucune base réelle touchée :
 db/manuel/verifier-schema.sh           # base neuve = base migrée
-db/manuel/verifier-migrations.sh       # les migrations passent sur de vraies données
+db/manuel/verifier-migrations.sh       # les migrations passent sur de vraies données, contraintes comprises
 db/manuel/verifier-jeux.sh             # jeu d'essai et jeu de démonstration, garde-fou compris
 python3 test_import_carnet.py          # l'import du carnet (exige psycopg2)
 python3 test_ciqual.py                 # l'import CIQUAL, sans dépendance
@@ -109,7 +109,7 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Domaine | Module de référence |
 |---|---|
 | 1RM, volume, paliers | `front/src/calcul/performance.ts` |
-| Macros, Atwater, catégories | `front/src/calcul/nutrition.ts` |
+| Macros, Atwater (`kcalDesGrammes`), catégories | `front/src/calcul/nutrition.ts` |
 | Cru/cuit, fournées, habitudes | `front/src/calcul/cuisson.ts` |
 | Composition de repas | `front/src/solveur/` |
 | Suppression des accents | `front/src/calcul/texte.ts` |
@@ -117,6 +117,11 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 
 Un hook qui recalcule un 1RM importe `performance.ts`. Trois copies d'Epley aux bornes divergentes
 ont produit un « record » de 79,96 kg que la formule elle-même déclare invalide.
+
+**La somme d'Atwater n'a qu'une écriture depuis le 17 septembre 2026.** Ce fichier l'affirmait
+déjà ; elle était en réalité écrite cinq fois (`solveur.ts`, `plausibilite.ts`, `planCoach.ts`,
+`carteRepas.tsx`, en plus de `nutrition.ts`). `front/src/calcul/formuleUnique.test.ts` refuse
+désormais toute multiplication par un coefficient `KCAL_…` hors de `nutrition.ts`.
 
 **`front/src/calcul/texte.ts` existe depuis le 15 septembre 2026** (constat D4).
 Il a longtemps figuré dans ce tableau sans exister : la ligne annonçait une

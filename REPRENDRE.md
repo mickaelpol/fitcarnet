@@ -5,13 +5,15 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 17 septembre 2026, après-midi, second poste** —
-**chaque aliment appartient à un compte**, et la reprise sur le second poste a
-lancé les trois agents de contrôle : un défaut élevé (la création d'un aliment
-s'ouvrait avec des macros à « 0 »), des dates écrites deux heures dans le
-futur, un import et une remise à zéro qui ne marchaient pas — tout est corrigé,
-testé et poussé. **Reste : contrôler la production, puis retirer la
-migration 34.** Voir juste en dessous.
+**Dernière mise à jour : 17 septembre 2026, soir, second poste** — **chaque
+aliment appartient à un compte**, et la reprise sur le second poste a lancé
+deux fois les trois agents de contrôle. Ils ont trouvé, entre autres, une
+création d'aliment qui s'ouvrait avec des macros à « 0 », une API qui
+enregistrait 0 pour une macro absente, des dates écrites deux heures dans le
+futur, un import et une remise à zéro qui ne marchaient pas, une procédure de
+restauration dangereuse, et la somme d'Atwater écrite cinq fois. **Tout est
+corrigé et testé.** Restent : contrôler la production, retirer la migration 34,
+et quelques arbitrages — voir juste en dessous et « Par quoi continuer ».
 
 **Le 17 au matin** — le chantier « aliments par compte » lui-même, sur le
 premier poste (conception, schéma, API, front, scripts, documentation).
@@ -29,9 +31,10 @@ agents** en sont nés, et l'épreuve sur émulateur Android a trouvé que le
 sélecteur de mode tout juste ajouté au modèle **ne commandait rien** (voir
 « Le mode de travail se choisit aussi dans un modèle », plus bas). Corrigé.
 
-**Avant cela, le 15 septembre au soir** : **les 79 constats de l'audit sont
-traités, les huit lots clos**. Les trois agents de contrôle ont été lancés sur
-l'ensemble et ont trouvé trois choses qu'aucun test ne voyait (voir plus bas).
+**Avant cela, le 15 septembre au soir** : **les neuf lots de l'audit (0 à 8)
+sont clos** — ce journal disait « les 79 constats traités » ; trois restent en
+réalité ouverts, à trancher (voir « Par quoi continuer »). Les trois agents de
+contrôle ont été lancés sur l'ensemble et ont trouvé trois choses qu'aucun test ne voyait (voir plus bas).
 L'application est éprouvée dans un vrai navigateur, écran par écran, et contre
 le vrai Grocy. Le dossier de présentation client est prêt ; il ne reste qu'à
 tourner les vidéos.
@@ -49,8 +52,8 @@ Chantier du 17 septembre 2026, conception et plan dans
 CASCADE`, le nom est unique par compte (`aliment_nom_unique_par_compte`), et
 depuis la migration 35 la base refuse qu'une ligne de stock vise l'aliment d'un
 autre compte. « Ajouter un aliment » ouvre l'éditeur aux macros vides.
-Vérifié le 17 septembre après-midi : **600 + 32 tests front, 307 tests API
-(819 assertions)**, PHPStan à ses 7 erreurs connues, `verifier-schema.sh`
+Vérifié le 17 septembre au soir : **603 + 33 tests front, 329 tests API
+(862 assertions)**, PHPStan à ses 7 erreurs connues, `verifier-schema.sh`
 « identiques », `verifier-migrations.sh`, `verifier-jeux.sh` et
 `test_import_carnet.py` verts.
 
@@ -72,21 +75,25 @@ Vérifié le 17 septembre après-midi : **600 + 32 tests front, 307 tests API
    ssh nas 'docker exec fitcarnet-db psql -U fitcarnet -d fitcarnet -c "\d aliment" -c "\d stock"'
    ```
    Attendu : `utilisateur_id` NOT NULL, l'index `aliment_nom_unique_par_compte`,
-   la contrainte `aliment_id_utilisateur_unique`, et côté `stock` la clé
-   `stock_aliment_du_meme_compte_fkey`. Puis se connecter et ouvrir le frigo.
+   la contrainte `aliment_id_utilisateur_unique` ; côté `stock`, la clé
+   `stock_aliment_du_meme_compte_fkey`, **et plus** ni `stock_aliment_id_fkey`
+   (retirée par la 35 — si la production l'avait nommée autrement, elle
+   resterait à côté) ni `stock_quantite_check` (retirée par la 36). Puis se
+   connecter, ouvrir le frigo, et créer puis supprimer un aliment.
 2. **Supprimer `db/manuel/34-aliments-par-compte.sql`** dans un commit à part,
    et pousser (donc déployer). C'est un passage ponctuel : une base neuve naît
-   déjà dans cet état. La 35, elle, reste. La prochaine migration prend le
-   numéro **36** — jamais le 34 libéré (voir `schema-base`).
-   *Une sauvegarde d'avant le passage ne se restaure alors plus telle quelle* :
-   elle revient avec `cree_par`. Il faudrait rejouer la 34 depuis l'historique
-   (`git show 1068054:db/manuel/34-aliments-par-compte.sql`). Accepté, voir la
-   décision ci-dessus.
+   déjà dans cet état. La 35 et la 36, elles, restent. La prochaine migration
+   prend le numéro **37** — jamais le 34 libéré (voir `schema-base`).
+   *Une sauvegarde d'avant le passage ne redémarre alors plus seule* : elle
+   revient avec `cree_par`, et la 35 s'arrête en demandant de rejouer la 34
+   depuis l'historique (`git show 1068054:db/manuel/34-aliments-par-compte.sql`)
+   — la production reste arrêtée tant que ce n'est pas fait. Accepté, voir la
+   décision ci-dessus ; `DEPLOIEMENT.md` le dit à l'endroit de la restauration.
 3. Réduire alors cette section à quelques lignes : c'est la dernière trace,
    dans le dépôt, du modèle précédent.
 
 **Base de développement.** Chaque poste a la sienne, et **chacune doit passer
-par la 34 et la 35** : `db/manuel/rattraper-dev.sh` après le `git pull`. Sans lui, le
+par les migrations 34 à 36** : `db/manuel/rattraper-dev.sh` après le `git pull`. Sans lui, le
 code attend `utilisateur_id` et la base a encore `cree_par` — le frigo de dev
 tombe. Les deux postes y sont passés le 17 septembre ; sur le second, 64
 aliments sont devenus 14 (les 50 sans propriétaire, qu'aucun stock, plan ni
@@ -128,6 +135,34 @@ qui suit a son test, vu rouge avant le correctif.
   rejoue désormais toute la procédure.
 - **Deux témoins de câblage** : `AlimentProcessor` bien branché sur
   `ProprietaireProcessor`, et la requête des aliments accessibles sans `OR`.
+
+**Et la seconde passe des agents, le soir même :**
+
+- **L'API enregistrait 0 pour une macro absente** (`POST /api/aliments` sans
+  `lip100` → 201, `lip_100 = 0`) : les macros partent de `null` et `NotNull`
+  refuse en 422. Même correctif sur le jumeau Grocy (`?? 0`).
+- **Les refus du sérialiseur étaient journalisés en `[critical]`** : `warning`
+  désormais (`framework.exceptions`).
+- **`/api/stocks` est en lecture seule** : ses écritures n'avaient jamais servi
+  et un doublon y répondait 500. **`POST /api/mon-frigo/stock`** refuse un
+  emplacement inconnu en 422 au lieu d'un 500.
+- **Constat 04#12** : un administrateur désactivé se supprime même s'il ne
+  reste qu'un administrateur actif. **02#14** : migration 36, un seul CHECK sur
+  la quantité. **02#19** : `installer.sh --repartir-de-zero` n'avale plus
+  l'échec de `down -v`.
+- **Supprimer un compte** annonce et emporte aussi objectifs, compléments et
+  exercices personnels (ceux que plus personne ne cite).
+- **La migration 35** nomme la migration 34 sur une base trop ancienne ; les
+  vérificateurs comparent la définition des contraintes et refusent les CHECK
+  en double ; `DatesAvecFuseauTest` attrape aussi le type implicite et
+  `DATETIMETZ_MUTABLE`.
+- **Règle 5** : la somme d'Atwater n'a plus qu'une écriture (`kcalDesGrammes`),
+  cinq copies retirées, `formuleUnique.test.ts` en garde.
+- **Les champs de macros vides** montrent « à saisir » et plus un « 0 » gris.
+- **La restauration** : `DEPLOIEMENT.md` renvoyait à une procédure manuelle
+  (dans `sauvegarde-nas.sh`) qui laissait tourner les travailleurs
+  d'inventaire (É4). Il renvoie à `restaurer-nas.sh`. Les commandes des jeux de
+  données portent `-v ON_ERROR_STOP=1`.
 - **`schema-base`** annonçait « la prochaine migration porte le numéro 34 »,
   et une divergence de dates « sans effet ».
 - Commentaires et documentation : plus d'aliment « privé », plus de renvoi aux
@@ -147,18 +182,29 @@ qui suit a son test, vu rouge avant le correctif.
 - **« J'ai cuisiné » dit « plus dans ton frigo »** d'un aliment qui n'y a
   jamais été (cas d'un plan qui cite l'aliment d'un autre compte). Libellé
   inexact, sans conséquence.
+- **Les dates ne sortent pas toutes sous la même forme** : `cuisineLe` vaut
+  `13:04:10+02:00` dans la réponse de « J'ai cuisiné » et `11:04:10+00:00` à la
+  relecture. L'instant est le même ; seul un client qui comparerait les chaînes
+  s'y tromperait.
+- **`GET /api/utilisateurs/{id}` d'un autre compte rend 403**, contre 404 pour
+  un identifiant inconnu : on apprend qu'un UUID existe. Un UUID v4 ne se
+  devine pas.
+- **Un décalage d'affichage d'environ 13 px** dans l'éditeur d'aliment après
+  une saisie (Chromium 1280×900), origine non recherchée.
 
 ---
 
 ## L'essentiel en cinq lignes
 
-Un audit complet a relevé **79 constats** (3 critiques, 14 élevés). **Les huit
-lots sont terminés** — garde-fous, ce qui était cassé, les chiffres faux, la
+Un audit complet a relevé **79 constats** (3 critiques, 14 élevés). **Les neuf
+lots (0 à 8) sont terminés**, et **76 constats traités** ; trois restent ouverts,
+à trancher (02#13, 02#15, 02#17 — voir « Par quoi continuer »). Les lots :
+garde-fous, ce qui était cassé, les chiffres faux, la
 sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État au 17 septembre après-midi : **632 tests front** (600 + 32 de rendu) · **307 API · 819 assertions**, 7 erreurs PHPStan
+État au 17 septembre au soir : **636 tests front** (603 + 33 de rendu) · **329 API · 862 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -174,7 +220,8 @@ En parallèle, un **dossier de présentation** est monté de bout en bout dans
 ## Ce que la journée du 14 septembre a changé
 
 **Le lot 3 — sécurité et isolation — est clos.** C3 : l'isolation entre comptes
-n'avait aucun test, elle en a 18, chacun **vu échouer** en cassant le code qu'il
+n'avait aucun test, elle en a désormais 14 (ce journal a dit 18 ; recompté le
+17 septembre), chacun **vu échouer** en cassant le code qu'il
 protège. É8 : les exercices « personnels » le sont vraiment (`FiltreExercice`,
 règle « public **OU** le mien »). M-03 : fait. M-02 : **complet depuis le
 15 septembre** — la fenêtre était passée à 90 jours glissants, et la *visibilité*
@@ -235,8 +282,8 @@ docker compose -f compose.dev.yml up -d
 ce journal :
 
 ```bash
-cd front && npm test                                                  # 600 + 32 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 307 tests, 819 assertions
+cd front && npm test                                                  # 603 + 33 tests, 0 echec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 329 tests, 862 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 db/manuel/verifier-jeux.sh                                            # ✓ jeux et garde-fou
@@ -355,17 +402,21 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 
 ## Par quoi continuer
 
-**L'audit est clos, ses huit lots et ses 79 constats.** Ce qui suit est du
-confort ou attend un arbitrage — à trois exceptions près, les trois premières
-lignes du tableau.
+**Les neuf lots de l'audit sont clos, 76 constats sur 79 traités.** Ce qui suit
+est du confort ou attend un arbitrage — la production d'abord, la clé Grocy
+ensuite, et les deux points à trancher avant de tourner.
 
 | | Quoi | Effort |
 |---|---|---|
 | **Contrôler la production, puis retirer la migration 34** | voir « Aliments par compte : ce qui reste à faire », en tête de ce fichier | 15 min |
 | **Tourner les vidéos** | tout le dossier de présentation est écrit, les huit bobines aussi ; la remise à zéro entre deux bobines marche depuis le 17 septembre | `./presentation/preparer-demonstration.sh`, et `presentation/demonstration.md` |
+| **Avant de tourner : le bandeau « Fibres inconnues »** | À TRANCHER. Le plan 4.1 et la slide 06 le montrent, mais `jeu-essai.sql` renseigne les fibres de ses huit aliments : il ne peut pas apparaître. Soit un féculent du jeu aux fibres inconnues (`NULL`), soit le retirer du plan | 15 min |
+| **Avant de tourner : les habitudes de cuisson du compte de démo** | À TRANCHER. Aucun fichier ne les pose, et `presentation/tournage/capturer.mjs` clique « se mangent tels quels » : sur un compte neuf, la capture 11 sort sans fournée. Soit `jeu-demo.sql` pose des habitudes, soit le script les choisit | 30 min |
+| **Constats d'audit ouverts** | À TRANCHER. **02#13** : ni rotation des journaux ni limites de ressources dans `docker-compose.yml` (toute modification s'y déploie au prochain push). **02#15** : `compose.dev.yml` publie `5432:5432` — `import_carnet.py` et `import_catalogue.py` visent `localhost:5432`. **02#17** : aucune purge des invitations expirées | à trancher |
+| **Les hooks de `.claude/settings.json`** | appellent graphify par un chemin absolu (`/home/micka/.local/bin/graphify`) : vrai sur les deux postes aujourd'hui, faux sur un troisième. Relevé par `verite-documentaire` ; non modifié | 5 min |
 | **Régénérer la clé d'API Grocy** | ⚠ **À FAIRE PAR TOI, ET VITE.** Elle a été collée dans une conversation le 15 septembre 2026 pour vérifier le pont Grocy de bout en bout. Elle est à considérer comme publiée. Grocy → Paramètres → Clés d'API → révoquer puis recréer, et reporter la nouvelle dans `.env` du NAS | 5 min |
 | **`choixRatio.tsx`** | dernier morceau du lot 6, et **il était mal rangé dans l'audit** : il appartient à `editeurAliment.tsx` (section 7), pas à l'écran de séance | 1 h |
-| **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 22 témoins ; les hooks React restent partiellement hors de portée — `@testing-library/react` est désormais installé, la porte est ouverte | ~4 h |
+| **Le câblage non couvert** | reste du lot 7. `client.ts` a ses 28 témoins ; les hooks React restent partiellement hors de portée — `@testing-library/react` est désormais installé, la porte est ouverte | ~4 h |
 | **Extraire `LigneAliment` de `carteRepas.tsx`** | le module `calcul/poidsServi.ts` est testé, mais le composant qui l'appelle ne l'est pas. L'extraire vers `src/` rendrait la ligne de repas testable comme le reste | 1 h |
 | **Le second `tsconfig` des tests de rendu** | la garde qui interdisait à un test d'importer un `.tsx` a été levée pour permettre `editeurAliment.test-rendu.tsx`. Un second `tsconfig` la rendrait aux tests non-rendu, qui n'ont pas de raison d'y toucher | 1 h |
 | **Publier un exercice depuis l'admin** | `Exercice.public` n'est écrit par personne : aucun mécanisme de publication n'existe. L'exposer en écriture aux seuls administrateurs est la proposition « C » de la revue, à trancher | à trancher |
@@ -375,10 +426,11 @@ lignes du tableau.
 ## Ce que la journée du 15 septembre a changé
 
 **Le lot 6 est terminé, les douze rangs.** Les trois écrans passent de 3 935 à
-**1 295** lignes (655 + 445 + 195) ; `composer.ts` de **817** à 135,
-`cuisson.ts` de **611** à 22, `hooks.ts` en dix modules. *Les chiffres « 1 169 »,
-« 827 » et « 613 » ont figuré ici : le premier était périmé, le deuxième était
-la taille de `frigo.tsx` — un chiffre transposé d'une ligne à l'autre.* **Les dix duplications D1 à D10 sont closes.**
+**1 295** lignes (655 + 445 + 195) ; `composer.ts` de **827** à 135 (830 au
+moment de l'audit), `cuisson.ts` de **613** à 22 (611 à l'audit), `hooks.ts` en
+dix modules. *Ce paragraphe a longtemps dit « 817 » et déclaré 827 et 613
+faux : c'étaient les bonnes tailles juste avant le découpage — recompté le
+17 septembre 2026 dans l'historique (`a83e704`, `952062a~1`).* **Les dix duplications D1 à D10 sont closes.**
 
 **Six agents ont travaillé en parallèle**, sur des périmètres strictement
 disjoints — c'est la condition, sans quoi ils s'écrasent. Trois ont **refusé**
@@ -608,8 +660,8 @@ rien à éviter de montrer.
 cette courbe qui fait vivre la démonstration.
 
 > **Il ne pose NI aliments NI stock, et ce document a affirmé le contraire
-> jusqu'au 16 septembre 2026.** Les 14 aliments et les 14 lignes de stock
-> viennent de **`db/manuel/jeu-essai.sql`**, que `jeu-demo.sql` exige en
+> jusqu'au 16 septembre 2026.** Les aliments et les lignes de stock (8 et 8
+> depuis le 17 septembre) viennent de **`db/manuel/jeu-essai.sql`**, que `jeu-demo.sql` exige en
 > prérequis et dont l'en-tête dit : « Il ne touche ni au frigo ni aux aliments :
 > c'est le domaine du jeu d'essai. » Charger le seul jeu de démonstration avant
 > une présentation, c'est arriver avec un **frigo vide** — et le frigo, c'est le
@@ -1113,7 +1165,10 @@ moitié fausse, et la vérification a ouvert trois autres trous.**
 
 ### Ce que dit la table, et où on se trompe en la lisant
 
-La source fait foi et elle est **dans le dépôt** : `Table_Ciqual_2025.xlsx`.
+La source fait foi : `Table_Ciqual_2025.xlsx`, publiée par l'Anses
+(ciqual.anses.fr). **Elle n'est pas versionnée** (`.gitignore`) : ce paragraphe
+disait le contraire jusqu'au 17 septembre 2026. La télécharger et la poser à la
+racine du dépôt pour revérifier les chiffres.
 
 | entrée CIQUAL | kcal | prot | gluc | lip | fibres |
 |---|---|---|---|---|---|
@@ -1214,7 +1269,7 @@ démonstration. Corrigé là et ici (voir plus bas, « Le jeu de démonstration 
 Il a aussi trouvé **quatorze renvois `fichier:ligne` faux** dans
 `presentation/fonctionnalites-revue.md` (absorbé depuis dans
 `presentation/demonstration.md`), tous hérités d'avant le lot 6 —
-`composer.ts` est passé de 817 lignes à 135, `repas.tsx` de 2 316 à 655. Recalés.
+`composer.ts` est passé de 827 lignes à 135, `repas.tsx` de 2 316 à 655. Recalés.
 
 ---
 
@@ -1366,7 +1421,7 @@ sur le nombre de fonctionnalités.
 > dans le solveur, 9 contrôleurs, 17 ressources API, 7 processeurs, 13 services,
 > **19 tables** (`BASE TABLE` — la base porte en plus la vue `v_performance`,
 > d'où 20 si on interroge `information_schema.tables` sans filtre),
-> 24 migrations numérotées, 1 338 exercices, 288 capacités dans `features.md`.
+> 24 migrations numérotées (20 au 17 septembre), 1 338 exercices, 288 capacités dans `features.md`.
 >
 > *J'avais d'abord écrit « 18 écrans, 43 composants » : le premier comptait les
 > deux `_layout.tsx`, le second comptait les fichiers de test. `verite-documentaire`
@@ -1418,7 +1473,8 @@ disparu (volet 1, vérifié jusqu'à la redirection), le portier de `_layout.tsx
 « Se déconnecter » quarante lignes plus bas. Dès que `GET /api/moi` échouait, la
 seule façon de quitter une session disparaissait — réseau coupé, API en panne,
 jeton corrompu. **Et le chargement enfermait autant que l'erreur** :
-`src/api/client.ts` ne pose aucun délai de garde, donc une requête qui pend
+`src/api/client.ts` ne posait alors aucun délai de garde (il en a un depuis,
+`fetchAvecDelai`), donc une requête qui pend
 laisse `isPending` vrai indéfiniment, et l'écran restait sur son rond qui tourne
 sans erreur à montrer ni bouton pour sortir.
 
@@ -1498,8 +1554,11 @@ aucun n'aurait levé la moindre erreur :
   débloquer le bouton, le script cliquait « Les N autres se mangent tels
   quels » — ce qui enregistre « sans cuisson » **comme habitude** pour tout le
   frigo. Plus rien ne cuisait, définitivement. Les habitudes du compte de
-  démonstration portent désormais de vraies cuissons (vapeur, eau bouillante,
-  poêle) ; l'image montre trois fournées réelles, poids en sec.
+  démonstration du **premier poste** ont été posées à la main avec de vraies
+  cuissons (vapeur, eau bouillante, poêle). **Aucun fichier ne les pose** —
+  `jeu-demo.sql` n'écrit rien dans `cuisson_habituelle` — et `capturer.mjs`
+  clique toujours « se mangent tels quels » : sur un compte neuf, la capture 11
+  sortira sans fournée. À trancher (voir « Par quoi continuer »).
 - **La bascule vers le compte administrateur attendait un formulaire absent.**
   La session ordinaire était encore ouverte, donc l'accueil affichait
   l'application. Les quatre écrans d'administration tombaient d'un coup sur
@@ -1558,7 +1617,10 @@ lui-même, au téléphone, et les images des slides ne lui conviennent pas non p
 - **Le plan 4.5 faisait lire un bandeau absent.** « Boulgour : 83 kilocalories
   aux cent grammes de grain sec » — or le boulgour du jeu de démonstration vaut
   347, corrigé la veille. Le seul bandeau présent est l'ambre « Fibres inconnues »,
-  et il est à l'étape **Jours**, avant de composer. Le bandeau est passé au 4.1 ;
+  et il est à l'étape **Jours**, avant de composer. *Relevé le 17 septembre :
+  avec `jeu-essai.sql`, qui renseigne les fibres de ses huit aliments, ce
+  bandeau ne peut pas apparaître (`planCalcule.ts` exige un aliment aux fibres
+  inconnues). À trancher (voir « Par quoi continuer »).* Le bandeau est passé au 4.1 ;
   le 4.5 montre ce que l'écran affiche vraiment après la composition : chaque
   macro en vert quand elle tient la cible, en ambre sinon.
 - **Le plan 7.5 annonçait « +2,8 kilos sur neuf séances »** ; l'écran affiche le

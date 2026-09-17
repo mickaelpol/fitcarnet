@@ -51,8 +51,10 @@ Puis les secrets, qui ne sont **pas** dans le dépôt :
 cp .env.exemple .env
 ```
 
-Cinq variables à renseigner. Les trois premières sont obligatoires — le
-`docker-compose.yml` les exige par `${VAR:?}` et refuse de démarrer sans elles :
+Cinq variables à renseigner. Les trois premières sont obligatoires **en
+production** — le `docker-compose.yml` les exige par `${VAR:?}` et refuse de
+démarrer sans elles. Le développement (`compose.dev.yml`, celui qu'utilise
+`installer.sh`) n'en lit aucune :
 
 | Variable | À mettre |
 |---|---|
@@ -118,7 +120,7 @@ dans `.claude/skills/` et `.claude/agents/`.*
 ## 4. L'application
 
 ```bash
-./installer.sh
+./installer.sh --email ton@adresse.fr
 ```
 
 Il enchaîne : vérifications, base de données, migrations de `db/manuel/`, compte
@@ -191,9 +193,9 @@ Un chantier peut en retirer autant qu'en ajouter : un chiffre différent se
 compare au journal (`REPRENDRE.md`), il ne se juge pas seul.
 
 ```bash
-cd front && npm test                    # 600 tests, puis 32 de rendu, 0 échec
+cd front && npm test                    # 603 tests, puis 33 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
-                                        # 307 tests, 819 assertions
+                                        # 329 tests, 862 assertions
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
                                         # 7 erreurs connues, aucune régression
 docker pull postgres:16                 # l'image des deux scripts ci-dessous (451 Mo),
@@ -233,8 +235,9 @@ script attrape désormais : il installe le manquant, en scope projet. Sans
 `--scope project`, `claude plugin install` pose le plugin en scope *utilisateur*
 et l'active dans tous les dépôts de la machine.
 
-**Les `skillOverrides` ne prennent effet qu'au redémarrage suivant.** Normal :
-Claude Code lit la configuration au lancement.
+**Des `skillOverrides`, s'il en fallait un jour, ne prendraient effet qu'au
+redémarrage suivant** — Claude Code lit la configuration au lancement. Le dépôt
+n'en déclare aucun aujourd'hui.
 
 **Et ils ne peuvent rien contre les skills des plugins.** Une entrée
 `expo:expo-dom` est acceptée sans broncher et ne coupe rien — vérifié le
@@ -262,7 +265,7 @@ le projet se travaille en terminal, avec Claude Code.
 - [ ] `./installer-outils.sh` — **toutes les lignes vertes**, dont « 5/5 plugins installés »
 - [ ] **Claude Code démarré dans le dossier** ← l'oubli le plus fréquent
 - [ ] `claude plugin list` montre bien les **cinq** plugins
-- [ ] `./installer.sh`
+- [ ] `./installer.sh --email ton@adresse.fr`
 - [ ] `cd front && npm install`
 - [ ] Les quatre vérifications ci-dessus au vert
 - [ ] `/graphify .` pour le graphe

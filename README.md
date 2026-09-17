@@ -71,7 +71,7 @@ cd fitcarnet
 cp .env.exemple .env        # DB_PASSWORD, APP_SECRET, JWT_PASSPHRASE
 ./installer-outils.sh       # graphify, intelephense, superpowers-symfony
 #  ← démarrer Claude Code ici : il installe les plugins officiels déclarés
-./installer.sh              # base, migrations, compte, catalogue
+./installer.sh --email ton@adresse.fr   # base, migrations, compte, catalogue
 cd front && npm install
 ```
 
@@ -80,12 +80,12 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 600 tests, puis 32 de rendu
+cd front && npm test        # tsc --noEmit + 603 tests, puis 33 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 
 docker compose -f compose.dev.yml up          # environnement de développement
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 307 tests API
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 329 tests API
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
 
 db/manuel/verifier-schema.sh      # base neuve == base migrée ?
@@ -103,8 +103,8 @@ api/          Symfony — 9 contrôleurs, 17 ressources API, 13 services, 7 proc
 front/        Expo — 16 écrans, 38 composants, le solveur de repas, 18 modules de calcul
   src/solveur/    composition de repas : algèbre, garanties, tests de propriété
   src/calcul/     nutrition, cuisson, performance, plausibilité
-db/           01-schema.sql (19 tables) + manuel/ (19 migrations numérotées, aliment-fibres.sql,
-              deux jeux de données, cibles.sql, et quatre scripts de contrôle et de rattrapage)
+db/           01-schema.sql (19 tables) + manuel/ (20 migrations numérotées, aliment-fibres.sql,
+              deux jeux de données, cibles.sql, et cinq scripts de contrôle et de rattrapage)
 docker/       Dockerfile, Caddyfile, point d'entrée de production
 docs/         audit-2026-09/ — 79 constats classés
 .claude/      outillage : skills du projet, agents, hooks, réglages
@@ -114,7 +114,7 @@ docs/         audit-2026-09/ — 79 constats classés
 
 ## Qualité
 
-**939 tests** au 17 septembre 2026 — 632 côté front (600 + 32 de rendu), 307 côté API — et des
+**965 tests** au 17 septembre 2026 — 636 côté front (603 + 33 de rendu), 329 côté API — et des
 garde-fous qui tournent sans qu'on y pense :
 
 - **PHPStan** niveau 5 sur l'API ;

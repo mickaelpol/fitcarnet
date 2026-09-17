@@ -17,6 +17,15 @@ db/manuel/verifier-schema.sh       # construit les deux bases et exige un diff v
 db/manuel/verifier-migrations.sh   # joue les migrations sur des données aberrantes
 ```
 
+**`verifier-schema.sh` ne voit pas tout**, et c'est à savoir : sa base migrée
+part de `01-schema.sql`, qui porte déjà la contrainte qu'une migration est
+censée poser. Une migration qui la poserait FAUSSE — `CASCADE` au lieu de
+`RESTRICT` — y passerait au vert. Depuis le 17 septembre 2026,
+`verifier-migrations.sh` compare donc la DÉFINITION de chaque contrainte de sa
+liste `attendues` à celle d'une base neuve, refuse les CHECK en double, et
+éprouve le message de la migration 35 sur une base d'avant la 34. **Une
+contrainte nouvelle va dans cette liste**, sinon rien ne vérifie sa définition.
+
 **Le seul résultat acceptable de `verifier-schema.sh` est
 « ✓ Base neuve et base migrée sont identiques. »** Les 280 lignes d'écart
 du 8 septembre 2026 (constat **C2**) ont été résorbées le 14 septembre. Tout
@@ -133,8 +142,9 @@ une semaine plus tôt manquait encore les migrations 30 à 33 après un pull.
 ## Ne jamais lancer les scripts de la racine « pour voir »
 
 `installer.sh`, `restaurer-nas.sh`, `deployer-nas.sh`, `publier*.sh` **déploient ou
-détruisent**. `installer.sh --repartir-de-zero` avale les erreurs de `down -v`
-(constat 19). Lire `DEPLOIEMENT.md` avant, jamais après — il porte depuis le
+détruisent**. `installer.sh --repartir-de-zero` avalait les erreurs de
+`down -v` jusqu'au 17 septembre 2026 (constat 19, corrigé). Lire
+`DEPLOIEMENT.md` avant, jamais après — il porte depuis le
 16 septembre 2026 la section « Si tu touches à la base de données », venue de
 `MISE-A-JOUR.md`.
 

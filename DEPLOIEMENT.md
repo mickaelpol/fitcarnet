@@ -148,7 +148,25 @@ pas une sauvegarde, c'est un espoir.
 ./sauvegarde-nas.sh --lister
 ```
 
-Pour restaurer, la marche à suivre est en commentaire à la fin du script.
+Pour restaurer, c'est `restaurer-nas.sh`, jamais une suite de commandes à la
+main :
+
+```bash
+./restaurer-nas.sh --lister
+./restaurer-nas.sh --essai                  # restaure dans une base JETABLE et compare
+./restaurer-nas.sh --vraiment               # restaure la PRODUCTION
+```
+
+Il arrête l'application **et les deux travailleurs d'inventaire**, et marque
+en échec les lots restaurés — sans quoi d'anciennes quantités repartiraient
+vers Grocy (constat É4). Une procédure manuelle vivait en commentaire à la fin
+de `sauvegarde-nas.sh`, et ce document y renvoyait jusqu'au 17 septembre 2026 :
+elle n'arrêtait que `fitcarnet-app`.
+
+**Une sauvegarde d'avant le 17 septembre 2026** (colonne `aliment.cree_par`)
+ne redémarre plus seule une fois la migration 34 retirée du dépôt : la 35
+s'arrête et demande de rejouer la 34 depuis l'historique git
+(`git show 1068054:db/manuel/34-aliments-par-compte.sql`).
 
 ---
 
@@ -291,8 +309,8 @@ docker logs fitcarnet-app | head -40
   rien : il tire, il redémarre.
 - **Il ne sait pas revenir en arrière.** Revenir à la version d'avant, c'est
   `git revert` puis `git push` — un aller-retour complet, pas un bouton. Pour
-  la base, en revanche, il y a quatorze sauvegardes, et la marche à suivre est
-  en commentaire à la fin de `sauvegarde-nas.sh`.
+  la base, en revanche, il y a quatorze sauvegardes, et `restaurer-nas.sh`
+  (voir plus haut).
 - **Il ne sauvegarde pas avant de migrer.** La sauvegarde est quotidienne, à
   4 h. Une migration destructive poussée à 14 h s'appliquerait sur des données
   dont la dernière copie a dix heures. Avant un déploiement qui touche au
