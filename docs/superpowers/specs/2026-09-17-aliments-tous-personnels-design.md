@@ -22,9 +22,8 @@ celui-là**.
   une migration déjà jouée partout ne change donc rien, **à condition que la
   production l'ait jouée**.
 
-**Précondition, vérifiée avant le déploiement de ce chantier :** la production
-tourne sur un `master` qui contient la migration 33. Sinon, déployer d'abord le
-`master` actuel, puis ce chantier.
+**Précondition :** la production tourne sur un `master` qui contient la
+migration 33 — confirmé par le propriétaire le 17 septembre 2026.
 
 ## Le modèle cible
 
@@ -167,7 +166,9 @@ modèle, sans récit de l'ancien :
 `donnees-de-test`, `epreuve-fonctionnalite`, `revue-de-code`, `schema-base`,
 et `presentation/` (`features.md`, `demonstration.md`, `construire.py`).
 
-`docs/audit-2026-09/` : voir « Question ouverte ».
+`docs/audit-2026-09/` : **nettoyé lui aussi**, sur décision du propriétaire — les
+constats qui ne portaient que sur le catalogue commun (C4, M-01, F-08, 10, 16,
+17) sont retirés ou réécrits, et les compteurs du README ajustés.
 
 ## Vérification
 
@@ -177,26 +178,17 @@ et `presentation/` (`features.md`, `demonstration.md`, `construire.py`).
 - Migration 34 jouée **deux fois** sur la base de dev ; la seconde ne change rien.
 - `command grep -rniE "cree_par|creePar|aliment.? commun|catalogue commun|FiltreAliment|nom_commun|nom_prive|aliment_par_auteur|fitcarnet_normaliser"`
   hors `.git`, `node_modules`, `sauvegardes/`, `docs/superpowers/` et la
-  migration 34 : **aucun résultat**.
+  migration 34 (audit compris) : **aucun résultat**.
 - Agent `verification-bout-en-bout` (deux comptes jetables, chacun ne voit que
   ses aliments ; ajout, correction, suppression ; inventaire), puis
   `verite-documentaire`.
 
 ## Déploiement
 
-1. Vérifier la précondition (production sur un `master` contenant la 33).
-2. `sauvegarde-nas.sh`.
-3. `deployer-nas.sh` : la migration 34 s'exécute au démarrage.
-4. Contrôler en production : `\d aliment` conforme au modèle cible.
-5. Commit « retrait de la migration 34 », poussé et déployé.
-
-## Question ouverte
-
-`docs/audit-2026-09/` est le rapport d'audit de septembre : il décrit
-l'application **telle qu'elle était**, catalogue commun compris (constats C4,
-M-01, F-08, 10, 16, 17). Recommandation : le laisser tel quel, parce qu'un
-rapport d'audit réécrit après coup ne prouve plus rien. À trancher par le
-propriétaire.
+1. `sauvegarde-nas.sh`.
+2. `deployer-nas.sh` : la migration 34 s'exécute au démarrage.
+3. Contrôler en production : `\d aliment` conforme au modèle cible.
+4. Commit « retrait de la migration 34 », poussé et déployé.
 
 ## Hors périmètre
 
