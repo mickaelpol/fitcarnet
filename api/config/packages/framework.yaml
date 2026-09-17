@@ -5,6 +5,15 @@ framework:
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
+    # API Platform repond 400 a toute exception du serialiseur, mais c'est
+    # l'ecouteur de Symfony qui les journalise, en `critical` par defaut : un
+    # IRI etranger ou un null a la place d'un nombre sonnait comme une panne.
+    # `warning` et non moins : une erreur de normalisation cote serveur sort
+    # aussi en 400. Voir tests/EventListener/JournalDesRefusTest.php.
+    exceptions:
+        Symfony\Component\Serializer\Exception\ExceptionInterface:
+            log_level: warning
+
     #esi: true
     #fragments: true
 
