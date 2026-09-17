@@ -2,10 +2,11 @@
 # Tout se refait d'un geste :  ./presentation/preparer-demonstration.sh
 #   tournage/capturer.mjs               → captures/*.jpg
 #   python3 presentation/construire.py  → fitcarnet-presentation.html
-#   python3 presentation/dossier.py     → fitcarnet-dossier.html
+#   python3 presentation/dossier.py     → fitcarnet-dossier.html + fitcarnet-tournage.html
 #   ./presentation/monter-demo.sh       → fitcarnet-demonstration.mp4
 fitcarnet-presentation.html
 fitcarnet-dossier.html
+fitcarnet-tournage.html
 
 # LA VIDÉO, ELLE, EST VERSIONNÉE — exception décidée le 17 septembre 2026.
 #

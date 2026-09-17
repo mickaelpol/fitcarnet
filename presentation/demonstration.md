@@ -163,6 +163,43 @@ WSLg est présent (`DISPLAY=:0`).
 - Vérifie que le clavier ne propose pas de suggestions embarrassantes au moment
   où tu tapes devant un client.
 
+## 5. Les images des slides — les remplacer par les tiennes
+
+Les slides embarquent **onze images**. Par défaut, ce sont les captures
+automatiques de `capturer.mjs`, prises sur le web en 1440 × 900 : l'application y
+paraît étirée, et trois d'entre elles ne montrent pas ce que la slide annonce.
+**Tes images passent avant** : pose-les dans **`presentation/images/`**, sous le
+nom de l'emplacement — `.png` ou `.jpg`, peu importe. Ce dossier est versionné ;
+`captures/`, lui, est réécrit à chaque passe, n'y mets rien à la main.
+
+| Slide | Fichier à poser | Ce que l'image doit montrer | Où la prendre | L'image automatique |
+|---|---|---|---|---|
+| Le frigo | `04-frigo-stock` | Mon frigo, mode Stock : la liste par emplacement, « poids cru » sous une quantité | plan 3.1 | juste, format PC |
+| L'inventaire, en écarts | `05-frigo-inventaire` | mode Inventaire, **deux ou trois lignes corrigées**, le compteur « n écarts » | plan 5.4 | **à refaire** : aucune ligne corrigée |
+| L'inventaire part en tâche de fond (gauche) | `12-inventaire-envoye` | juste après l'envoi : « Inventaire en cours… Tu peux quitter l'écran, ça continue tout seul » | plan 5.5 | **fausse** : montre déjà l'inventaire appliqué |
+| L'inventaire part en tâche de fond (droite) | `13-inventaire-applique` | retour au frigo : « Inventaire appliqué : n corrections », les quantités changées | plan 5.6 | juste, format PC |
+| Le calculateur | `07-repas-compose` | étape Repas : un repas déplié, les colonnes À peser / Servi / 1 pers. | plan 4.4 | juste, format PC |
+| Ce que le calcul donne | `09-repas-macros` | le jour composé : « 1 hors cible », et la ligne de macros vert / ambre d'un repas | plan 4.5 | **fausse** : montre le tableau, pas les macros |
+| Quand les données sont douteuses | `06-repas-cibles` | étape Jours, le bandeau ambre « Fibres inconnues sur … aliments » | plan 4.1 | juste, format PC |
+| Le batch cooking | `11-batch-cooking` | étape Cuisiner : les fournées, **et** une boîte dépliée | plan 4.9 | partielle : les boîtes sont hors cadre |
+| Le carnet de séances | `18-seance-detail-1rm` | une séance ouverte : séries, disque du 1RM, son écart, la courbe | plan 7.5 | juste, format PC |
+| Les objectifs | `03-objectifs` | écran Objectifs : les quatre repas, la case « Glucides fibres comprises » | plan 2.2 | juste, format PC |
+| Les programmes | `15-modeles-liste` | un modèle **ouvert** : ses exercices, ses séries cibles, Charge / Tenue / Chrono | plan 6.2 | faible : la liste seule |
+
+**Deux façons de les obtenir.** Une capture d'écran du téléphone pendant le
+tournage (sur Android : marche + volume bas), ou une image tirée de ta vidéo :
+
+```bash
+# l'image de la seconde 42 de la bobine 4, pour la slide « Ce que le calcul donne »
+ffmpeg -ss 42 -i bobine-4.mp4 -frames:v 1 presentation/images/09-repas-macros.png
+```
+
+Puis `./presentation/preparer-demonstration.sh --slides` : le rapport de fin dit,
+pour chaque slide, si l'image vient de `images/ (toi)` ou de
+`captures/ (automatique)`. Une image en portrait s'affiche centrée, sans être
+étirée. **Garde les légendes vraies** : elles décrivent l'écran, pas des
+chiffres ; si ton image en montre d'autres, c'est normal.
+
 ---
 
 # Partie II — L'inventaire de ce qu'il faut montrer
@@ -247,7 +284,8 @@ sont les précisions et les ajouts qui font la démonstration.
 | | Étape **Jours** : cocher les repas à cuisiner, le nombre de convives par repas, plusieurs jours d'un coup, recopier la configuration du premier repas sur tous les autres | `/(onglets)/repas` | 4.1, 4.2 |
 | | **Composer** : le calcul part des cibles **et de ce qu'il y a réellement dans le frigo** | Composer les repas | 4.3 |
 | | Le tableau à quatre colonnes — **à peser** (avant cuisson), servi, une personne | après le calcul | 4.4 |
-| + | **Les avertissements — le moment fort.** « Ces aliments se ressemblent trop pour que le calcul fonctionne », « retire 40 g de riz », « X ne pèse quasiment rien ici » | sur la carte d'un repas | 4.5 |
+| + | **L'écart affiché, jamais lissé — le moment fort.** Chaque macro en vert quand elle tient la cible, en ambre quand elle s'en écarte, et « 1 hors cible » sur le jour. Les lignes « ⚠ » (aliments trop semblables, « retire 40 g de … ») ne sortent que si le plan les provoque | sur le jour composé | 4.5 |
+| + | **Le bandeau « Fibres inconnues »**, avant de composer : il nomme les aliments et chiffre l'écart — 17 % sur un pain complet | étape Jours | 4.1 |
 | ◐ | **« Tes grammes représentent 612 calories, pas 580 » ne s'affiche PAS sur la carte d'un repas** : émis en gravité `info`, et la carte filtre les `info`. **On ne le voit que sur l'écran des objectifs.** Relevé le 16 septembre 2026 | `/objectifs` | — |
 | + | **Les cuissons ont trois états** — cuit ainsi, se mange tel quel, ou **personne n'a décidé**. « Je n'en mets pas » n'est pas « je n'ai pas répondu ». Et elles sont **mémorisées d'une fois sur l'autre** | étape Cuisiner | 4.6 |
 | | **Remplacer** un aliment, **verrouiller** (un aliment choisi par toi n'est jamais remplacé dans ton dos), déclarer un **reste**, mettre à **0** (retire l'aliment), **ajouter** hors proposition | carte de repas | 4.7 |
@@ -431,10 +469,10 @@ l'enchaînement parfait : le montage recolle.
 *Geste* : arrête-toi sur la case **« Glucides fibres comprises »**.
 *Tu dis* : « Cette case porte la convention européenne — les fibres comptent 2 kilocalories par gramme, pas 4 et pas 0, et elles sont comptées à part. La plupart des applications se trompent là-dessus, et l'écart se voit sur un régime riche en fibres. »
 
-> **Ce plan disait « Glucides totaux » jusqu'au 16 septembre 2026.** Cet
-> intitulé **n'est pas sur le formulaire des objectifs** : « Glucides totaux » et
-> « Fibres » n'existent que dans le **convertisseur de plan américain**, plus
-> bas sur le même écran. Dire « Glucides fibres comprises », et rien d'autre.
+> **Ne dis pas « Glucides totaux ».** Cet intitulé **n'est pas sur le
+> formulaire des objectifs** : « Glucides totaux » et « Fibres » n'existent que
+> dans le **convertisseur de plan américain**, plus bas sur le même écran. Dire
+> « Glucides fibres comprises », et rien d'autre.
 
 **2.4 — Réglages** · 10 s
 *Geste* : entre, montre les cinq sonneries, ressors.
@@ -457,16 +495,13 @@ l'enchaînement parfait : le montage recolle.
 
 > **Deux mots à ne pas dire : « 130 » et « basmati ».**
 >
-> **130** est la valeur **USDA** du riz blanc long cuit ; elle circule partout en
-> français sans sa source, et le plan de tournage l'a portée jusqu'au
-> 16 septembre 2026.
+> **130** est la valeur **américaine** (USDA) du riz blanc long cuit ; elle
+> circule partout en français sans sa source. Les chiffres de l'application
+> viennent de la table française CIQUAL.
 >
-> **Basmati** est tout aussi faux, et c'était la correction de la première heure.
-> La paire **350 / 155** est celle du **riz blanc** dans CIQUAL, et c'est elle
-> qui produit le rendement **2,26** du catalogue : le « Riz basmati » de
-> l'application est apparié à l'entrée « Riz blanc, cru »
-> (`ciqual_vers_grocy.py:294`). Le vrai basmati donne 351 au cru et 148 au cuit,
-> soit 2,37.
+> **Basmati** est tout aussi faux : la paire **350 / 155** est celle du **riz
+> blanc** dans CIQUAL, et c'est elle qui donne le rendement **2,26** du
+> catalogue. Le vrai basmati donne 351 au cru et 148 au cuit, soit 2,37.
 >
 > Et attention au **2,26 lui-même** : le riz *pèse* 2,26 fois plus, il n'a pas
 > « absorbé deux fois et demie son poids en eau » — il en a absorbé 1,26 fois son
@@ -501,10 +536,12 @@ l'enchaînement parfait : le montage recolle.
 
 > **État de départ** : frigo garni, aucun plan enregistré.
 
-**4.1 — Les cibles du jour** · 25 s
+**4.1 — Les cibles du jour** · 40 s
 *Geste* : onglet **Repas**. Étape 1.
-*À l'écran* : Matin, Midi, 16 h, Soir, chacun avec ses macros.
+*À l'écran* : Matin, Midi, 16 h, Soir, chacun avec ses macros — et dessous, le bandeau ambre **« Fibres inconnues sur … aliments »**.
 *Tu dis* : « Quatre repas, quatre cibles. Je coche ceux que je veux cuisiner et je dis pour combien de personnes. »
+*Geste* : arrête-toi sur le bandeau ambre.
+*Tu dis, en le lisant* : « Et avant même de calculer, l'application prévient : des aliments de mon frigo n'ont pas leurs fibres renseignées, et elle les nomme. Elle ne les invente pas — elle dit ce que ça coûte : sur un pain complet, l'écart atteint 17 %. Elle le dit avant de cuisiner, pas après. »
 
 **4.2 — Plusieurs jours** · 20 s
 *Geste* : active **Plusieurs jours**, change le nombre de convives d'un repas.
@@ -518,16 +555,17 @@ l'enchaînement parfait : le montage recolle.
 *Geste* : arrête-toi sur les colonnes.
 *Tu dis* : « À peser, servi, une personne. La première colonne, c'est ce que je mets sur la balance — avant cuisson. La dernière, ce que je me sers. »
 
-**4.5 — Les avertissements** · 40 s — **le moment fort**
-*Geste* : fais défiler jusqu'aux bandeaux rouge et ambre.
-*Tu dis, en lisant* : « "Des données de ton frigo rendent le calcul faux. Boulgour : 83 kilocalories aux cent grammes de grain sec, alors qu'un grain sec en fait 300 à 400 — c'est une borne physique, pas une moyenne." L'application refuse de calculer sur des chiffres qui ne peuvent pas être vrais. Et juste en dessous : "fibres inconnues sur six aliments, l'écart atteint 17 % sur un pain complet." Elle le dit avant de cuisiner, pas après. »
+**4.5 — L'écart affiché, jamais lissé** · 40 s — **le moment fort**
+*Geste* : sur le jour composé, arrête-toi sur « 4 repas · 1 hors cible », puis sur la ligne de macros sous le nom d'un repas.
+*À l'écran* : chaque macro en **vert** quand elle tient la cible, en **ambre** quand elle s'en écarte.
+*Tu dis* : « Quand le frigo ne permet pas de tomber pile, l'application ne maquille pas le résultat. Elle affiche l'écart, macro par macro : vert, c'est tenu ; ambre, c'est à côté — et on sait tout de suite quoi corriger. C'est une règle du projet : un chiffre faux est pire qu'un refus de répondre. »
 
-> **Ce plan ne peut pas montrer « Tes grammes représentent 612 calories, pas
-> 580 ».** Ce message est émis en gravité `info` et la carte de repas filtre les
-> `info` : **on ne le voit que sur l'écran des objectifs**. Relevé le
-> 16 septembre 2026 en écrivant les fiches. Les autres avertissements — aliments
-> trop semblables, « retire 40 g de riz », apport négligeable — s'affichent bien
-> sur la carte : ce sont eux, le moment fort.
+> **Ne lis que ce qui est à l'écran.** Les lignes « ⚠ » sous une carte
+> (aliments trop semblables, « retire 40 g de … », apport négligeable)
+> n'apparaissent que si le plan les provoque. Et le bandeau rouge « Des données
+> de ton frigo rendent le calcul faux » **n'apparaît pas** avec le jeu de
+> démonstration : ses valeurs sont justes. « Tes grammes représentent
+> 612 calories » ne se voit que sur l'écran des objectifs.
 
 **4.6 — Les cuissons** · 35 s
 *Geste* : bascule un aliment de cru à cuit, puis règle le reste d'un coup.
@@ -561,12 +599,10 @@ l'enchaînement parfait : le montage recolle.
 > **État de départ** : un plan enregistré non cuisiné.
 > **Le travailleur de fond doit tourner.**
 
-> **Cette bobine n'est PAS tournable avec le seul jeu de démonstration.** Les
-> deux plans de `db/manuel/jeu-demo.sql` portent un `consomme` **vide** : le plan
-> non cuisiné affiche « · ne réserve rien » au lieu de « · à cuisiner », et
-> « J'ai cuisiné » répond **422**. **Compose et enregistre un plan dans
-> l'application** (bobine 4) avant de filmer celle-ci. Relevé le 16 septembre
-> 2026.
+> **Filme-la juste après la bobine 4, avec le plan que tu viens d'y
+> enregistrer.** Les deux plans du jeu de démonstration ne réservent rien : ils
+> affichent « · ne réserve rien » au lieu de « · à cuisiner », et « J'ai
+> cuisiné » les refuse.
 
 **5.1 — Avant** · 15 s
 *Geste* : va au frigo, montre la quantité de deux ou trois aliments du plan.
@@ -595,7 +631,7 @@ l'enchaînement parfait : le montage recolle.
 **5.6 — On quitte, on revient** · 30 s
 *Geste* : change d'onglet, attends, reviens.
 *À l'écran* : « Inventaire appliqué : 3 corrections ».
-*Tu dis* : « J'ai changé d'écran, je suis revenu, c'était fait. Et si j'avais fermé l'application, je retrouverais le résultat au retour. Ce n'est pas un détail de confort : une requête HTTP a une durée maximale, un inventaire n'en a pas. Les faire coïncider nous a coûté un frigo à moitié corrigé, un soir d'août. »
+*Tu dis* : « J'ai changé d'écran, je suis revenu, c'était fait. Et si j'avais fermé l'application, je retrouverais le résultat au retour. Ce n'est pas un détail de confort : une requête HTTP a une durée maximale, un inventaire n'en a pas. Les faire coïncider nous a déjà coûté un frigo à moitié corrigé. »
 
 **5.7 — Supprimer un plan** · 15 s
 *Geste* : supprime le plan depuis la liste des plans enregistrés.
@@ -622,10 +658,8 @@ l'enchaînement parfait : le montage recolle.
 *Geste* : change l'ordre des exercices → « **Appliquer cet ordre à tes séances ?** » → **Appliquer**.
 *Tu dis* : « Et quand je change l'ordre, je peux le répercuter sur mes séances à venir — l'application annonce d'abord combien en seraient touchées. »
 
-> **Le partage d'un modèle ne fait pas partie de l'application.** Tranché le
-> 15 septembre 2026 : le champ n'a jamais rien fait, il a été retiré de
-> l'entité, de la base et du front. Il n'y a donc plus rien à éviter de montrer
-> — mais rien à promettre non plus.
+> **Le partage d'un modèle ne fait pas partie de l'application.** Rien à
+> montrer, donc — et rien à promettre non plus.
 
 ---
 
@@ -650,14 +684,14 @@ l'enchaînement parfait : le montage recolle.
 *Geste* : **touche la puce ambre** « ↓ 12×25 · 12×27,5 », dans la rangée des modes.
 *Tu dis* : « Et juste au-dessus : ce que j'avais fait la dernière fois. Je la touche, elle applique. C'est un geste, pas une information. »
 
-> **Ce n'est pas un bandeau**, et ce plan l'a dit jusqu'au 16 septembre 2026.
-> C'est une **puce cliquable** bordée d'ambre, posée dans la même rangée que les
-> modes, et **elle applique les valeurs** quand on la touche.
+> **Ce n'est pas un bandeau** : c'est une **puce cliquable** bordée d'ambre,
+> posée dans la même rangée que les modes, et **elle applique les valeurs**
+> quand on la touche.
 
 **7.5 — Le 1RM** · 45 s — **le moment fort**
 *Geste* : saisis une charge plus lourde. **Reste sur le nombre.**
 *À l'écran* : le 1RM se recalcule, la variation s'affiche, la courbe suit.
-*Tu dis* : « Le 1RM estimé — la charge maximale sur une répétition — se recalcule à chaque saisie. Et en dessous, la progression : plus 2,8 kilos sur neuf séances. La formule est écrite à un seul endroit dans tout le code ; trois copies aux règles divergentes avaient produit un record que la formule elle-même déclarait invalide. »
+*Tu dis* : « Le 1RM estimé — la charge maximale sur une répétition — se recalcule à chaque saisie. Et en dessous, la courbe : ce que j'ai gagné sur mes dernières séances. La formule est écrite à un seul endroit dans tout le code ; trois copies aux règles divergentes avaient produit un record que la formule elle-même déclarait invalide. »
 
 **7.6 — Les trois modes** · 30 s
 *Geste* : bascule un exercice sur **Tenue**, puis **Chrono**. Laisse une mesure tourner pendant la bascule.
@@ -671,12 +705,10 @@ l'enchaînement parfait : le montage recolle.
 *Geste* : appuie sur **⚖ RM**, en bas de séance. Saisis une charge et des répétitions.
 *Tu dis* : « Le calculateur de charge : à partir d'un maximum, ce qu'il faut mettre sur la barre pour un pourcentage donné. »
 
-> **Le disque et le calculateur sont deux choses**, et ce plan les confondait
-> jusqu'au 16 septembre 2026. « ⚖ RM » ouvre le **calculateur**, appelé avec
-> `rmConnu={null}` depuis la séance : **il n'hérite pas** du 1RM de l'exercice
-> ouvert, on y saisit une charge et des répétitions. Le **disque**, lui, est le
-> cercle sur la carte de l'exercice, qui déplie la table des paliers (zone 70 à
-> 90 %).
+> **Le disque et le calculateur sont deux choses.** « ⚖ RM » ouvre le
+> **calculateur** : **il ne reprend pas** le 1RM de l'exercice ouvert, on y
+> saisit une charge et des répétitions. Le **disque**, lui, est le cercle sur la
+> carte de l'exercice, qui déplie la table des paliers (zone 70 à 90 %).
 
 **7.9 — Notes, séries, totaux** · 30 s
 *Geste* : écris une note, ajoute une série, montre « répétitions / kilos soulevés », réordonne deux exercices.
@@ -701,12 +733,9 @@ l'enchaînement parfait : le montage recolle.
 *À l'écran* : groupes, équipement, muscle ciblé, format prescrit, compteurs.
 *Tu dis* : « Le catalogue commun, mille trois cent trente-huit entrées. Un exercice porte son équipement, son muscle ciblé, le format prescrit. C'est ce que tout le monde utilise — et personne ne peut en supprimer un, sinon on effacerait de l'historique. »
 
-> **8.2 — Créer un exercice : NON FILMABLE.** La création est réservée à
-> l'administrateur depuis le 15 septembre 2026, et **aucun écran ne la propose,
-> pour personne** : un exercice créé par l'API naît privé, sans moyen de le
-> publier. Relevé le 16 septembre 2026 en écrivant les fiches. Ce plan portait
-> le numéro 8.2 ; il est laissé vide plutôt que renuméroté, pour que les renvois
-> existants ne pointent pas sur autre chose.
+> **8.2 — Créer un exercice : non filmable.** **Aucun écran ne le propose,
+> pour personne.** Le numéro est laissé vide plutôt que renuméroté, pour que
+> les renvois restent justes.
 
 **8.3 — Fusionner** · 40 s
 *Geste* : **Fusion** → sélectionne deux doublons → la confirmation.
@@ -807,8 +836,8 @@ mots interdits) et **l'inventaire en écarts** —
 
 **6:00 – 11:00 · Le calculateur — le cœur.** Trois choses, dans cet ordre :
 les quantités retenues **bloquées** pour ce repas ; **l'écart à la cible affiché
-quand le frigo ne permet pas mieux**, non lissé ; puis l'avertissement sur les
-données douteuses (plan 4.5), lu à voix haute. Et, en regardant la partie
+quand le frigo ne permet pas mieux**, non lissé ; puis le bandeau des fibres
+inconnues (plan 4.1), lu à voix haute. Et, en regardant la partie
 technique de la salle : « C'est une règle du projet : **un chiffre faux est pire
 qu'un refus de répondre.** »
 

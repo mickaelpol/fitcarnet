@@ -238,6 +238,289 @@ def construire() -> str:
     ])
 
 
+# =====================================================================
+#  LA FEUILLE DE TOURNAGE.
+#
+#  POURQUOI. La vidéo montée par `tourner.mjs` est un parcours automatique :
+#  elle montre les écrans, elle ne fait pas une démonstration. Le propriétaire
+#  filme donc lui-même, au téléphone, et il lui faut ce qu'aucun des deux
+#  rendus précédents ne donnait : UNE TIMELINE — filmer ceci, puis cela, et à
+#  quel moment du film on en est.
+#
+#  Elle ne s'écrit pas à part. La partie III de `demonstration.md` porte déjà
+#  chaque plan avec son geste, ce qu'on voit, ce qu'on dit et sa durée ; on la
+#  lit, on cumule les durées, on la rend. Une seconde source aurait dérivé de
+#  la première en une semaine — c'est ce qui a fait supprimer quatre documents.
+# =====================================================================
+SORTIE_TOURNAGE = RACINE / "fitcarnet-tournage.html"
+
+BOBINE = re.compile(r"^## Bobine (\d+) · (.+?) · ~[^—]+(?:— (.*))?$")
+PLAN = re.compile(r"^\*\*(\d+\.\d+) — (.+?)\*\*\s*·\s*(\d+)\s*(s|min)\b(.*)$")
+ETAPE = re.compile(r"^\*([^*]+)\*\s*:\s*(.+)$")
+
+CSS_TOURNAGE = """
+.plan{display:grid;grid-template-columns:8.6rem 1fr;gap:0 1.2rem;padding:1rem 0;
+      border-top:1px solid #262a31}
+.tc{font-family:"IBM Plex Mono",ui-monospace,monospace;color:#e8b84b;font-size:.95rem;
+    line-height:1.4;white-space:nowrap}
+.tc small{display:block;color:#71767e;font-size:.8rem}
+.plan h3{margin:0 0 .5rem;font-size:1.12rem}
+.plan h3 .n{color:#71767e;font-weight:500;margin-right:.35rem}
+.fort{display:inline-block;margin-left:.5rem;padding:.05rem .45rem;border-radius:3px;
+      background:#e8b84b;color:#0f1114;font-size:.72rem;font-weight:700;
+      letter-spacing:.04em;text-transform:uppercase;vertical-align:middle}
+.etape{display:grid;grid-template-columns:5.6rem 1fr;gap:.6rem;margin:.28rem 0}
+.etape b{font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;
+         padding-top:.2rem}
+.geste b{color:#6fa8dc}.ecran b{color:#9aa0a8}.dire b{color:#7bc47f}
+.dire span{color:#fff}
+.note{border-left:3px solid #e8b84b;background:#1c1a14;border-radius:0 6px 6px 0;
+      padding:.6rem .9rem;margin:.6rem 0 0;color:#d9d2c0;font-size:.92rem}
+.note p{margin:0 0 .4rem}.note p:last-child{margin:0}
+.depart{border-left-color:#6fa8dc;background:#141a22;color:#b9bec6}
+.remise{border-left-color:#71767e;background:#15171b;color:#9aa0a8}
+.coche{font-size:1.15rem;color:#71767e;margin-right:.35rem}
+.recap td:nth-child(3),.recap td:nth-child(4){font-family:"IBM Plex Mono",monospace;
+      white-space:nowrap}
+@media (max-width:40rem){
+  main{padding:0 1rem}
+  .plan{grid-template-columns:1fr}
+  .tc{margin-bottom:.3rem}
+  .etape{grid-template-columns:1fr;gap:0}
+}
+@media print{
+  .plan{page-break-inside:avoid}
+  .dire span{color:#111}
+  .note{background:#f7f5ee;color:#333}
+}
+"""
+
+
+def minutage(secondes: int) -> str:
+    return f"{secondes // 60:02d}:{secondes % 60:02d}"
+
+
+def duree_lisible(secondes: int) -> str:
+    m, s = divmod(secondes, 60)
+    return f"{m} min {s:02d} s" if m else f"{s} s"
+
+
+def lire_partie_iii(markdown: str) -> tuple[list[dict], list[str]]:
+    """Les bobines et leurs plans, dans l'ordre du document.
+
+    Une citation qui commence par « État de départ » ou « Remise à zéro » est
+    rangée à part ; toute autre citation est une note « à savoir », accrochée
+    au plan qui la précède — c'est là qu'elle sert, au moment de filmer.
+    """
+    debut = markdown.find("\n# Partie III")
+    fin = markdown.find("\n# Partie IV")
+    if debut < 0 or fin < 0:
+        raise SystemExit("tournage : la partie III de demonstration.md est introuvable.")
+    lignes = markdown[debut:fin].split("\n")
+
+    bobines: list[dict] = []
+    hors_champ: list[str] = []
+    bobine = plan = None
+    dans_hors_champ = False
+    i = 0
+    while i < len(lignes):
+        nu = lignes[i].strip()
+
+        if nu.startswith("## Ce qui reste hors champ"):
+            dans_hors_champ, bobine, plan = True, None, None
+            i += 1
+            continue
+
+        m = BOBINE.match(nu)
+        if m:
+            dans_hors_champ = False
+            bobine = {"numero": int(m.group(1)), "titre": m.group(2).strip(),
+                      "marque": (m.group(3) or "").strip(),
+                      "depart": [], "remise": [], "notes": [], "plans": []}
+            bobines.append(bobine)
+            plan = None
+            i += 1
+            continue
+
+        if dans_hors_champ and nu.startswith("- "):
+            texte = nu[2:]
+            i += 1
+            while i < len(lignes) and lignes[i].startswith("  ") and lignes[i].strip():
+                texte += " " + lignes[i].strip()
+                i += 1
+            hors_champ.append(texte)
+            continue
+
+        if bobine is None:
+            i += 1
+            continue
+
+        m = PLAN.match(nu)
+        if m:
+            secondes = int(m.group(3)) * (60 if m.group(4) == "min" else 1)
+            plan = {"numero": m.group(1), "titre": m.group(2).strip(),
+                    "secondes": secondes, "fort": "moment fort" in m.group(5),
+                    "etapes": [], "notes": []}
+            bobine["plans"].append(plan)
+            i += 1
+            continue
+
+        m = ETAPE.match(nu)
+        if m and plan is not None:
+            plan["etapes"].append((m.group(1).strip(), m.group(2).strip()))
+            i += 1
+            continue
+
+        if nu.startswith(">"):
+            bloc = []
+            while i < len(lignes) and lignes[i].strip().startswith(">"):
+                bloc.append(re.sub(r"^\s*>\s?", "", lignes[i]))
+                i += 1
+            paragraphes = [" ".join(p.split()) for p in "\n".join(bloc).split("\n\n") if p.strip()]
+            # Par PARAGRAPHE et non par ligne : la bobine 1 écrit son état de
+            # départ sur deux lignes, et le tableau récapitulatif s'arrêtait
+            # sur « Un second ». Vu à la première relecture de la feuille.
+            if paragraphes and paragraphes[0].startswith("**État de départ**"):
+                bobine["depart"].extend(paragraphes)
+            elif paragraphes and paragraphes[0].startswith("**Remise à zéro**"):
+                bobine["remise"].extend(paragraphes)
+            elif plan is not None:
+                plan["notes"].append(paragraphes)
+            else:
+                bobine["notes"].append(paragraphes)
+            continue
+
+        i += 1
+
+    for b in bobines:
+        for p in b["plans"]:
+            if not any(etiquette.startswith("Geste") for etiquette, _ in p["etapes"]):
+                raise SystemExit(f"tournage : le plan {p['numero']} n'a aucun geste — "
+                                 "la partie III a changé de forme, le lecteur aussi doit changer.")
+    return bobines, hors_champ
+
+
+def rendre_etape(etiquette: str, texte: str) -> str:
+    if etiquette.startswith("Geste"):
+        classe, nom = "geste", "Geste"
+    elif etiquette.startswith("À l'écran"):
+        classe, nom = "ecran", "À l'écran"
+    else:
+        classe, nom = "dire", "Tu dis"
+    precision = etiquette[len("Tu dis"):].strip(" ,") if classe == "dire" else ""
+    prefixe = f"<em>({html.escape(precision)})</em> " if precision else ""
+    return (f'<div class="etape {classe}"><b>{nom}</b>'
+            f"<span>{prefixe}{enligne(texte)}</span></div>")
+
+
+def rendre_note(paragraphes: list[str], classe: str = "") -> str:
+    return (f'<div class="note {classe}">'
+            + "".join(f"<p>{enligne(p)}</p>" for p in paragraphes) + "</div>")
+
+
+def construire_tournage() -> tuple[str, int, int]:
+    bobines, hors_champ = lire_partie_iii(SOURCE.read_text(encoding="utf-8"))
+
+    # Le minutage court sur tout le film, bobine après bobine : c'est lui qui
+    # dit « à 07:40, on est dans le calculateur ».
+    horloge = 0
+    for b in bobines:
+        b["debut"] = horloge
+        for p in b["plans"]:
+            p["debut"] = horloge
+            horloge += p["secondes"]
+            p["fin"] = horloge
+        b["fin"] = horloge
+    total = horloge
+    nb_plans = sum(len(b["plans"]) for b in bobines)
+
+    corps = [
+        "<h1>Feuille de tournage</h1>",
+        f"<p><strong>{len(bobines)} bobines, {nb_plans} plans, "
+        f"{duree_lisible(total)} de film</strong> une fois recollés. "
+        "Filme <strong>dans cet ordre</strong> : il raconte une journée — on arrive, on "
+        "règle ses objectifs, on remplit le frigo, on planifie, on cuisine, on prépare "
+        "ses programmes, on s'entraîne, puis on passe côté administrateur.</p>",
+        "<ul>"
+        "<li><strong>Une bobine = un enregistrement.</strong> On ne cherche pas "
+        "l'enchaînement parfait : le montage recolle. Une bobine ratée se refait seule.</li>"
+        "<li><strong>La colonne de gauche</strong> dit où le plan tombe dans le film "
+        "final, et combien de temps il dure. Ce sont des minimums : un geste trop "
+        "rapide est un geste illisible.</li>"
+        "<li><strong>La bobine 5 se filme juste après la 4</strong> : on y cuisine le "
+        "plan qu'on vient d'enregistrer.</li>"
+        "<li><strong>Ne lis que ce qui est à l'écran.</strong> Si un message annoncé "
+        "n'apparaît pas, tais-le plutôt que de le réciter.</li>"
+        "<li>Enregistrement : <code>scrcpy --record bobine-1.mp4 --max-size 1080</code> "
+        "depuis le PC, ou l'enregistreur intégré d'Android. Téléphone en « Ne pas "
+        "déranger », luminosité fixe, batterie au-dessus de 50 %.</li>"
+        "</ul>",
+        '<h2>Le déroulé</h2>',
+        '<div class="tableau"><table class="recap"><thead><tr>'
+        "<th>#</th><th>Bobine</th><th>Dans le film</th><th>Durée</th><th>Avant de filmer</th>"
+        "</tr></thead><tbody>",
+    ]
+    for b in bobines:
+        depart = enligne(re.sub(r"^\*\*État de départ\*\*\s*:\s*", "", b["depart"][0])) \
+            if b["depart"] else "—"
+        corps.append(
+            f"<tr><td>{b['numero']}</td><td>{enligne(b['titre'])}</td>"
+            f"<td>{minutage(b['debut'])} → {minutage(b['fin'])}</td>"
+            f"<td>{duree_lisible(b['fin'] - b['debut'])}</td><td>{depart}</td></tr>")
+    corps.append("</tbody></table></div>")
+
+    for b in bobines:
+        marque = f' <span class="fort">{html.escape(re.sub(r"[*]", "", b["marque"]))}</span>' \
+            if b["marque"] else ""
+        corps.append(f"<h2>Bobine {b['numero']} · {enligne(b['titre'])}{marque}</h2>")
+        corps.append(f"<p class=\"tc\">{minutage(b['debut'])} → {minutage(b['fin'])} · "
+                     f"{duree_lisible(b['fin'] - b['debut'])}</p>")
+        if b["depart"]:
+            corps.append(rendre_note(b["depart"], "depart"))
+        for n in b["notes"]:
+            corps.append(rendre_note(n))
+        for p in b["plans"]:
+            fort = '<span class="fort">moment fort</span>' if p["fort"] else ""
+            corps.append(
+                '<div class="plan">'
+                f'<div class="tc">{minutage(p["debut"])} → {minutage(p["fin"])}'
+                f'<small>{p["secondes"]} s</small></div>'
+                "<div>"
+                f'<h3><span class="coche">☐</span><span class="n">{p["numero"]}</span>'
+                f'{enligne(p["titre"])}{fort}</h3>'
+                + "".join(rendre_etape(e, t) for e, t in p["etapes"])
+                + "".join(rendre_note(n) for n in p["notes"])
+                + "</div></div>")
+        for r in b["remise"]:
+            corps.append(rendre_note([r], "remise"))
+
+    if hors_champ:
+        corps.append("<h2>Ce qu'on ne filme pas</h2><ul>"
+                     + "".join(f"<li>{enligne(h)}</li>" for h in hors_champ) + "</ul>")
+
+    return "\n".join([
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width,initial-scale=1">',
+        "<title>fitcarnet — feuille de tournage</title>",
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
+        "family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&"
+        'family=IBM+Plex+Mono:wght@400&display=swap">',
+        f"<style>{CSS}{CSS_TOURNAGE}</style>",
+        "<main>",
+        '<p class="entete">Rendue depuis la partie III de '
+        "<code>presentation/demonstration.md</code>. Pour changer un plan, change-le "
+        "là-bas, puis <code>python3 presentation/dossier.py</code>.</p>",
+        "\n".join(corps),
+        "</main>",
+    ]), total, nb_plans
+
+
 if __name__ == "__main__":
     SORTIE.write_text(construire(), encoding="utf-8")
     print(f"{SORTIE.name} — {SORTIE.stat().st_size // 1024} Ko")
+    page, total, nb_plans = construire_tournage()
+    SORTIE_TOURNAGE.write_text(page, encoding="utf-8")
+    print(f"{SORTIE_TOURNAGE.name} — {nb_plans} plans, {duree_lisible(total)} de film, "
+          f"{SORTIE_TOURNAGE.stat().st_size // 1024} Ko")

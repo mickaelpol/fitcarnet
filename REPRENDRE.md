@@ -1418,6 +1418,42 @@ SQL
 
 ---
 
+## Filmer soi-même : la feuille de tournage, et des images qu'on remplace
+
+**Le 17 septembre 2026, au soir.** La vidéo montée par `tourner.mjs` ne fait pas
+une démonstration : c'est un parcours automatique. Le propriétaire filme donc
+lui-même, au téléphone, et les images des slides ne lui conviennent pas non plus
+— certaines ne montrent pas l'écran dont la slide parle.
+
+- **`fitcarnet-tournage.html`**, rendu par `dossier.py` depuis la **partie III**
+  de `demonstration.md` : 8 bobines, 53 plans, 24 min 53 s, chaque plan avec son
+  minutage dans le film, son geste, ce qu'on voit, ce qu'on dit, une case à
+  cocher. Pas de seconde source : pour changer un plan, on change la partie III.
+- **Les images des slides se remplacent** dans `presentation/images/`
+  (versionné, prioritaire sur `captures/`, PNG accepté, portrait centré). La
+  partie I, section 5, dit ce que chacune doit montrer et à quel plan la prendre.
+- **Plus aucune date** dans les slides ni dans la partie III.
+
+**Ce que la relecture a trouvé, et qui aurait été dit à l'oral :**
+
+- **Le plan 4.5 faisait lire un bandeau absent.** « Boulgour : 83 kilocalories
+  aux cent grammes de grain sec » — or le boulgour du jeu de démonstration vaut
+  347, corrigé la veille. Le seul bandeau présent est l'ambre « Fibres inconnues »,
+  et il est à l'étape **Jours**, avant de composer. Le bandeau est passé au 4.1 ;
+  le 4.5 montre ce que l'écran affiche vraiment après la composition : chaque
+  macro en vert quand elle tient la cible, en ambre sinon.
+- **Le plan 7.5 annonçait « +2,8 kilos sur neuf séances »** ; l'écran affiche le
+  chiffre de l'exercice ouvert (« +25,3 kg sur 5 séances » sur le squat avant).
+- **Deux légendes de slide mentaient** : « le stock est passé de 623,5 g à
+  480 g » (il partait de 836,5), et la slide des avertissements montrait
+  l'éditeur d'aliment depuis que la capture 14 y a été déplacée.
+- **Le contrôle par empreintes ne suffit pas.** `12-inventaire-envoye` et
+  `13-inventaire-applique` ont des md5 différents et montrent **le même écran** :
+  le travailleur de fond applique le lot avant la première photo. Regarder les
+  images reste le seul contrôle qui vaille.
+
+---
+
 ## Pièges vérifiés, qui reviendront
 
 - ~~`verifier-schema.sh` signale 280 lignes de divergence~~ — **corrigé le

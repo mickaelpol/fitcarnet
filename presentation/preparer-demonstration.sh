@@ -7,6 +7,7 @@
 #  Sorties : presentation/captures/*.jpg            les images
 #            presentation/fitcarnet-presentation.html les slides
 #            presentation/fitcarnet-dossier.html      ce qu'on dit, dans l'ordre
+#            presentation/fitcarnet-tournage.html     quoi filmer, plan par plan, minuté
 #            presentation/fitcarnet-demonstration.mp4 la vidéo (option --video)
 #
 #  POURQUOI UN SEUL SCRIPT.
@@ -251,7 +252,7 @@ fi
 
 # ---------------------------------------------------------------------
 titre "C'est prêt"
-for produit in fitcarnet-presentation.html fitcarnet-dossier.html fitcarnet-demonstration.mp4; do
+for produit in fitcarnet-presentation.html fitcarnet-dossier.html fitcarnet-tournage.html fitcarnet-demonstration.mp4; do
     [ -r "$RACINE/$produit" ] && printf '  %s  (%s)\n' "$produit" "$(du -h "$RACINE/$produit" | cut -f1)"
 done
 if [ -d "$RACINE/captures" ]; then

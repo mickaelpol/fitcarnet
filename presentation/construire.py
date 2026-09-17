@@ -18,14 +18,45 @@ import re
 RACINE = pathlib.Path(__file__).parent
 CAPTURES = RACINE / "captures"
 
+# TES IMAGES PASSENT AVANT LES CAPTURES AUTOMATIQUES.
+#
+# Les captures de `capturer.mjs` sont prises sur le web, en 1440 × 900 : l'app
+# mobile y paraît étirée, et certaines ne montrent pas l'écran dont la slide
+# parle. Le propriétaire veut pouvoir poser les siennes — des captures de son
+# téléphone, ou des images tirées de son tournage.
+#
+# Elles ne vont PAS dans `captures/` : ce dossier est ignoré par git et
+# réécrit à chaque `preparer-demonstration.sh`, l'image posée à la main y
+# serait écrasée sans un mot. Elles vont dans `images/`, qui est versionné —
+# c'est aussi ce qui les fait arriver sur l'autre PC. Même nom que
+# l'emplacement, sans se soucier de l'extension.
+IMAGES = RACINE / "images"
+TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+
+# Ce que chaque slide a réellement embarqué, pour le rapport de fin.
+EMPLACEMENTS: list[tuple[str, str, str]] = []
+
+
+def trouver(nom: str) -> tuple[pathlib.Path | None, str]:
+    base = pathlib.Path(nom).stem
+    for extension in TYPES:
+        chemin = IMAGES / (base + extension)
+        if chemin.exists():
+            return chemin, "images/ (toi)"
+    chemin = CAPTURES / nom
+    if chemin.exists():
+        return chemin, "captures/ (automatique)"
+    return None, "MANQUANTE"
+
 
 def image(nom: str) -> str:
-    """Encode une capture en data URI. Rend une chaîne vide si elle manque —
+    """Encode l'image en data URI. Rend une chaîne vide si elle manque —
     une slide sans visuel vaut mieux qu'une présentation qui ne s'ouvre pas."""
-    chemin = CAPTURES / nom
-    if not chemin.exists():
+    chemin, _ = trouver(nom)
+    if chemin is None:
         return ""
-    return "data:image/jpeg;base64," + base64.b64encode(chemin.read_bytes()).decode()
+    type_mime = TYPES.get(chemin.suffix.lower(), "image/jpeg")
+    return f"data:{type_mime};base64," + base64.b64encode(chemin.read_bytes()).decode()
 
 
 # --------------------------------------------------------------------------
@@ -33,6 +64,7 @@ def image(nom: str) -> str:
 #  L'acte pilote la couleur du bandeau et le fil conducteur en pied de page.
 # --------------------------------------------------------------------------
 def visuel(nom: str, legende: str = "") -> str:
+    EMPLACEMENTS.append((pathlib.Path(nom).stem, legende, trouver(nom)[1]))
     src = image(nom)
     if not src:
         return f'<p class="manque">[capture manquante : {nom}]</p>'
@@ -46,7 +78,7 @@ SLIDES = [
       <p class="accroche">Nutrition et musculation, dans une seule application.</p>
       <p class="sous">Suivi des repas composés à partir du frigo réel · carnet de séances ·
          web et Android · hébergement personnel</p>
-      <p class="meta">Présentation produit et technique — septembre 2026</p>
+      <p class="meta">Présentation produit et technique</p>
     """),
 
     # ================================================================== ACTE 1
@@ -95,13 +127,13 @@ SLIDES = [
     """),
 
     ("produit", "Le frigo", f"""
-      {visuel('04-frigo-stock.jpg', "12 aliments en stock, regroupés par emplacement, avec leurs valeurs pour 100 g")}
+      {visuel('04-frigo-stock.jpg', "Le stock, regroupé par emplacement, avec ses valeurs pour 100 g")}
       <p class="chute">« <strong>poids cru</strong> » sous la quantité : les valeurs décrivent le produit
          tel qu'on le pèse. C'est une règle du projet, et elle est visible à l'écran.</p>
     """),
 
     ("produit", "L'inventaire, en écarts", f"""
-      {visuel('05-frigo-inventaire.jpg', "On ne corrige que ce qui a bougé — « 0/14 vérifiés · 0 écart »")}
+      {visuel('05-frigo-inventaire.jpg', "On ne corrige que ce qui a bougé")}
       <p class="chute">Une ligne absente n'est pas un zéro : elle n'a pas été comptée, et son stock ne bouge pas.
          Un inventaire de trente aliments prend le temps d'en corriger trois.</p>
     """),
@@ -109,7 +141,7 @@ SLIDES = [
     ("produit", "L'inventaire part en tâche de fond", f"""
       <div class="deux">
         <div>{visuel('12-inventaire-envoye.jpg', "« Tu peux quitter l'écran, ça continue tout seul »")}</div>
-        <div>{visuel('13-inventaire-applique.jpg', "Appliqué : le stock est passé de 623,5 g à 480 g")}</div>
+        <div>{visuel('13-inventaire-applique.jpg', "« Inventaire appliqué » : le stock a bougé, sans rien ressaisir")}</div>
       </div>
       <p class="chute">L'écran rend la main immédiatement. Le traitement suit, ligne par ligne,
          et son avancement reste consultable même après avoir fermé l'application.</p>
@@ -128,22 +160,22 @@ SLIDES = [
     """),
 
     ("produit", "Quand les données sont douteuses, il le dit", f"""
-      {visuel('14-garde-fou-donnees.jpg', "Deux avertissements levés avant le calcul, sur les données du frigo")}
-      <p class="chute">« Le calcul sera juste, mais il partira de chiffres qui ne peuvent pas être vrais. »
-         L'application connaît les bornes physiques d'un aliment sec, et sait qu'une fibre inconnue
-         fausse une cible en glucides totaux de 17 % sur un pain complet. Elle le dit <em>avant</em> de cuisiner.</p>
+      {visuel('06-repas-cibles.jpg', "Avant le calcul : les aliments dont les fibres sont inconnues, nommés un par un")}
+      <p class="chute">Une fibre inconnue compte pour zéro, et fausse une cible en glucides totaux de
+         17 % sur un pain complet : l'application le dit, et nomme les aliments. Une valeur physiquement
+         impossible — un grain sec à 83 kcal — est signalée en rouge. Elle le dit <em>avant</em> de cuisiner.</p>
     """),
 
     ("produit", "Le batch cooking", f"""
-      {visuel('11-batch-cooking.jpg', "Le plan réparti en boîtes : ce qu'on met dedans, et ce qu'on se sert")}
+      {visuel('11-batch-cooking.jpg', "Les fournées pesées sec, puis les boîtes : ce qu'on y met, et ce qu'on se sert")}
       <p class="chute">Deux colonnes distinctes — la boîte pour tout le monde, la portion pour soi.
          C'est la différence entre cuisiner pour la semaine et savoir ce qu'on mange.</p>
     """),
 
     ("produit", "Le carnet de séances", f"""
       {visuel('18-seance-detail-1rm.jpg', "Séance en cours : séries prescrites, charges, minuteur, et 1RM estimé")}
-      <p class="chute">63,3 kg de 1RM estimé, <strong>+3,1 kg</strong> depuis la séance précédente, dont les
-         charges sont rappelées en haut. Neuf semaines de données derrière ce chiffre.</p>
+      <p class="chute">Le <strong>1RM estimé</strong> se recalcule à chaque saisie, et l'écart depuis la
+         séance précédente s'affiche à côté. Neuf semaines de données derrière ce chiffre.</p>
     """),
 
     ("produit", "Les objectifs, repas par repas", f"""
@@ -154,7 +186,7 @@ SLIDES = [
     """),
 
     ("produit", "Les programmes", f"""
-      {visuel('15-modeles-liste.jpg', "Les patrons d'où partent les séances : Push, Pull, Legs")}
+      {visuel('15-modeles-liste.jpg', "Les programmes d'où partent les séances")}
       <p class="chute">Les séries prescrites d'un programme pré-remplissent la séance. Le mode de travail
          s'y choisit — et il commande ce qu'on prescrit : des secondes en « Tenue », des kilos en « Charge ».</p>
     """),
@@ -293,7 +325,7 @@ SLIDES = [
     """),
 
     ("technique", "Pourquoi l'inventaire est asynchrone", """
-      <p class="accroche">Le 14 août 2026, l'envoi d'un inventaire est mort à mi-parcours.</p>
+      <p class="accroche">Un soir, l'envoi d'un inventaire est mort à mi-parcours.</p>
       <div class="deux">
         <div>
           <h3>Ce qui s'est passé</h3>
@@ -356,7 +388,7 @@ SLIDES = [
       </div>
     """),
 
-    ("qualite", "L'audit de septembre 2026", """
+    ("qualite", "L'audit du code", """
       <p class="accroche">84 constats, chacun reproduit avant d'être corrigé.</p>
       <div class="chiffres">
         <div><strong>3</strong><span>critiques</span></div>
@@ -447,7 +479,7 @@ SLIDES = [
         <div><strong>schema-base</strong><span>double écriture du schéma, idempotence, ordre des migrations</span></div>
         <div><strong>postgres</strong><span>index, plans de requête, maintenance</span></div>
       </div>
-      <p class="chute">Dix compétences génériques ont été <em>supprimées</em> le 9 septembre : elles
+      <p class="chute">Dix compétences génériques ont été <em>supprimées</em> : elles
          décrivaient une architecture que le code n'a pas. Un outillage qui ment coûte plus qu'il ne rapporte.</p>
     """),
 
@@ -501,7 +533,7 @@ SLIDES = [
           <h3>Absent de l'application</h3>
           <ul>
             <li><strong>Le partage d'un modèle</strong> — le champ ne faisait rien ;
-                il a été retiré le 15 septembre 2026</li>
+                il a été retiré</li>
             <li><strong>Créer un exercice</strong> — réservé à l'API, sans aucun écran</li>
             <li><strong>Changer son mot de passe ou son adresse</strong> — la règle est complète
                 côté serveur, aucun écran ne l'appelle</li>
@@ -575,7 +607,8 @@ code{background:#1b1f25;padding:.1em .35em;border-radius:3px;font-size:.9em}
 .carte{background:#161a20;border:1px solid #242931;border-radius:9px;padding:1.2rem 1.3rem}
 .carte h3{color:#e8b84b}
 figure{margin:0;flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0}
-figure img{width:100%;max-height:100%;object-fit:contain;border-radius:7px;border:1px solid #242931}
+figure img{display:block;margin:0 auto;width:auto;height:auto;max-width:100%;max-height:62vh;
+           object-fit:contain;border-radius:7px;border:1px solid #242931}
 figcaption{margin-top:.7rem;font-size:.9rem;color:#8b9098;text-align:center}
 .deux figure img{max-height:52vh}
 .pile{display:flex;flex-direction:column;gap:.5rem}
@@ -652,7 +685,7 @@ def construire() -> str:
             f'style="--c:{couleur}">{titre_html}{corps}</section>'
         )
     html.append('<div class="pied"><span class="acte" id="acte"></span>'
-                '<span>fitcarnet · septembre 2026</span><span id="num"></span></div>')
+                '<span>fitcarnet</span><span id="num"></span></div>')
     html.append(f"<script>{JS}</script>")
     return "\n".join(html)
 
@@ -661,7 +694,13 @@ sortie = RACINE / "fitcarnet-presentation.html"
 sortie.write_text(construire(), encoding="utf-8")
 taille = sortie.stat().st_size
 print(f"{sortie.name} — {len(SLIDES)} slides, {taille // 1024} Ko")
-manquantes = [n for n in re.findall(r"'(\d\d-[a-z0-9-]+\.jpg)'", pathlib.Path(__file__).read_text())
-              if not (CAPTURES / n).exists()]
-if manquantes:
-    print("captures manquantes :", ", ".join(sorted(set(manquantes))))
+
+# D'OÙ VIENT CHAQUE IMAGE. EMPLACEMENTS est rempli par visuel(), appelé quand
+# les f-strings de SLIDES sont évaluées — au chargement du module. L'ancien
+# contrôle ne regardait que captures/ : il aurait déclaré manquante une image
+# posée dans images/.
+print("images des slides (pour remplacer : presentation/images/<nom>.png) :")
+for nom, legende, origine in EMPLACEMENTS:
+    print(f"  {nom:<24} {origine:<24} {legende[:46]}")
+if any(origine == "MANQUANTE" for _, _, origine in EMPLACEMENTS):
+    print("images manquantes :", ", ".join(n for n, _, o in EMPLACEMENTS if o == "MANQUANTE"))

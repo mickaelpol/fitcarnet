@@ -1,185 +1,203 @@
 # Aliments tous personnels — conception
 
-*17 septembre 2026. Conception A, validée par le propriétaire le même jour.*
+*17 septembre 2026. Conception A, validée par le propriétaire, puis révisée le
+même jour sur sa consigne : « faire les choses comme si c'était la première
+fois, sans plus aucune trace des aliments communs, migrations comprises ».*
 
 ## Le besoin
 
-Chaque compte remplit son frigo lui-même. Un catalogue d'aliments communs
-propose des valeurs nutritionnelles qui ne correspondent pas forcément au
-produit que la personne a acheté — or ce qui s'affiche sera pesé et mangé
-(règle 7). La notion d'« aliment commun » disparaît : **tout aliment a un
-propriétaire, et chacun ne voit que les siens.**
+Chaque compte remplit son frigo lui-même. Un aliment appartient toujours à un
+compte, et chacun ne voit que les siens. Le code, le schéma, les migrations et
+la documentation doivent décrire ce modèle **comme s'il avait toujours été
+celui-là**.
 
-## État de départ
+## Ce qui rend l'approche « table rase » sûre
 
-- Depuis le 14 septembre 2026, `db/02-donnees.sql` ne sème plus d'aliment
-  commun : une base neuve n'en a aucun.
-- Les bases existantes en ont encore. Base de dev, relevé du 17/09 : 50 communs,
-  14 personnels, 1 ligne de stock sur un commun (1 compte). La production n'a pas
-  été lue ; elle en a au moins autant.
-- L'API les expose par l'exception `FiltreAliment` (« commun OU le mien »).
-- L'écran Frigo les propose dans « Partir d'un aliment de référence ».
+- La production n'a qu'un compte, celui du propriétaire, administrateur, dont le
+  frigo est **dans Grocy** : aucun stock ni plan ne dépend d'un aliment de la
+  base. Les aliments de la table `aliment` en production ne servent à personne.
+- Une base neuve n'a déjà aucun aliment commun depuis le 14 septembre 2026.
+- Les migrations de `db/manuel/` ne servent qu'à amener une base **existante** à
+  l'état de `db/01-schema.sql`. Une base neuve naît déjà dans cet état. Retirer
+  une migration déjà jouée partout ne change donc rien, **à condition que la
+  production l'ait jouée**.
 
-## Décisions
+**Précondition, vérifiée avant le déploiement de ce chantier :** la production
+tourne sur un `master` qui contient la migration 33. Sinon, déployer d'abord le
+`master` actuel, puis ce chantier.
 
-| Question | Décision |
+## Le modèle cible
+
+`aliment` suit la même forme que toutes les tables rattachées à un compte :
+
+```sql
+CREATE TABLE aliment (
+    id             BIGSERIAL PRIMARY KEY,
+    utilisateur_id UUID NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
+    nom            TEXT NOT NULL,
+    categorie      …,
+    …valeurs nutritionnelles, ratio, pesées, fibres (inchangées)…,
+    source         TEXT NOT NULL DEFAULT 'manuel'
+                   CHECK (source IN ('manuel','openfoodfacts')),
+    …
+);
+CREATE UNIQUE INDEX aliment_nom_unique_par_compte ON aliment (utilisateur_id, lower(nom));
+```
+
+Disparaissent : `cree_par` (remplacée par `utilisateur_id`), `public`, la valeur
+`'reference'` de `source`, les index `aliment_nom_commun_unique`,
+`aliment_nom_prive_unique` et `aliment_par_auteur` (l'index unique commence par
+`utilisateur_id` et sert aussi la clé étrangère), la fonction
+`fitcarnet_normaliser` (utilisée seulement par les migrations 16 et 19 et par
+l'export CIQUAL, tous retirés).
+
+## 1. Base
+
+### `db/01-schema.sql`
+Réécrit selon le modèle cible. Commentaires « référentiel commun » réécrits :
+l'en-tête ne cite plus que les exercices et les emplacements comme référentiels
+partagés.
+
+### Migrations retirées
+Elles n'existent que pour l'histoire du catalogue commun ou pour des états
+intermédiaires que `01-schema.sql` contient déjà :
+
+| Fichier | Pourquoi il peut partir |
 |---|---|
-| Stock existant sur un commun | Le compte en reçoit une **copie personnelle** ; rien n'est perdu |
-| Mécanisme d'isolation | `Aliment` rejoint la règle générale : `ProprieteUtilisateur` + `FiltreProprietaire`. `FiltreAliment` est supprimé |
-| Garantie en base | `aliment.cree_par` passe `NOT NULL`, `ON DELETE CASCADE` |
-| Colonne `public` | **Conservée, sans usage**, retirée dans un chantier ultérieur (voir « Hors périmètre ») |
-| `ciqual_vers_grocy.py --exporter-catalogue` | Retiré, avec son test |
-| `docs/audit-2026-09/` | Inchangé : c'est un historique |
-| Droit de l'administrateur sur les aliments | Retiré : il ne voit plus que les siens |
+| `10-aliment-unicite-par-proprietaire.sql` | Index communs/privés, remplacés par l'index du modèle cible |
+| `14-etat-reference-coherent.sql` | Corrections du catalogue, contraintes redéfinies par 18 puis présentes dans 01 |
+| `15-legumes-peses-crus.sql` | Idem |
+| `16-catalogue-ciqual.sql` | Réalignement du catalogue commun |
+| `17-fibres-zero-evidentes.sql` | Idem |
+| `18-un-seul-etat.sql` | Retrait de `etat_reference`, déjà joué ; son diagnostic vise les communs |
+| `19-semoule-nommee-pour-ce-quelle-est.sql` | Renommage d'un aliment commun |
 
-## 1. Données — migration `db/manuel/34-aliments-tous-personnels.sql`
+### Migrations nettoyées
+- `aliment-fibres.sql` : retrait de l'`UPDATE … public` et du comptage des
+  communs. **Indispensable** : ce fichier est joué en premier à chaque démarrage,
+  et écrirait dans une colonne `public` qui n'existe plus.
+- `31-index-de-jointure.sql` : retrait de `aliment_par_auteur` et de son
+  commentaire.
+- `25-garde-fous.sql` : commentaire « riz commun » reformulé.
 
-Idempotente, rejouée à chaque démarrage par `entrypoint-prod.sh`. Numéro 34 :
-couvert par le motif `3[0-9]-*.sql` des cinq lanceurs, aucun ne change.
+### Passage de la production — `34-aliments-par-compte.sql`
+Seul fichier qui sait qu'il a existé un autre modèle. Idempotent, dans une
+transaction, chaque étape gardée par une lecture du catalogue système :
 
-Dans une transaction, et seulement s'il reste un aliment `cree_par IS NULL` :
+1. si la colonne `cree_par` existe : supprimer les lignes de `stock` qui visent
+   un aliment sans propriétaire, puis ces aliments ;
+2. renommer `cree_par` en `utilisateur_id`, `SET NOT NULL`, clé étrangère
+   recréée en `ON DELETE CASCADE` ;
+3. `DROP COLUMN IF EXISTS public` ; contrainte `source` recréée sans
+   `'reference'` ;
+4. `DROP INDEX IF EXISTS` des trois anciens index,
+   `CREATE UNIQUE INDEX IF NOT EXISTS aliment_nom_unique_par_compte` ;
+5. `DROP FUNCTION IF EXISTS fitcarnet_normaliser(text)`.
 
-1. **Qui utilise quoi.** Pour chaque commun C, les comptes U qui l'utilisent :
-   une ligne de `stock` (U, C), **ou** un `plan_repas` de U dont
-   `contenu->'consomme'` contient `{"reference": "base:<C>"}`.
-2. **Copie.** Pour chaque (U, C), insérer une copie de C avec `cree_par = U`,
-   toutes valeurs nutritionnelles, catégorie, ratio et pesées identiques.
-   Nom : celui de C ; si U possède déjà un aliment de même `lower(nom)`, le nom
-   devient `<nom> (ancien commun)`. Aucune fusion silencieuse.
-3. **Repointage.** `stock.aliment_id` passe de C à la copie pour U. Dans les
-   plans de U, chaque `"reference": "base:<C>"` de `consomme` devient
-   `"base:<copie>"` — sans quoi « J'ai cuisiné » ne retrouverait plus l'aliment.
-4. **Suppression** de tous les aliments `cree_par IS NULL`. Le `ON DELETE
-   RESTRICT` de `stock` garantit qu'aucune ligne n'a été oubliée : un oubli fait
-   échouer la migration au lieu de perdre une donnée.
+**Ce fichier est supprimé dans un second commit, une fois la production
+redémarrée avec lui.** Il ne reste alors plus aucune trace dans le dépôt en
+dehors de l'historique git. Numéro 34 : couvert par le motif `3[0-9]-*.sql` des
+cinq lanceurs, aucun ne change.
 
-Puis, hors condition (idempotent par construction) :
+La base de développement passe par le même fichier (`rattraper-dev.sh`).
 
-5. `DROP INDEX IF EXISTS aliment_nom_commun_unique`.
-6. `ALTER COLUMN cree_par SET NOT NULL`.
-7. Remplacer la clé étrangère `cree_par` par `ON DELETE CASCADE` (supprimer et
-   recréer sous le même nom, uniquement si sa règle n'est pas déjà CASCADE).
-
-Les index partiels `aliment_nom_prive_unique` et `aliment_par_auteur`
-(`WHERE cree_par IS NOT NULL`) sont **conservés tels quels** : leur prédicat est
-désormais toujours vrai, et `jeu-essai.sql` s'appuie sur le premier dans son
-`ON CONFLICT`.
-
-**Double écriture (règle 1).** `db/01-schema.sql` reçoit le même état final :
-`cree_par NOT NULL ON DELETE CASCADE`, plus d'index `aliment_nom_commun_unique`
-ni de `COMMENT ON INDEX` associé, commentaires « référentiel commun »
-réécrits.
-
-**Migrations antérieures.**
-- `10-aliment-unicite-par-proprietaire.sql` ne crée plus
-  `aliment_nom_commun_unique` : sinon la production le recréerait puis le
-  supprimerait à chaque démarrage. Commentaire daté expliquant pourquoi.
-- `aliment-fibres.sql`, `14` à `19`, `31` : inchangées. Leurs `UPDATE … WHERE
-  cree_par IS NULL` deviennent sans effet, ce qui est idempotent.
-
-**Scripts de contrôle.**
-- `verifier-migrations.sh:109-110` insère un aliment sans `cree_par` : lui
-  donner un propriétaire.
-- `jeu-essai.sql`, `audit-catalogue.sql` : retirer ce qui copie ou audite les
-  communs.
+### Scripts
+- `verifier-migrations.sh` : l'aliment injecté reçoit un `utilisateur_id`.
+- `jeu-essai.sql` : crée directement les aliments du compte d'essai, sans rien
+  copier.
+- `audit-catalogue.sql` : supprimé (il n'audite que le catalogue commun).
+- `installer.sh` : le relevé d'état ne compte plus d'aliments communs.
 
 ## 2. API
 
-- `Aliment` implémente `ProprieteUtilisateur`. La propriété Doctrine devient
-  `utilisateur` (colonne `cree_par` inchangée), `JoinColumn(nullable: false,
-  onDelete: 'CASCADE')`. `getCreePar`/`setCreePar` disparaissent au profit de
-  `getUtilisateur`/`setUtilisateur`.
-- Opérations : `Patch` et `Delete` → `security: 'object.getUtilisateur() == user'`.
-  Plus de `ROLE_ADMIN`.
-- `AlimentProcessor` : pose `utilisateur` sur un Post (au lieu de `creePar`) et
-  garde la traduction du doublon de nom en 422, aux deux opérations.
-- Suppression de `FiltreAliment` et de sa déclaration dans
-  `config/services.yaml`.
-- `FrigoBase::alimentsAccessibles` : `cree_par = :u` seul.
-- Commentaires à rectifier : `Aliment.php` (l.25, l.40, l.49-57, l.62-63,
-  l.87-98), `FrigoBase.php` (l.14-16, l.43-48, l.82), `FrigoController.php:375`,
-  `ComptesController.php` (l.35-37, l.176-192), `api_platform.yaml:5-7`,
-  `FiltreExercice.php:28-36`.
+- `Aliment` implémente `ProprieteUtilisateur` : propriété `utilisateur`
+  (colonne `utilisateur_id`, `nullable: false`, `onDelete: 'CASCADE'`),
+  `getUtilisateur`/`setUtilisateur`. Plus de `public`, plus de `creePar`,
+  `source` sans `'reference'`.
+- Opérations : `Patch` et `Delete` → `object.getUtilisateur() == user`.
+- `FiltreAliment` supprimé (classe, déclaration `services.yaml`, test) :
+  `FiltreProprietaire` s'en charge.
+- `AlimentProcessor` : décore `ProprietaireProcessor` (qui pose le
+  propriétaire) et ne garde que la traduction du doublon de nom en 422.
+- `FrigoBase` : `utilisateur_id = :u` partout ; `alimentsAccessibles` sur la
+  même règle.
+- `ComptesController` : colonnes renommées ; commentaires sur les aliments qui
+  « restent » retirés.
+- Commentaires : `Aliment.php`, `FrigoBase.php`, `FrigoController.php`,
+  `api_platform.yaml`, `FiltreExercice.php` (qui se comparait à `FiltreAliment`).
 
-**Tests (TDD : chaque nouveau test vu échouer avant le correctif).**
-- Nouveau : un aliment sans propriétaire n'est lu par aucun compte — la
-  collection et l'item passent par `FiltreProprietaire`.
-- Nouveau : `alimentsAccessibles` refuse un aliment qui n'est pas au demandeur,
-  quel que soit son `cree_par`.
-- `ModeleExposeTest` : retirer `Aliment` de `DEROGATIONS` ; adapter
-  `testUnAuteurPeutCorrigerCeQuIlACree` (Aliment → `getUtilisateur`).
-- `SurfaceAdministrationTest` : retirer `Aliment` de `CATALOGUES_COMMUNS` et
+**Tests (TDD).**
+- Nouveau : un aliment n'est lu que par son propriétaire (collection et item).
+- `ModeleExposeTest` : `Aliment` sort de `DEROGATIONS` et de
+  `testUnAuteurPeutCorrigerCeQuIlACree`.
+- `SurfaceAdministrationTest` : `Aliment` sort de `CATALOGUES_COMMUNS` et
   `Aliment::Patch` de `SURFACE`.
-- `FiltreAlimentTest` : supprimé avec la classe.
-- `AlimentProcessorTest` : retirer le cas « aliment commun » ; le reste suit le
-  renommage.
-- `FiltreProprietaireTest:98-112`, `ProprietaireProcessorTest:69-82`,
-  `FiltreExerciceTest:112-123` : Aliment n'est plus un témoin d'entité non
-  marquée — en prendre une autre (`Exercice` ou `Emplacement`).
-- Commentaires de `InventaireProprieteTest`, `StockProprieteTest`,
-  `BornesDuCatalogueCommunTest` rectifiés.
+- `AlimentProcessorTest` réécrit pour le nouveau rôle.
+- Témoins d'« entité non marquée » (`FiltreProprietaireTest`,
+  `ProprietaireProcessorTest`, `FiltreExerciceTest`) : une autre entité.
+- `InventaireProprieteTest`, `StockProprieteTest`,
+  `BornesDuCatalogueCommunTest` : commentaires ; ce dernier ne cite plus les
+  « 50 aliments de référence ».
 
 ## 3. Front
 
-- `app/(onglets)/frigo.tsx` : « Ajouter un aliment » ouvre directement l'éditeur
-  vide. Suppression du sélecteur « Partir d'un aliment de référence », de
-  `modelesPossibles`, `dejaChezMoi` et de l'appel `useAliments`.
-- `src/api/hooks/referentiels.ts` : suppression de `useAliments` et de son
-  réexport, s'il n'a plus d'appelant.
-- `app/admin-utilisateurs.tsx:296` : le message « Les aliments que cette
-  personne a créés restent, ils servent à tout le monde » est faux depuis que
-  `ComptesController` les supprime ; il dit désormais qu'ils sont supprimés avec
-  le compte.
-- `npm run build:web` pour régénérer `front/dist/`.
+- `app/(onglets)/frigo.tsx` : « Ajouter un aliment » ouvre l'éditeur vide ;
+  sélecteur de modèle, `modelesPossibles`, `dejaChezMoi` et `useAliments`
+  retirés.
+- `src/api/hooks/referentiels.ts` et `index.ts` : `useAliments` retiré.
+- `app/admin-utilisateurs.tsx:296` : les aliments d'un compte supprimé partent
+  avec lui.
+- `npm run build:web`.
 
 ## 4. Scripts Python
 
-- `ciqual_vers_grocy.py` : suppression de `--exporter-catalogue`,
-  `exporter_catalogue()` et `CHEMIN_CATALOGUE`. Le fichier 16 reste versionné,
-  tel quel, comme trace historique.
-- `test_ecriture_grocy.py` : suppression du banc de l'export (l.247-250,
-  l.384-460).
+- `ciqual_vers_grocy.py` : retrait de `--exporter-catalogue` et de toute la
+  section « catalogue commun » ; les mentions « du catalogue COMMUN » dans
+  `CORRESPONDANCE` reformulées.
+- `test_ecriture_grocy.py` : retrait du banc de l'export.
 
 ## 5. Documentation
 
-Mettre à jour tout passage qui décrit les aliments communs comme existants :
+Tout passage décrivant des aliments communs est réécrit au présent du nouveau
+modèle, sans récit de l'ancien :
+`CLAUDE.md` (règle 2 sans exception, piège `--exporter-catalogue`),
+`REPRENDRE.md`, `NOUVELLE-MACHINE.md`, `INSTALLATION.md`, les skills
+`isolation-donnees`, `nutrition-fitcarnet`, `fonctionnalite-frigo`,
+`fonctionnalite-inventaire`, `fonctionnalite-administration`,
+`donnees-de-test`, `epreuve-fonctionnalite`, `revue-de-code`, `schema-base`,
+et `presentation/` (`features.md`, `demonstration.md`, `construire.py`).
 
-- `CLAUDE.md` : règle 2 sans exception `Aliment` ; retirer le piège
-  `--exporter-catalogue`.
-- `REPRENDRE.md` : entrée datée du chantier.
-- `NOUVELLE-MACHINE.md`, `INSTALLATION.md` (« 50 aliments »).
-- Skills : `isolation-donnees`, `nutrition-fitcarnet`, `fonctionnalite-frigo`,
-  `fonctionnalite-inventaire`, `fonctionnalite-administration`,
-  `donnees-de-test`, `epreuve-fonctionnalite`, `revue-de-code`, `schema-base`.
-- `presentation/` : `features.md`, `demonstration.md`, `construire.py`
-  (puis régénération du HTML, qui n'est pas versionné).
+`docs/audit-2026-09/` : voir « Question ouverte ».
 
 ## Vérification
 
 - `cd front && npm test` ; `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'`.
-- `db/manuel/verifier-schema.sh` (base neuve = base migrée) et
-  `db/manuel/verifier-migrations.sh`.
-- Migration 34 jouée **deux fois** sur la base de dev : la seconde ne change rien.
-  Avant la première, relever le stock et les plans du compte concerné ; après,
-  constater que la quantité est intacte et pointe sur une copie personnelle.
-- Agent `verification-bout-en-bout` : deux comptes, aucun ne voit les aliments de
-  l'autre ; ajout, correction, suppression d'un aliment ; inventaire.
-- Agent `verite-documentaire` après la mise à jour des documents.
+- `verifier-schema.sh` : base neuve = base migrée.
+- `verifier-migrations.sh`.
+- Migration 34 jouée **deux fois** sur la base de dev ; la seconde ne change rien.
+- `command grep -rniE "cree_par|creePar|aliment.? commun|catalogue commun|FiltreAliment|nom_commun|nom_prive|aliment_par_auteur|fitcarnet_normaliser"`
+  hors `.git`, `node_modules`, `sauvegardes/`, `docs/superpowers/` et la
+  migration 34 : **aucun résultat**.
+- Agent `verification-bout-en-bout` (deux comptes jetables, chacun ne voit que
+  ses aliments ; ajout, correction, suppression ; inventaire), puis
+  `verite-documentaire`.
 
-## Risque de déploiement
+## Déploiement
 
-Au premier démarrage de la production après `deployer-nas.sh`, la migration 34
-**supprime les aliments communs de la production**. Irréversible sans
-sauvegarde : lancer `sauvegarde-nas.sh` juste avant le déploiement. Si la
-migration échoue (`ON_ERROR_STOP`), la production ne redémarre pas — la
-transaction garantit qu'elle n'a rien laissé à moitié.
+1. Vérifier la précondition (production sur un `master` contenant la 33).
+2. `sauvegarde-nas.sh`.
+3. `deployer-nas.sh` : la migration 34 s'exécute au démarrage.
+4. Contrôler en production : `\d aliment` conforme au modèle cible.
+5. Commit « retrait de la migration 34 », poussé et déployé.
+
+## Question ouverte
+
+`docs/audit-2026-09/` est le rapport d'audit de septembre : il décrit
+l'application **telle qu'elle était**, catalogue commun compris (constats C4,
+M-01, F-08, 10, 16, 17). Recommandation : le laisser tel quel, parce qu'un
+rapport d'audit réécrit après coup ne prouve plus rien. À trancher par le
+propriétaire.
 
 ## Hors périmètre
 
-- **Retrait de la colonne `public`.** Elle est écrite par `aliment-fibres.sql`
-  (rejoué en premier à chaque démarrage) et par `jeu-essai.sql` : la supprimer
-  exige d'abord de neutraliser ces écritures, sans quoi la production ne
-  redémarre plus.
-- Les exercices gardent leur catalogue commun (`FiltreExercice`) : ce chantier
-  ne concerne que les aliments.
-- Une fonction « dupliquer un de mes aliments ».
+Les exercices gardent leur catalogue partagé (`FiltreExercice`).
