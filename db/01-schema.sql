@@ -112,7 +112,11 @@ CREATE TABLE aliment (
     CONSTRAINT aliment_pesees_positives CHECK (
         (pesee_avant IS NULL OR pesee_avant > 0) AND
         (pesee_apres IS NULL OR pesee_apres > 0)
-    )
+    ),
+    -- Redondante avec la clé primaire, et c'est voulu : c'est la cible de la
+    -- clé composite de `stock`, qui exige que le stock et son aliment
+    -- appartiennent au même compte (migration 35).
+    CONSTRAINT aliment_id_utilisateur_unique UNIQUE (id, utilisateur_id)
 );
 -- Un nom est unique chez son propriétaire, et seulement chez lui : deux
 -- comptes peuvent avoir chacun leur « Riz basmati », avec leurs propres
@@ -167,13 +171,21 @@ CREATE TABLE emplacement (
 CREATE TABLE stock (
     id             BIGSERIAL PRIMARY KEY,
     utilisateur_id UUID     NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
-    aliment_id     BIGINT   NOT NULL REFERENCES aliment(id)     ON DELETE RESTRICT,
+    aliment_id     BIGINT   NOT NULL,
     emplacement_id SMALLINT NOT NULL REFERENCES emplacement(id),
     quantite       NUMERIC(9,2) NOT NULL DEFAULT 0 CHECK (quantite >= 0),  -- en grammes
     peremption     DATE,
     maj_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (utilisateur_id, aliment_id, emplacement_id),
-    CONSTRAINT stock_quantite_positive CHECK (quantite >= 0)
+    CONSTRAINT stock_quantite_positive CHECK (quantite >= 0),
+    -- LE STOCK ET SON ALIMENT APPARTIENNENT AU MÊME COMPTE, et c'est la base
+    -- qui le garantit (migration 35). Une clé sur `aliment_id` seul laissait un
+    -- compte poser du stock sur l'aliment d'un autre dès qu'un chemin
+    -- d'écriture oubliait de vérifier — É1, septembre 2026. `FrigoBase` vérifie
+    -- toujours ; ceci ferme les chemins à venir.
+    CONSTRAINT stock_aliment_du_meme_compte_fkey
+        FOREIGN KEY (aliment_id, utilisateur_id)
+        REFERENCES aliment (id, utilisateur_id) ON DELETE RESTRICT
 );
 CREATE INDEX ON stock (utilisateur_id);
 -- `ON DELETE RESTRICT` sur aliment_id : sans cet index, PostgreSQL balaie tout

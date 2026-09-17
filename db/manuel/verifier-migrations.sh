@@ -98,6 +98,24 @@ ALTER TABLE serie        DROP CONSTRAINT IF EXISTS serie_valeurs_positives;
 ALTER TABLE modele_serie DROP CONSTRAINT IF EXISTS modele_serie_valeurs_positives;
 SQL
 
+# ------------------------------------------------ retour avant la migration 35
+# Même principe : une base d'avant la 35 n'a qu'une clé simple de `stock` vers
+# `aliment`, qui laisse une ligne de stock viser l'aliment d'un AUTRE compte.
+# On la remet, pour que l'injection ci-dessous puisse poser une telle ligne et
+# que la migration ait à la nettoyer.
+gris "Retour à l'état d'avant la clé stock → aliment du même compte (migration 35)..."
+psql_ <<'SQL'
+ALTER TABLE stock   DROP CONSTRAINT IF EXISTS stock_aliment_du_meme_compte_fkey;
+ALTER TABLE aliment DROP CONSTRAINT IF EXISTS aliment_id_utilisateur_unique;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stock_aliment_id_fkey') THEN
+        ALTER TABLE stock ADD CONSTRAINT stock_aliment_id_fkey
+            FOREIGN KEY (aliment_id) REFERENCES aliment(id) ON DELETE RESTRICT;
+    END IF;
+END $$;
+SQL
+
 # ---------------------------------------------------------------- données
 # Les valeurs sont celles citées en tête de 25-garde-fous.sql : ce ne sont pas
 # des cas inventés pour le test, ce sont celles qui ont été observées en base.
@@ -124,6 +142,16 @@ SELECT s.id, e.id, 1 FROM seance s, exercice e WHERE e.nom = 'Exercice essai' LI
 
 INSERT INTO serie (seance_exercice_id, ordre, reps, poids)
 SELECT id, 1, -12, -100 FROM seance_exercice LIMIT 1;
+
+-- Le reste d'É1 : un compte a posé du stock sur l'aliment d'un autre. La
+-- ligne légitime du propriétaire, elle, doit survivre à la migration.
+INSERT INTO utilisateur (email, mot_de_passe, nom)
+VALUES ('autre@verif.local', 'x', 'Autre');
+
+INSERT INTO stock (utilisateur_id, aliment_id, emplacement_id, quantite)
+SELECT u.id, a.id, (SELECT min(id) FROM emplacement), 50
+FROM   utilisateur u, aliment a
+WHERE  u.email IN ('autre@verif.local', 'essai@verif.local');
 SQL
 
 # ------------------------------------------------------------ migrations
@@ -162,6 +190,8 @@ attendues=(
     cible_valeurs_positives
     serie_valeurs_positives
     modele_serie_valeurs_positives
+    aliment_id_utilisateur_unique
+    stock_aliment_du_meme_compte_fkey
 )
 
 manquantes=0
@@ -180,6 +210,33 @@ restantes=$(psql_ -tAc "
     SELECT (SELECT count(*) FROM aliment WHERE kcal_100 < 0 OR prot_100 < 0 OR gluc_100 < 0 OR lip_100 < 0)
          + (SELECT count(*) FROM cible   WHERE kcal < 0 OR prot < 0 OR gluc < 0 OR lip < 0)
          + (SELECT count(*) FROM serie   WHERE reps < 0 OR poids < 0);")
+
+# ------------------------------------------ stock sur l'aliment d'un autre
+# La ligne étrangère doit être partie, la légitime restée — et la base doit
+# désormais refuser d'en poser une nouvelle, quel que soit le chemin.
+stock_faux=0
+etranger=$(psql_ -tAc "
+    SELECT count(*) FROM stock s JOIN aliment a ON a.id = s.aliment_id
+     WHERE s.utilisateur_id <> a.utilisateur_id;")
+legitime=$(psql_ -tAc "
+    SELECT count(*) FROM stock s JOIN aliment a ON a.id = s.aliment_id
+     WHERE s.utilisateur_id = a.utilisateur_id;")
+if [[ "$etranger" != "0" ]]; then
+    rouge "  ✗ $etranger ligne(s) de stock visent encore l'aliment d'un autre compte"
+    stock_faux=$((stock_faux + etranger))
+fi
+if [[ "$legitime" != "1" ]]; then
+    rouge "  ✗ la ligne de stock du propriétaire a disparu ($legitime au lieu de 1)"
+    stock_faux=$((stock_faux + 1))
+fi
+if psql_ -c "INSERT INTO stock (utilisateur_id, aliment_id, emplacement_id, quantite)
+             SELECT u.id, a.id, (SELECT max(id) FROM emplacement), 1
+             FROM utilisateur u, aliment a WHERE u.email = 'autre@verif.local';" >/dev/null 2>&1; then
+    rouge "  ✗ la base accepte encore du stock sur l'aliment d'un autre compte"
+    stock_faux=$((stock_faux + 1))
+else
+    gris "  ✓ la base refuse du stock sur l'aliment d'un autre compte"
+fi
 
 if [[ "$restantes" != "0" ]]; then
     rouge "  ✗ $restantes valeur(s) négative(s) encore en base après nettoyage"
@@ -212,12 +269,12 @@ done
 (( nonconformes == 0 )) && gris "  ✓ tous les lanceurs s'arrêtent à la première erreur"
 
 echo
-if (( echecs == 0 && manquantes == 0 && nonconformes == 0 )) && [[ "$restantes" == "0" ]]; then
+if (( echecs == 0 && manquantes == 0 && nonconformes == 0 && stock_faux == 0 )) && [[ "$restantes" == "0" ]]; then
     vert "✓ Les migrations passent sur des données réelles, tous les garde-fous sont posés."
     exit 0
 fi
 
-rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s)."
+rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s), $stock_faux défaut(s) de stock entre comptes."
 rouge "  En l'état, le conteneur applicatif ne redémarrerait pas : entrypoint-prod.sh"
 rouge "  rejoue db/manuel/ à chaque démarrage, avec ON_ERROR_STOP=1 et set -e."
 exit 1
