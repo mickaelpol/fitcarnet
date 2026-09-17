@@ -8,7 +8,7 @@
 --
 --  CE QU'IL AJOUTE À `jeu-essai.sql`, ET POURQUOI.
 --
---  Le jeu d'essai remplit le frigo — des aliments privés et du stock, de quoi
+--  Le jeu d'essai remplit le frigo — les aliments du compte et leur stock, de quoi
 --  exercer l'inventaire. Il ne raconte aucune HISTOIRE : pas de cible à
 --  atteindre, pas une séance, pas un plan de repas. Or une démonstration se
 --  regarde dans le temps : une charge qui monte semaine après semaine dit ce
@@ -42,6 +42,14 @@
 --  `psql -v ecraser=oui`. Il ne touche ni au frigo
 --  ni aux aliments : c'est le domaine du jeu d'essai.
 -- =====================================================================
+
+-- `psql -v ecraser=oui` pose une VARIABLE psql, que le bloc DO ne voit pas :
+-- elle est recopiée ici dans un réglage de session, qu'il lit. Jusqu'au
+-- 17 septembre 2026 cette ligne manquait, et la remise à zéro documentée
+-- échouait toujours. `db/manuel/verifier-jeux.sh` l'éprouve.
+\if :{?ecraser}
+SET psql.ecraser = :'ecraser';
+\endif
 
 DO $$
 DECLARE
@@ -107,7 +115,7 @@ BEGIN
     SELECT id INTO v_ex_souleve   FROM exercice WHERE coalesce(nom_fr, nom) ILIKE 'soulevé de terre%' LIMIT 1;
 
     IF v_ex_developpe IS NULL OR v_ex_rowing IS NULL OR v_ex_squat IS NULL THEN
-        RAISE EXCEPTION 'Catalogue d''exercices incomplet : joue d''abord db/03-exercices.sql ou installer.sh.';
+        RAISE EXCEPTION 'Catalogue d''exercices incomplet : db/02-donnees.sql n''a pas été joué (installer.sh le fait).';
     END IF;
 
     -- ----------------------------------------------------------------
