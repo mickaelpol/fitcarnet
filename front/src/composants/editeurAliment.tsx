@@ -77,6 +77,13 @@ const nombre = (v: string): number => nombreSaisi(v) ?? 0;
    « zéro gramme » (règle 6). Relevé par la revue. Désormais `valide` exige un
    texte LISIBLE pour chaque macro obligatoire : ce 0 n'atteint plus l'API. */
 
+/**
+ * Texte indicatif des quatre macros. « 0 » l'a été jusqu'au 17 septembre 2026 :
+ * gris clair dans un champ vide, il se lisait comme un zéro saisi — la
+ * confusion même que la règle 6 interdit.
+ */
+const A_SAISIR = 'à saisir';
+
 /** Ce texte désigne-t-il un nombre ? Vide ne compte pas comme lisible. */
 const lisible = (texte: string): boolean => nombreSaisi(texte) !== null;
 
@@ -129,7 +136,6 @@ export function EditeurAliment({
   onQuantiteChange?: (v: string) => void;
   /** faux quand le nom appartient à une source externe, Grocy par exemple */
   nomModifiable?: boolean;
-  /** faux quand l'état de référence est déduit de la catégorie, non stocké */
 }) {
   const [a, setA] = useState<AlimentSaisi>(aliment ?? ALIMENT_VIDE);
   const [mesurer, setMesurer] = useState(false);
@@ -314,21 +320,21 @@ export function EditeurAliment({
               <View style={s.paire}>
                 <Champ etiquette="Calories" unite="kcal" numerique style={{ flex: 1 }}
                   valeur={textes.kcal100}
-                  onChange={(v) => majNombre('kcal100', v)} placeholder="0"
+                  onChange={(v) => majNombre('kcal100', v)} placeholder={A_SAISIR}
                   illisible={illisible('kcal100')} />
                 <Champ etiquette="Protéines" unite="g" numerique style={{ flex: 1 }}
                   valeur={textes.prot100}
-                  onChange={(v) => majNombre('prot100', v)} placeholder="0"
+                  onChange={(v) => majNombre('prot100', v)} placeholder={A_SAISIR}
                   illisible={illisible('prot100')} />
               </View>
               <View style={[s.paire, { marginTop: E.s }]}>
                 <Champ etiquette="Glucides" unite="g" numerique style={{ flex: 1 }}
                   valeur={textes.gluc100}
-                  onChange={(v) => majNombre('gluc100', v)} placeholder="0"
+                  onChange={(v) => majNombre('gluc100', v)} placeholder={A_SAISIR}
                   illisible={illisible('gluc100')} />
                 <Champ etiquette="Lipides" unite="g" numerique style={{ flex: 1 }}
                   valeur={textes.lip100}
-                  onChange={(v) => majNombre('lip100', v)} placeholder="0"
+                  onChange={(v) => majNombre('lip100', v)} placeholder={A_SAISIR}
                   illisible={illisible('lip100')} />
               </View>
               {/* LE BOUTON NE SE DÉSACTIVE PAS EN SILENCE. Une macro vide bloque

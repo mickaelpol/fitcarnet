@@ -118,8 +118,8 @@ const huile = (): AlimentSaisi => ({ nom: 'Huile d\'olive', categorie: 'lip',
   ratio: 1, peseeAvant: null, peseeApres: null,
 });
 
-/** Les quatre champs de macros portent la même indication « 0 » : on les prend dans l'ordre. */
-const macro = (rang: 0 | 1 | 2 | 3) => screen.getAllByPlaceholderText('0')[rang] as HTMLInputElement;
+/** Les quatre champs de macros portent la même indication « à saisir » : on les prend dans l'ordre. */
+const macro = (rang: 0 | 1 | 2 | 3) => screen.getAllByPlaceholderText('à saisir')[rang] as HTMLInputElement;
 const CALORIES = 0; const PROTEINES = 1; const LIPIDES = 3;
 
 function editer(t: TestContext): AlimentSaisi[] {

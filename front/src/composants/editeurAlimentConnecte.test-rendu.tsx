@@ -73,6 +73,19 @@ test('une création s\'ouvre avec des macros vides, pas à zéro', (t: TestConte
   }
 });
 
+/* UN CHAMP VIDE NE DOIT PAS AVOIR L'AIR D'UN ZÉRO. Les quatre macros portaient
+   « 0 » en texte indicatif, gris clair : à l'œil, un champ vide ressemblait à
+   un champ rempli de zéro — précisément la confusion de la règle 6. Relevé par
+   `verification-bout-en-bout` le 17 septembre 2026. */
+test('un champ de macro vide ne montre pas un zéro en indication', (t: TestContext) => {
+  creer(t);
+
+  for (const etiquette of ['Calories', 'Protéines', 'Glucides', 'Lipides']) {
+    assert.doesNotMatch(champ(etiquette).placeholder, /^\s*0([.,]0*)?\s*$/,
+      `« ${etiquette} » vide affiche « ${champ(etiquette).placeholder} », qu'on lit comme une valeur`);
+  }
+});
+
 test('des lipides oubliés ne partent pas comme 0 g', (t: TestContext) => {
   const crees = creer(t);
 
