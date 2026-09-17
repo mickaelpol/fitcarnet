@@ -38,19 +38,19 @@ sélecteur à deux segments (`front/app/(onglets)/frigo.tsx:152-173`).
 | « **soit 1 250 g** » quand l'unité n'est pas le gramme | ligne | `front/src/composants/ligneFrigo.tsx:52-56` |
 | Mention « **poids cru** » / « **poids sec** » quand le rendement n'est pas 1 | ligne | `front/src/composants/ligneFrigo.tsx:35`, `:57-59` |
 | **Détail dépliable** : Pour 100 g, Protéines, Glucides, Lipides, **Fibres si connues**, et « **À la cuisson : 100 g → 230 g** » ou « **poids inchangé** » | carte ouverte | `front/src/composants/ligneFrigo.tsx:63-78` |
-| **Contrôle de cohérence** affiché dans le détail dès que le verdict n'est pas « cohérent » | carte ouverte | `front/src/composants/ligneFrigo.tsx:81-85`, `front/src/calcul/nutrition.ts:45` |
+| **Contrôle de cohérence** affiché dans le détail dès que le verdict n'est pas « cohérent » | carte ouverte | `front/src/composants/ligneFrigo.tsx:81-85`, `front/src/calcul/nutrition.ts:63` |
 | « **La quantité se modifie depuis l'inventaire.** » | carte ouverte | `front/src/composants/ligneFrigo.tsx:87-90` |
-| **Ajouter un aliment** — l'éditeur s'ouvre directement, **macros vides** : l'écran demande une création (`creation`) et ne passe aucun aliment | « Ajouter un aliment » | `front/app/(onglets)/frigo.tsx:258-271`, `:265` ; `front/src/composants/editeurAlimentConnecte.tsx:87-89` ; `front/src/composants/editeurAliment.tsx:90-93` (`textesDe`) |
-| **Huit catégories** en puces colorées, avec un exemple sous la rangée | éditeur | `front/src/calcul/nutrition.ts:248-257`, rendu `front/src/composants/editeurAliment.tsx:285-309` |
-| **Fibres facultatives** — vide ⇒ `null`, pas zéro | éditeur | `front/src/composants/editeurAliment.tsx:201-205`, `:374-380` |
-| **Contrôle de cohérence permanent** qui **BLOQUE** l'enregistrement sur « incohérent » | éditeur | `front/src/composants/editeurAliment.tsx:230-234` (`valide`), `:391-397` |
-| **Détection des kilojoules** — bandeau + bouton « **Convertir : 1473 kJ = 352 kcal** » | éditeur | `front/src/composants/editeurAliment.tsx:355-372`, `front/src/calcul/nutrition.ts:144` |
-| **Rendement de cuisson** : cinq guides, ou « **Je préfère mesurer** » → deux pesées → « **Utiliser ce résultat (2,3)** » | éditeur | `front/src/composants/editeurAliment.tsx:422-482`, `front/src/calcul/nutrition.ts:179`, `:193` |
-| **Provenance du rendement** — « ✓ mesuré : 100 g avant cuisson → 230 g après » ou « Valeur courante — mesure-la pour un chiffre propre à ton produit. » | éditeur | `front/src/composants/editeurAliment.tsx:487-495`, `front/src/calcul/nutrition.ts:204` |
-| **Le texte saisi vit à part du nombre** — on tape « 0,8 » sans que le séparateur disparaisse | éditeur | `front/src/composants/editeurAliment.tsx:139-144`, `front/src/calcul/saisieNombre.ts:30` |
+| **Ajouter un aliment** — l'éditeur s'ouvre directement, **macros vides** : l'écran demande une création (`creation`) et ne passe aucun aliment | « Ajouter un aliment » | `front/app/(onglets)/frigo.tsx:258-271`, `:265` ; `front/src/composants/editeurAlimentConnecte.tsx:87-89` ; `front/src/composants/editeurAliment.tsx:97-100` (`textesDe`) |
+| **Huit catégories** en puces colorées, avec un exemple sous la rangée | éditeur | `front/src/calcul/nutrition.ts:262-271`, rendu `front/src/composants/editeurAliment.tsx:291-315` |
+| **Fibres facultatives** — vide ⇒ `null`, pas zéro | éditeur | `front/src/composants/editeurAliment.tsx:207-211`, `:380-386` |
+| **Contrôle de cohérence permanent** qui **BLOQUE** l'enregistrement sur « incohérent » | éditeur | `front/src/composants/editeurAliment.tsx:236-240` (`valide`), `:397-403` |
+| **Détection des kilojoules** — bandeau + bouton « **Convertir : 1473 kJ = 352 kcal** » | éditeur | `front/src/composants/editeurAliment.tsx:361-378`, `front/src/calcul/nutrition.ts:158` |
+| **Rendement de cuisson** : cinq guides, ou « **Je préfère mesurer** » → deux pesées → « **Utiliser ce résultat (2,3)** » | éditeur | `front/src/composants/editeurAliment.tsx:428-488`, `front/src/calcul/nutrition.ts:193`, `:207` |
+| **Provenance du rendement** — « ✓ mesuré : 100 g avant cuisson → 230 g après » ou « Valeur courante — mesure-la pour un chiffre propre à ton produit. » | éditeur | `front/src/composants/editeurAliment.tsx:493-501`, `front/src/calcul/nutrition.ts:218` |
+| **Le texte saisi vit à part du nombre** — on tape « 0,8 » sans que le séparateur disparaisse | éditeur | `front/src/composants/editeurAliment.tsx:145-150`, `front/src/calcul/saisieNombre.ts:30` |
 | **Corriger un aliment** — le sien | « Corriger les valeurs » | `front/src/composants/ligneFrigo.tsx:93-95`, `api/src/Entity/Aliment.php:53-56` |
-| **Supprimer, mais seulement le sien** | « Supprimer », visible si `modifiable` | `front/src/composants/ligneFrigo.tsx:98-102`, `api/src/Entity/Aliment.php:60-63` |
-| **Refus de supprimer un aliment encore en stock**, comptage en SQL direct, hors du filtre de propriété, 409 nommant le nombre de lignes | API | `api/src/State/AlimentSuppressionProcessor.php:41-51` |
+| **Supprimer, mais seulement le sien** — le bouton n'apparaît que si `modifiable`, c'est-à-dire **si le compte tient son frigo en base** (`frigo.data?.source === 'base'`, `front/app/(onglets)/frigo.tsx:71`) ; « le sien » est garanti par l'API | « Supprimer » | `front/src/composants/ligneFrigo.tsx:98-102`, `api/src/Entity/Aliment.php:60-63` |
+| **Refus de supprimer un aliment encore en stock**, comptage en SQL direct, hors du filtre de propriété, 409 nommant le nombre de lignes | API | `api/src/State/AlimentSuppressionProcessor.php:43-53` |
 | **Un aliment appartient au compte qui le crée** — `utilisateur` vient du jeton, jamais du corps | API | `api/src/State/AlimentProcessor.php:38` (délègue à `ProprietaireProcessor`) |
 | **Doublon de nom dans le compte rendu lisible** — 422 avec le nom en clair ; deux comptes peuvent nommer pareil | API | `api/src/State/AlimentProcessor.php:39-44`, index `aliment_nom_unique_par_compte` |
 | **Tirer pour rafraîchir**, en mode Stock seulement | liste | `front/app/(onglets)/frigo.tsx:214-215` |
@@ -85,19 +85,22 @@ quantités décimales, et **laisse deux aliments à zéro**
    L'écran demande une création (`setCreation(true)`, `frigo.tsx:265`) et
    l'éditeur ne reçoit alors aucun aliment (`editeurAlimentConnecte.tsx:89`) :
    tous les champs partent vides, les quatre macros comprises
-   (`editeurAliment.tsx:90-93`).
+   (`editeurAliment.tsx:97-100`).
 6. **Nom** (placeholder « Skyr nature Milbona »), **Quantité déjà en stock
    (facultatif)** avec l'aide « Laisse vide si tu n'en as pas encore. L'aliment
    sera créé à zéro et se remplira au prochain inventaire. »
-   (`editeurAliment.tsx:269-283`).
+   (`editeurAliment.tsx:275-289`).
 7. **Catégorie** : huit puces — Protéine, Glucide, Légume, Fruit, Oléagineux,
-    Matière grasse, Laitage, Autre (`nutrition.ts:248-257`).
+    Matière grasse, Laitage, Autre (`nutrition.ts:262-271`).
 8. **« Pour 100 g, d'après l'emballage »** : Calories, Protéines, Glucides,
-    Lipides (`editeurAliment.tsx:312-333`), puis **Fibres (facultatif)**,
-    placeholder « — » (`editeurAliment.tsx:374-380`).
+    Lipides, texte indicatif **« à saisir »** dans les quatre
+    (`editeurAliment.tsx:318-339`, constante `A_SAISIR` `:85`) — c'était « 0 »
+    jusqu'au 17 septembre 2026, un gris clair qui se lisait comme un zéro saisi.
+    Puis **Fibres (facultatif)**, placeholder « — »
+    (`editeurAliment.tsx:380-386`).
 9. **« Changement de poids à la cuisson »** : cinq guides, ou
-    **« Je préfère mesurer »** (`editeurAliment.tsx:441-445`).
-10. **« Enregistrer »** (`editeurAliment.tsx:523-529`). La création part en deux
+    **« Je préfère mesurer »** (`editeurAliment.tsx:447-451`).
+10. **« Enregistrer »** (`editeurAliment.tsx:529-535`). La création part en deux
     temps : l'aliment, puis sa quantité **même à zéro** — c'est cet appel qui le
     rattache à un emplacement (`editeurAlimentConnecte.tsx:154-166`).
 
@@ -141,31 +144,38 @@ quantités décimales, et **laisse deux aliments à zéro**
 6. **L'enregistrement est BLOQUÉ sur « incohérent ».** `valide` exige à la fois
    un nom non vide, **les quatre macros lisibles**, `kcal100 > 0`, un rendement
    possible pour la catégorie (`rendementPossible`), et
-   `controle.verdict !== 'incoherent'` (`editeurAliment.tsx:230-234`). Le verdict passe à `incoherent` au-delà de
-   **30 %** d'écart (`nutrition.ts:94`).
+   `controle.verdict !== 'incoherent'` (`editeurAliment.tsx:236-240`). Le verdict passe à `incoherent` au-delà de
+   **30 %** d'écart (`nutrition.ts:108`).
    **Et le bouton ne se désactive pas en silence** : « Renseigne les quatre
-   valeurs — écris 0 si l'aliment n'en contient pas. » (`editeurAliment.tsx:336-340`).
+   valeurs — écris 0 si l'aliment n'en contient pas. » (`editeurAliment.tsx:342-346`).
+   **L'API refuse aussi, pour les clients qui ne passent pas par cet écran** :
+   depuis le 17 septembre 2026, les quatre macros d'`Aliment` partent de
+   `null` et `NotNull` refuse leur absence en **422** — « Valeur manquante :
+   écris 0 si l'aliment n'en contient pas. » (`api/src/Entity/Aliment.php:107-132`,
+   `api/tests/Entity/AlimentMacrosObligatoiresTest.php`). Jusque-là,
+   `POST /api/aliments` sans `lip100` répondait 201 et la base enregistrait
+   `lip_100 = 0.00`.
 
 7. **Vide ≠ zéro sur les fibres, et jusqu'en base.** Vider le champ Fibres pose
-   `fibres100: null` (`editeurAliment.tsx:201-205`), transmis tel quel
+   `fibres100: null` (`editeurAliment.tsx:207-211`), transmis tel quel
    (`editeurAlimentConnecte.tsx:114`), colonne nullable côté API
-   (`api/src/Entity/Aliment.php:128-130`). **Refus** : une macro
+   (`api/src/Entity/Aliment.php:139-141`). **Refus** : une macro
    **obligatoire** vidée ou illisible bloque l'enregistrement au lieu de partir
    à 0 — c'est le correctif du 15 septembre 2026 (`editeurAliment.tsx:71-78`).
 
 8. **Les kilojoules sont détectés de deux façons.** Plafond de **900 kcal/100 g**
-   (`nutrition.ts:116`, `:149`) **ou** rapport à **4,184** des macros à 10 % près
-   (`nutrition.ts:156-161`). Le bouton propose la conversion chiffrée
-   (`editeurAliment.tsx:364-370`).
+   (`nutrition.ts:130`, `:163`) **ou** rapport à **4,184** des macros à 10 % près
+   (`nutrition.ts:170-175`). Le bouton propose la conversion chiffrée
+   (`editeurAliment.tsx:370-376`).
 
 9. **Le rendement se mesure par deux pesées.** `ratioDepuisPesees` arrondit au
-   centième (`nutrition.ts:193-197`). Le bouton dit « Utiliser ce résultat
+   centième (`nutrition.ts:207-211`). Le bouton dit « Utiliser ce résultat
    (2,3) » et se désactive en « **Ces deux poids sont inversés : ce produit ne
    peut pas varier ainsi** » quand la mesure contredit la catégorie : un
    féculent ne pèse pas moins cuit que cru, une protéine ou un légume cuit ne
-   dépasse pas 1,05 fois son poids cru (`rendementPossible`, `front/src/calcul/plausibilite.ts:148-154`,
-   `editeurAliment.tsx:470-475`). **Refus** : `nombreSaisi` et non `parseFloat` —
-   « 4,2,1 » ne produit aucun ratio (`editeurAliment.tsx:221-223`).
+   dépasse pas 1,05 fois son poids cru (`rendementPossible`, `front/src/calcul/plausibilite.ts:149-155`,
+   `editeurAliment.tsx:476-481`). **Refus** : `nombreSaisi` et non `parseFloat` —
+   « 4,2,1 » ne produit aucun ratio (`editeurAliment.tsx:227-229`).
 
 10. **Un aliment créé appartient à son compte.** Après création, en base :
     `utilisateur_id = <le compte>`, **posé par l'API depuis le jeton** et
@@ -175,19 +185,27 @@ quantités décimales, et **laisse deux aliments à zéro**
     aujourd'hui.** On ne pose pas de stock sur l'aliment d'autrui. Le
     contrôle est au **point de passage obligé**, `FrigoBase::definirStock`, qui
     lève une exception avant toute écriture
-    (`api/src/Service/FrigoBase.php:124-126`) ; la règle elle-même est
+    (`api/src/Service/FrigoBase.php:131-133`) ; la règle elle-même est
     `alimentsAccessibles`, « le mien »
     (`api/src/Service/FrigoBase.php:89-101`). Les deux routes qui écrivent du
     stock la posent aussi **en amont**, pour répondre tout de suite :
     `POST /mon-frigo/stock` (`FrigoController.php:125-128`, `:154-156`) et son
-    jumeau `POST /mon-frigo/inventaire` (`FrigoController.php:391-398`).
+    jumeau `POST /mon-frigo/inventaire` (`FrigoController.php:412-419`).
     **Refus attendu : 404**, avec le **même message** que pour « n'existe pas »,
     pour ne pas laisser énumérer les identifiants
     (`FrigoController.php:151-156`). Derrière le code, la base refuse
     d'elle-même une ligne de stock posée sur l'aliment d'un autre compte : clé
     étrangère composite `stock_aliment_du_meme_compte_fkey`, (`aliment_id`,
-    `utilisateur_id`) vers `aliment` (`db/01-schema.sql:186-188`, migration
+    `utilisateur_id`) vers `aliment` (`db/01-schema.sql:188-190`, migration
     `db/manuel/35-stock-et-aliment-du-meme-compte.sql`).
+    **Le stock ne s'écrit que par `/api/mon-frigo`** : `/api/stocks` n'expose
+    plus que `GetCollection` et `Get` depuis le 17 septembre 2026
+    (`api/src/Entity/Stock.php:29-37`, `StockEnLectureSeuleTest`) — ses
+    `POST`/`PATCH`/`DELETE` contournaient `FrigoBase`. Et un `emplacementId`
+    inconnu envoyé à `POST /mon-frigo/stock` est refusé en **422** « Cet
+    emplacement n'existe pas. » au lieu d'un 500 SQL
+    (`FrigoController.php:158-164`, `FrigoBase::emplacementExiste`,
+    `EmplacementInconnuTest`).
 
 12. **Corriger et supprimer : seulement le sien.** `Patch` et `Delete` sont
     gardés par `object.getUtilisateur() == user`
@@ -198,10 +216,10 @@ quantités décimales, et **laisse deux aliments à zéro**
 13. **Refus de supprimer un aliment encore en stock.** 409 : « Cet aliment est
     encore dans un frigo (N ligne(s) de stock). Mets sa quantité à zéro avant de
     le supprimer. » Le comptage passe en SQL direct, hors du filtre de propriété
-    (`AlimentSuppressionProcessor.php:41-51`) ; depuis la clé composite de la
+    (`AlimentSuppressionProcessor.php:43-53`) ; depuis la clé composite de la
     migration 35, les seules lignes de stock qui puissent viser un aliment sont
     celles de son compte. **Les lignes à zéro, elles, sont
-    supprimées silencieusement** (`:55-58`) : un aliment dont le stock est à 0
+    supprimées silencieusement** (`:57-60`) : un aliment dont le stock est à 0
     se supprime.
 
 14. **Le frigo ne montre que SES aliments.** La requête filtre
@@ -294,7 +312,7 @@ Le même refus est couvert sans base par
   sur une correction est une fausse piste.
 - **L'éditeur ne se réinitialise plus pendant la saisie**, mais l'effet dépend de
   `visible` et de l'**identité** de l'aliment, pas de la référence de l'objet
-  (`editeurAliment.tsx:179-193`). Si une saisie s'efface toutes les deux
+  (`editeurAliment.tsx:185-199`). Si une saisie s'efface toutes les deux
   secondes pendant un inventaire, c'est cette régression-là.
 - **La suppression envoie `Number(reference.split(':')[1])`**
   (`frigo.tsx:349`) : sur une référence `grocy:…` le bouton n'existe pas, c'est
@@ -340,11 +358,11 @@ La frappe à 60 ms par caractère et les temps morts volontaires viennent de
   plan de tournage.
 - **Le contrôle de cohérence est un garde-fou, pas une garantie** : « un aliment
   sans macros et sous 900 kcal passera entre les mailles »
-  (`front/src/calcul/nutrition.ts:141-143`).
+  (`front/src/calcul/nutrition.ts:155-156`).
 - **Les contrôles de `plausibilite.ts` ne s'affichent pas dans cet écran.** Le
   refus des valeurs déjà cuites, du féculent qui rétrécit et des « plus de 100 g
   de nutriments dans 100 g » vit dans l'onglet **Repas**, au paramétrage
-  (`front/src/calcul/plausibilite.ts:184`, affichage
+  (`front/src/calcul/plausibilite.ts:185`, affichage
   `front/src/composants/etapeReglage.tsx:483-523`). Ne pas le chercher ici.
 - **`presentation/features.md` (section B) est périmé sur ses `fichier:ligne`.**
   Il cite `frigo.tsx:222`, `:635`, `:644`, `:658`, `:669`, `:702`, `:730` — or le

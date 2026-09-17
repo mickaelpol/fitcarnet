@@ -63,10 +63,12 @@ personnalisé écrit à partir d'un identifiant reçu dans le corps de la requê
   l'aliment visé appartenait au demandeur. Son jumeau
   `POST /api/mon-frigo/inventaire`, qui écrit le même stock par un autre chemin,
   n'avait jamais reçu ce contrôle. Bob posait 1 g sur un aliment d'Alice, et
-  l'aliment d'Alice devenait **indélébile** : `AlimentSuppressionProcessor` compte
-  les lignes de stock tous comptes confondus, et l'application n'offrait à Alice
-  aucun moyen de défaire ce blocage. Ce n'était pas une fuite — c'était pire, un
-  blocage qu'on ne peut pas lever.
+  l'aliment d'Alice devenait **indélébile** : `AlimentSuppressionProcessor`
+  comptait les lignes de stock tous comptes confondus — il compte toujours hors
+  du filtre, mais depuis la migration 35 seul le stock du propriétaire peut
+  viser son aliment —, et l'application n'offrait à Alice aucun moyen de défaire
+  ce blocage. Ce n'était pas une fuite — c'était pire, un blocage qu'on ne peut
+  pas lever.
 - **Correction du 8 septembre 2026, à copier.** La règle a été descendue dans
   `FrigoBase::alimentsAccessibles()`, et `FrigoBase::definirStock()` la pose
   elle-même. Les **trois** appelants sont couverts d'un coup — la route `/stock`,
@@ -76,11 +78,21 @@ personnalisé écrit à partir d'un identifiant reçu dans le corps de la requê
   composite `stock_aliment_du_meme_compte_fkey` — (`aliment_id`,
   `utilisateur_id`) vers `aliment (id, utilisateur_id)`, en `ON DELETE
   RESTRICT` — refuse toute ligne de stock posée sur l'aliment d'un autre compte,
-  quel que soit le chemin qui l'écrit (`db/01-schema.sql:186-188`, migration
+  quel que soit le chemin qui l'écrit (`db/01-schema.sql:188-190`, migration
   `db/manuel/35-stock-et-aliment-du-meme-compte.sql`, qui s'appuie sur la
   contrainte `aliment_id_utilisateur_unique`). `FrigoBase` vérifie toujours :
   c'est lui qui répond un 404 lisible, là où la base ne rendrait qu'une
   violation de contrainte.
+- **17 septembre 2026 aussi, la porte que personne n'empruntait est murée.**
+  `POST`, `PATCH` et `DELETE /api/stocks` existaient encore, sans appelant
+  dans le front, et contournaient tout ce que `FrigoBase` vérifie —
+  l'emplacement, la source du frigo, la ligne à zéro qui garde sa place ; un
+  doublon y répondait 500. **`/api/stocks` est en lecture seule** (`GetCollection`
+  et `Get`, `api/src/Entity/Stock.php:29-37`, figé par
+  `api/tests/Entity/StockEnLectureSeuleTest.php`) : le stock ne s'écrit plus que
+  par `/api/mon-frigo`. Le même jour, `POST /api/mon-frigo/stock` a appris à
+  refuser un `emplacementId` inconnu en 422 (`FrigoBase::emplacementExiste`,
+  `EmplacementInconnuTest`) au lieu de laisser la clé étrangère répondre un 500.
 
 **La leçon de conception** : place le contrôle au point de passage obligé de
 l'écriture, pas devant chaque porte. Une règle recopiée devant trois portes finira

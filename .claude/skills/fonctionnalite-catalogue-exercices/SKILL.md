@@ -25,30 +25,30 @@ jamais rien.**
 
 | Capacité | Où | `fichier:ligne` |
 |---|---|---|
-| Catalogue commun, **~1338 exercices** | référentiel | `api/src/Entity/Exercice.php:37` · `front/src/api/hooks/referentiels.ts:31` |
+| Catalogue commun, **~1338 exercices** | référentiel | `api/src/Entity/Exercice.php:38` · `front/src/api/hooks/referentiels.ts:31` |
 | Chargé d'un coup, gardé **30 minutes** | `useExercices` | `front/src/api/hooks/referentiels.ts:15,17-24` |
-| **Liste allégée, fiche à la demande** | groupes `exercice:lire` / `exercice:detail` | `api/src/Entity/Exercice.php:212-263` |
+| **Liste allégée, fiche à la demande** | groupes `exercice:lire` / `exercice:detail` | `api/src/Entity/Exercice.php:214-265` |
 | Recherche **sans accents**, sur le nom affiché | modale de choix | `front/src/composants/choixAliment.tsx:51,59` |
 | Recherche **français ET anglais** | écran d'administration | `front/src/muscles/catalogueExercices.ts:118-126` |
-| Filtres API : `nom`, `nomFr` (partiel) · `partieCorps`, `equipement`, `source` (exact) | `SearchFilter` | `api/src/Entity/Exercice.php:140-143` |
+| Filtres API : `nom`, `nomFr` (partiel) · `partieCorps`, `equipement`, `source` (exact) | `SearchFilter` | `api/src/Entity/Exercice.php:141-144` |
 | **Quinze vignettes de muscles**, dont « Autre » | rangée déroulante | `front/src/composants/choixMuscle.tsx:108-135` · `front/src/muscles/groupes.ts:37-63,78` |
 | Vignette **et** mot se cumulent | modale de choix | `front/src/composants/choixAliment.tsx:50-61` |
 | Fiche détaillée : vidéo, zone, muscle ciblé, aussi sollicités, matériel, format, exécution | « Comment faire cet exercice » | `front/src/composants/modaleExercice.tsx:199-239` |
 | **Chargement progressif** de la fiche | `detail.data ?? exercice` | `front/src/composants/modaleExercice.tsx:126-141` |
 | Vidéo YouTube intégrée (iframe web / WebView mobile) | fiche | `front/src/composants/modaleExercice.tsx:156-190` |
-| **Aucune suppression possible** | pas d'opération `Delete` | `api/src/Entity/Exercice.php:49-102` · `db/01-schema.sql:288,327` |
-| Correction : l'administrateur, **ou l'auteur de l'exercice** | `Patch` | `api/src/Entity/Exercice.php:93-101` |
-| Création : **administrateur seulement** | `Post` | `api/src/Entity/Exercice.php:78` |
+| **Aucune suppression possible** | pas d'opération `Delete` | `api/src/Entity/Exercice.php:50-103` · `db/01-schema.sql:290,329` |
+| Correction : l'administrateur, **ou l'auteur de l'exercice** | `Patch` | `api/src/Entity/Exercice.php:94-102` |
+| Création : **administrateur seulement** | `Post` | `api/src/Entity/Exercice.php:79` |
 
 ### Qui peut créer, qui peut corriger — l'état réel
 
 **La création est réservée à l'administrateur depuis le 15 septembre 2026.**
-Vérifié : `api/src/Entity/Exercice.php:78` porte
+Vérifié : `api/src/Entity/Exercice.php:79` porte
 `new Post(security: "is_granted('ROLE_ADMIN')", processor: ExerciceProcessor::class)`.
 L'opération portait auparavant `ROLE_USER`, et **aucun écran de l'application ne
 l'appelait** — zéro appelant dans `front/`. Une porte ouverte sans usage n'est
 pas une fonctionnalité en attente, c'est une surface à défendre pour rien
-(`:60-78`). Ce n'était pas une fuite : `ExerciceProcessor` posait déjà `creePar`
+(`:61-79`). Ce n'était pas une fuite : `ExerciceProcessor` posait déjà `creePar`
 et `public = false`.
 
 **Deux conséquences qu'il faut dire telles quelles :**
@@ -61,13 +61,13 @@ et `public = false`.
 2. **Même par l'API, un exercice créé est PRIVÉ.** `ExerciceProcessor` pose
    `public = false` sur tout `Post` (`api/src/State/ExerciceProcessor.php:60-66`),
    et `public` n'a **aucun groupe de sérialisation**
-   (`api/src/Entity/Exercice.php:278-279`) : rien dans l'API ne peut le
+   (`api/src/Entity/Exercice.php:280-281`) : rien dans l'API ne peut le
    rebasculer à `true`. **Le catalogue commun n'a aujourd'hui aucun moyen d'être
-   alimenté par l'API** — c'est écrit noir sur blanc en `:73-77`, « en suspens,
+   alimenté par l'API** — c'est écrit noir sur blanc en `:74-78`, « en suspens,
    et c'est volontaire ».
 
 **La correction, elle, est ouverte à l'auteur** :
-`security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user"` (`:99`,
+`security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user"` (`:100`,
 constat F-09). Sans cette clause, un exercice personnel devenu vraiment privé
 n'aurait plus été corrigeable par personne — ni l'auteur, faute de droit, ni
 l'administrateur, `FiltreExercice` étant une extension Doctrine qui ignore les
@@ -75,7 +75,7 @@ rôles.
 
 **Aucune suppression, et c'est le schéma qui tient la promesse** :
 `modele_exercice.exercice_id` et `seance_exercice.exercice_id` sont en
-`ON DELETE RESTRICT` (`db/01-schema.sql:288,327`). Supprimer effacerait
+`ON DELETE RESTRICT` (`db/01-schema.sql:290,329`). Supprimer effacerait
 l'historique et les 1RM. La sortie prévue est la **fusion**, qui reporte
 l'historique avant de supprimer — voir `fonctionnalite-administration`.
 
@@ -121,14 +121,14 @@ libellés ; le français ne vit que du côté de l'écran.
 
 1. **Le catalogue arrive en entier** — `GET /api/exercices?itemsPerPage=2000`
    (`front/src/api/hooks/referentiels.ts:22`) rend l'ensemble. Côté serveur,
-   `paginationItemsPerPage: 1500` (`api/src/Entity/Exercice.php:113`). Compter
+   `paginationItemsPerPage: 1500` (`api/src/Entity/Exercice.php:114`). Compter
    les entrées rendues et **les comparer au compte en base**.
 2. **La liste est allégée** — la réponse de collection ne doit contenir **ni**
    `instructions`, **ni** `equipement`, **ni** `musclesSecondaires`. Elle doit
    en revanche contenir `muscleCible` : c'est l'exception mesurée qui permet de
-   filtrer par vignette **sans réseau** (`api/src/Entity/Exercice.php:229-248`).
+   filtrer par vignette **sans réseau** (`api/src/Entity/Exercice.php:231-250`).
 3. **La fiche complète arrive à la demande** — `GET /api/exercices/{id}` rend en
-   plus les quatre champs ci-dessus (`:59`).
+   plus les quatre champs ci-dessus (`:60`).
 4. **Chargement progressif** — à l'ouverture de la fiche, le nom, la zone et le
    format s'affichent **immédiatement** depuis la liste déjà en mémoire ; les
    textes longs se remplissent ensuite, **sans écran d'attente**
@@ -151,16 +151,16 @@ libellés ; le français ne vit que du côté de l'écran.
    affiche « Aucune vidéo pour cet exercice. » — **jamais un lecteur vide**.
 10. **Aucune suppression possible** — `DELETE /api/exercices/{id}` doit répondre
     **405** (opération non déclarée) et **non** 403 ou 204. Aucune opération
-    `Delete` n'existe sur la ressource (`api/src/Entity/Exercice.php:49-102`).
+    `Delete` n'existe sur la ressource (`api/src/Entity/Exercice.php:50-103`).
 11. **Création refusée à un compte ordinaire** — `POST /api/exercices` avec un
-    jeton ordinaire doit rendre **403** (`:78`).
+    jeton ordinaire doit rendre **403** (`:79`).
 12. **Création par l'administrateur : possible par l'API, invisible dans
     l'application** — aucun écran ne l'appelle, et l'exercice créé naît
     **privé** (`public = false`, `api/src/State/ExerciceProcessor.php:60-66`) :
     il n'apparaît **pas** dans le catalogue des autres comptes.
 13. **Correction par l'auteur** — le créateur d'un exercice doit pouvoir le
     corriger (200) ; un troisième compte doit être refusé
-    (`api/src/Entity/Exercice.php:99`). Déjà figé par
+    (`api/src/Entity/Exercice.php:100`). Déjà figé par
     `ModeleExposeTest::testUnAuteurPeutCorrigerCeQuIlACree`.
 14. **Isolation entre comptes** — `FiltreExercice` applique « public **OU** le
     mien » : un exercice privé du compte A ne doit **jamais** apparaître dans le
@@ -178,9 +178,9 @@ libellés ; le français ne vit que du côté de l'écran.
     `ExerciceProcessorTest::testCorrigerUnExerciceDuCatalogueCommunNeSeLApproprie`.
 16. **Deux exercices ne peuvent pas porter le même nom** — un `POST` sur un nom
     existant doit rendre **422 « Un exercice porte déjà ce nom. »**, et non une
-    erreur de contrainte SQL brute (`api/src/Entity/Exercice.php:45-48`).
+    erreur de contrainte SQL brute (`api/src/Entity/Exercice.php:46-49`).
 17. **Refus du démesuré** — les plafonds de longueur sont mesurés sur les
-    données réelles (`:148-161`) : nom 150, nomFr 150, instructions 4000,
+    données réelles (`:149-163`) : nom 150, nomFr 150, instructions 4000,
     musclesSecondaires 255, vidéo 500. Un dépassement doit rendre 422 en
     **désignant le champ**. Déjà figé par
     `api/tests/Entity/BornesDesChampsTexteTest.php`.
@@ -230,7 +230,7 @@ SELECT id, nom, source, public, cree_par FROM exercice WHERE public = false;
 **Pièges propres à cette fonctionnalité**
 
 - **Le chiffre 1338 est un commentaire, pas une mesure du jour.** Il apparaît
-  dans `api/src/Entity/Exercice.php:37`, `front/src/api/hooks/referentiels.ts:31`
+  dans `api/src/Entity/Exercice.php:38`, `front/src/api/hooks/referentiels.ts:31`
   et `front/src/muscles/editionExercice.ts:44` (qui parle, lui, de **1318
   importés**). **Recompter en base** avant de l'annoncer à l'écran ou dans une
   narration — règle 7.
@@ -250,7 +250,7 @@ SELECT id, nom, source, public, cree_par FROM exercice WHERE public = false;
   pas sur le web.
 - 33 Ko : c'est ce que pèse `muscleCible` sur les 1338 entrées, et ce qu'il
   achète est un filtrage **instantané, hors réseau, dans une salle sans
-  couverture** (`api/src/Entity/Exercice.php:234-246`). Éprouver le filtre en
+  couverture** (`api/src/Entity/Exercice.php:236-248`). Éprouver le filtre en
   coupant le réseau après le premier chargement.
 
 ## La capture pour la démonstration
@@ -279,12 +279,13 @@ signaler à l'auteur du plan plutôt que de mettre en scène un geste impossible
   toute annonce chiffrée.
 - **La création d'un exercice n'existe dans aucun écran**, pour aucun compte —
   et un exercice créé par l'API naît privé, sans moyen de rejoindre le catalogue
-  commun (`api/src/Entity/Exercice.php:73-77`). Publier demanderait d'exposer
+  commun (`api/src/Entity/Exercice.php:74-78`). Publier demanderait d'exposer
   `public` en écriture, **ce qui n'est pas tranché**.
-- `presentation/features.md` (section G, datée du 14 septembre) affirme
-  « **Tout utilisateur peut ajouter un exercice** » : **c'est faux depuis le
-  15 septembre 2026**. Ses renvois `Exercice.php:48`, `:59`, `:62`, `:96`
-  tombent par ailleurs à côté du contenu annoncé.
+- `presentation/features.md` (section G, datée du 14 septembre) affirmait
+  « **Tout utilisateur peut ajouter un exercice** » — **faux depuis le
+  15 septembre 2026** —, avec des renvois `Exercice.php:48`, `:59`, `:62`, `:96`
+  qui tombaient à côté du contenu annoncé. Phrase et renvois corrigés le
+  17 septembre 2026.
 - **Non éprouvé ici** : la lecture de la vidéo sur un vrai téléphone (WebView,
   plein écran, retour) — passer par `verification-android`. Expo Go et un APK ne
   se comportent pas pareil sur ce point.

@@ -99,7 +99,7 @@ que l'écran reçoit (`:46-51`).
 ### Fusionner deux exercices
 
 Une suppression est **impossible** dès qu'un exercice figure dans une séance
-(`ON DELETE RESTRICT`, `db/01-schema.sql:288,327`) — et c'est heureux. La fusion
+(`ON DELETE RESTRICT`, `db/01-schema.sql:290,329`) — et c'est heureux. La fusion
 transfère l'historique **avant** de supprimer :
 `api/src/State/FusionExerciceProcessor.php:52-90`.
 
@@ -135,20 +135,28 @@ champ libre, qui finirait avec « four », « Four », « au four » et « four 
   (`front/app/admin-utilisateurs.tsx:38-41,156-161` ·
   `api/src/Controller/InvitationsController.php:183-188`).
 - Une nouvelle invitation **remplace** celle qui attendait (`:130-136,163-179`).
-- Liste avec le contenu en chiffres : « *n* séances · *n* séries · *n* modèles ·
-  *n* plans · *n* aliments · *n* lignes de stock »
-  (`api/src/Controller/ComptesController.php:64-111` ·
-  `front/app/admin-utilisateurs.tsx:229-231`, mise en mots
-  `front/src/calcul/contenuCompte.ts:22-31`).
+- Liste avec le contenu en chiffres, **neuf compteurs** depuis le 17 septembre
+  2026 : « *n* séances · *n* séries · *n* modèles · *n* plans · *n* aliments ·
+  *n* lignes de stock · *n* objectifs · *n* compléments · *n* exercices
+  personnels » — les exercices personnels étant ceux que le compte a créés et
+  qui ne sont pas publics (`cree_par = u.id AND NOT public`)
+  (`api/src/Controller/ComptesController.php:69-122` ·
+  `front/app/admin-utilisateurs.tsx:230-232`, mise en mots
+  `front/src/calcul/contenuCompte.ts:25-37`).
 - **Désactiver supprime aussi les jetons de rafraîchissement** — sinon un compte
   bloqué se prolongerait tout seul pendant des semaines
-  (`ComptesController.php:116-121,154-161`).
-- **Suppression : le compte part avec ses aliments et son stock** — les lignes
-  de stock visant ses aliments, **puis** ses aliments, **puis** le compte, dans
-  une transaction. `aliment.utilisateur_id` est en `ON DELETE CASCADE`, mais
-  `stock.aliment_id` est en `RESTRICT` : l'ordre est écrit à la main pour ne pas
-  dépendre de celui des cascades (`:179-185`, `:205-217`).
-- **Son propre compte n'a aucun bouton** (`admin-utilisateurs.tsx:233-242`).
+  (`ComptesController.php:127-132,166-173`).
+- **Suppression : le compte part avec ses aliments, son stock et ses exercices
+  personnels** — les lignes de stock visant ses aliments, **puis** ses
+  aliments, **puis** le relevé de ses exercices personnels, **puis** le compte,
+  **puis** ces exercices, dans une transaction. `aliment.utilisateur_id` est en
+  `ON DELETE CASCADE`, mais `stock.aliment_id` est en `RESTRICT` : l'ordre est
+  écrit à la main pour ne pas dépendre de celui des cascades. `exercice.cree_par`
+  est en `SET NULL` : sans le relevé fait **avant**, ses exercices resteraient
+  sans auteur ni publication, visibles de personne. Ils ne sont retirés
+  qu'**après** le compte (ses séances et modèles les citaient, en `RESTRICT`),
+  et seulement si plus personne ne les cite (`:191-200`, `:221-256`).
+- **Son propre compte n'a aucun bouton** (`admin-utilisateurs.tsx:234-243`).
 
 ## Le parcours
 
@@ -285,36 +293,48 @@ critères d'isolation.
 
 23. **Refus de se bloquer soi-même** — message exact : « Tu ne peux pas
     désactiver ton propre compte : la requête suivante serait refusée, y compris
-    celle qui te réactiverait. » (`api/src/Service/ProtectionDuCompte.php:39-42`).
+    celle qui te réactiverait. » (`api/src/Service/ProtectionDuCompte.php:40-43`).
     Un **refus**, pas une confirmation. L'écran ne propose même aucun bouton
-    (`admin-utilisateurs.tsx:238-242`) : **éprouver quand même par l'API**.
+    (`admin-utilisateurs.tsx:239-243`) : **éprouver quand même par l'API**.
 24. **Refus de se supprimer soi-même** — « Tu ne peux pas supprimer ton propre
-    compte depuis l'application. » (`ProtectionDuCompte.php:60-62`).
+    compte depuis l'application. » (`ProtectionDuCompte.php:61-63`).
 25. **Refus de bloquer ou supprimer le dernier administrateur actif** — on
     compte les **actifs**, et le test est `<= 1` et non `=== 1`, pour qu'un état
     incohérent (zéro admin actif) n'ouvre pas la porte par accident
-    (`:88-91` · `ComptesController.php:257-263`). Déjà figé par
-    `api/tests/Service/ProtectionDuCompteTest.php`
+    (`:83-98` · `ComptesController.php:296-302`). **Une cible désactivée n'est
+    le dernier de personne** : un administrateur désactivé se supprime même s'il
+    ne reste qu'un administrateur actif — la règle
+    reçoit `cibleEstActive` depuis le 17 septembre 2026 (constat 04#12,
+    `ProtectionDuCompte.php:89-98`, `ComptesController.php:151`, `:213`).
+    Jusque-là, elle ne regardait que le rôle et refusait la suppression d'un
+    ancien administrateur dès qu'il ne restait qu'un actif — celui qui agit.
+    Déjà figé par `api/tests/Service/ProtectionDuCompteTest.php`
     (`testLeDernierAdministrateurActifEstIntouchable`,
-    `testZeroAdministrateurActifNOuvrePasLaPorte`).
-26. **Réactiver ne se refuse jamais** (`ProtectionDuCompte.php:76-79`).
+    `testZeroAdministrateurActifNOuvrePasLaPorte`,
+    `testUnAdministrateurDesactiveSeSupprimeQuandIlNeResteQuUnActif`).
+26. **Réactiver ne se refuse jamais** (`ProtectionDuCompte.php:77-80`).
 27. **Désactiver coupe la session en cours** — après désactivation, le jeton du
     compte visé doit être refusé **à la requête suivante** (`CompteActif` sur le
     pare-feu `api`), et `jeton_rafraichissement` doit être **vide** pour ce
-    compte (`ComptesController.php:154-161`).
-28. **Supprimer chiffre ce qui sera détruit** — la confirmation cite séances,
-    séries, modèles, plans, aliments et lignes de stock : « *n* séances, *n*
-    séries, *n* modèles, *n* plans, *n* aliments et *n* lignes de stock
-    **seront effacés définitivement.** » (`admin-utilisateurs.tsx:287-294`,
-    `front/src/calcul/contenuCompte.ts:22-38`). « Supprimer ? Oui / Non » sans
+    compte (`ComptesController.php:166-173`).
+28. **Supprimer chiffre ce qui sera détruit** — la confirmation cite les neuf
+    compteurs : « *n* séances, *n* séries, *n* modèles, *n* plans, *n*
+    aliments, *n* lignes de stock, *n* objectifs, *n* compléments et *n*
+    exercices personnels **seront effacés définitivement.** »
+    (`admin-utilisateurs.tsx:288-295`,
+    `front/src/calcul/contenuCompte.ts:25-44`). « Supprimer ? Oui / Non » sans
     chiffres n'est pas une question, c'est un piège.
 29. **Aucun aliment ne survit au compte supprimé** — après suppression,
     `SELECT count(*) FROM aliment WHERE utilisateur_id = '<id>'` doit rendre
     **0**, et aucune ligne de `stock` ne doit viser un aliment disparu
-    (`ComptesController.php:205-217`). C'est le critère le plus important de
-    cette section.
+    (`ComptesController.php:221-256`). C'est le critère le plus important de
+    cette section. **Ses exercices personnels partent aussi** : relevés avant
+    la suppression (`id`), aucun ne doit subsister après — sauf celui qu'un
+    autre compte cite encore, qui reste en place plutôt que de faire échouer
+    toute la suppression (`:232-255`, figé par
+    `ComptesContenuTest::testLaSuppressionRetireSesExercicesPersonnelsQuePersonneNeCite`).
 30. **Compte inexistant → 404**, refus métier → **422**
-    (`ComptesController.php:127-129,273-276`).
+    (`ComptesController.php:138-140,312-315`).
 31. **Invitation** — le lien n'est rendu qu'**une fois** ; la base n'en garde
     qu'une empreinte (`InvitationsController.php:183-188`). Inviter une adresse
     déjà titulaire d'un compte est refusé en nommant la personne (`:149-157`).
@@ -366,6 +386,9 @@ SELECT count(*) FROM jeton_rafraichissement WHERE utilisateur_id = :cible;   -- 
 
 -- SUPPRESSION : aucun aliment ne survit au compte
 SELECT count(*) FROM aliment WHERE utilisateur_id = '<id>';                  -- 0
+-- ni ses exercices personnels : relever leurs id AVANT (cree_par passe à NULL)
+SELECT id FROM exercice WHERE cree_par = '<id>' AND NOT public;              -- avant
+SELECT count(*) FROM exercice WHERE id IN (<ids relevés>);                   -- après : 0
 
 -- CUISSONS : deux modes ne partagent jamais un rang
 SELECT ordre, count(*) FROM mode_cuisson GROUP BY ordre HAVING count(*) > 1; -- 0 ligne
@@ -375,13 +398,13 @@ SELECT ordre, count(*) FROM mode_cuisson GROUP BY ordre HAVING count(*) > 1; -- 
 
 - **Ne jamais éprouver la suppression de compte sur autre chose qu'un compte
   jetable créé pour l'épreuve.** Rien ne se restaure sans une sauvegarde
-  (`ComptesController.php:31-33`).
+  (`ComptesController.php:32-35`).
 - **Un 403 attendu n'est pas une panne** : sur cette fiche, le 403 *est* le
   résultat. Ce qui serait une panne, c'est un **200**.
 - **Le portier fait qu'aucune requête ne part** (critère 2) : chercher des 403
   dans l'onglet réseau d'un compte ordinaire et n'en trouver aucun est le
   **succès**, pas un échec d'épreuve.
-- `ComptesController` porte son garde **sur la classe** (`:45`),
+- `ComptesController` porte son garde **sur la classe** (`:47`),
   `InvitationsController` **sur chaque méthode** (`:91,139,202`). Une lecture qui
   ne regarde qu'un niveau déclarerait l'autre sans protection —
   `SurfaceAdministrationTest:347-379` lit les deux.
@@ -401,7 +424,7 @@ administrateur**.
 | `01-catalogue.webm` | Compte → **Gestion des exercices**, défiler, en ouvrir un | 60 s | les compteurs et la jauge, les six filtres, puis l'éditeur avec ses puces |
 | `02-fusion.webm` | **Fusionner des exercices** → deux doublons → la confirmation | 40 s | « Correspondances probables » avec leur pourcentage, puis « Ton historique est conservé, mais l'opération est définitive. » |
 | `03-cuissons.webm` | **Façons de cuire** → ajouter un mode → le remonter | 25 s | l'avertissement sur la fournée partagée, et l'échange de rangs |
-| `04-comptes.webm` | **Inviter quelqu'un** → « Comptes » → désactiver un compte, réactiver | 30 s | les compteurs « *n* séances · *n* séries · *n* modèles · *n* plans · *n* aliments · *n* lignes de stock », et la pastille « Désactivé » |
+| `04-comptes.webm` | **Inviter quelqu'un** → « Comptes » → désactiver un compte, réactiver | 30 s | les neuf compteurs « *n* séances · *n* séries · *n* modèles · *n* plans · *n* aliments · *n* lignes de stock · *n* objectifs · *n* compléments · *n* exercices personnels », et la pastille « Désactivé » |
 | `05-refus.webm` *(hors bobine 8)* | son propre compte dans la liste | 15 s | « C'est ton compte. Rien à faire ici : un administrateur ne peut ni se désactiver ni se supprimer lui-même. » |
 
 **Ce qui n'est PAS tournable en l'état** : la prise **8.2 du plan de tournage**
@@ -434,7 +457,7 @@ si `GROCY_URL` est renseigné sur l'instance filmée ; sinon l'écran affiche
   les compteurs ont été lus dans le code, pas recomptés en base.
 - `presentation/features.md` (section H, datée du 14 septembre) est **périmée
   sur cette fonctionnalité** : elle annonce un filtre « **Les miens** » qui
-  s'appelle aujourd'hui « **Ajoutés dans l'app** », et **huit de ses renvois
+  s'appelle aujourd'hui « **Ajoutés dans l'app** », et **six de ses renvois
   pointent hors fichier**. **Les numéros qui suivent sont volontairement
   reproduits FAUX** — ce sont ceux de `features.md`, pas les miens : ne pas les
   « corriger », c'est précisément le défaut qu'ils documentent.
@@ -442,9 +465,11 @@ si `GROCY_URL` est renseigné sur l'instance filmée ; sinon l'écran affiche
     fichier n'en compte plus que **195** depuis le découpage du 15 septembre
     2026 (son contenu est parti dans `modaleEditeurExercice.tsx`,
     `useEditeurExercice.ts` et `editionExercice.ts`) ;
-  - `ProtectionDuCompte.php` aux lignes **158** et **207**, pour un fichier de
-    **92** lignes ;
   - `FusionExerciceProcessor.php` à la ligne **173**, pour un fichier de **108**
     lignes.
+
+  Ses deux renvois `ProtectionDuCompte.php:158` et `:207`, eux aussi hors
+  fichier, ont été recalés le 17 septembre 2026 avec ceux qui visent
+  `ComptesController.php` et `admin-utilisateurs.tsx`.
 
   Se fier à cette fiche, et non à ces renvois.

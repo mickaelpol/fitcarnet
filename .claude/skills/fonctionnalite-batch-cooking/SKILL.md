@@ -375,9 +375,15 @@ recette à rejouer. »
   du plan qui met les ingrédients de côté, et **« J'ai cuisiné »** qui décrémente
   le frigo (`planRelu.tsx:204-222`). Ces deux gestes appartiennent à la
   fonctionnalité des plans enregistrés, pas à celle-ci.
-- **Aucun test de rendu ne couvre ces écrans** : le projet n'embarque ni
-  `@testing-library` ni `react-test-renderer`. Les modules purs sont éprouvés,
-  le **câblage ne l'est qu'à l'écran** — c'est ce que cette fiche fait.
+- **Aucun test de rendu ne couvre ces écrans.** Le projet embarque bien
+  `@testing-library/react` (version DOM, sous `global-jsdom`, environnement
+  `front/src/tests/environnement.ts`) depuis le 15 septembre 2026, et
+  `npm test` passe 33 tests de rendu (17 septembre 2026) — mais ils montent six
+  composants (`cadreCompte`, `champNombre`, `choixMode`, `editeurAliment`,
+  `editeurAlimentConnecte`, `serieModele`), aucun de l'étape « Cuisiner ». Les
+  modules purs sont éprouvés, le **câblage ne l'est qu'à l'écran** — c'est ce
+  que cette fiche fait. (`react-test-renderer`, lui, n'est pas installé :
+  déprécié en React 19, voir `front-fitcarnet`.)
 - **`presentation/features.md` (14 septembre 2026) cite cette fonctionnalité en
   `cuisson.ts:134`, `:233`, `:581`, `composer.ts:800`, `:821`, `repas.tsx:1396`,
   `:1479` : ces lignes n'existent plus.** Le découpage du 15 septembre a réduit

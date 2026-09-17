@@ -22,17 +22,28 @@ formule américaine, et `cibles_incoherentes` comptait les fibres à 4 kcal/g.
 ~~Reste ouvert (M1 et M4 du lot 2) : deux formules Atwater encore recopiées.~~
 **Corrigé le 15 septembre 2026**, et cette phrase était périmée depuis — relevée
 le 16 en écrivant les fiches de fonctionnalité. Les deux appellent désormais
-`kcalDesMacros` (`front/src/solveur/solveur.ts:31`), qui tient ses coefficients
-de `nutrition.ts` ; `app/objectifs.tsx:87` l'importe. **Ne pas aller « corriger »
-un défaut qui n'existe plus.**
+`kcalDesMacros` (`front/src/solveur/solveur.ts:29-31`) ; `app/objectifs.tsx:87`
+s'en sert. **Ne pas aller « corriger » un défaut qui n'existe plus.**
+
+**Depuis le 17 septembre 2026, la somme elle-même n'a plus qu'une écriture** :
+`kcalDesGrammes` (`front/src/calcul/nutrition.ts:45-51`), fibres à
+`KCAL_FIBRES`. `controler`, `kcalDesMacros` (solveur), `kcalAtwater`
+(`plausibilite.ts`), `planCoach.ts` et `carteRepas.tsx` l'appellent, et
+`front/src/calcul/formuleUnique.test.ts` refuse toute multiplication par un
+coefficient `KCAL_…` ailleurs, dans `src/` comme dans `app/`. Une fibre absente
+y compte pour zéro gramme : c'est à l'appelant de savoir s'il la connaît, et de
+le dire à l'écran.
 
 ## 2. Les valeurs décrivent le produit TEL QU'ON LE PÈSE
 
 Le riz blanc sec vaut **350 kcal/100 g**, pas 155 — 155, c'est le même riz une
 fois cuit, gonflé d'eau (rendement **2,26**). Un légume se pèse **cru**.
 
-> **Les chiffres viennent de `Table_Ciqual_2025.xlsx`**, la table ANSES, à la
-> racine du dépôt. **Deux colonnes d'énergie y cohabitent** : prendre « Énergie,
+> **Les chiffres viennent de `Table_Ciqual_2025.xlsx`**, la table de l'Anses.
+> **Elle n'est pas versionnée** (`.gitignore`, 1,5 Mo) : elle se télécharge sur
+> le site de l'Anses, <https://ciqual.anses.fr/> — le lien de téléchargement est
+> en tête de `ciqual_vers_grocy.py` —, et se pose à la racine du dépôt, où les
+> scripts l'attendent. **Deux colonnes d'énergie y cohabitent** : prendre « Énergie,
 > Règlement UE n° 1169/2011 », qui compte les fibres à 2 kcal/g comme la règle 1
 > de cette skill. « N × facteur Jones » donne 348 au même riz — un écart muet de
 > 2 kcal qui suffit à faire croire à une faute de saisie.
@@ -76,9 +87,9 @@ expliquée à l'écran plutôt que lissée.
 
 ## Où vivent les formules
 
-`front/src/calcul/nutrition.ts` (macros, Atwater, catégories) et
-`front/src/calcul/cuisson.ts` (cru/cuit, fournées, habitudes) sont les **seuls**
-porteurs de ces formules. Un écran, un hook ou un script qui recalcule importe le
+`front/src/calcul/nutrition.ts` (macros, Atwater — `kcalDesGrammes` —,
+catégories) et `front/src/calcul/cuisson.ts` (cru/cuit, fournées, habitudes)
+sont les **seuls** porteurs de ces formules. Un écran, un hook ou un script qui recalcule importe le
 module — il ne recopie pas. Voir la skill `front-fitcarnet`.
 
 ## Attention aux scripts d'import

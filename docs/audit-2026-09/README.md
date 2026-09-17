@@ -14,6 +14,13 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
+> **Au 17 septembre 2026 : 60 constats clos, 19 ouverts** — vérifiés un par un
+> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 19
+> sont 13 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
+> 17 ; 03 — 8 sur 33 ; 04 — 5 sur 17. **Trois sont à trancher** (02#13,
+> 02#15, 02#17), les seize autres n'ont aucune décision consignée. La liste,
+> avec la preuve de chacun, est dans « [Ce qui reste ouvert](#ce-qui-reste-ouvert-au-17-septembre-2026) ».
+
 ## Ce que l'audit dit du projet
 
 Le projet est **soigné**, et ce n'est pas une politesse : `tsc --noEmit` passe sans une erreur avec
@@ -59,7 +66,7 @@ pas, et un second appui rend 409 « déjà cuisiné ». Le plan cesse de réserv
 compose ensuite sur des quantités qui n'existent plus — exactement le « bac vide une semaine plus
 tard » que ce bouton existe pour éviter.
 
-*Correction : boucler sur `inventorierUn()` en reprenant la forme de `FrigoController.php:301`.
+*Correction : boucler sur `inventorierUn()` en reprenant la forme de `FrigoController.php:319`.
 30 min, 1 h avec test.* **PHPStan niveau 5 l'aurait attrapé gratuitement — voir lot 0.**
 
 ### C2 — ✅ corrigé le 14 septembre 2026 — La double écriture du schéma n'était pas tenue
@@ -82,17 +89,19 @@ AUJOURD'HUI ». Une base neuve n'a ni compléments, ni file d'inventaire, ni auc
 positivité : elle accepte `kcal_100 = -350` en silence. La production ne le voit pas parce que
 `entrypoint-prod.sh` rejoue `db/manuel/` à chaque démarrage — le risque est différé, pas absent.
 
-Constat symétrique : `db/01-schema.sql:266` déclare `modele_exercice.secondes_total_cible`, colonne
-créée par aucune migration, présente dans aucune entité, référencée par aucune ligne de code.
+Constat symétrique : `db/01-schema.sql:294` déclare `modele_exercice.secondes_total_cible`, colonne
+créée par aucune migration, présente dans aucune entité, référencée par aucune ligne de code —
+**toujours vrai au 17 septembre 2026**, voir 02#12.
 
 *Correction : replier le DDL de 25/26/27 dans le schéma, régler `secondes_total_cible`, et ajouter
 au dépôt le script qui construit A et B et exige un diff vide. ~2 h.*
 
 ### C3 — ✅ corrigé le 14 septembre 2026 — Aucun test ne vérifiait l'isolation entre comptes
-`api/tests/` — **CONFIRMÉ (absence), désormais couvert par 13 témoins**
+`api/tests/` — **CONFIRMÉ (absence), désormais couvert par 14 témoins**
 
 **Ce qui a été fait.** Trois fichiers, sans base ni noyau, un par pièce du dispositif :
-`FiltreProprietaireTest` (5), `ProprietaireProcessorTest` (4), `CompteActifTest` (4). Chaque
+`FiltreProprietaireTest` (6 — le sixième, « un aliment n'est lu que par son propriétaire », date
+du 17 septembre 2026), `ProprietaireProcessorTest` (4), `CompteActifTest` (4). Chaque
 témoin a été **mis en échec** en cassant le code qu'il protège, avant d'être conservé — la
 restriction retirée de `applyToItem`, le `1 = 0` supprimé, le garde `is_a()` court-circuité, le propriétaire écrasé, le compte désactivé laissé passer.
 
@@ -126,7 +135,7 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 
 ### Sécurité
 - **É1** — ✅ **corrigé le 8 septembre 2026.** L'inventaire différé n'avait aucun contrôle de
-  propriété sur l'aliment. `FrigoController.php:332-390` + `AppliqueInventaire.php:146-179`. Le
+  propriété sur l'aliment. `FrigoController.php:351-434` + `AppliqueInventaire.php:146-179`. Le
   chemin jumeau (`POST /api/mon-frigo/stock`) avait reçu `alimentAccessible()` pour corriger
   exactement cette faille ; `POST /api/mon-frigo/inventaire` ne l'avait pas eu. Un compte pouvait
   écrire une ligne de stock sur l'aliment d'un autre, qui ne pouvait alors plus le supprimer.
@@ -150,7 +159,7 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   seule valeur négative existe — le cas que ce fichier dit avoir constaté — le conteneur applicatif
   ne redémarre plus.** *Correction : `= 0` au lieu de `= NULL`. 20 min.*
 - **É3** — ✅ **corrigé le 7 septembre 2026** (lot 1) : `installer.sh` joue désormais chaque
-  migration avec `ON_ERROR_STOP=1`. Le constat d'origine : `installer.sh:167` joue les migrations
+  migration avec `ON_ERROR_STOP=1`. Le constat d'origine : `installer.sh:167` (ligne de l'audit) joue les migrations
   sans `ON_ERROR_STOP` : psql continue après erreur
   et sort 0, l'installateur affiche « ✓ » sur un échec. C'est le mécanisme exact par lequel une
   divergence s'installe sans bruit. *15 min.*
@@ -202,7 +211,10 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   `public = false` à la création, `FiltreExercice` applique « **public OU le mien** » en collection
   et en item. La règle porte sur `public`, et non sur l'absence d'auteur : la nuance ouvre une
   troisième possibilité, l'exercice **publié mais attribué**, par où un administrateur verse au
-  catalogue d'exercices l'exercice bien rédigé de quelqu'un sans en effacer la paternité. C'est le `PATCH` d'administration, déjà réservé à `ROLE_ADMIN`, qui publie.
+  catalogue d'exercices l'exercice bien rédigé de quelqu'un sans en effacer la paternité.
+  **Ce mécanisme de publication n'existe pas encore** : `public` n'a aucun groupe de
+  sérialisation, aucun `PATCH` ne peut le basculer — relevé par la revue le 15 septembre 2026
+  (`Exercice.php:83-92`) et laissé « en suspens, et c'est volontaire » (`:74-78`).
 
   Les 1 338 exercices importés sont `public = true` : ils restent visibles de tous, **aucune
   migration de données n'a été nécessaire**.
@@ -216,9 +228,9 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
     « ajouté dans l'app ». Distinguer « le mien » demanderait d'exposer `creePar`, ce qui n'a pas
     été fait.
 
-  10 témoins, chacun vu échouer. Le `PATCH` reste réservé à `ROLE_ADMIN` : **l'auteur d'un exercice
-  privé ne peut toujours pas le corriger lui-même** — c'était déjà le cas avant, rien ne régresse,
-  mais le filtrage rend la limite plus visible.
+  10 témoins, chacun vu échouer. Le `PATCH` restait alors réservé à `ROLE_ADMIN`, et l'auteur d'un
+  exercice privé ne pouvait pas le corriger lui-même — **corrigé le 15 septembre 2026 par F-09** :
+  le `PATCH` s'ouvre à l'auteur (`Exercice.php:94-102`).
 - **É9** — ✅ **réglé le 8 septembre 2026** (lot 5) : `grocy_macros.py` a été supprimé. Le constat
   d'origine : `grocy_macros.py:105-113` écrivait dans les mêmes champs Grocy avec la **convention inverse**
   (valeurs cuites, riz basmati à 130 kcal contre 350 sec) : un produit amorcé ainsi fait peser ~3×
@@ -242,7 +254,8 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   liste = `[Riz, 20 g]` ; en déclarant « il me reste 80 g de riz », liste = `[]`, pour un plan
   cuisiné **identique**. Fait sous-acheter, et ça ne se voit qu'au supermarché. *15 min + 1 test.*
 - **É13** — ✅ **corrigé le 7 septembre 2026** (lot 2) : `kcalAtwater` compte les fibres à
-  2 kcal/g. Le constat d'origine : `plausibilite.ts:49-50` applique la formule **américaine**
+  2 kcal/g — et depuis le 17 septembre 2026, la somme elle-même vient de `kcalDesGrammes`, seule
+  écriture dans le front. Le constat d'origine : `plausibilite.ts:49-50` (ligne de l'audit) applique la formule **américaine**
   d'Atwater (fibres ignorées),
   celle que `nutrition.ts:4-7` interdit explicitement quatre fichiers plus loin. Reproduit sur des
   graines de chia : « 486 kcal déclarées, mais ses macros en font 378 » — alors que dans la
@@ -275,14 +288,15 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ | É11, É12, É13, É15, M2, M3 · **M1 et M4 faits le 15 septembre** — M1 affichait un écart de 2 kcal/g de fibres en mode glucides totaux (7,5 g suffisaient à accuser une cible atteignable) ; M4 a reçu un seuil **relatif**, choisi sur 134 860 pivots mesurés |
 | **3 — sécurité et isolation** | ✅ | É1, C3, É8, M-02, M-03 · **M-02 complet le 15 septembre** : `GET /api/mes-sessions` et `DELETE /api/mes-sessions/{id}` |
-| **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
+| **4 — base reproductible** | ◐ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** · **reste ouverte** la dérive entités ↔ schéma que le plan y rangeait (02#12) |
 | **5 — scripts dangereux** | ✅ | É4, `sauvegarde.sh` (É9 fait le 8 sept.) |
-| **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → **1 295** lignes · `composer.ts` **817** → 135 · `cuisson.ts` **611** → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
-| **7 — tests manquants** | ✅ | `client.ts` : 22 témoins, chacun prouvé par une **mutation** qui le tue (29 mutations au banc). `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
-| **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
+| **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → **1 295** lignes · `composer.ts` **830** → 135 (817 au commit de l'audit, 830 après le correctif É12 du même soir, 827 au premier rang du lot) · `cuisson.ts` **611** → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
+| **7 — tests manquants** | ✅ | `client.ts` : 22 témoins à la clôture, chacun prouvé par une **mutation** qui le tue (29 mutations au banc) ; **28** au 17 septembre 2026 (`it(` dans `client.test.ts`), dont ceux du délai de garde `fetchAvecDelai`. `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
+| **8 — le reste** | ◐ | Les onze du front et les neuf de sécurité sont faits ; 02#14, 02#18 et 02#19 aussi. **Restent ouverts** 02#13, 02#15, 02#17 (à trancher), 04#14, 04#15, 04#19, et la permission `RECORD_AUDIO` en double (M8) que le plan y rangeait. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
 Tests au 15 septembre, au terme du chantier : **600 front** (577 + 23 de rendu, en deux passes) · **252 API · 661 assertions · 7 erreurs PHPStan**
-(aucune sur les fichiers corrigés).
+(aucune sur les fichiers corrigés). Au 17 septembre 2026 en fin de journée : **636 front** (603 + 33 de
+rendu) · **329 API · 862 assertions · 7 erreurs PHPStan**.
 
 **Et une épreuve que les tests ne remplacent pas** :
 `presentation/tournage/verifier-ecrans.mjs` pilote un vrai navigateur — connexion,
@@ -295,14 +309,48 @@ Un point laissé ouvert volontairement :
   Le premier suffit à rouvrir la session ; le portier de `_layout.tsx` est en place ; et le
   bouton de déconnexion de `compte.tsx`, jusque-là enfermé derrière un `return` précoce sur
   l'erreur, est rendu **hors de toute condition** par `src/composants/cadreCompte.tsx`. Une
-  panne de `/api/moi` — ou une requête qui pend, `client.ts` n'ayant aucun délai de garde —
-  ne retire plus la seule sortie de la session. Cinq témoins de rendu.
+  panne de `/api/moi` — ou une requête qui pend : `client.ts` n'avait alors aucun délai de garde,
+  il en a un depuis le 15 septembre 2026 au soir (`fetchAvecDelai`, `client.ts:231`) — ne retire
+  plus la seule sortie de la session. Cinq témoins de rendu.
 - ~~**La table des paliers du disque RM**~~ — **tranchée le 15 septembre 2026.** Une seule
   table, centrée sur **70-90 %**, la zone où l'on progresse et la seule où la formule dit vrai.
   Neuf paliers par pas de 2,5 %, donnant neuf cibles de répétitions distinctes. En dessous de
   70 %, la charge s'affiche et la prédiction disparaît — le seuil est **dérivé** de
   `REPS_MAX_POUR_1RM`, pas écrit à la main. `pasConseille` descend à 1 kg pour les petites
   charges, où onze paliers ne donnaient que cinq charges distinctes.
+
+## Ce qui reste ouvert au 17 septembre 2026
+
+Dix-neuf constats, vérifiés un par un dans le code ce jour-là. Aucun critique, aucun élevé.
+
+**À trancher — la décision appartient au propriétaire, avec son argument :**
+
+| Constat | Gravité | Ce qui retient |
+|---|---|---|
+| **02#13** — ni limites de ressources ni rotation des journaux | faible | `docker-compose.yml` se déploie en production au prochain push : une limite mal choisie arrêterait l'application réelle |
+| **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
+| **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée (une nouvelle invitation remplace l'ancienne) ; reste la purge, non décidée |
+
+**Ouverts, sans décision consignée :**
+
+| Constat | Gravité | Preuve au 17 septembre 2026 |
+|---|---|---|
+| **02#8** — sauvegardes sur le même volume que la base | moyenne | correction hors dépôt ; rien ne la consigne |
+| **02#9** — `deployer-nas.sh` redémarre l'application et les travailleurs d'un seul `restart` | moyenne | `deployer-nas.sh:195-197` |
+| **02#12** — dérive entités ↔ schéma | moyenne | `Utilisateur.php:47` (`length: 180, unique: true`) ; `secondes_total_cible` sans migration ni propriété (`db/01-schema.sql:294`) |
+| **03 M5** — jetons en clair dans `localStorage` sur le web | moyenne | `front/src/api/client.ts:64-93` |
+| **03 M6** — chargement infini quand une requête voisine échoue | moyenne | **partiel** : `seance/[id].tsx` corrigé ; `modele/[id].tsx:74-78`, `admin-utilisateurs.tsx` et les cibles de `repas.tsx` non |
+| **03 M8** — `RECORD_AUDIO` inutile, déclaré deux fois | moyenne | `front/app.json:17-22` |
+| **03 M9** — `@react-navigation/native-stack` importé sans être déclaré | moyenne | `front/src/composants/enTete.tsx:1` |
+| **03 M10** — course au chargement des jetons | moyenne | `front/src/api/client.ts:106-113` |
+| **03 M11** — `useMoi` ne réessaie pas après une panne réseau | moyenne | `front/src/api/hooks/auth.ts:133-142` |
+| **03 M12** — saisie d'inventaire perdue au changement d'onglet | moyenne | `front/app/(onglets)/frigo.tsx:54-59` |
+| **03 M13** — `noUncheckedIndexedAccess` désactivé | moyenne | `front/tsconfig.json:5` |
+| **04#7** — deux juges du rendement, API et front | moyenne | l'impossible est aligné (16 septembre) ; les bandes du plausible et le seuil de 100,5 g restent écrits deux fois |
+| **04#9** — date d'une nouvelle séance calculée en UTC | moyenne | `front/src/composants/useSeanceEditable.ts:35` |
+| **04#14** — `DeductionDuPlan` : la seconde ligne écrase la première | faible | `DeductionDuPlanTest.php:143-160` affirme toujours `800` |
+| **04#15** — le bouchon de `FrigoGrocyCreationTest` répond `[]` à tout | faible | `FrigoGrocyCreationTest.php:176` |
+| **04#19** — divisions et conversions non gardées dans `ciqual_vers_grocy.py` | faible | `:914`, `:944`, `:729-731`, `:348`, `:818` |
 
 Une refonte vers l'architecture hexagonale est un objectif assumé, **non commencée**. Voir la
 section « Skills » de `CLAUDE.md` : elle ne doit jamais se mélanger à une correction de bug.

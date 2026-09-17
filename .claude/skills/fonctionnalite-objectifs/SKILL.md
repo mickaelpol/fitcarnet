@@ -28,12 +28,12 @@ c'est viser huit grammes de trop par repas sans qu'aucun écran ne le signale.
 |---|---|---|
 | **Quatre cibles, une par moment** — `Matin` / `Midi` / `16 h` / `Soir`, en segments en haut de l'écran ; les noms longs sont `Petit-déjeuner`, `Déjeuner`, `Collation`, `Dîner` | Mes objectifs | `front/app/objectifs.tsx:17`, `:163` |
 | **Quatre champs** : `Protéines`, `Glucides`, `Lipides` (en `g`), `Calories` (en `kcal`) | idem | `objectifs.tsx:264` |
-| **Les calories se recalculent seules** dès qu'une macro change — `4·P + 4·G + 9·L`, coefficients pris dans `nutrition.ts`, jamais recopiés | idem | `objectifs.tsx:83`, `front/src/solveur/solveur.ts:31`, `front/src/calcul/nutrition.ts:10` |
-| **Alerte d'incohérence au-delà de 15 kcal**, avec deux formulations selon la convention | idem | `objectifs.tsx:109`, `:278`, `solveur.ts:16` |
+| **Les calories se recalculent seules** dès qu'une macro change — `4·P + 4·G + 9·L` : `kcalDesMacros` délègue à `kcalDesGrammes`, seule écriture de la somme dans le front depuis le 17 septembre 2026 (`formuleUnique.test.ts`) | idem | `objectifs.tsx:83`, `front/src/solveur/solveur.ts:29-31`, `front/src/calcul/nutrition.ts:45-51` |
+| **Alerte d'incohérence au-delà de 15 kcal**, avec deux formulations selon la convention | idem | `objectifs.tsx:109`, `:278`, `solveur.ts:14` |
 | **Case « Glucides fibres comprises »**, dont le texte d'aide change avec l'état | idem | `objectifs.tsx:181` |
 | **Convertisseur de plan américain**, repliable, avec aperçu « Sera enregistré : … » | idem | `objectifs.tsx:197`, `:204` |
-| **Avertissement « ton plan les sous-estime »** sur des fibres invraisemblables | idem | `objectifs.tsx:248`, `front/src/calcul/planCoach.ts:80` |
-| **Jamais de glucide négatif** à la conversion | — | `planCoach.ts:88` |
+| **Avertissement « ton plan les sous-estime »** sur des fibres invraisemblables | idem | `objectifs.tsx:248`, `front/src/calcul/planCoach.ts:78` |
+| **Jamais de glucide négatif** à la conversion | — | `planCoach.ts:86` |
 | **Récapitulatif des quatre repas** — « 40 P · 60 G · 15 L » ou « à définir » | bas de l'écran | `objectifs.tsx:304` |
 | **Refus d'une saisie illisible** : champ bordé de rouge, bouton éteint | idem | `objectifs.tsx:36`, `:102`, `front/src/calcul/saisieNombre.ts:30` |
 | **Compléments alimentaires par moment de repas** — consigne, pas journal de prises | onglet Compte, encart repliable | `front/src/composants/complements.tsx:143`, `api/src/Entity/Complement.php:19` |
@@ -45,9 +45,9 @@ c'est viser huit grammes de trop par repas sans qu'aucun écran ne le signale.
 - `KCAL_PROTEINES = 4`, `KCAL_GLUCIDES = 4`, **`KCAL_FIBRES = 2`**, `KCAL_LIPIDES = 9`
   — `front/src/calcul/nutrition.ts:10-13`. **Convention européenne** : les fibres
   sont comptées **à part** et valent **2 kcal/g**, jamais 4 ni 0.
-- `SEUIL_COHERENCE = 15` kcal — `solveur.ts:16`. En deçà, c'est de l'arrondi.
+- `SEUIL_COHERENCE = 15` kcal — `solveur.ts:14`. En deçà, c'est de l'arrondi.
 - Fibres douteuses : **glucides ≥ 20 g ET fibres < glucides / 10** —
-  `planCoach.ts:81`. C'est un ordre de grandeur, pas une loi.
+  `planCoach.ts:79`. C'est un ordre de grandeur, pas une loi.
 - Affichage des nombres : arrondi à l'entier si l'écart est < 0,05, sinon une
   décimale — `nb()`, `front/src/theme/index.ts`.
 
@@ -127,7 +127,7 @@ rangée **« Avec quel repas »** (`Matin`/`Midi`/`16 h`/`Soir`). Après un ajou
    « Glucides fibres comprises » sur `{710 kcal, 40 P, 100 G, 20 L}` doit faire
    **disparaître** l'alerte : 100 g de glucides totaux couvrent l'intervalle
    `[600 ; 740]` kcal selon la part de fibres, et 710 tombe dedans
-   (`solveur.ts:53-68`). **Compter les fibres à 4 kcal/g accuserait à tort dès
+   (`solveur.ts:47-62`). **Compter les fibres à 4 kcal/g accuserait à tort dès
    7,5 g** — c'est le défaut M1 du 15 septembre 2026, il ne doit pas revenir.
 5. **Le convertisseur ne retranche rien de ce qu'il enregistre.** Saisir
    `40 P / 100 G / 20 L / 15 F / 700 kcal`, puis « Reporter » : le champ
@@ -139,7 +139,7 @@ rangée **« Avec quel repas »** (`Matin`/`Midi`/`16 h`/`Soir`). Après un ajou
    conséquence ici — c'est justement pour ça qu'on ne s'en sert pas. »**
    `100 G / 12 F` ne doit **rien** afficher (seuil : glucides/10).
 7. **Jamais de glucide négatif.** `50 G / 80 F` : la conversion retranche au plus
-   les 50 g (`planCoach.ts:88`), l'aperçu « hors fibres » affiche `0`, jamais un
+   les 50 g (`planCoach.ts:86`), l'aperçu « hors fibres » affiche `0`, jamais un
    négatif.
 8. **Refus d'une saisie illisible (règle 6 : vide ≠ zéro).** Taper `12O` (avec un
    O) ou `4,2,1` dans `Protéines` : le champ se borde de rouge
@@ -269,7 +269,7 @@ pas les vidéos.
   aucune colonne de fibres. **La case « Glucides fibres comprises » suffit** :
   elle dit dans quelle convention les glucides sont écrits, et le calculateur
   ajoute les fibres **réelles** des aliments au moment de comparer
-  (`front/src/solveur/solveur.ts:105`). Ajouter une cible de fibres reviendrait à
+  (`front/src/solveur/solveur.ts:99`). Ajouter une cible de fibres reviendrait à
   demander à l'utilisateur un chiffre que les plans remplissent mal — celui de
   référence annonce 14 g par jour pour un contenu réel proche de 48
   (`objectifs.tsx:123-135`). Le document du propriétaire
@@ -295,7 +295,7 @@ pas les vidéos.
   à l'étape « Repas » du calculateur. Voir `fonctionnalite-calculateur-repas`.
 - **Le message d'incohérence de cet écran n'est pas celui du calculateur.** Le
   solveur produit le même constat sous le code `cibles_incoherentes`, mais avec
-  la gravité `info` (`solveur.ts:437`) — et la carte d'un repas **filtre les
+  la gravité `info` (`solveur.ts:431`) — et la carte d'un repas **filtre les
   diagnostics `info`** (`front/src/composants/carteRepas.tsx:513`). L'alerte de
   cohérence ne se voit donc **que sur cet écran-ci**. Ne pas promettre de la
   montrer pendant la bobine 4.

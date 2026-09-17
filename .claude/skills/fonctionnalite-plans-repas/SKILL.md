@@ -239,7 +239,7 @@ majeur en *Comment l'éprouver* : les plans de `jeu-demo.sql` ne conviennent pas
     **Et la déduction ne peut pas écrire chez autrui** : elle passe par
     `FrigoBase::definirStock` (`PlansController.php:197`), dont la garde
     « le mien » est le point de passage obligé fermé après la faille É1
-    (`api/src/Service/FrigoBase.php:109-126`) ; la base refuse d'ailleurs
+    (`api/src/Service/FrigoBase.php:116-133`) ; la base refuse d'ailleurs
     elle-même une telle ligne (clé composite
     `stock_aliment_du_meme_compte_fkey`, migration 35). Un `consomme` trafiqué
     visant l'aliment d'un autre fait **échouer cette ligne**, qui ressort dans
@@ -396,7 +396,7 @@ npm --prefix "$(git rev-parse --show-toplevel)"/front test
 
 ### Nettoyer
 
-`plan_repas` part en **CASCADE** avec le compte (`db/01-schema.sql:502`). Mais
+`plan_repas` part en **CASCADE** avec le compte (`db/01-schema.sql:504`). Mais
 **`plan_repas.contenu` est du JSON que nulle clé étrangère ne protège** : un
 aliment supprimé qui y figure laisse le plan incohérent **sans la moindre erreur
 SQL** (`donnees-de-test`). Vérifier qu'aucun plan ne cite un aliment avant de le
@@ -464,8 +464,9 @@ sont à l'image des deux côtés.
   front.
 - **`features.md` cite `DeductionDuPlan.php:346`** pour le plancher et les motifs :
   le fichier fait **112 lignes**. Les vraies références sont `:80-90`.
-- **Le commentaire de `db/manuel/jeu-demo.sql` se contredit** : il annonce « Le
-  premier est déjà cuisiné (`cuisine_le` renseigné) : c'est lui qui montre le
-  bouton "J'ai cuisiné" dans son état d'après » — or un plan cuisiné **n'affiche
-  aucun bouton** (`planRelu.tsx:204`). Et les deux plans ont un `consomme` vide,
+- **Le commentaire de `db/manuel/jeu-demo.sql` s'est contredit jusqu'au
+  17 septembre 2026** : il annonçait que le plan déjà cuisiné « montre le bouton
+  "J'ai cuisiné" dans son état d'après » — or un plan cuisiné **n'affiche aucun
+  bouton** (`planRelu.tsx:204`). Corrigé ce jour-là : il dit désormais que le
+  bouton « n'y est plus ». Mais les deux plans ont toujours un `consomme` vide,
   donc **aucun des deux** ne peut démontrer la déduction.

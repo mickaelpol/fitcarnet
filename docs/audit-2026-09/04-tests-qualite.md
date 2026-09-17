@@ -67,9 +67,14 @@ Consigne respectée.
 
 ## 3. Constats, du plus grave au moins grave
 
+**État au 17 septembre 2026, vérifié constat par constat : douze clos, cinq
+ouverts.** Clos : 1, 2, 4, 5, 6, 8, 10, 11, 12, 13, 16 et 18. **Ouverts** : 7 et 9
+(moyens), 14, 15 et 19 (faibles) — aucun n'a de décision consignée. Chaque
+constat porte son statut ; les constats clos suivent au présent de l'audit.
+
 ---
 
-### 1. **« J'ai cuisiné » appelle une méthode qui n'existe plus, et le plan est déjà marqué**
+### 1. ✅ corrigé le 7 septembre 2026 (C1) — **« J'ai cuisiné » appelle une méthode qui n'existe plus, et le plan est déjà marqué**
 **Gravité : CRITIQUE — Statut : CONFIRMÉ**
 `api/src/Controller/PlansController.php:155`
 
@@ -90,7 +95,7 @@ Le commit `1055cc2` (« inventaire en tâche de fond ») a remplacé `inventorie
 
 Résultat : le frigo Grocy reste au chiffre d'avant, le plan cesse de réserver son stock, et le solveur compose les repas suivants sur des quantités qui n'existent plus. Exactement le défaut que ce bouton existe pour corriger, et exactement le « bac vide une semaine plus tard » décrit dans le docblock de `DeductionDuPlan`. `DeductionDuPlanTest` teste parfaitement le calcul — mais rien ne teste qu'on sait l'appliquer.
 
-**Correction.** Remplacer par une boucle sur `inventorierUn()`, en reprenant la forme déjà écrite dans `FrigoController.php:301` et `AppliqueInventaire.php:165` (qui rendent le motif d'échec plutôt qu'une exception, ce qui alimente naturellement `$echecs`) :
+**Correction.** Remplacer par une boucle sur `inventorierUn()`, en reprenant la forme déjà écrite dans `FrigoController.php:319` et `AppliqueInventaire.php:165` (qui rendent le motif d'échec plutôt qu'une exception, ce qui alimente naturellement `$echecs`) :
 ```php
 foreach ($nouvellesQuantites as $idProduit => $quantite) {
     $motif = $this->grocy->inventorierUn($idProduit, $quantite);
@@ -103,7 +108,7 @@ Recommandation de fond : ce bug aurait été attrapé gratuitement par PHPStan/P
 
 ---
 
-### 2. **Aucun test ne vérifie l'isolation des données entre comptes**
+### 2. ✅ corrigé le 14 septembre 2026 (C3) — **Aucun test ne vérifie l'isolation des données entre comptes**
 **Gravité : CRITIQUE — Statut : CONFIRMÉ**
 `api/src/Doctrine/FiltreProprietaire.php`, `api/src/State/ProprietaireProcessor.php`, `api/src/Security/CompteActif.php`, `api/config/services.yaml:18-28`
 
@@ -125,9 +130,9 @@ Deux garde-fous sans base de données sont possibles tout de suite :
 
 ---
 
-### 4. **Les exercices « personnels » d'un compte sont visibles de tous les autres**
+### 4. ✅ corrigé le 14 septembre 2026 (É8) — **Les exercices « personnels » d'un compte sont visibles de tous les autres**
 **Gravité : ÉLEVÉE — Statut : CONFIRMÉ**
-`api/src/Entity/Exercice.php:48-62`, `:136`, `:206` ; `front/app/admin-exercices.tsx:299`
+`api/src/Entity/Exercice.php:50-103` (opérations), `:280-281` (`public`), `:283-285` (`creePar`) — lignes d'aujourd'hui ; `front/app/admin-exercices.tsx:299` à l'audit
 
 `Exercice` porte `private bool $public = true;` et `private ?Utilisateur $creePar = null;`. Or, sur tout `api/src/`, `creePar` n'est lu ni écrit nulle part, hors deux commentaires. Concrètement :
 
@@ -143,7 +148,7 @@ C'est en partie délibéré (le commentaire du `Patch` dit « le catalogue est c
 
 ---
 
-### 5. **`grocy_macros.py` écrit dans les mêmes champs Grocy avec la convention inverse, et par appariement en sous-chaîne**
+### 5. ✅ réglé le 8 septembre 2026 (É9, script supprimé) — **`grocy_macros.py` écrit dans les mêmes champs Grocy avec la convention inverse, et par appariement en sous-chaîne**
 **Gravité : ÉLEVÉE — Statut : CONFIRMÉ**
 `grocy_macros.py:105-113` et `:176`
 
@@ -158,7 +163,7 @@ Accessoirement, `grocy_macros.py` ignore `fibres100` (`CHAMPS`, `:73-85`) alors 
 
 ---
 
-### 6. **Le chemin d'authentification du front n'a aucun test**
+### 6. ✅ corrigé le 15 septembre 2026 (É10, `client.test.ts`) — **Le chemin d'authentification du front n'a aucun test**
 **Gravité : ÉLEVÉE — Statut : CONFIRMÉ**
 `front/src/api/client.ts` (342 lignes, 0 test)
 
@@ -176,9 +181,9 @@ Un cas limite non couvert que j'ai relevé en lisant : si le jeton d'accès exis
 
 ---
 
-### 7. **Deux juges du rendement, un dans l'API et un dans le front, aux seuils différents**
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
-`api/src/Service/RendementPlausible.php:48-76` vs `front/src/calcul/plausibilite.ts:70-83` et `:203-262`
+### 7. OUVERT — **Deux juges du rendement, un dans l'API et un dans le front, aux seuils différents**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : la borne de l'**impossible** est alignée des deux côtés depuis le 16 (`rendementPossible`), mais les bandes du **plausible** et le seuil de 100,5 g restent écrits deux fois.
+`api/src/Service/RendementPlausible.php:48-76` vs `front/src/calcul/plausibilite.ts:91-105` et `:280-382`
 
 Les deux répondent à la même question — « ce rendement est-il possible ? » — et ne répondent pas pareil :
 
@@ -191,7 +196,7 @@ Les deux répondent à la même question — « ce rendement est-il possible ? �
 
 Et la conséquence n'est pas symétrique : la version **API décide quel rendement est retenu** (`AlimentDisponible::__construct` : la pesée de l'utilisateur ne gagne que si `sens()` la valide), tandis que la version **front ne fait qu'afficher**. Une pesée de viande à 0,4 est donc *retenue* par l'API et *signalée* par le front : deux verdicts sur la même donnée, sur le même écran.
 
-Même chose pour le seuil « plus de 100 g de matière dans 100 g » : `100.5` écrit deux fois, à `api/src/Service/AlimentDisponible.php:141` et `front/src/calcul/plausibilite.ts:148`.
+Même chose pour le seuil « plus de 100 g de matière dans 100 g » : `100.5` écrit deux fois, à `api/src/Service/AlimentDisponible.php:141` et `front/src/calcul/plausibilite.ts:215`.
 
 Chaque implémentation est correctement testée de son côté (`RendementMesureTest.php`, `AlimentDisponibleTest.php`, `plausibilite.test.ts`) — c'est précisément ce qui rend la divergence invisible : les deux suites sont vertes.
 
@@ -199,11 +204,11 @@ Chaque implémentation est correctement testée de son côté (`RendementMesureT
 
 ---
 
-### 8. **Deux contrôles Atwater dans le front, avec des verdicts qui peuvent se contredire**
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
-`front/src/calcul/nutrition.ts:45-100` vs `front/src/calcul/plausibilite.ts:48-49` et `:155-162`
+### 8. ✅ corrigé (fibres le 7 septembre 2026, formule unique le 17) — **Deux contrôles Atwater dans le front, avec des verdicts qui peuvent se contredire**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, corrigé** : `kcalAtwater` compte les fibres depuis le 7 septembre 2026 (É13), et depuis le 17 les deux contrôles appellent la même somme, `kcalDesGrammes` — la correction proposée ci-dessous, mot pour mot. Leurs tolérances restent distinctes (8 % / 20 % et `max(25 kcal, 20 %)`). Renvois d'aujourd'hui :
+`front/src/calcul/nutrition.ts:63-114` vs `front/src/calcul/plausibilite.ts:68-70` et `:222-230`
 
-- `nutrition.controler()` : `4·prot + 4·gluc + **2·fibres** + 9·lip`, tolérance **8 %** (20 % sans fibres). Appelé par `editeurAliment.tsx:133` et `frigo.tsx:635`.
+- `nutrition.controler()` : `4·prot + 4·gluc + **2·fibres** + 9·lip`, tolérance **8 %** (20 % sans fibres). Appelé par `editeurAliment.tsx:224` et `frigo.tsx:635` (aujourd'hui `ligneFrigo.tsx:29`).
 - `plausibilite.kcalAtwater()` : `4·prot + 4·gluc + 9·lip`, **sans les fibres**, tolérance `max(25 kcal, 20 %)`. Appelé par `repas.tsx:410` via `verifierCatalogue`.
 
 Un aliment riche en fibres peut donc être déclaré **cohérent** dans l'éditeur et **`calories_incoherentes`** sur l'écran repas — ou l'inverse. Sur un aliment à 10 g de fibres, l'écart entre les deux formules est de 20 kcal, soit exactement l'ordre de grandeur du seuil `max(25, …)`.
@@ -212,9 +217,9 @@ Un aliment riche en fibres peut donc être déclaré **cohérent** dans l'édite
 
 ---
 
-### 9. **La date d'une nouvelle séance est calculée en UTC**
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
-`front/app/seance/[id].tsx:24`, utilisée en `:134`
+### 9. OUVERT — **La date d'une nouvelle séance est calculée en UTC**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : la fonction a déménagé dans `front/src/composants/useSeanceEditable.ts:35`, inchangée — `new Date().toISOString().slice(0, 10)`.
+`front/app/seance/[id].tsx:24` à l'audit, utilisée en `:134`
 
 ```ts
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
@@ -228,7 +233,7 @@ Le reste du projet fait pourtant bien attention : `calendrier.tsx` travaille en 
 
 ---
 
-### 10. **Le 1RM n'est pas testé, et son fichier n'est pas compilable par la suite de tests**
+### 10. ✅ corrigé le 7 septembre 2026 — **Le 1RM n'est pas testé, et son fichier n'est pas compilable par la suite de tests**
 **Gravité : MOYENNE — Statut : CONFIRMÉ**
 `front/src/calcul/performance.ts` (123 lignes) ; `front/tsconfig.tests.json`
 
@@ -240,9 +245,9 @@ Le code est sain (`REPS_MAX_POUR_1RM = 15` avec la justification, le cas `reps =
 
 ---
 
-### 11. **Douze vérifications de `test_ciqual.py` sont des tautologies qui ne peuvent pas échouer**
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
-`test_ciqual.py:111-129`
+### 11. ✅ corrigé le 17 septembre 2026 — **Douze vérifications de `test_ciqual.py` sont des tautologies qui ne peuvent pas échouer**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, corrigé le 17 septembre 2026** : le test a été réécrit pour appeler le script (voir son commentaire, `test_ciqual.py:123-137`). Le constat d'origine :
+`test_ciqual.py:111-129` à l'audit
 
 ```python
 attendu = CIBLE_GLUCIDES * 100 / RIZ_SEC["gluc"]
@@ -263,11 +268,11 @@ Sur les ~38 `verifier()` de ce fichier, **3 seulement appellent une fonction du 
 
 ---
 
-### 12. **On refuse de supprimer un administrateur déjà désactivé, à tort**
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
-`api/src/Controller/ComptesController.php:238-244` (`administrateursActifs()`), appelé en `:196`
+### 12. ✅ corrigé le 17 septembre 2026 — **On refuse de supprimer un administrateur déjà désactivé, à tort**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, corrigé le 17 septembre 2026** : la règle reçoit `cibleEstActive` — la seconde correction proposée —, et une cible désactivée n'est plus le dernier administrateur de personne (`ProtectionDuCompte.php:89-98`, témoin `testUnAdministrateurDesactiveSeSupprimeQuandIlNeResteQuUnActif`). Le constat d'origine :
+`api/src/Controller/ComptesController.php:296-302` (`administrateursActifs()`), appelé en `:152` et `:214`
 
-Le contrat documenté est `@param int $adminsActifs nombre d'administrateurs ACTIFS, **cible comprise**` (`ProtectionDuCompte.php:29`). Mais la requête compte `WHERE actif = true AND roles LIKE '%ROLE_ADMIN%'` : quand la cible est un administrateur **déjà désactivé**, elle n'est pas comptée.
+Le contrat documenté était `@param int $adminsActifs nombre d'administrateurs ACTIFS, **cible comprise**` (`ProtectionDuCompte.php:30`, qui dit aujourd'hui « cible comprise si elle l'est »). Mais la requête compte `WHERE actif = true AND roles LIKE '%ROLE_ADMIN%'` : quand la cible est un administrateur **déjà désactivé**, elle n'est pas comptée.
 
 Scénario : deux administrateurs, moi (actif) et un autre (désactivé). `adminsActifs = 1`, `cibleEstAdmin = true` → `dernierAdministrateur(true, 1) = true` → suppression **refusée** au motif que « c'est le dernier administrateur actif », alors que je suis actif et que la cible ne l'est pas. Le geste devient impossible depuis l'application, ce qui est précisément ce que cette classe cherche à éviter.
 
@@ -277,7 +282,7 @@ Scénario : deux administrateurs, moi (actif) et un autre (désactivé). `admins
 
 ---
 
-### 13. **`tsconfig.tests.json` liste les fichiers un par un : un nouveau test peut ne jamais tourner**
+### 13. ✅ corrigé le 7 septembre 2026 (lot 0) — **`tsconfig.tests.json` liste les fichiers un par un : un nouveau test peut ne jamais tourner**
 **Gravité : FAIBLE — Statut : CONFIRMÉ**
 `front/tsconfig.tests.json`
 
@@ -287,9 +292,9 @@ L'`include` énumère explicitement chaque `.ts` et chaque `.test.ts` (à l'exce
 
 ---
 
-### 14. **`DeductionDuPlan` : deux lignes sur la même référence, la seconde écrase — et le test l'entérine**
-**Gravité : FAIBLE — Statut : CONFIRMÉ**
-`api/src/Service/DeductionDuPlan.php:88` ; `api/tests/Service/DeductionDuPlanTest.php:159-176`
+### 14. OUVERT — **`DeductionDuPlan` : deux lignes sur la même référence, la seconde écrase — et le test l'entérine**
+**Gravité : FAIBLE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : `testDeuxLignesSurLeMemeAlimentNeSeCumulentPas` affirme toujours `[5 => 800.0]` (`DeductionDuPlanTest.php:143-160`).
+`api/src/Service/DeductionDuPlan.php:88` ; `api/tests/Service/DeductionDuPlanTest.php:159-176` à l'audit
 
 `$quantites[identifiantSource($reference)] = round($restant / $parUnite, 3)` : chaque ligne recalcule depuis le stock **initial**. Deux lignes de 300 g et 200 g sur 1 000 g de riz donnent 800, pas 500 — 300 g de riz qui n'existent plus restent inscrits au frigo.
 
@@ -299,9 +304,9 @@ Le test `testDeuxLignesSurLeMemeAlimentNeSeCumulentPas` **affirme** `[5 => 800.0
 
 ---
 
-### 15. **Le bouchon HTTP de `FrigoGrocyCreationTest` répond `[]` à tout chemin inconnu**
-**Gravité : FAIBLE — Statut : CONFIRMÉ**
-`api/tests/Service/FrigoGrocyCreationTest.php:158-172`
+### 15. OUVERT — **Le bouchon HTTP de `FrigoGrocyCreationTest` répond `[]` à tout chemin inconnu**
+**Gravité : FAIBLE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : le bouchon rend toujours `$reponses[$chemin] ?? []` (`FrigoGrocyCreationTest.php:176`).
+`api/tests/Service/FrigoGrocyCreationTest.php:158-172` à l'audit
 
 `return new MockResponse(json_encode($reponses[$chemin] ?? []));` — si le code appelait demain un endpoint Grocy supplémentaire (ou en renommait un), le bouchon rendrait un tableau vide sans broncher et les tests resteraient verts. C'est le genre de mock assez permissif pour valider un code faux.
 
@@ -311,19 +316,19 @@ Le reste de ce fichier est bon : les corps envoyés sont capturés et vérifiés
 
 ---
 
-### 16. **Le docblock de `Aliment` décrit l'ancienne convention, abandonnée**
-**Gravité : FAIBLE — Statut : CONFIRMÉ**
-`api/src/Entity/Aliment.php:22-27`
+### 16. ✅ corrigé le 16 septembre 2026 — **Le docblock de `Aliment` décrit l'ancienne convention, abandonnée**
+**Gravité : FAIBLE — Statut : CONFIRMÉ, corrigé le 16 septembre 2026** : le docblock dit la règle, et raconte l'erreur qu'il portait (`Aliment.php:24-42`). Le constat d'origine :
+`api/src/Entity/Aliment.php:22-27` à l'audit
 
 > « proteines : valeurs CRUES, ratio = cuit/cru ; **feculents : valeurs CUITES**, ratio = cuit/sec »
 
-C'est exactement l'inverse de la règle posée par la refonte, martelée dans `RendementPlausible.php:20-24`, `AlimentDisponible.php:36-40` et `plausibilite.ts:24-27` : « les macros décrivent TOUJOURS le produit tel qu'on le pèse ». Ce commentaire est sur l'entité qui définit le schéma — c'est le premier endroit qu'on lit avant de saisir un aliment, et il conseille précisément l'erreur (valeurs cuites sur un féculent) que `plausibilite.ts` bloque ensuite sous le code `valeurs_deja_cuites`. Même remarque pour la fin de la ligne 26 : « personne ne peut en supprimer », alors qu'une opération `Delete` existe (`:46-49`).
+C'est exactement l'inverse de la règle posée par la refonte, martelée dans `RendementPlausible.php:20-24`, `AlimentDisponible.php:36-40` et `plausibilite.ts:26-28` : « les macros décrivent TOUJOURS le produit tel qu'on le pèse ». Ce commentaire est sur l'entité qui définit le schéma — c'est le premier endroit qu'on lit avant de saisir un aliment, et il conseille précisément l'erreur (valeurs cuites sur un féculent) que `plausibilite.ts` bloque ensuite sous le code `valeurs_deja_cuites`. Même remarque pour la fin de la ligne 26 : « personne ne peut en supprimer », alors qu'une opération `Delete` existe (aujourd'hui `Aliment.php:60-63`).
 
 **Correction : 15 min.**
 
 ---
 
-### 18. **Cinq implémentations de « sans accent » dans le front, dont trois avec un littéral fragile**
+### 18. ✅ corrigé le 15 septembre 2026 (D4, `texte.ts`) — **Cinq implémentations de « sans accent » dans le front, dont trois avec un littéral fragile**
 **Gravité : FAIBLE — Statut : CONFIRMÉ**
 
 - `front/src/calcul/frigo.ts:40`, `front/app/admin-exercices.tsx:118`, `front/src/solveur/garanties.test.ts:395` : `replace(/[̀-ͯ]/g, '')` — la plage de diacritiques est écrite avec des **caractères combinants bruts** dans le source, illisible et sensible à tout retraitement d'encodage ;
@@ -336,9 +341,9 @@ Les usages diffèrent (clé d'habitude vs filtre de recherche) et aucun ne fauss
 
 ---
 
-### 19. **Divisions et conversions non gardées dans `ciqual_vers_grocy.py`, au milieu d'une phase d'écriture**
-**Gravité : FAIBLE — Statut : CONFIRMÉ**
-`ciqual_vers_grocy.py:992`, `:1022`, `:849`, `:349`, `:895`
+### 19. OUVERT — **Divisions et conversions non gardées dans `ciqual_vers_grocy.py`, au milieu d'une phase d'écriture**
+**Gravité : FAIBLE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : les cinq points sont toujours là, aux lignes d'aujourd'hui `ciqual_vers_grocy.py:914`, `:944`, `:729-731`, `:348` et `:818` — et les fibres écrites à `0` en dur, `:859`.
+`ciqual_vers_grocy.py:992`, `:1022`, `:849`, `:349`, `:895` à l'audit
 
 - `:992` et `:1022` — `abs(calcule - ratio) / ratio`, `ratio` venant directement de la table `CORRESPONDANCE` (`:206-273`), sans garde. Une entrée à `0` fait planter tout l'import ;
 - `:849` — la boucle de conversion saute `None` et `""` mais pas une chaîne inconvertible : `nombre("n/a")` rend `None`, puis `None * ratio` lève un `TypeError` **non rattrapé, en plein `--appliquer`**, après que des écritures sont déjà parties vers Grocy ;
@@ -362,9 +367,9 @@ La dette est réelle mais **écrite en prose française dans les commentaires**,
 
 | Duplication | Emplacements | Divergence |
 |---|---|---|
-| Plausibilité d'un rendement | `RendementPlausible.php:48` / `plausibilite.ts:203-262` | **Oui, avérée** (constat 7) |
-| Seuil « 100,5 g de matière » | `AlimentDisponible.php:141` / `plausibilite.ts:148` | Pas encore |
-| Contrôle énergétique Atwater | `nutrition.ts:45` / `plausibilite.ts:48` — **deux fois dans le front** | **Oui, avérée** (constat 8) |
+| Plausibilité d'un rendement | `RendementPlausible.php:48` / `plausibilite.ts:280-382` | **Oui, avérée** (constat 7, toujours ouvert) |
+| Seuil « 100,5 g de matière » | `AlimentDisponible.php:141` / `plausibilite.ts:215` | Pas encore |
+| Contrôle énergétique Atwater | `nutrition.ts:63` / `plausibilite.ts:68` — **deux fois dans le front** à l'audit | **Oui, avérée** à l'audit (constat 8) ; une seule somme, `kcalDesGrammes`, depuis le 17 septembre 2026 |
 | Convention macros crues/cuites | `ciqual_vers_grocy.py` / `grocy_macros.py` | **Oui, opposée** (constat 5) |
 | Normalisation d'accents | 5 implémentations dans le front | Pas de conséquence numérique (constat 18) |
 
@@ -374,7 +379,7 @@ La dette est réelle mais **écrite en prose française dans les commentaires**,
 
 ## 5. Ce qui va bien
 
-1. **`garanties.test.ts` tient sa promesse, et c'est rare.** J'ai vérifié les trois propriétés annoncées et elles sont réellement testées : *arrondi avant macros* — `macrosAffichees()` reconstruit les macros depuis `q.aCuire`, c'est-à-dire depuis **l'affichage**, et les compare à 0,01 près à celles annoncées ; côté code, `solveur.ts:185-190` arrondit bien avant de calculer. *Jamais de quantité négative* — testé, avec `Number.isFinite` en plus. *Toute déviation expliquée* — trois invariants distincts (`ok` ⇔ trois macros dans la tolérance, un repas raté porte un diagnostic non-`info`, un repas juste ne porte aucun blocage). En prime, un **méta-test** (`La batterie couvre vraiment quelque chose`) exige > 800 scénarios, > 100 réussis, > 100 ratés, > 50 plafonnements et > 20 échanges : sans lui, un jeu de données dégénéré rendrait tous les autres invariants vrais et vides. C'est le test le mieux conçu du projet. *Précision* : la batterie construit **1 000 scénarios** (250 frigos × 4 repas), pas 5 000 — le fichier lui-même et `ETAT.md:60` disent bien « mille », le chiffre de 5 000 ne vient pas du projet.
+1. **`garanties.test.ts` tient sa promesse, et c'est rare.** J'ai vérifié les trois propriétés annoncées et elles sont réellement testées : *arrondi avant macros* — `macrosAffichees()` reconstruit les macros depuis `q.aCuire`, c'est-à-dire depuis **l'affichage**, et les compare à 0,01 près à celles annoncées ; côté code, `solveur.ts:259-265` arrondit bien avant de calculer. *Jamais de quantité négative* — testé, avec `Number.isFinite` en plus. *Toute déviation expliquée* — trois invariants distincts (`ok` ⇔ trois macros dans la tolérance, un repas raté porte un diagnostic non-`info`, un repas juste ne porte aucun blocage). En prime, un **méta-test** (`La batterie couvre vraiment quelque chose`) exige > 800 scénarios, > 100 réussis, > 100 ratés, > 50 plafonnements et > 20 échanges : sans lui, un jeu de données dégénéré rendrait tous les autres invariants vrais et vides. C'est le test le mieux conçu du projet. *Précision* : la batterie construit **1 000 scénarios** (250 frigos × 4 repas), pas 5 000 — le fichier lui-même et `ETAT.md:60` disent bien « mille », le chiffre de 5 000 ne vient pas du projet.
 
 2. **Les tests disent *pourquoi*, avec la panne qu'ils empêchent.** `DeductionDuPlanTest` (« pas 200 mais 0,5 — sans cette conversion, deux pots deviendraient deux cents pots »), `InventaireUneLigneTest` (« ce qui s'est passé le 14 août 2026 »), `ProtectionDuCompteTest` (« `<= 1` et pas `=== 1` »). Chacun est un cas vécu figé, pas une ligne de couverture. C'est la meilleure défense contre la régression, et c'est cohérent d'un bout à l'autre.
 

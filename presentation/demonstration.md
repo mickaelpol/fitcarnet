@@ -64,10 +64,10 @@ docker compose -f compose.dev.yml exec app php bin/console \
 
 # 1) le frigo
 sed 's/essai@/demo@/' db/manuel/jeu-essai.sql \
-  | docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet
+  | docker compose -f compose.dev.yml exec -T db psql -v ON_ERROR_STOP=1 -U fitcarnet -d fitcarnet
 
 # 2) l'histoire
-docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet \
+docker compose -f compose.dev.yml exec -T db psql -v ON_ERROR_STOP=1 -U fitcarnet -d fitcarnet \
   < db/manuel/jeu-demo.sql
 ```
 
@@ -78,19 +78,23 @@ sont lus sur ta machine, toujours depuis la racine du dépôt :
 ```bash
 cd "$(git rev-parse --show-toplevel)" && set -o pipefail
 sed 's/essai@fitcarnet.local/demo@ton-domaine/' db/manuel/jeu-essai.sql \
-  | ssh nas 'docker exec -i fitcarnet-db psql -U fitcarnet -d fitcarnet'
+  | ssh nas 'docker exec -i fitcarnet-db psql -v ON_ERROR_STOP=1 -U fitcarnet -d fitcarnet'
 
 sed 's/demo@fitcarnet.local/demo@ton-domaine/' db/manuel/jeu-demo.sql \
-  | ssh nas 'docker exec -i fitcarnet-db psql -U fitcarnet -d fitcarnet'
+  | ssh nas 'docker exec -i fitcarnet-db psql -v ON_ERROR_STOP=1 -U fitcarnet -d fitcarnet'
 ```
 
 **Relis l'adresse dans les deux `sed` avant d'appuyer sur Entrée.** C'est la
 seule chose qui sépare un compte de démonstration de ton compte personnel.
 
+**`-v ON_ERROR_STOP=1` n'est pas décoratif.** Sans lui, un refus du garde-fou
+s'affiche, puis `psql` joue quand même la requête de contrôle finale et sort en
+0 : la commande a l'air d'avoir réussi (relevé le 17 septembre 2026).
+
 > **Le garde-fou de `jeu-demo.sql`** refuse tout compte qui a déjà des séances :
 > il EFFACE avant de poser, et une adresse mal recopiée détruirait un historique
 > réel. Si le message apparaît sur un compte qui est bien celui de démonstration,
-> relance avec `psql -v ecraser=oui`. **Si le message nomme ton compte
+> relance avec `psql -v ON_ERROR_STOP=1 -v ecraser=oui`. **Si le message nomme ton compte
 > personnel, arrête tout** : l'adresse est fausse.
 >
 > `db/manuel/verifier-jeux.sh` éprouve cette procédure dans un PostgreSQL
@@ -231,8 +235,9 @@ La colonne **Bobine** renvoie à la partie III.
 Les adresses `fichier:ligne` exactes ne sont pas recopiées ici : elles vivent
 dans `features.md` (~288 capacités) et, à jour et vérifiées une par une, dans
 les quinze fiches `.claude/skills/fonctionnalite-*`. **Ce sont elles qui font
-foi** ; `features.md` est daté du 14 septembre et porte encore au moins une
-erreur connue (« zone 70–80 % », alors que c'est 70 à 90 %).
+foi** ; `features.md` est daté du 14 septembre, et seuls ses renvois vers les
+fichiers touchés le 17 septembre 2026 ont été recalés. (Son « zone 70–80 % »,
+lui, est corrigé depuis le 16 : c'est 70 à 90 %.)
 
 ## A · Entrer, et rester
 
@@ -268,7 +273,7 @@ erreur connue (« zone 70–80 % », alors que c'est 70 à 90 %).
 | | Le stock **groupé par emplacement** — frigo, congélateur, placard — dans l'ordre d'un inventaire réel, avec « 6 en stock sur 8 » | `/(onglets)/frigo` | 3.1 |
 | | Le détail d'un aliment : macros, catégorie, et **« 100 g → 78 g »** à la cuisson | ouvrir « Poulet, filet sans peau cru » | 3.2 |
 | ◐ | Le rendement de cuisson est **mesurable** (poids avant / après → « Utiliser ce résultat (2,3) »). Et les catégories sont **huit**, pas trois : Protéine, Glucide, Légume, Fruit, Oléagineux, Matière grasse, Laitage, Autre | éditeur d'aliment | 3.2 |
-| + | **Recherche** par aliment ou par emplacement, insensible aux accents | champ « Rechercher » | 3.3 |
+| + | **Recherche** par aliment ou par emplacement, insensible aux accents | champ « Chercher un aliment ou un emplacement » | 3.3 |
 | | **Ajouter un aliment** : l'éditeur s'ouvre vide, on saisit les valeurs de l'étiquette. L'aliment **appartient au compte** : aucun autre ne le voit | Ajouter un aliment | 3.4 |
 | + | **Contrôle de cohérence permanent** des valeurs, **blocage** de l'enregistrement sur « incohérent », et **détection des kilojoules** (« Convertir : 1473 kJ = 352 kcal ») | éditeur d'aliment | 3.5 |
 | + | **Fibres facultatives** — vide veut dire « non renseigné », pas zéro | éditeur d'aliment | 3.5 |
@@ -341,7 +346,7 @@ sont les précisions et les ajouts qui font la démonstration.
 |---|---|---|---|
 | | Le **1RM estimé** se recalcule à chaque saisie, formule d'**Epley** | carte d'exercice | 7.5 |
 | ◐ | **Deux garde-fous que l'inventaire ne dit pas** : au-delà de **15 répétitions** l'estimation est refusée (on mesure l'endurance), et une série d'**une** répétition est prise telle quelle. Ils restent tels quels, sauf arbitrage contraire | — | 7.5 |
-| | La **zone de travail est 70 à 90 %** — et c'est `features.md` qui se trompe en annonçant « 70–80 % » | disque RM | 7.5 |
+| | La **zone de travail est 70 à 90 %** — `features.md` annonçait « 70–80 % » jusqu'à sa correction du 16 septembre 2026 | disque RM | 7.5 |
 | | Écart depuis la dernière fois : « ▲ +2,5 kg », « = stable », « 1re fois » | disque de tendance | 7.5 |
 | + | **Courbe de progression** à partir de 2 séances : « +7,5 kg sur 6 séances » | carte d'exercice | 7.5 |
 | ◐ | **Le disque et le calculateur sont deux choses.** « ⚖ RM » en bas de séance ouvre le **calculateur de charge** (charge + répétitions → 1RM, arrondi 1 / 2,5 / 5 kg, table des paliers) et **il n'hérite pas** du 1RM de l'exercice ouvert. Le **disque**, lui, est le cercle sur la carte, qui déplie la table des paliers | `/seance/<id>` | 7.8 |
@@ -551,7 +556,13 @@ encore en stock est refusé, 409).
 
 ## Bobine 4 · On planifie la semaine · ~5 min — **la bobine décisive**
 
-> **État de départ** : frigo garni, aucun plan enregistré.
+> **État de départ** : frigo garni (`jeu-essai.sql`) et cibles posées
+> (`jeu-demo.sql`). **Ce jeu pose aussi deux plans** : l'étape 1 s'ouvre donc
+> sur le repli « **Mes plans enregistrés** », sous-titré « **2 plans · 1 en
+> attente de cuisson · 1 sans mise de côté** » — « Batch cooking du dimanche »
+> est déjà cuisiné, « Repas de ce soir » ne met rien de côté
+> (`front/src/composants/etapeReglage.tsx:170-194`). Ne pas le déplier : ce
+> n'est pas le sujet de cette bobine.
 
 **4.1 — Les cibles du jour** · 40 s
 *Geste* : onglet **Repas**. Étape 1.
@@ -606,7 +617,7 @@ encore en stock est refusé, 409).
 
 **4.11 — Enregistrer** · 25 s
 *Geste* : nomme le plan, enregistre. Reviens à l'étape 1.
-*À l'écran* : « Mes plans enregistrés · 1 en attente de cuisson ».
+*À l'écran* : sous « Mes plans enregistrés », le décompte passe à « **3 plans · 2 en attente de cuisson · 1 sans mise de côté** » — le plan qu'on vient d'enregistrer, et les deux du jeu de démonstration.
 *Tu dis* : « Le plan est figé. Pas une recette à rejouer : un instantané. Dans trois jours, je veux savoir ce que j'ai cuisiné dimanche, pas ce que je cuisinerais aujourd'hui. »
 
 ---
@@ -617,9 +628,11 @@ encore en stock est refusé, 409).
 > **Le travailleur de fond doit tourner.**
 
 > **Filme-la juste après la bobine 4, avec le plan que tu viens d'y
-> enregistrer.** Les deux plans du jeu de démonstration ne réservent rien : ils
-> affichent « · ne réserve rien » au lieu de « · à cuisiner », et « J'ai
-> cuisiné » les refuse.
+> enregistrer.** Aucun des deux plans du jeu de démonstration ne convient :
+> « Batch cooking du dimanche » est **déjà cuisiné** — pas de badge, pas de
+> bouton « J'ai cuisiné » ; « Repas de ce soir » ne réserve rien — il affiche
+> « · ne réserve rien » au lieu de « · à cuisiner », et « J'ai cuisiné » y est
+> refusé (422).
 
 **5.1 — Avant** · 15 s
 *Geste* : va au frigo, montre la quantité de deux ou trois aliments du plan.
@@ -666,7 +679,7 @@ encore en stock est refusé, 409).
 **6.2 — Le détail** · 40 s
 *Geste* : ouvre « Haut du corps — poussée ».
 *À l'écran* : les exercices, les séries cibles en répétitions et charge, et le sélecteur **Charge / Tenue / Chrono**.
-*Tu dis* : « Trois exercices, et pour chacun les séries prescrites : quatre fois huit à 55 kilos. C'est ce qui sera pré-rempli quand je commencerai la séance. Et le mode se choisit ici : en "Tenue", ce ne sont plus des kilos qu'on prescrit, ce sont des secondes. »
+*Tu dis* : « Trois exercices, et pour chacun les séries prescrites : trois fois huit à 55 kilos, puis six à 60. C'est ce qui sera pré-rempli quand je commencerai la séance. Et le mode se choisit ici : en "Tenue", ce ne sont plus des kilos qu'on prescrit, ce sont des secondes. »
 
 **6.3 — Ajouter, retirer** · 30 s
 *Geste* : **Ajouter un exercice**, puis retire-le (la confirmation apparaît).
@@ -737,7 +750,7 @@ encore en stock est refusé, 409).
 **7.11 — Supprimer** · 15 s
 *Geste* : supprime la séance — la confirmation nomme le type, la date et le nombre de séries.
 
-> **Remise à zéro** : rejoue `jeu-demo.sql` avec `-v ecraser=oui`.
+> **Remise à zéro** : rejoue `jeu-demo.sql` avec `-v ON_ERROR_STOP=1 -v ecraser=oui`.
 
 ---
 
@@ -933,14 +946,14 @@ la panne si on te le demande, pas avant :**
 
 | | |
 |---|---|
-| Tests front | **632** (600 purs + 32 de rendu) |
-| Tests API | **307**, 819 assertions, sans base ni noyau |
-| Audit de septembre 2026 | **79 constats** (3 critiques, 14 élevés), **9 lots (0 à 8), tous clos** |
+| Tests front | **636** (603 purs + 33 de rendu) |
+| Tests API | **329**, 862 assertions, sans base ni noyau |
+| Audit de septembre 2026 | **79 constats** (3 critiques, 14 élevés) : **60 clos**, 19 ouverts au 17 septembre 2026 — tous moyens ou faibles, dont 3 à trancher (`docs/audit-2026-09/README.md`) |
 | Catalogue d'exercices | ~1 338 entrées |
 | Inventaire des capacités | **288**, chacune avec fichier et ligne |
 
 > **Les compteurs vieillissent.** Ceux-ci ont été relevés le 16 septembre 2026, et
-> les tests recomptés le 17.
+> les tests recomptés le 17 en fin de journée.
 > Avant de les annoncer, relance `cd front && npm test` et
 > `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'` et **lis la
 > sortie** : annoncer un chiffre qu'on n'a pas recompté est exactement la faute
@@ -1011,9 +1024,10 @@ invitation. C'est un choix, pas une limite technique.
 **« Comment garantissez-vous qu'un utilisateur ne voit pas les données d'un autre ? »**
 > Trois pièces : une interface de marquage, un filtre Doctrine qui pose le WHERE
 > sur toutes les requêtes, et un test qui refuse toute entité exposée non
-> conforme. Plus un contrôle au point de passage obligé de l'écriture. Et je
-> vous dis franchement ce qui manque encore : un test qui vérifie le filtre
-> lui-même.
+> conforme. Plus un contrôle au point de passage obligé de l'écriture, doublé
+> par la base là où un identifiant vient du client. Et le filtre lui-même a ses
+> témoins depuis le 14 septembre 2026, chacun vu échouer en cassant le code
+> qu'il protège.
 
 **« Et si l'IA écrit du code faux ? »**
 > C'est pour ça que le test est écrit avant, et qu'on le regarde échouer. Et que
@@ -1050,10 +1064,13 @@ propriétaire.** Elles sont ici pour ne pas être découvertes en salle.
    source `base` — mais **deux comptes en Grocy liraient le même stock et
    écriraient l'un chez l'autre**. Ce n'est pas dans la liste des exceptions
    documentées de la règle 2 du projet. *À arbitrer.*
-4. **`features.md` est daté du 14 septembre 2026** et porte encore des
-   affirmations fausses : « zone 70–80 % » (c'est 70 à 90 %), et le partage de
-   modèle. Il reste la matière — les adresses `fichier:ligne` à jour sont dans
-   les fiches `fonctionnalite-*` — mais **il est à reprendre**.
+4. **`features.md` est daté du 14 septembre 2026.** Ses affirmations fausses
+   relevées sont corrigées — le partage de modèle le 15 septembre, « zone
+   70–80 % » le 16, « tout utilisateur peut ajouter un exercice » le 17 —, mais la
+   plupart de ses `fichier:ligne` restent périmés : seuls ceux des fichiers
+   touchés le 17 septembre 2026 ont été recalés. Il reste la matière — les
+   adresses à jour sont dans les fiches `fonctionnalite-*` — mais **il est à
+   reprendre**.
 
 ## Ce qui n'a pas été vérifié
 

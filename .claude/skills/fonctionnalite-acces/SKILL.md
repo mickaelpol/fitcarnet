@@ -58,7 +58,7 @@ désactivation du compte.
 | **Limitation des tentatives** — 5 par quart d'heure, plus un compteur global par IP | API | `api/config/packages/security.yaml:39-41` |
 | **Un compte désactivé est bloqué à la requête suivante** | API | `api/src/Security/CompteActif.php:56-63`, `security.yaml:96` |
 | **Refus de prolonger la session d'un compte désactivé**, même message qu'un jeton inconnu | — | `SessionController.php:69-71` |
-| **La désactivation supprime aussi les jetons de rafraîchissement** | — | `api/src/Controller/ComptesController.php:154-161` |
+| **La désactivation supprime aussi les jetons de rafraîchissement** | — | `api/src/Controller/ComptesController.php:166-173` |
 | **Voir et couper une session précise** | `GET`/`DELETE /api/mes-sessions` | `api/src/Controller/MesSessionsController.php:67-83`, `:96-108` |
 | **Le serveur ne répond pas → on le dit** (30 s) | tous les écrans | `client.ts:220`, `:363-371` |
 | **« Se déconnecter » reste accessible dans les trois états** | onglet Compte | `front/src/composants/cadreCompte.tsx:64-68` |
@@ -136,11 +136,11 @@ créer l'invitation. **Données de départ** : aucune.
    > réinviter la même adresse — l'ancien lien meurt aussitôt.**
 
 4. La liste en dessous porte une pastille par invitation : **`Compte créé`**,
-   **`En attente`**, **`Périmée`** (`admin-utilisateurs.tsx:306-316`), et pour
+   **`En attente`**, **`Périmée`** (`admin-utilisateurs.tsx:307-317`), et pour
    une invitation en attente **« Invitée le `11 août`, valable jusqu'au `18 août`. »**
 5. **`Révoquer`** demande confirmation : *« Le lien cesse de fonctionner
    immédiatement, même s'il a déjà été transmis. Aucun compte n'est supprimé :
-   cette invitation n'en a pas encore créé. »* (`admin-utilisateurs.tsx:276`).
+   cette invitation n'en a pas encore créé. »* (`admin-utilisateurs.tsx:277`).
 
 ### C. Créer son compte depuis le lien
 
@@ -251,7 +251,7 @@ créer l'invitation. **Données de départ** : aucune.
     inconnu** (`SessionController.php:69-71`). Témoins :
     `CompteActifTest.php:30`, `:43`.
 19. **La désactivation coupe les sessions ouvertes** : plus aucune ligne dans
-    `jeton_rafraichissement` pour ce compte (`ComptesController.php:154-161`).
+    `jeton_rafraichissement` pour ce compte (`ComptesController.php:166-173`).
 20. **Refus : trop de tentatives.** Six essais faux en moins d'un quart d'heure
     sur le même couple adresse+IP doivent être refusés par le serveur, sans
     atteindre la vérification du mot de passe (`security.yaml:39-41`).

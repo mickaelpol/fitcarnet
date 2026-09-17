@@ -32,7 +32,7 @@ mangé.
 | **Sept rôles**, déduits de la catégorie — seule règle automatique | — | `front/src/solveur/repasVocabulaire.ts:36`, `:41` |
 | **Un modèle de repas par moment** — le matin un fruit, la collation deux sources de protéines, midi et soir huile + légume | — | `repasVocabulaire.ts:125` |
 | **Système 3×3 résolu exactement**, Gauss à pivot partiel | — | `front/src/solveur/algebre.ts:45` |
-| **Arrondi AVANT le calcul des macros** | — | `front/src/solveur/solveur.ts:265` |
+| **Arrondi AVANT le calcul des macros** | — | `front/src/solveur/solveur.ts:259` |
 | **Toute la période partage un seul frigo**, résolue dans l'ordre du temps | — | `front/src/solveur/periode.ts:177` |
 | **Plafonnement au stock et relais par rôle**, 12 tours, marge d'un demi-gramme | — | `front/src/solveur/plafonner.ts:175`, `:184` |
 | **Recherche d'une meilleure combinaison** — deux échanges seulement | — | `front/src/solveur/auMieux.ts:58` |
@@ -48,18 +48,20 @@ mangé.
 ### Les chiffres qui font foi
 
 - **Tolérances** (une macro est « juste » en deçà) : `kcal 45`, `prot 1,5`,
-  `gluc 2,5`, `lip 1,2` — `solveur.ts:12` (le calcul) et `demandeRepas.ts:26`
+  `gluc 2,5`, `lip 1,2` — `solveur.ts:10` (le calcul) et `demandeRepas.ts:26`
   (l'affichage). **Les deux tables doivent rester identiques.**
 - **Pas d'arrondi** des quantités : protéine `1 g`, glucide `5 g`, lipide `0,5 g`
-  — `solveur.ts:13`.
+  — `solveur.ts:11`.
 - **Marge de dépassement du stock** : `0,5 g` — `plafonner.ts:184`, `:229`.
-- **Seuil de cohérence des cibles** : `15 kcal` — `solveur.ts:16`.
-- **Apport négligeable** : une variable arrondie **sous 8 g** — `solveur.ts:463`.
+- **Seuil de cohérence des cibles** : `15 kcal` — `solveur.ts:14`.
+- **Apport négligeable** : une variable arrondie **sous 8 g** — `solveur.ts:457`.
 - **Pivot singulier** : `EPSILON_RELATIF = 5e-3`, **relatif à l'amplitude de la
   colonne** — `algebre.ts:39`. Absolu, il ne se déclenchait que sur deux aliments
   strictement identiques.
 - **Fibres à 2 kcal/g**, convention européenne — `front/src/calcul/nutrition.ts:12`,
-  reprise telle quelle par la carte (`carteRepas.tsx:22`, `:276`).
+  reprise par la carte à travers `kcalDesGrammes`, seule écriture de la somme
+  d'Atwater depuis le 17 septembre 2026 (`carteRepas.tsx:22`, `:276`,
+  `nutrition.ts:45-51`).
 - **Quantités par personne du modèle** : légume `200 g`, huile `5 g`, fruit
   `55 g` au matin et `83 g` à 16 h, blancs d'œufs `175 g` à 16 h —
   `repasVocabulaire.ts:64`, `:76`, `:86`, `:123`.
@@ -167,29 +169,29 @@ Ils viennent de trois endroits, et ne se ressemblent pas.
 
 - **Système singulier** (blocage) — *« Ces aliments se ressemblent trop pour que
   le calcul fonctionne. Choisis-en un plus riche en protéines, un plus riche en
-  féculents et un plus gras. »* (`solveur.ts:206-212`).
+  féculents et un plus gras. »* (`solveur.ts:200-206`).
 - **Lipides incompressibles** (blocage) — *« Trop gras de 8,4 g : ce repas en
   apporte 60,0 g pour un objectif de 51,6 g, sans le moindre oléagineux. Choisis
-  une viande ou un poisson plus maigre. »* (`solveur.ts:376-379`).
+  une viande ou un poisson plus maigre. »* (`solveur.ts:370-373`).
 - **Le conseil chiffré** — un aliment, un nombre, un geste :
   ***« Retire environ 40 g de « riz » — ou garde-les pour le repas suivant. »***
   ou ***« Ajoute environ 44 g de « riz ». »***, et quand retirer tout ne suffit
   pas : *« Même en retirant tout le « riz » (290 g), il resterait un écart :
-  c'est ailleurs qu'il faut couper. »* (`solveur.ts:338-356`). Il complète le
+  c'est ailleurs qu'il faut couper. »* (`solveur.ts:332-350`). Il complète le
   constat : *« Trop de glucides de 12,3 g : ce repas en apporte 72,3 g pour un
-  objectif de 60,0 g. »* (`:359`).
+  objectif de 60,0 g. »* (`:353`).
 - **Apport négligeable** — *« Thon ne pèse quasiment rien ici (1,0 g, soit 0,3 g
   de protéines) : le reste du repas couvre déjà l'objectif. Retire-le, ou réduis
-  ce que tu as déjà mis. »* (`solveur.ts:470-477`).
+  ce que tu as déjà mis. »* (`solveur.ts:464-471`).
 - **Quantité négative écartée** — *« Pas de skyr dans ce repas : le reste apporte
-  déjà tout ce qu'il faut. »* (`solveur.ts:244-248`).
+  déjà tout ce qu'il faut. »* (`solveur.ts:238-242`).
 - **Stock insuffisant** (blocage) — *« Ce repas demande plus que ce que le frigo
   contient : Poulet (320 g demandés, 200 g en stock). Les relais du stock n'ont
   pas suffi à boucler le compte. Complète le frigo, ou compose ce repas à la
   main. »* (`plafonner.ts:163-170`).
 - **Tout verrouillé** — *« Tout est verrouillé : rien ne peut être ajusté. Voici
   ce que donne ce que tu as, et ce qui manque pour tomber juste. »*
-  (`solveur.ts:186-192`).
+  (`solveur.ts:180-186`).
 
 **Dans le corps du tableau**, en vert et non en rouge, parce que ce sont des
 décisions et non des pannes :
@@ -223,7 +225,7 @@ décisions et non des pannes :
    sur tous les jours suivants (`etapeReglage.tsx:402-425`).
 6. **La colonne « à peser » ne dépend jamais du rendement.** Changer le rendement
    d'un aliment doit laisser « à peser » identique **à moins d'un gramme** et
-   changer « servi » (`solveur.ts:126-141`, garantie I.10 de
+   changer « servi » (`solveur.ts:120-135`, garantie I.10 de
    `front/src/solveur/garanties.test.ts:649`).
 7. **« servi » respecte la cuisson choisie.** Un aliment marqué « tel quel »
    (`null`) s'affiche au poids de la balance, pas au poids × rendement — sinon
@@ -287,7 +289,7 @@ décisions et non des pannes :
     deux riz distants de 1,4 % doivent être refusés, riz blanc et riz complet
     doivent passer (`algebre.ts:39`).
 23. **Le conseil chiffré désigne un seul aliment et un seul nombre**, avec le bon
-    verbe selon le signe de l'écart (`solveur.ts:325-356`). Il ne s'affiche pas
+    verbe selon le signe de l'écart (`solveur.ts:319-350`). Il ne s'affiche pas
     s'il proposerait 0 g ou s'il désignerait le mauvais aliment.
 24. **Isolation entre comptes (règle 2)** : le frigo, les cibles et les plans d'un
     second compte n'apparaissent jamais.
@@ -337,7 +339,7 @@ cd "$(git rev-parse --show-toplevel)"/front && npm test
   (`planCalcule.ts:42`). Un frigo qui paraît plein peut être vide pour le
   calculateur — le message de l'étape Jours le dit.
 - **Le message de cible incohérente n'apparaît PAS sur la carte du repas.** Le
-  solveur l'émet en gravité `info` (`solveur.ts:437`) et la carte filtre les
+  solveur l'émet en gravité `info` (`solveur.ts:431`) et la carte filtre les
   `info` (`carteRepas.tsx:513`). Il ne se voit que sur l'écran des objectifs.
   **Ne pas le chercher ici**, et ne pas le promettre pendant la bobine 4.
 - **Le champ `reste` et les puces `cru`/`cuit` sont deux réglages distincts** :
@@ -347,10 +349,14 @@ cd "$(git rev-parse --show-toplevel)"/front && npm test
 - **Le bouton du batch cooking est éteint tant qu'une cuisson manque**
   (`repas.tsx:524`). Pour passer à l'étape 3, régler les cuissons ou appuyer sur
   « Les N autres se mangent tels quels ».
-- **Un rendu de composant n'est pas couvert par les tests** : le projet n'embarque
-  ni `@testing-library` ni `react-test-renderer` (`carteRepas.tsx:127-134`). Le
-  câblage écran ↔ module **ne se prouve qu'à l'écran** — c'est exactement ce que
-  cette fiche existe pour faire.
+- **Aucun rendu de cet écran n'est couvert par les tests.** Le projet embarque
+  bien `@testing-library/react` (sous `global-jsdom`) et `npm test` passe 33
+  tests de rendu (17 septembre 2026), mais aucun ne monte `carteRepas.tsx` :
+  monter une ligne charge tout le fichier, donc `complements` → `api/hooks` →
+  `client.ts` → `expo-secure-store`, un module natif que le banc ne fournit
+  pas sans doublure (`carteRepas.tsx:127-134`,
+  `front/src/tests/environnement.ts:60-63`). Le câblage écran ↔ module **ne se
+  prouve qu'à l'écran** — c'est exactement ce que cette fiche existe pour faire.
 
 ## La capture pour la démonstration
 
@@ -408,7 +414,7 @@ Une prise ratée se refait ; **on ne monte jamais une prise fausse**.
 - **Les valeurs viennent de la base avec leur propre marge d'erreur** : viser
   mieux qu'un gramme par macro n'aurait pas de sens.
 - **Le garde-fou nutritionnel n'est pas infaillible** : un aliment sans macros et
-  sous 900 kcal passe entre les mailles (`nutrition.ts:143`). C'est un garde-fou,
+  sous 900 kcal passe entre les mailles (`nutrition.ts:155-156`). C'est un garde-fou,
   pas une garantie.
 - **Trois variables au plus.** Le modèle d'un repas fige ce qui n'est pas
   ajustable (`repasVocabulaire.ts:99`) : quatre variables libres pour trois
@@ -430,7 +436,8 @@ Une prise ratée se refait ; **on ne monte jamais une prise fausse**.
   `LigneAliment` dans son propre module la rendrait montable seule — **un quart
   d'heure, non fait** (`carteRepas.tsx:127-134`).
 - **`presentation/features.md` (14 septembre 2026) cite cet écran en
-  `repas.tsx:2054`, `:2120`, `:2239`, `composer.ts:800`, `solveur.ts:203` : ces
-  lignes n'existent plus.** Le découpage du 15 septembre a ramené `repas.tsx` à
+  `repas.tsx:2054`, `:2120`, `:2239`, `composer.ts:800` : ces lignes n'existent
+  plus.** Ses renvois vers `solveur.ts`, `nutrition.ts` et `plausibilite.ts`,
+  eux, ont été recalés le 17 septembre 2026. Le découpage du 15 septembre a ramené `repas.tsx` à
   655 lignes et éclaté `composer.ts` en cinq fichiers. Les `fichier:ligne` de
   cette fiche ont été relus le 16 septembre 2026.

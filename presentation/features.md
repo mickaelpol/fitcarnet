@@ -2,10 +2,11 @@
 
 Inventaire établi le 14 septembre 2026 par exploration systématique du code.
 
-**Les compteurs ci-dessous ont été re-mesurés le 16 septembre 2026** :
+**Les compteurs ci-dessous ont été re-mesurés le 17 septembre 2026** :
 **16 écrans** (hors les deux `_layout`), **38 composants** (`.tsx` hors tests),
-**9 contrôleurs**, 17 ressources API, 13 services,
-**7 processeurs**, 2 commandes, **17 modules de calcul** et leurs tests.
+**9 contrôleurs**, 17 ressources API (15 entités et 2 DTO), 13 services,
+**7 processeurs**, 2 commandes, **18 modules de calcul** et leurs tests
+(`contenuCompte.ts`, le dix-huitième, date du 17 septembre).
 *(La version du 14 annonçait 40 composants, 8 contrôleurs, 6 processeurs et
 9 modules de calcul : le découpage du lot 6 est passé par là.)*
 
@@ -16,6 +17,14 @@ Inventaire établi le 14 septembre 2026 par exploration systématique du code.
 > restent justes ; **leurs adresses ne le sont plus**. Les adresses à jour sont
 > dans les fiches `.claude/skills/fonctionnalite-*/SKILL.md`, vérifiées une par
 > une — ce document reste utile comme inventaire, pas comme index.
+>
+> **Exception, le 17 septembre 2026** : les renvois vers les fichiers touchés ce
+> jour-là — `Aliment.php`, `Exercice.php`, `FrigoController.php`,
+> `ComptesController.php`, `ProtectionDuCompte.php`,
+> `AlimentSuppressionProcessor.php`, `editeurAliment.tsx`,
+> `admin-utilisateurs.tsx`, `nutrition.ts`, `plausibilite.ts`, `planCoach.ts`,
+> `solveur.ts` — ont été rouverts et recalés un par un. Les autres restent
+> périmés.
 
 **Comment lire.** Chaque ligne est une capacité vérifiée dans le code, avec son
 emplacement. Les mentions *(à confirmer)* signalent ce qui n'a pas pu être
@@ -39,7 +48,7 @@ démontrer devant un client.
 
 - **Créer un lien d'invitation à partir d'une adresse** — aucun courriel envoyé, c'est un choix : pas de SMTP, pas de panne muette. `InvitationsController.php:138`
 - **Le lien n'existe qu'une fois** — le serveur n'en garde qu'une empreinte SHA-256 ; il reste affiché tant qu'on ne quitte pas l'écran. `Invitation.php:38`
-- **Partager ou copier le lien** — feuille de partage système sur mobile, presse-papiers sur le web, bouton qui passe à « Envoyé ✓ ». `admin-utilisateurs.tsx:56`
+- **Partager ou copier le lien** — feuille de partage système sur mobile, presse-papiers sur le web, bouton qui passe à « Envoyé ✓ ». `admin-utilisateurs.tsx:69`
 - **Vérification du lien avant le formulaire** — on n'invite pas quelqu'un à choisir un mot de passe pour lui apprendre ensuite que le lien est mort. `invitation/[jeton].tsx:45`
 - **Lien inconnu, déjà utilisé ou périmé : le même message** — aucune fuite d'information. `InvitationsController.php:237`
 - **L'adresse est affichée, jamais saisie** — elle vient de l'invitation, le serveur ignore ce que le formulaire enverrait. `invitation/[jeton].tsx:96`
@@ -48,7 +57,7 @@ démontrer devant un client.
 - **Pas de connexion automatique après création** — le mot de passe doit être tapé une première fois. `invitation/[jeton].tsx:63`
 - **Validité de 7 jours**, annoncée en clair dans la liste des invitations. `Invitation.php:217`
 - **Remplacer une invitation en attente** — l'ancien lien meurt à l'instant où le nouveau naît, dans une transaction. `InvitationsController.php:163`
-- **Révoquer une invitation** — « Le lien cesse de fonctionner immédiatement, même s'il a déjà été transmis. » `admin-utilisateurs.tsx:275`
+- **Révoquer une invitation** — « Le lien cesse de fonctionner immédiatement, même s'il a déjà été transmis. » `admin-utilisateurs.tsx:277`
 - **Refus d'inviter une adresse qui a déjà un compte** — sinon le lien échouerait après avoir été transmis. `InvitationsController.php:151`
 - **Refus des domaines impossibles** — sans point, ou réservés RFC 2606/6761 (`.test`, `.example`, `.invalid`, `.localhost`, `.local`). `Invitation.php:109`
 - **Double acceptation concurrente impossible** — garde `accepte_le IS NULL` dans la transaction de création. `Invitation.php:211`
@@ -95,17 +104,19 @@ démontrer devant un client.
 
 - **« Ajouter un aliment » ouvre l'éditeur vide** — formulaire complet, aucune valeur pré-remplie : on saisit celles de l'étiquette. `frigo.tsx:259`
 - **Création en deux temps** — l'aliment, puis sa quantité (même à zéro : c'est cet appel qui le rattache à un emplacement). Si le second échoue, on le dit sans perdre le premier. `frigo.tsx:247`
+- **Le stock ne s'écrit que par `/api/mon-frigo`** — `/api/stocks` n'expose plus que ses lectures depuis le 17 septembre 2026 : ses écritures contournaient les contrôles de `FrigoBase` (propriété, emplacement, source du frigo). Un emplacement inconnu est refusé en 422. `Stock.php:29`, `FrigoController.php:158`
 - **Un aliment appartient à son compte** — le propriétaire vient du jeton, jamais du corps, et chacun ne voit que les siens. Sur des valeurs nutritionnelles, l'erreur de l'un ne doit pas fausser la diète des autres. `AlimentProcessor.php:38`
-- **Catégorie en puces colorées** parmi huit, avec un exemple sous la rangée. `editeurAliment.tsx:199`
-- **Fibres facultatives** — vide veut dire « non renseigné », pas zéro. `editeurAliment.tsx:228`
-- **Détection des kilojoules** — bandeau et bouton « Convertir : 1473 kJ = 352 kcal », déclenché par le facteur 4,184 ou par le plafond de 900 kcal/100 g. `editeurAliment.tsx:258`
-- **Vérificateur de cohérence en direct** — vert, jaune, rouge, gris ; l'enregistrement est **bloqué** sur « incohérent ». `editeurAliment.tsx:133`
-- **Rendement de cuisson** — choix parmi des guides, ou **« Je préfère mesurer »** : poids avant, poids après, et « Utiliser ce résultat (2,3) » ou « Ces deux poids sont inversés : ce produit ne peut pas varier ainsi » quand la mesure contredit la catégorie. `editeurAliment.tsx:302`
+- **Catégorie en puces colorées** parmi huit, avec un exemple sous la rangée. `editeurAliment.tsx:291`
+- **Fibres facultatives** — vide veut dire « non renseigné », pas zéro. `editeurAliment.tsx:207`
+- **Les quatre macros sont obligatoires, et un zéro se dit** — champs vides à la création, texte indicatif « à saisir » (c'était « 0 » jusqu'au 17 septembre 2026), bouton éteint avec « Renseigne les quatre valeurs — écris 0 si l'aliment n'en contient pas. » ; l'API refuse aussi une macro absente, en 422. `editeurAliment.tsx:85`, `Aliment.php:107`
+- **Détection des kilojoules** — bandeau et bouton « Convertir : 1473 kJ = 352 kcal », déclenché par le facteur 4,184 ou par le plafond de 900 kcal/100 g. `editeurAliment.tsx:361`
+- **Vérificateur de cohérence en direct** — vert, jaune, rouge, gris ; l'enregistrement est **bloqué** sur « incohérent ». `editeurAliment.tsx:236`
+- **Rendement de cuisson** — choix parmi des guides, ou **« Je préfère mesurer »** : poids avant, poids après, et « Utiliser ce résultat (2,3) » ou « Ces deux poids sont inversés : ce produit ne peut pas varier ainsi » quand la mesure contredit la catégorie. `editeurAliment.tsx:428`
 - **Provenance du ratio affichée** — « ✓ mesuré par toi » ou « Valeur courante — mesure-la pour un chiffre propre à ton produit ». `AlimentDisponible.php:103`
-- **Le texte saisi vit à part du nombre** — on peut taper « 0,8 » sans que le séparateur disparaisse. `editeurAliment.tsx:91`
+- **Le texte saisi vit à part du nombre** — on peut taper « 0,8 » sans que le séparateur disparaisse. `editeurAliment.tsx:145`
 - **Corriger un aliment, mais seulement le sien** — son propriétaire, et lui seul. `Aliment.php:53`
 - **Supprimer un aliment, mais seulement le sien.** `Aliment.php:60`
-- **Refus de supprimer un aliment encore en stock** — comptage en SQL direct, hors du filtre de propriété, 409 nommant le nombre de lignes. Les lignes à zéro sont supprimées silencieusement. `AlimentSuppressionProcessor.php:131`
+- **Refus de supprimer un aliment encore en stock** — comptage en SQL direct, hors du filtre de propriété — depuis la migration 35, seul le stock du propriétaire peut viser l'aliment —, 409 nommant le nombre de lignes. Les lignes à zéro sont supprimées silencieusement. `AlimentSuppressionProcessor.php:43`
 - **Doublon de nom rendu lisible** — un nom par compte, casse ignorée : l'unicité vit dans un index fonctionnel que Doctrine ne sait pas pré-vérifier ; l'exception devient un 422 avec le nom en clair. `AlimentProcessor.php:39`
 - **Recherche et filtres sur ses aliments** — nom (partiel), catégorie, code-barres, tri par nom, 200 par page. `Aliment.php:70`
 
@@ -140,10 +151,10 @@ démontrer devant un client.
 
 ## Le dépôt et le traitement différé
 
-- **Le dépôt répond 202 immédiatement** — la requête HTTP ne touche plus à Grocy. Le 14 août 2026, PHP s'est arrêté à 30 s au milieu de 40 lignes pendant que Grocy continuait d'appliquer. `FrigoController.php:326`
-- **Plafond de 500 lignes**, refus des références étrangères à la source, refus des quantités négatives. `FrigoController.php:347`
-- **Dédoublonnage par référence** — deux corrections sur le même produit : la seconde annoncerait la quantité que la première vient de poser, et Grocy la refuserait. `FrigoController.php:353`
-- **Contrôle de propriété au dépôt**, sans nommer la ligne fautive — un refus rendu une heure plus tard n'a plus personne devant l'écran. `FrigoController.php:383`
+- **Le dépôt répond 202 immédiatement** — la requête HTTP ne touche plus à Grocy. Le 14 août 2026, PHP s'est arrêté à 30 s au milieu de 40 lignes pendant que Grocy continuait d'appliquer. `FrigoController.php:334`
+- **Plafond de 500 lignes**, refus des références étrangères à la source, refus des quantités négatives. `FrigoController.php:363`
+- **Dédoublonnage par référence** — deux corrections sur le même produit : la seconde annoncerait la quantité que la première vient de poser, et Grocy la refuserait. `FrigoController.php:371`
+- **Contrôle de propriété au dépôt**, sans nommer la ligne fautive — un refus rendu une heure plus tard n'a plus personne devant l'écran. `FrigoController.php:396`
 - **Un seul inventaire à la fois par compte** — l'index unique partiel tranche, l'exception devient un 409. `InventaireLots.php:86`
 - **Suivi consultable après coup** — statut, traités, échecs, date de fin ; date formatée en ISO 8601 UTC par PostgreSQL, parce que le format natif est refusé par Safari. `InventaireLots.php:216`
 - **Sondage toutes les 2 secondes** tant que le lot tourne, y compris fenêtre non focalisée ; le frigo n'est relu qu'une fois, au passage à « terminé ». `api/hooks.ts:460`
@@ -173,8 +184,8 @@ démontrer devant un client.
 - **Alerte d'incohérence au-delà de 15 kcal** — « Tes grammes représentent 612 calories, pas 580. L'app respecte les grammes ; les calories suivent. » `objectifs.tsx:79`
 - **Case « Glucides fibres comprises »** — le texte d'aide change selon l'état, convention nord-américaine ou française. `objectifs.tsx:150`
 - **Convertisseur de plan américain** — protéines, glucides totaux, lipides, fibres, calories ; aperçu « Sera enregistré : … » avant report. `objectifs.tsx:166`
-- **Avertissement « ton plan sous-estime ses fibres »** — la règle est un ordre de grandeur (moins d'un dixième des glucides), éprouvée sur un plan réel où trois repas sur quatre étaient signalés à juste titre. `planCoach.ts:51`
-- **Jamais de glucide négatif** à la conversion — on préfère ne rien retrancher. `planCoach.ts:75`
+- **Avertissement « ton plan sous-estime ses fibres »** — la règle est un ordre de grandeur (moins d'un dixième des glucides), éprouvée sur un plan réel où trois repas sur quatre étaient signalés à juste titre. `planCoach.ts:78`
+- **Jamais de glucide négatif** à la conversion — on préfère ne rien retrancher. `planCoach.ts:86`
 - **Récapitulatif des quatre repas** — « 40 P · 60 G · 15 L » ou « à définir ». `objectifs.tsx:269`
 - **Compléments alimentaires par moment de repas** — une consigne, pas un journal de prises ; volontairement hors du solveur. Ce qui se mange va au frigo, ce qui s'avale vient ici. `Complement.php:43`
 - **Doublon et quantité invalide annoncés avant l'envoi.** `complements.tsx:163`
@@ -200,9 +211,9 @@ démontrer devant un client.
 - **On ne signale que ce qui manque vraiment** — plus de « Aucune huile utilisable » au petit-déjeuner. `composer.ts:173`
 - **Choix déterministe** — un aliment préféré passe devant, puis ce qui n'a pas encore servi aujourd'hui, puis l'ordre du stock. Un tri instable ferait croire à un bug. `composer.ts:224`
 - **Système 3×3 résolu exactement** — élimination de Gauss avec pivot partiel, aucune itération, aucune convergence à espérer. `algebre.ts:13`
-- **Moins de trois variables : on résout le sous-système** — trois macros justes, ou deux et une qui dérive, ou une seule, et on le dit. `solveur.ts:112`
-- **Arrondi avant le calcul des macros, jamais après** — ce qui est affiché est ce qui sera pesé. `solveur.ts:172`
-- **Jamais de quantité négative** — la variable est fixée à zéro et le reste est résolu à nouveau, jusqu'à 3 passes, avec double écrêtage. `solveur.ts:158`
+- **Moins de trois variables : on résout le sous-système** — trois macros justes, ou deux et une qui dérive, ou une seule, et on le dit. `solveur.ts:167`
+- **Arrondi avant le calcul des macros, jamais après** — ce qui est affiché est ce qui sera pesé. `solveur.ts:259`
+- **Jamais de quantité négative** — la variable est fixée à zéro et le reste est résolu à nouveau, jusqu'à 3 passes, avec double écrêtage. `solveur.ts:210`
 - **Repli lipides** — sans oléagineux, l'huile prend le rôle et cesse d'être une quantité fixe. `composer.ts:236`
 - **Ajustement au stock en 12 tours** — les quantités imposées passent devant les variables, avec une marge d'un demi-gramme avant de déclarer un dépassement. `composer.ts:393`
 - **Relais par rôle** — seul un aliment du même rôle prend la suite ; exception unique, huile et oléagineux se suppléent. `composer.ts:311`
@@ -226,7 +237,7 @@ démontrer devant un client.
 - **Renforts affichés sous la ligne qu'ils complètent** — étiquetés « Complément » ou « À la place », liseré vert. `repas.tsx:2069`
 - **Relais modifiable** — « X : 200 g, c'est tout ce que tu as. Le reste est porté par Y. **Changer** ». `repas.tsx:2152`
 - **Échange automatique expliqué** — « X ne permettait pas de tenir les objectifs : remplacé par Y. Tu peux revenir dessus. » `repas.tsx:2175`
-- **Conseil chiffré de correction** — un seul aliment, un seul nombre, un seul geste : « retire 40 g de riz ». Et si retirer tout ne suffit pas, on le dit. `solveur.ts:203`
+- **Conseil chiffré de correction** — un seul aliment, un seul nombre, un seul geste : « retire 40 g de riz ». Et si retirer tout ne suffit pas, on le dit. `solveur.ts:319`
 
 ## Le calculateur — les cuissons
 
@@ -350,15 +361,15 @@ démontrer devant un client.
 
 # G · Le catalogue d'exercices
 
-- **~1338 exercices**, référentiel commun. `Exercice.php:48`
-- **Liste allégée, fiche détaillée à la demande** — instructions, muscles et matériel ne sont pas transportés à chaque liste. `Exercice.php:48`
-- **Recherche sur le nom anglais et français**, sans accents, plus filtres par zone, équipement et source. `Exercice.php:96`
+- **~1338 exercices**, référentiel commun. `Exercice.php:38`
+- **Liste allégée, fiche détaillée à la demande** — instructions, muscles et matériel ne sont pas transportés à chaque liste. `Exercice.php:214`
+- **Recherche sur le nom anglais et français**, sans accents, plus filtres par zone, équipement et source. `Exercice.php:141`
 - **Sélecteur à vignettes de muscles** — quinze silhouettes dessinées, dont « Autre » pour le cardio et les exercices sans muscle renseigné ; le filtre se cumule avec la recherche. `choixMuscle.tsx:57`
 - **Fiche d'exercice** — vidéo YouTube intégrée (iframe sur le web, WebView sur mobile), zone, muscle ciblé, muscles secondaires, matériel, format prescrit, exécution. `modaleExercice.tsx:199`
 - **Chargement progressif de la fiche** — le nom et la zone s'affichent tout de suite, le reste arrive ensuite. `modaleExercice.tsx:126`
 - **Ce qui n'est pas traduit s'affiche en anglais** — donc se voit, et se corrige. `modaleExercice.tsx:199`
-- **Tout utilisateur peut ajouter un exercice ; seul l'admin peut le corriger** — une erreur s'afficherait pour tout le monde. `Exercice.php:59`
-- **Aucune suppression** — le schéma l'interdit, pour ne pas effacer l'historique et les 1RM. `Exercice.php:62`
+- **Seul l'administrateur crée un exercice ; l'administrateur ou son auteur le corrige** — depuis le 15 septembre 2026. Ce document annonçait le 14 « tout utilisateur peut ajouter un exercice ; seul l'admin peut le corriger » : ce n'est plus vrai. Aucun écran ne crée d'exercice, et un exercice créé par l'API naît privé. `Exercice.php:79`, `:100`
+- **Aucune suppression** — le schéma l'interdit, pour ne pas effacer l'historique et les 1RM. `Exercice.php:50`, `01-schema.sql:290`
 
 ---
 
@@ -391,13 +402,13 @@ démontrer devant un client.
 
 ## Les comptes
 
-- **Liste avec le contenu en chiffres** — « 42 séances · 310 séries · 5 modèles · 3 plans ». Les compteurs existent pour rendre la suppression décidable. `ComptesController.php:62`
-- **Désactiver ou réactiver** — la désactivation supprime aussi les jetons de rafraîchissement, sinon un compte bloqué se prolongerait tout seul pendant des semaines. `ComptesController.php:117`
-- **Refus de se bloquer soi-même** — irréversible depuis l'application. Refus, pas confirmation. `ProtectionDuCompte.php:158`
-- **Refus de bloquer ou supprimer le dernier administrateur actif** — comptage des admins **actifs**, test `<= 1` pour qu'un état incohérent n'ouvre pas la porte. `ProtectionDuCompte.php:207`
-- **Suppression qui chiffre ce qui sera détruit** — séances, séries, modèles, plans — et prévient que ses aliments et son stock partent avec lui. `admin-utilisateurs.tsx:290`
-- **Nettoyage ordonné avant suppression** — les lignes de stock visant ses aliments, puis ses aliments, puis le compte : la contrainte RESTRICT du stock bloquerait sinon la cascade. `ComptesController.php:198`
-- **Son propre compte n'a aucun bouton.** `admin-utilisateurs.tsx:235`
+- **Liste avec le contenu en chiffres** — neuf compteurs depuis le 17 septembre 2026 : « *n* séances · *n* séries · *n* modèles · *n* plans · *n* aliments · *n* lignes de stock · *n* objectifs · *n* compléments · *n* exercices personnels ». Les compteurs existent pour rendre la suppression décidable. `ComptesController.php:69`, `contenuCompte.ts:25`
+- **Désactiver ou réactiver** — la désactivation supprime aussi les jetons de rafraîchissement, sinon un compte bloqué se prolongerait tout seul pendant des semaines. `ComptesController.php:127`
+- **Refus de se bloquer soi-même** — irréversible depuis l'application. Refus, pas confirmation. `ProtectionDuCompte.php:40`
+- **Refus de bloquer ou supprimer le dernier administrateur actif** — comptage des admins **actifs**, test `<= 1` pour qu'un état incohérent n'ouvre pas la porte. Un administrateur **désactivé** n'est le dernier de personne : il se supprime même s'il ne reste qu'un actif (constat 04#12, corrigé le 17 septembre 2026). `ProtectionDuCompte.php:83`
+- **Suppression qui chiffre ce qui sera détruit** — les neuf compteurs, en toutes lettres : « … seront effacés définitivement ». `admin-utilisateurs.tsx:291`
+- **Nettoyage ordonné avant suppression** — les lignes de stock visant ses aliments, puis ses aliments, puis le compte : la contrainte RESTRICT du stock bloquerait sinon la cascade. Ses exercices personnels sont relevés avant et retirés après (`cree_par` est en `SET NULL`), sauf celui qu'un autre compte cite encore. `ComptesController.php:221`
+- **Son propre compte n'a aucun bouton.** `admin-utilisateurs.tsx:234`
 
 ---
 
@@ -422,13 +433,13 @@ Ces garanties sont **éprouvées par test de propriétés** — 250 frigos aléa
 
 ## Ce que l'application refuse de faire
 
-- **Système singulier** — « Ces aliments se ressemblent trop pour que le calcul fonctionne. Choisis-en un plus riche en protéines, un plus riche en féculents et un plus gras. » `solveur.ts:144`
-- **Lipides incompressibles** — « Trop gras de X g… sans le moindre oléagineux. Choisis une viande ou un poisson plus maigre. » `solveur.ts:274`
-- **Valeurs déjà cuites détectées** — bande physique du grain sec, 300 à 400 kcal/100 g, avec la correction chiffrée complète. `plausibilite.ts:196`
-- **Féculent qui rétrécit** — « un féculent absorbe de l'eau, il ne peut pas peser moins cuit que sec. Ce n'est pas une cuisson inhabituelle, c'est impossible. » `plausibilite.ts:249`
-- **Plus de 100 g de nutriments dans 100 g de produit.** `plausibilite.ts:168`
-- **Soupçon de kilojoules** — deux détections, le plafond de 900 kcal et le rapport 4,184 aux macros. `nutrition.ts:109`
-- **Apport négligeable** — « X ne pèse quasiment rien ici (1,0 g, soit 0,3 g de protéines). Retire-le, ou réduis ce que tu as déjà mis. » `solveur.ts:339`
+- **Système singulier** — « Ces aliments se ressemblent trop pour que le calcul fonctionne. Choisis-en un plus riche en protéines, un plus riche en féculents et un plus gras. » `solveur.ts:199`
+- **Lipides incompressibles** — « Trop gras de X g… sans le moindre oléagineux. Choisis une viande ou un poisson plus maigre. » `solveur.ts:363`
+- **Valeurs déjà cuites détectées** — bande physique du grain sec, 300 à 400 kcal/100 g, avec la correction chiffrée complète. `plausibilite.ts:244`
+- **Féculent qui rétrécit** — « un féculent absorbe de l'eau, il ne peut pas peser moins cuit que sec. Ce n'est pas une cuisson inhabituelle, c'est impossible. » `plausibilite.ts:349`
+- **Plus de 100 g de nutriments dans 100 g de produit.** `plausibilite.ts:215`
+- **Soupçon de kilojoules** — deux détections, le plafond de 900 kcal et le rapport 4,184 aux macros. `nutrition.ts:158`
+- **Apport négligeable** — « X ne pèse quasiment rien ici (1,0 g, soit 0,3 g de protéines). Retire-le, ou réduis ce que tu as déjà mis. » `solveur.ts:464`
 - **Rendement à contresens** — une viande qui gagnerait du poids, un féculent qui en perdrait. `RendementPlausible.php:255`
 - **Une pesée non retenue est dite explicitement** — la taire laisserait croire qu'elle a été prise en compte. `AlimentDisponible.php:118`
 

@@ -13,7 +13,7 @@ le métier.**
 ## Les commandes, dans cet ordre
 
 ```bash
-cd front && npm test          # tsc --noEmit + 600 tests, puis 32 de rendu (17 septembre 2026)
+cd front && npm test          # tsc --noEmit + 603 tests, puis 33 de rendu (17 septembre 2026)
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, servi par Caddy)
 ```
@@ -43,6 +43,20 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 `performance.ts`. Trois copies d'Epley aux bornes divergentes ont produit un
 « record » de 79,96 kg que la formule elle-même déclare invalide.
 
+**La somme d'Atwater n'a qu'une écriture, et c'est désormais vérifié.** Jusqu'au
+17 septembre 2026, « `nutrition.ts` seul porte la formule » était faux : la
+somme « coefficient × grammes » s'écrivait quatre fois en entier
+(`nutrition.ts`, `kcalDesMacros` du solveur, `kcalAtwater` de `plausibilite.ts`,
+`planCoach.ts`), et une cinquième fois pour les seules fibres dans
+`carteRepas.tsx` — celle-là trouvée par le test de garde ; coefficients importés,
+mais fibres inconnues traitées à la façon de chacun.
+Elle vit maintenant dans **`kcalDesGrammes`** (`src/calcul/nutrition.ts:45-51`) ;
+`controler`, `kcalDesMacros`, `kcalAtwater`, `planCoach.ts` et `carteRepas.tsx`
+l'appellent. **`src/calcul/formuleUnique.test.ts` refuse toute multiplication
+par un coefficient `KCAL_…` ailleurs**, dans `src/` comme dans `app/`,
+commentaires exclus — avec un témoin qui vérifie que le motif reconnaît bien la
+formule de référence.
+
 **L'exception à ne pas « factoriser »** : `cleDHabitude` utilise volontairement une
 table de correspondance manuelle plutôt que `normalize('NFD')`, parce que Hermes
 ne l'implémente pas partout.
@@ -53,9 +67,11 @@ quatre `TypeError` en puissance, Hermes ne l'implémentant pas partout. Le modul
 s'aligne sur la **table manuelle**, jamais sur `normalize` — et son test retire
 `String.prototype.normalize` du prototype pour qu'une rechute tombe ici.
 
-Les deux restes signalés le 15 au matin **sont réglés** : la table ne vit plus
-qu'ici (`cuisson.ts` l'importe), et la sixième copie de `garanties.test.ts` a été
-remplacée par un import. Vérifié : une seule définition dans tout le front.
+Les deux restes signalés le 15 au matin **sont réglés** : la table
+`SANS_ACCENT` ne vit plus que dans `texte.ts` (`habitudesCuisson.ts` l'importe,
+et `cuisson.ts` ne fait que réexporter `habitudesCuisson`), et la sixième copie
+de `garanties.test.ts` a été remplacée par un import. Vérifié : une seule
+définition dans tout le front.
 
 ## Les tests
 
@@ -67,7 +83,9 @@ de l'audit y vivaient. Ne jamais revenir à une liste.
 **Conséquence à connaître** : le motif ne couvre que `src/`. Un test posé dans
 `app/` ne sera jamais exécuté, sans le moindre signal. Le code testable vit dans
 `src/`, les écrans dans `app/` — c'est aussi pour cela que le découpage de
-`repas.tsx` (2 397 → 650 lignes, fait au lot 6) consiste à **extraire vers `src/`**.
+`repas.tsx` (2 397 lignes au dernier commit d'avant, 2 316 le jour de l'audit ;
+650 après, fait au lot 6 ; 655 le 17 septembre 2026) consiste à **extraire vers
+`src/`**.
 
 Convention du projet : un module pur et son `.test.ts` en regard.
 
@@ -94,9 +112,9 @@ Relevé le 15 septembre 2026, après que deux agents y sont tombés le même jou
 **Deux passes, et deux suffixes.** `npm test` lance :
 
 ```bash
-node --test "dist-tests/**/*.test.js"                    # 600 tests, SANS DOM
+node --test "dist-tests/**/*.test.js"                    # 603 tests, SANS DOM
 node --import ./dist-tests/tests/environnement.js \
-     --test "dist-tests/**/*.test-rendu.js"              # les tests de rendu
+     --test "dist-tests/**/*.test-rendu.js"              # 33 tests de rendu
 ```
 
 Un test de calcul s'appelle `*.test.ts`. **Un test de composant s'appelle

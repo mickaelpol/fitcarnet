@@ -18,11 +18,17 @@ Les 21 migrations passent toutes sans erreur sur B — c'est le bon côté du co
 
 Comptage : **1 CRITIQUE, 5 ÉLEVÉES, 5 MOYENNES, 6 FAIBLES.**
 
+**État au 17 septembre 2026, vérifié constat par constat : onze clos, six
+ouverts.** Clos : 1 à 7, 11, 14, 18 et 19. **Ouverts** : 8, 9 et 12 (moyens,
+sans décision consignée) ; 13, 15 et 17 (faibles, **à trancher**, avec leur
+argument). Chaque constat porte son statut ; les constats clos suivent au
+présent de l'audit, leurs renvois pointent le code d'aujourd'hui.
+
 ---
 
-## 1. La double écriture n'est pas tenue : deux tables et six contraintes n'existent que dans les migrations
+## 1. ✅ corrigé le 14 septembre 2026 (C2) — La double écriture n'est pas tenue : deux tables et six contraintes n'existent que dans les migrations
 
-**Gravité : CRITIQUE — Statut : CONFIRMÉ (reproduit par diff de deux bases réelles)**
+**Gravité : CRITIQUE — Statut : CONFIRMÉ (reproduit par diff de deux bases réelles), corrigé le 14 septembre 2026** : `db/manuel/verifier-schema.sh` déclare identiques une base neuve et une base migrée.
 
 **Emplacement** `db/01-schema.sql` (501 lignes, s'arrête à `invitation`) ;
 `db/manuel/25-garde-fous.sql:46,64,76,93,111,124,139` ;
@@ -58,7 +64,8 @@ démarrage : la base finit toujours en B. Le risque est donc différé — il se
 jour d'une restauration à partir de `01-schema.sql` seul, d'un nouvel environnement, ou d'une
 lecture du schéma pour raisonner (le fichier ment sur ce qu'il décrit).
 
-**Constat symétrique, plus ancien** : `db/01-schema.sql:266` déclare
+**Constat symétrique, plus ancien** — **toujours vrai au 17 septembre 2026**, voir
+n° 12 : `db/01-schema.sql:294` déclare
 `modele_exercice.secondes_total_cible INTEGER`. Cette colonne n'est créée par **aucune**
 migration de `db/manuel/`, n'apparaît dans **aucune** entité Doctrine et n'est référencée par
 **aucune** ligne de code (`grep` sur `api/`, `db/`, `front/`). `git log` montre qu'elle est
@@ -74,13 +81,13 @@ compare les deux `pg_dump --schema-only` — le diff attendu doit être vide.
 
 ---
 
-## 2. `25-garde-fous.sql` ne peut pas nettoyer ce qu'il prétend nettoyer, et casse le démarrage de la production
+## 2. ✅ corrigé le 7 septembre 2026 (É2) — `25-garde-fous.sql` ne peut pas nettoyer ce qu'il prétend nettoyer, et casse le démarrage de la production
 
-**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (reproduit)**
+**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (reproduit), corrigé le 7 septembre 2026** (lot 1) : la migration pose `= 0`.
 
 **Emplacement** `db/manuel/25-garde-fous.sql:37-41` et `:85-88`, face à
-`db/01-schema.sql:90-93` (`kcal_100/prot_100/gluc_100/lip_100 … NOT NULL`) et
-`db/01-schema.sql:187-190` (`cible.kcal/prot/gluc/lip … NOT NULL`).
+`db/01-schema.sql:74-77` (`kcal_100/prot_100/gluc_100/lip_100 … NOT NULL`) et
+`db/01-schema.sql:205-208` (`cible.kcal/prot/gluc/lip … NOT NULL`).
 
 **Ce qui se passe.** Le fichier applique `UPDATE aliment SET kcal_100 = NULL WHERE kcal_100 < 0`
 sur une colonne déclarée `NOT NULL`. Le nettoyage est donc impossible. Reproduit :
@@ -109,11 +116,11 @@ le CHECK sur la nullabilité réelle. **Effort : 20 min.**
 
 ---
 
-## 3. `installer.sh` joue les migrations sans `ON_ERROR_STOP` et annonce « ✓ » sur un échec
+## 3. ✅ corrigé le 7 septembre 2026 (É3) — `installer.sh` joue les migrations sans `ON_ERROR_STOP` et annonce « ✓ » sur un échec
 
-**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (reproduit)**
+**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (reproduit), corrigé le 7 septembre 2026** (lot 1) : chaque migration part avec `-v ON_ERROR_STOP=1`, et l'erreur s'affiche.
 
-**Emplacement** `installer.sh:167`
+**Emplacement** `installer.sh:167` à l'audit ; la boucle est aujourd'hui en `installer.sh:173-192`
 
 ```bash
 if dc exec -T db psql -U "$UTILISATEUR" -d "$BASE" -q < "$fichier" >/dev/null 2>&1; then
@@ -121,7 +128,7 @@ if dc exec -T db psql -U "$UTILISATEUR" -d "$BASE" -q < "$fichier" >/dev/null 2>
 ```
 
 **Ce qui se passe.** Sans `-v ON_ERROR_STOP=1`, `psql` continue après une erreur et sort avec
-le code 0. Le commentaire juste au-dessus (`installer.sh:170`) dit pourtant « ces scripts sont
+le code 0. Le commentaire juste au-dessus (aujourd'hui `installer.sh:188`) dit pourtant « ces scripts sont
 idempotents : un échec signale un vrai souci ». Reproduit sur le cas du constat n° 2 :
 
 ```
@@ -143,9 +150,9 @@ d'échec, itérer sur un tableau bash plutôt que sur une chaîne. **Effort : 15
 
 ---
 
-## 4. `restaurer-nas.sh --vraiment` n'arrête pas les travailleurs : ils écrivent pendant et après le remplacement de la base
+## 4. ✅ corrigé le 14 septembre 2026 (É4) — `restaurer-nas.sh --vraiment` n'arrête pas les travailleurs : ils écrivent pendant et après le remplacement de la base
 
-**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (lecture)**
+**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (lecture), corrigé le 14 septembre 2026** : les travailleurs sont arrêtés, et surtout les lots restaurés sont neutralisés (voir [README.md](README.md), É4). Les numéros de ligne de `restaurer-nas.sh` ci-dessous sont ceux de l'audit.
 
 **Emplacement** `restaurer-nas.sh:34` (`APPLICATION="fitcarnet-app"`), `:157` (`docker stop "$APPLICATION"`),
 `:160-164` ; `docker-compose.yml:187-216` (service `fitcarnet-taches`, `replicas: 2`).
@@ -176,9 +183,9 @@ restauré n'a plus de sens. **Effort : 30 min.**
 
 ---
 
-## 5. Une installation de développement suivie à la lettre donne une base sans `complement` ni `inventaire_lot`
+## 5. ✅ résolu par le n° 1, le 14 septembre 2026 (É5) — Une installation de développement suivie à la lettre donne une base sans `complement` ni `inventaire_lot`
 
-**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (lecture)**
+**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (lecture), résolu le 14 septembre 2026** : `db/01-schema.sql` porte désormais tout le schéma.
 
 **Emplacement** `db/manuel/INSTALLATION.md:1-6` et `:19` ; `docker/Dockerfile:27-55` (étape `dev`) ;
 `compose.dev.yml:27-31`.
@@ -193,11 +200,11 @@ séparément de `base`. Rien ne rejoue les migrations en développement.
 Combiné au constat n° 1, le développeur qui suit ce document obtient une base sans les tables
 `complement` et `inventaire_lot`. L'écran des compléments et l'envoi d'inventaire répondent
 500 sur `relation "complement" does not exist` — la panne exacte que le fichier dit avoir
-supprimée pour la table `invitation` (`db/01-schema.sql:478-481`).
+supprimée pour la table `invitation` (`db/01-schema.sql:530-536`).
 
 `installer.sh`, lui, joue bien les migrations : les deux chemins d'installation documentés ne
 produisent pas la même base. Note annexe : `INSTALLATION.md:17` annonce « 12 tables » ;
-`01-schema.sql` en crée 17, et 19 après migrations — `installer.sh:118` contrôle `>= 17`.
+`01-schema.sql` en crée 17, et 19 après migrations — `installer.sh:123` contrôle `>= 17`.
 
 **Correction proposée.** Une fois le constat n° 1 corrigé, ce problème disparaît de lui-même.
 En attendant : corriger `INSTALLATION.md` pour renvoyer vers `./installer.sh`, et mettre à
@@ -205,9 +212,9 @@ jour le compte de tables. **Effort : 15 min (ou 0 après le n° 1).**
 
 ---
 
-## 6. Course entre la reprise des lots abandonnés et un travailleur encore vivant
+## 6. ✅ corrigé le 14 septembre 2026 (É6) — Course entre la reprise des lots abandonnés et un travailleur encore vivant
 
-**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (lecture ; l'occurrence dépend d'une temporisation)**
+**Gravité : ÉLEVÉE — Statut : CONFIRMÉ (lecture ; l'occurrence dépend d'une temporisation), corrigé le 14 septembre 2026** : colonne `jeton` (migration 30), exigée à chaque écriture. Les renvois vers `InventaireLots.php` et `TraiterInventaires.php` ci-dessous sont ceux de l'audit.
 
 **Emplacement** `api/src/Service/InventaireLots.php:49` (`SILENCE_MAXIMAL = '2 minutes'`),
 `:202-209` (`reprendreLesAbandonnes`), `:107-131` (`prendre`) ;
@@ -227,7 +234,7 @@ configuré (`api/config/services.yaml:44-47`, aucun bloc `http_client` dans
 Conséquences de l'entrelacement :
 
 * A et B envoient la même ligne. Bénin : `definirStock` pose une quantité **absolue**
-  (`FrigoBase.php:116-131`) et Grocy répond « déjà à jour » — le fichier le dit et c'est juste.
+  (`FrigoBase.php:110-181`) et Grocy répond « déjà à jour » — le fichier le dit et c'est juste.
 * A appelle `terminer()` → `statut = 'termine'`. B continue, appelle `avancer()` sur une ligne
   terminée, puis `terminer()` une seconde fois : `traites`, `echecs` et `fini_le` sont écrasés
   par les valeurs de B. Le compte-rendu affiché à l'écran devient faux.
@@ -247,11 +254,11 @@ Un travailleur dépossédé écrit alors zéro ligne et peut s'en apercevoir. Et
 
 ---
 
-## 7. `sauvegarde.sh` (développement) écrit directement le fichier final, sans aucun contrôle
+## 7. ✅ corrigé le 14 septembre 2026 (lot 5) — `sauvegarde.sh` (développement) écrit directement le fichier final, sans aucun contrôle
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, corrigé le 14 septembre 2026** : `.partiel`, taille minimale, relecture `pg_restore --list`, `mv` final — le motif de `sauvegarde-nas.sh`, désormais dans `sauvegarde.sh:63-108`.
 
-**Emplacement** `sauvegarde.sh:33-45`, à comparer à `sauvegarde-nas.sh:50-73`.
+**Emplacement** à l'audit : la fonction de sauvegarde complète de `sauvegarde.sh`, à comparer à `sauvegarde-nas.sh:50-73`.
 
 **Ce qui se passe.** `dc exec -T db pg_dump … -Fc > "$fichier"` crée le `.dump` **avant** de
 savoir si `pg_dump` réussit. Un disque plein, un conteneur qui meurt en cours de dump, et il
@@ -260,20 +267,20 @@ minimale, aucune relecture `pg_restore --list` — les deux contrôles que `sauv
 applique, en expliquant précisément pourquoi (`sauvegarde-nas.sh:50-53, 65-67`). Le correctif
 a été fait d'un côté et pas de l'autre.
 
-Aggravant : `rotation()` (`sauvegarde.sh:104-113`) trie par date de modification et garde les
+Aggravant : `rotation()` (aujourd'hui `sauvegarde.sh:159-171`) trie par date de modification et garde les
 14 plus récentes. La sauvegarde tronquée est la plus récente : elle est conservée, et c'est
 une bonne sauvegarde ancienne qui saute à sa place.
 
-`installer.sh:253-255` appelle `./sauvegarde.sh` en avalant l'échec (« sans gravité »).
+`installer.sh:273-275` appelle `./sauvegarde.sh` en avalant l'échec (« sans gravité »).
 
 **Correction proposée.** Reprendre le motif de `sauvegarde-nas.sh` : `.partiel`, contrôle de
 taille, `pg_restore --list`, `mv` final. **Effort : 20 min (copier-coller).**
 
 ---
 
-## 8. Les sauvegardes vivent sur le même volume que la base, sans copie hors NAS
+## 8. OUVERT — Les sauvegardes vivent sur le même volume que la base, sans copie hors NAS
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : la correction est hors dépôt (tâche DSM), et rien dans le dépôt ne la consigne.
 
 **Emplacement** `sauvegarde-nas.sh:25` (`/volume1/docker/sauvegardes-fitcarnet`) face à
 `docker-compose.yml:33` (`/volume1/docker/fitcarnet/pgdata`).
@@ -291,9 +298,9 @@ découverte tard.
 
 ---
 
-## 9. `deployer-nas.sh` court-circuite l'ordonnancement `depends_on` par un `docker compose restart`
+## 9. OUVERT — `deployer-nas.sh` court-circuite l'ordonnancement `depends_on` par un `docker compose restart`
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : `deployer-nas.sh:195-197` redémarre encore `fitcarnet-app` et `fitcarnet-taches` d'un seul `restart`.
 
 **Emplacement** `deployer-nas.sh:195-197` ; `docker-compose.yml:217-223`
 (`depends_on: fitcarnet-app: condition: service_healthy`).
@@ -333,11 +340,11 @@ invitation         utilisateur_id
 
 **Ce qui se passe.** Le plus gênant est **`modele_serie.modele_exercice_id`** : c'est un chemin
 chaud, joint à chaque lecture de modèle par `ChargementComplet` (`ChargementComplet.php:66`,
-chemin `exercices.series`). Le côté séance a bien son index (`db/01-schema.sql:325`,
+chemin `exercices.series`). Le côté séance a bien son index (`db/01-schema.sql:363`,
 `CREATE INDEX ON serie (seance_exercice_id)`), le côté modèle a été oublié — asymétrie qui
 ressemble à un oubli, pas à un choix.
 
-Ensuite `stock.aliment_id` : la contrainte `ON DELETE RESTRICT` (`db/01-schema.sql:171`) force
+Ensuite `stock.aliment_id` : la contrainte `ON DELETE RESTRICT` (aujourd'hui la clé composite `db/01-schema.sql:188-190`) force
 un balayage complet de `stock` à chaque suppression d'aliment. Et `exercice.cree_par`, sollicité
 dès qu'on filtre par auteur un catalogue de 1 300 exercices.
 
@@ -351,9 +358,9 @@ migration numérotée. **Effort : 20 min.**
 
 ---
 
-## 12. Aucun contrôle de dérive entités ↔ schéma, et quelques divergences installées
+## 12. OUVERT — Aucun contrôle de dérive entités ↔ schéma, et quelques divergences installées
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
+**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : `Utilisateur::$email` porte encore `length: 180, unique: true`, `secondes_total_cible` n'a toujours ni migration ni propriété, et aucun `doctrine:schema:validate` n'est lancé. Seule la dérive des dates est désormais gardée (`DatesAvecFuseauTest`).
 
 **Emplacement** `api/config/packages/doctrine.yaml` ; `api/src/Entity/` ; `api/tests/`.
 
@@ -366,11 +373,11 @@ détection qui est le vrai constat.
 * **`Utilisateur::$email`** — `api/src/Entity/Utilisateur.php:47` :
   `#[ORM\Column(type: Types::STRING, length: 180, unique: true)]`. En base :
   `email TEXT NOT NULL` avec un index fonctionnel `utilisateur_email_unique ON (lower(email))`
-  (`db/01-schema.sql:56,68`). Ni la longueur ni la contrainte d'unicité déclarées n'existent.
+  (`db/01-schema.sql:38,50`). Ni la longueur ni la contrainte d'unicité déclarées n'existent.
   Sans `#[UniqueEntity]` sur cette entité (le seul du projet est sur `Exercice`,
-  `Exercice.php:44`), un doublon d'adresse remonte en 500 SQL au lieu d'un 422.
-* **`Exercice::$groupes`** — `Exercice.php:197` : `SIMPLE_ARRAY`, non nullable, `default: ''` ;
-  en base `groupes TEXT` nullable sans défaut (`db/01-schema.sql:210`).
+  `Exercice.php:46`), un doublon d'adresse remonte en 500 SQL au lieu d'un 422.
+* **`Exercice::$groupes`** — `Exercice.php:276` : `SIMPLE_ARRAY`, non nullable, `default: ''` ;
+  en base `groupes TEXT` nullable sans défaut (`db/01-schema.sql:234`).
 * **`ModeleExercice`** n'a pas de propriété pour `secondes_total_cible`, présente en base
   (voir constat n° 1).
 * **Contraintes `DEFERRABLE INITIALLY DEFERRED`** — vérifiées : présentes et identiques dans A
@@ -393,9 +400,11 @@ un `#[UniqueEntity]`. **Effort : 2 h.**
 
 ---
 
-## 13. Aucune limite de ressources ni rotation des journaux Docker
+## 13. OUVERT, À TRANCHER — Aucune limite de ressources ni rotation des journaux Docker
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ.** `docker-compose.yml` : aucun `mem_limit`, `cpus`,
+**Gravité : FAIBLE — Statut : CONFIRMÉ, ouvert et à trancher au 17 septembre 2026.** L'argument
+qui retient : toute modification de `docker-compose.yml` se déploie en production au prochain
+push — une limite mémoire mal choisie arrêterait l'application réelle. `docker-compose.yml` : aucun `mem_limit`, `cpus`,
 `ulimits`, ni `logging.options.max-size` sur les quatre conteneurs (`grep` : seul `deploy:`
 apparaît, ligne 196, pour `replicas`). Sur un NAS partagé avec Grocy et le reste, une fuite
 mémoire dans un travailleur qui tourne des semaines (`AppliqueInventaire.php:100-111` s'en
@@ -406,19 +415,25 @@ par défaut ne tourne jamais : les journaux d'accès Caddy grossissent sans born
 
 ---
 
-## 14. `stock_quantite_positive` fait double emploi avec `stock_quantite_check`
+## 14. ✅ corrigé le 17 septembre 2026 — `stock_quantite_positive` fait double emploi avec `stock_quantite_check`
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ.** `db/manuel/25-garde-fous.sql:111` ajoute
-`CHECK (quantite >= 0)` alors que `db/01-schema.sql:173` le pose déjà en ligne. Le diff A↔B le
+**Gravité : FAIBLE — Statut : CONFIRMÉ, corrigé le 17 septembre 2026** : la migration 36
+(`db/manuel/36-stock-un-seul-controle-de-quantite.sql`) retire `stock_quantite_check`, et
+`verifier-migrations.sh` refuse désormais tout CHECK en double. Il ne reste que
+`stock_quantite_positive` (`db/01-schema.sql:182`). À l'audit : `db/manuel/25-garde-fous.sql:111` ajoutait
+`CHECK (quantite >= 0)` alors que `01-schema.sql` le posait déjà en ligne. Le diff A↔B le
 montre : la table B porte les deux. Coût : une évaluation de plus à chaque écriture, et un
 schéma qui laisse croire que les deux disent des choses différentes.
 **Correction : supprimer le bloc de la migration 25. Effort : 5 min.**
 
 ---
 
-## 15. La base de développement écoute sur toutes les interfaces avec un mot de passe trivial
+## 15. OUVERT, À TRANCHER — La base de développement écoute sur toutes les interfaces avec un mot de passe trivial
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ.** `compose.dev.yml:24-25` (`ports: - "5432:5432"`) et
+**Gravité : FAIBLE — Statut : CONFIRMÉ, ouvert et à trancher au 17 septembre 2026.** L'argument
+qui retient : ce port sert — `import_carnet.py` et `import_catalogue.py` visent
+`localhost:5432` par défaut. Un `127.0.0.1:5432:5432` les laisserait fonctionner depuis la
+machine elle-même, mais la décision n'est pas prise. `compose.dev.yml:24-25` (`ports: - "5432:5432"`) et
 `:15` (`POSTGRES_PASSWORD: fitcarnet`). Le port se lie à `0.0.0.0`. En WSL2 l'exposition reste
 limitée à l'hôte, mais sur une machine de développement sur réseau d'entreprise ou Wi-Fi
 public, la base est joignable. Le raisonnement écrit pour la production
@@ -427,9 +442,12 @@ public, la base est joignable. Le raisonnement écrit pour la production
 
 ---
 
-## 17. Aucune purge des invitations expirées
+## 17. OUVERT, À TRANCHER — Aucune purge des invitations expirées
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ.** `db/01-schema.sql:483-501` : la table `invitation`
+**Gravité : FAIBLE — Statut : CONFIRMÉ, ouvert et à trancher au 17 septembre 2026.** La
+réinvitation, elle, n'est plus bloquée : une nouvelle invitation remplace celle qui attendait,
+expirée ou non (`InvitationsController.php:163-179`). Reste la purge, qui n'est pas décidée.
+À l'audit : `db/01-schema.sql:538-547` : la table `invitation`
 porte `expire_le`, mais rien ne supprime les lignes périmées — contrairement à
 `jeton_rafraichissement`, purgé par `JetonsRafraichissement.php:111`, et à `inventaire_lot`,
 purgé à 30 jours par `26-inventaire-en-tache-de-fond.sql:149`. L'index partiel
@@ -441,9 +459,11 @@ Effort : 20 min.**
 
 ---
 
-## 18. Aucun timeout sur les appels HTTP vers Grocy
+## 18. ✅ corrigé le 15 septembre 2026 — Aucun timeout sur les appels HTTP vers Grocy
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ.** Aucun bloc `http_client` dans
+**Gravité : FAIBLE — Statut : CONFIRMÉ, corrigé le 15 septembre 2026** : chaque appel est
+borné à 20 s (`FrigoGrocy.php:484-485`, `:594-595`), sous les 30 s du front
+(`FrigoGrocyDelaiTest`). Le constat d'origine : Aucun bloc `http_client` dans
 `api/config/packages/framework.yaml`, aucune option passée au client injecté dans
 `FrigoGrocy.php:58`. La durée totale d'un appel n'est donc pas bornée (`max_duration` vaut 0
 par défaut). C'est le déclencheur le plus probable du constat n° 6, et une requête HTTP de
@@ -453,9 +473,10 @@ pour Grocy). Effort : 10 min.**
 
 ---
 
-## 19. `installer.sh --repartir-de-zero` : `down -v` avale ses erreurs
+## 19. ✅ corrigé le 17 septembre 2026 — `installer.sh --repartir-de-zero` : `down -v` avale ses erreurs
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ.** `installer.sh:97` :
+**Gravité : FAIBLE — Statut : CONFIRMÉ, corrigé le 17 septembre 2026** : l'échec de
+`down -v` arrête désormais le script (`installer.sh:97-102`). À l'audit :
 `dc down -v >/dev/null 2>&1 || true`. La confirmation en clair (« Taper "oui" ») est bien là,
 mais si `down -v` échoue, le script continue comme si les volumes avaient été supprimés et
 installe par-dessus l'ancienne base. Le reste du script est correct :
@@ -496,7 +517,7 @@ installe par-dessus l'ancienne base. Le reste du script est correct :
 5. **Le raisonnement de concurrence est bon dans ses fondations.** `FOR UPDATE SKIP LOCKED`,
    reprise fondée sur une observation (`vu_le`) et non sur une hypothèse de nombre de
    travailleurs, `definirStock` qui pose une quantité absolue dans une transaction unique
-   (`FrigoBase.php:105-131`), gestion explicite du `EntityManager` fermé dans un processus
+   (`FrigoBase.php:110-181`), gestion explicite du `EntityManager` fermé dans un processus
    long. Le constat n° 6 est un trou dans une conception par ailleurs solide, pas une absence
    de conception.
 

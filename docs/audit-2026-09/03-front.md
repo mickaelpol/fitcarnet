@@ -6,11 +6,22 @@
 > éclaté en dix modules sous `src/api/hooks/` — donc la section 2 entière et la
 > trentaine de renvois `hooks.ts:826`, `:906`, `:158-163` pointent dans le vide.
 > Les tailles annoncées non plus ne valent plus (mesurées au `wc -l` le
-> 17 septembre 2026) : `composer.ts` 780 → **135**, `cuisson.ts` 611 → **22**,
+> 17 septembre 2026) : `composer.ts` 780 → **135** (780 est le compte de ce
+> rapport ; git en donne 817 au commit de l'audit, 830 le même soir après le
+> correctif É12, 827 au premier rang du lot 6), `cuisson.ts` 611 → **22**,
 > `repas.tsx` 2 316 → **655**, `frigo.tsx` 827 → **392**, `admin-exercices.tsx`
 > 711 → **195**, `seance/[id].tsx` 430 → **340**.
 >
-> Les constats **F4, F10, F11, F13 sont faits**, F12 pour l'essentiel.
+> **État des constats, vérifié le 17 septembre 2026 : 25 clos, 8 ouverts.**
+> Clos : É1 à É5, M1 à M4, M7, M14, et les quatorze faibles — F8 refusé avec
+> argument, F12 pour l'essentiel (`pourObtenirCuit` gardé, il a ses tests).
+> **Ouverts** : M5 (jetons en clair dans `localStorage` sur le web), M6
+> (partiel : `seance/[id].tsx` garde son erreur, `modele/[id].tsx`,
+> `admin-utilisateurs.tsx` et les cibles de `repas.tsx` non), M8
+> (`RECORD_AUDIO` toujours déclaré deux fois dans `app.json`), M9, M10, M11
+> (le `retry: false` de `useMoi` ne distingue toujours pas une panne réseau),
+> M12 et M13 (`noUncheckedIndexedAccess` toujours à `false`). Le détail est
+> dans [README.md](README.md), « Ce qui reste ouvert ».
 >
 > Ce document garde toute sa valeur pour **le raisonnement** de chaque constat —
 > pourquoi c'est un défaut, ce qu'il coûte. Il n'en a plus aucune pour

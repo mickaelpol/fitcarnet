@@ -98,7 +98,13 @@ porter leur formule.
   écrit trois fois **dans le module de référence**.
 - `sansAccent` : **six** copies, toutes en `normalize('NFD')` — que Hermes
   n'implémente pas toujours. Six `TypeError` en puissance.
-- Atwater : recopié dans le solveur et l'écran des objectifs.
+- Atwater : recopié dans le solveur et l'écran des objectifs. Et encore le
+  **17 septembre 2026** : coefficients importés partout, mais la somme
+  « coefficient × grammes » écrite **quatre** fois en entier, plus une
+  cinquième pour les seules fibres (`carteRepas.tsx`, trouvée par le test de
+  garde), chaque copie traitant à sa façon les fibres inconnues. Elle n'a plus qu'une écriture, `kcalDesGrammes`
+  (`front/src/calcul/nutrition.ts`), et `formuleUnique.test.ts` refuse toute
+  autre multiplication par un `KCAL_…`, dans `src/` comme dans `app/`.
 
 **À faire** : `grep` la constante numérique, pas seulement le nom de la fonction.
 `0.0333`, `4 *`, `9 *` trouvent ce que `grep epley` rate.
@@ -111,8 +117,15 @@ Le bon exemple, à imiter : `controler()` dans `nutrition.ts` distingue
 `fibresConnues`, élargit son seuil de tolérance et **l'écrit à l'écran** —
 « Cohérent, mais sans les fibres le contrôle reste approximatif ».
 
-**À faire** : chercher `?? 0`, `|| 0`, `parseFloat(...) || 0`. Chacun est un
-endroit où « je ne sais pas » devient « zéro » sans le dire.
+- **17 septembre 2026, et c'est un jumeau** : les quatre macros d'`Aliment`
+  valaient `'0'` par défaut — `POST /api/aliments` sans `lip100` répondait 201
+  et la base écrivait `0.00` ; le même jour, `POST /api/mon-frigo/aliment`
+  écrivait dans Grocy `$donnees['prot100'] ?? 0`. Les deux refusent désormais
+  en 422 (`AlimentMacrosObligatoiresTest`, `ValeursGrocyObligatoiresTest`).
+
+**À faire** : chercher `?? 0`, `|| 0`, `parseFloat(...) || 0`, et les valeurs
+par défaut des propriétés d'entité. Chacun est un endroit où « je ne sais pas »
+devient « zéro » sans le dire.
 
 ### 7. Le chiffre faux affiché
 

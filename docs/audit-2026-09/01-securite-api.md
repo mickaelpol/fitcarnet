@@ -7,6 +7,10 @@ Vérifications dynamiques : `php bin/console debug:router` (liste réelle des
 routes exposées et de leurs contrôleurs).
 
 Bilan : **0 CRITIQUE, 1 ÉLEVÉE, 2 MOYENNES, 9 FAIBLES.**
+**Au 17 septembre 2026, les douze sont clos** (vérifié constat par constat) :
+E-01 le 8 septembre (É1), M-02, M-03 et les neuf faibles entre le 14 et le
+15 — dont F-04, réglé par É8, et F-07, vérifié et laissé en l'état par
+décision. Chaque constat porte son statut ci-dessous.
 Aucune fuite de données entre comptes en LECTURE n'a été trouvée. Le socle
 d'isolation (`ProprieteUtilisateur` + `FiltreProprietaire` + `security:` par
 opération) est correct et redondant. Le seul défaut d'autorisation réel est un
@@ -20,12 +24,12 @@ chemin d'ÉCRITURE oublié.
 |---|---|---|---|---|---|
 | `Seance` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | `FiltreProprietaire` + `object.getUtilisateur() == user` — **OK** |
 | `Modele` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** (voir F-05 sur `partage`) |
-| `Stock` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** |
+| `Stock` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get — **lecture seule depuis le 17 septembre 2026** ; l'écriture passe par `/api/mon-frigo` (`FrigoBase::definirStock`) | idem — **OK** |
 | `PlanRepas` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Delete | idem — **OK** |
 | `Cible` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** |
 | `Complement` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** |
 | `Aliment` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** |
-| `Exercice` | `creePar` (nullable) | non | oui | GetC, Get, Post, Patch(ADMIN) | **aucun filtre** — catalogue volontairement commun (voir F-04) |
+| `Exercice` | `creePar` (nullable) | non | oui | GetC, Get, Post(ADMIN), Patch(ADMIN ou auteur) | à l'audit : **aucun filtre** (voir F-04) ; depuis le 14 septembre 2026, `FiltreExercice` — « public OU le mien » (É8) |
 | `Utilisateur` | — | non | oui | Get, GetC(ADMIN), Post(ADMIN), Patch | `is_granted('ROLE_ADMIN') or object == user` — **OK** |
 | `Emplacement` | — | non | oui | GetC, Get (lecture seule) | référentiel fixe, aucune donnée personnelle — **OK** |
 | `ModeCuisson` | — | non | oui | GetC, Get, Post/Patch/Delete(ADMIN) | référentiel commun — **OK** |
@@ -43,14 +47,14 @@ pare-feu par conception (voir F-06/F-07 pour ce qui les concerne).
 
 # Constats, du plus grave au moins grave
 
-## E-01 — L'inventaire différé n'a aucun contrôle de propriété sur l'aliment
+## E-01 — ✅ corrigé le 8 septembre 2026 — L'inventaire différé n'avait aucun contrôle de propriété sur l'aliment
 
 - **Gravité : ÉLEVÉE**
-- **Statut : CONFIRMÉ**
+- **Statut : CONFIRMÉ à l'audit, corrigé le 8 septembre 2026** (É1, voir [README.md](README.md)) : le dépôt vérifie la propriété, et `FrigoBase::definirStock` la pose pour tous ses appelants. La base la double depuis le 17 septembre 2026 (clé composite `stock_aliment_du_meme_compte_fkey`, migration 35). Le constat d'origine suit, au présent de l'audit ; les renvois pointent le code d'aujourd'hui.
 - **Emplacement :**
-  - `api/src/Controller/FrigoController.php:332-390` (dépôt du lot, aucune vérification)
+  - `api/src/Controller/FrigoController.php:351-434` (dépôt du lot, aucune vérification à l'audit)
   - `api/src/Service/AppliqueInventaire.php:146-179` (application, aucune vérification)
-  - à comparer avec `api/src/Controller/FrigoController.php:124-131` et `:157-159`, qui font le contrôle sur l'autre chemin
+  - à comparer avec `api/src/Controller/FrigoController.php:125-128` et `:151-156`, qui font le contrôle sur l'autre chemin
 
 **Ce qui se passe.** `POST /api/mon-frigo/stock` vérifie que l'aliment visé
 appartient au demandeur (`alimentAccessible()`, ajouté explicitement pour
@@ -64,7 +68,9 @@ poster `{"lignes":[{"reference":"base:<id d'un aliment d'Alice>","quantite":1}]}
 et faire écrire une ligne de stock sur un aliment d'Alice. Conséquence
 exacte que le commentaire du fichier annonce pour l'autre route : Alice ne peut
 plus supprimer son aliment (`AlimentSuppressionProcessor` compte les lignes de
-stock **tous comptes confondus**, `api/src/State/AlimentSuppressionProcessor.php:41-51`)
+stock **tous comptes confondus**, `api/src/State/AlimentSuppressionProcessor.php:43-53` —
+il compte toujours hors du filtre, mais depuis la migration 35 seul le stock du
+propriétaire peut viser son aliment)
 et n'a aucun moyen de défaire ce blocage depuis l'application. Effet secondaire :
 un identifiant inexistant produit une violation de clé étrangère dont le message
 DBAL brut est rendu au demandeur via `GET /api/mon-frigo/inventaire/dernier`
@@ -102,7 +108,7 @@ un accès permanent, indétectable : le porteur légitime ne dispose d'aucun éc
 listant ses sessions, et rien ne trahit un second usage. Les seuls leviers de
 révocation existent et fonctionnent (déconnexion, changement de mot de passe →
 `UtilisateurProcessor.php:86-89`, désactivation du compte →
-`ComptesController.php:148-153`), mais ils sont tous « tout ou rien » et
+`ComptesController.php:166-173`), mais ils sont tous « tout ou rien » et
 supposent qu'on soupçonne quelque chose.
 
 Le choix de ne pas faire de rotation est argumenté dans le code et le compromis
@@ -141,10 +147,10 @@ est utile et déjà tronqué à 200 caractères (`FrigoGrocy::corpsDe`).
 
 ---
 
-## F-01 — `security.route_loader.logout` chargé sans aucun pare-feu de déconnexion
+## F-01 — ✅ corrigé le 15 septembre 2026 — `security.route_loader.logout` chargé sans aucun pare-feu de déconnexion
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
+- **Statut : CONFIRMÉ à l'audit, corrigé le 15 septembre 2026** (lot 8) : `api/config/routes/security.yaml` supprimé.
 - **Emplacement :** `api/config/routes/security.yaml:1-3` ; aucun `logout:` dans `api/config/packages/security.yaml`
 
 **Ce qui se passe.** Vérifié à l'exécution : `debug:router` ne produit **aucune**
@@ -159,10 +165,10 @@ déconnexion Symfony existe, alors que la vraie déconnexion est
 
 ---
 
-## F-02 — CORS de production : `http://` accepté et `localhost:5173` autorisé
+## F-02 — ✅ corrigé le 15 septembre 2026 — CORS de production : `http://` accepté et `localhost:5173` autorisé
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
+- **Statut : CONFIRMÉ à l'audit, corrigé le 15 septembre 2026** (lot 8).
 - **Emplacement :** `docker-compose.yml:107` (`CORS_ALLOW_ORIGIN: '^https?://(carnet\.mickael-pol\.fr|localhost:5173)$$'`), `api/config/packages/nelmio_cors.yaml`
 
 **Ce qui se passe.** Le motif accepte le schéma `http` sur le domaine de
@@ -177,10 +183,10 @@ laisser `localhost` au fichier `.env` de développement.
 
 ---
 
-## F-03 — Aucun en-tête de sécurité servi par Caddy
+## F-03 — ✅ corrigé le 15 septembre 2026 — Aucun en-tête de sécurité servi par Caddy
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
+- **Statut : CONFIRMÉ à l'audit, corrigé le 15 septembre 2026** (lot 8) : la règle est posée au niveau du site, pour ses quatre blocs ; HSTS et CSP volontairement absents, avec la raison écrite.
 - **Emplacement :** `docker/Caddyfile:15-109` (aucune directive `header` autre que `Content-Type` et `Cache-Control`)
 
 **Ce qui se passe.** Ni `X-Content-Type-Options`, ni `X-Frame-Options` /
@@ -200,7 +206,7 @@ détournement par cadre (clickjacking) et au *MIME sniffing*.
 
 - **Gravité : FAIBLE**
 - **Statut : CONFIRMÉ à l'audit, réglé par É8 le 14 septembre 2026** (voir [README.md](README.md), lot 8) — la piste signalée dans la commande était réelle mais son impact plus petit qu'attendu
-- **Emplacement :** `api/src/Entity/Exercice.php:50` (`new GetCollection()` sans `security:`), `:59` (`Post` ouvert à `ROLE_USER`), `:204-206` (`creePar`), `:189-191` (`source` par défaut `'perso'`)
+- **Emplacement** (lignes d'aujourd'hui) **:** `api/src/Entity/Exercice.php:52` (`new GetCollection()` sans `security:`), `:79` (`Post`, ouvert à `ROLE_USER` à l'audit, `ROLE_ADMIN` depuis le 15 septembre), `:283-285` (`creePar`), `:267-269` (`source` par défaut `'perso'`)
 
 **Ce qui se passe.** Confirmation point par point :
 - `Exercice` n'implémente pas `ProprieteUtilisateur` et aucune extension Doctrine
@@ -280,10 +286,10 @@ interdit la rechute sur cette entité comme sur les autres.
 
 ---
 
-## F-06 — `POST /api/utilisateurs` accepte un compte sans mot de passe
+## F-06 — ✅ corrigé le 15 septembre 2026 — `POST /api/utilisateurs` accepte un compte sans mot de passe
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
+- **Statut : CONFIRMÉ à l'audit, corrigé le 15 septembre 2026** (lot 8), avec un témoin : un `PATCH` qui ne change que le nom reste autorisé.
 - **Emplacement :** `api/src/Entity/Utilisateur.php:56-59` (`motDePasseClair` : `Assert\Length(min: 10)` seulement, pas de `NotBlank`), `api/src/State/UtilisateurProcessor.php:67,74-76`
 
 **Ce qui se passe.** `Assert\Length` laisse passer `null`. Un `POST` d'admin sans
@@ -300,10 +306,10 @@ simple ici, un refus explicite dans `UtilisateurProcessor` quand
 
 ---
 
-## F-07 — Un `APP_SECRET` de développement subsiste dans l'historique git
+## F-07 — ✅ clos le 15 septembre 2026, sans réécriture — Un `APP_SECRET` de développement subsiste dans l'historique git
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
+- **Statut : CONFIRMÉ, vérifié et laissé en l'état le 15 septembre 2026** (lot 8) : le secret n'alimente que `framework.secret`, ne protège rien ici, et a déjà été changé ; réécrire l'historique casserait le dépôt distant.
 - **Emplacement :** `api/.env.dev` (aujourd'hui ignoré par `.gitignore:/api/.env.dev`), présent dans les commits `80a1197` puis retiré par `b1b3de0`
 
 **Ce qui se passe.** Le fichier a été retiré du suivi mais son contenu reste
@@ -319,11 +325,11 @@ utilisée nulle part ailleurs.
 
 ---
 
-## F-08 — Le catalogue d'exercices est ouvert en écriture sans plafond ni suppression
+## F-08 — ✅ corrigé le 15 septembre 2026 — Le catalogue d'exercices est ouvert en écriture sans plafond ni suppression
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
-- **Emplacement :** `api/src/Entity/Exercice.php:59` (`Post`, `ROLE_USER`), `:69` (`paginationItemsPerPage: 1500`)
+- **Statut : CONFIRMÉ à l'audit, corrigé le 15 septembre 2026** (lot 8) : plafonds de longueur sur les champs texte (`Exercice.php:149-163`) le matin ; le limiteur de débit, laissé ouvert faute de seuil, a perdu son objet l'après-midi quand le `Post` est passé à l'administrateur (`:79`). Le plafond de volume par compte, chiffre produit, n'a pas été inventé.
+- **Emplacement** (lignes d'aujourd'hui) **:** `api/src/Entity/Exercice.php:79` (`Post`, `ROLE_USER` à l'audit), `:114` (`paginationItemsPerPage: 1500`)
 
 **Ce qui se passe.** Tout compte authentifié peut créer autant d'`Exercice` qu'il
 veut — dans un catalogue servi à tous en une page de 1500 entrées —, sans limite
@@ -338,11 +344,11 @@ sur ce `Post`.
 
 ---
 
-## F-09 — Un exercice créé par un utilisateur ne peut plus être corrigé par lui
+## F-09 — ✅ corrigé le 15 septembre 2026 — Un exercice créé par un utilisateur ne peut plus être corrigé par lui
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ**
-- **Emplacement :** `api/src/Entity/Exercice.php:62` (`Patch` : `ROLE_ADMIN`), aucune opération `Delete`
+- **Statut : CONFIRMÉ à l'audit, corrigé le 15 septembre 2026** : le `Patch` porte `is_granted('ROLE_ADMIN') or object.getCreePar() == user`. Toujours aucune opération `Delete`, par décision.
+- **Emplacement** (ligne d'aujourd'hui) **:** `api/src/Entity/Exercice.php:94-102` (`Patch` : `ROLE_ADMIN` à l'audit), aucune opération `Delete`
 
 **Ce qui se passe.** `Post` est ouvert à `ROLE_USER`, `Patch` est réservé à
 `ROLE_ADMIN` et il n'y a pas de `Delete`. Une faute de frappe dans le nom d'un

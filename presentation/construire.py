@@ -260,13 +260,13 @@ SLIDES = [
       <div class="pile">
         <div class="etage"><span class="tag">Mobile &amp; web</span>
           <strong>Expo SDK 54 · React Native</strong>
-          <em>un seul code TypeScript pour le web et Android — 18 210 lignes, 18 écrans</em></div>
+          <em>un seul code TypeScript pour le web et Android — 18 210 lignes, 16 écrans</em></div>
         <div class="etage"><span class="tag">API</span>
           <strong>Symfony 7.4 · API Platform 4 · PHP 8.3</strong>
-          <em>7 441 lignes, 8 contrôleurs, 27 routes, 18 entités</em></div>
+          <em>7 441 lignes, 9 contrôleurs, 27 routes, 15 entités exposées</em></div>
         <div class="etage"><span class="tag">Données</span>
           <strong>PostgreSQL 16</strong>
-          <em>20 tables, 4 436 lignes de SQL versionné, migrations idempotentes</em></div>
+          <em>19 tables, 4 436 lignes de SQL versionné, migrations idempotentes</em></div>
         <div class="etage"><span class="tag">Exécution</span>
           <strong>Docker · FrankenPHP · Caddy · NAS Synology</strong>
           <em>hébergement personnel, pas de compte tiers, pas de mesure d'audience</em></div>
@@ -360,12 +360,12 @@ SLIDES = [
     # ================================================================== ACTE 3
     ("qualite", "Ce qui garantit que ça marche", """
       <div class="chiffres">
-        <div><strong>939</strong><span>tests automatisés</span></div>
+        <div><strong>965</strong><span>tests automatisés</span></div>
         <div><strong>6 769</strong><span>lignes de test</span></div>
         <div><strong>26 %</strong><span>du code est du test</span></div>
         <div><strong>120</strong><span>commits en 5 semaines</span></div>
       </div>
-      <p class="chute">632 tests côté front (<code>node:test</code>, dont 32 de rendu), 307 côté API
+      <p class="chute">636 tests côté front (<code>node:test</code>, dont 33 de rendu), 329 côté API
          (PHPUnit), comptés le 17 septembre 2026 : quelques secondes pour l'ensemble. Une suite
          qu'on n'attend pas est une suite qu'on lance.</p>
     """),
@@ -394,7 +394,7 @@ SLIDES = [
       <div class="chiffres">
         <div><strong>3</strong><span>critiques</span></div>
         <div><strong>14</strong><span>élevés</span></div>
-        <div><strong>9 lots</strong><span>tous clos</span></div>
+        <div><strong>60 / 79</strong><span>clos · aucun critique ni élevé ouvert</span></div>
         <div><strong>0</strong><span>constat effacé sans preuve</span></div>
       </div>
       <p class="chute">Garde-fous automatiques, pannes réelles, chiffres faux montrés à l'utilisateur,

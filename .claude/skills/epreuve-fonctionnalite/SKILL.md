@@ -62,7 +62,10 @@ sed "s/essai@fitcarnet.local/$COMPTE/" "$DEPOT/db/manuel/jeu-essai.sql" \
 
 **Relis l'adresse du `sed` avant d'appuyer sur Entrée** : `jeu-demo.sql` EFFACE
 avant de poser. Son garde-fou refuse un compte qui a déjà des séances — s'il se
-déclenche, lis le message au lieu de relancer avec `-v ecraser=oui`. (L'option
+déclenche, lis le message au lieu de relancer avec `-v ecraser=oui`. **Garde
+`-v ON_ERROR_STOP=1`** : sans lui, ce refus s'affiche, puis `psql` joue quand
+même la requête de contrôle finale et sort en 0 — la commande a l'air d'avoir
+réussi (relevé le 17 septembre 2026). (L'option
 lève bien le garde-fou depuis le 17 septembre 2026 ; `db/manuel/verifier-jeux.sh`
 éprouve la procédure dans un PostgreSQL jetable.)
 

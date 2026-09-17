@@ -60,7 +60,7 @@ fermeture gagnait. C'était une fonctionnalité morte qui affirmait le contraire
 Il a été retiré des **quatre** endroits le même jour :
 `api/src/Entity/Modele.php:27-53` (le commentaire qui raconte la décision),
 `db/manuel/33-retirer-le-partage-de-modele.sql`,
-`db/01-schema.sql:276` (« PAS DE COLONNE `partage` ») et
+`db/01-schema.sql:278` (« PAS DE COLONNE `partage` ») et
 `front/src/api/types.ts:179-185`. **Un modèle n'appartient qu'à son compte.**
 Ne rien filmer, ne rien promettre, ne pas réintroduire le champ sans rouvrir la
 décision.
@@ -240,7 +240,7 @@ au moins un modèle (`front/app/seance/[id].tsx:209`).
     recopié (`front/src/api/hooks/seances.ts:138`).
 13. **Suppression** — supprimer le modèle ne touche **aucune** séance passée :
     recompter `seance` et `serie` avant/après. La cascade ne descend que sur
-    `modele_exercice` et `modele_serie` (`db/01-schema.sql:285-299`).
+    `modele_exercice` et `modele_serie` (`db/01-schema.sql:287-301`).
 14. **Refus et vide ≠ zéro** — un champ de série laissé vide s'enregistre
     `null` (« je ne sais pas »), jamais `0`. Un type non choisi reste `null` et
     l'application ne doit pas en inventer un.

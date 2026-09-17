@@ -60,6 +60,13 @@ Le JWT dure une heure. Pour un `POST` API Platform, l'en-tête est
 `Content-Type: application/ld+json` ; pour un `PATCH`,
 `application/merge-patch+json`.
 
+**Le stock se pose par `/api/mon-frigo`, pas par `/api/stocks`** : depuis le
+17 septembre 2026, `/api/stocks` n'expose plus que ses deux lectures
+(`api/src/Entity/Stock.php`, `StockEnLectureSeuleTest`). Pour garnir le frigo
+d'un compte jetable : `POST /api/mon-frigo/stock` avec
+`{"alimentId": …, "quantite": …, "emplacementId": …}` (un `emplacementId`
+inconnu est refusé en 422), ou `db/manuel/jeu-essai.sql`.
+
 ## Nettoyer — et l'ordre compte
 
 ```sql
@@ -72,8 +79,17 @@ DELETE FROM stock WHERE aliment_id IN
 DELETE FROM aliment WHERE utilisateur_id IN
   (SELECT id FROM utilisateur WHERE email LIKE '%-verif@test.local');
 
--- 3. les comptes : inventaire_lot, stock et le reste partent en CASCADE
+-- 3. RELEVER leurs exercices personnels, dans la même session psql :
+--    exercice.cree_par est en ON DELETE SET NULL
+CREATE TEMP TABLE exercices_verif AS
+  SELECT e.id FROM exercice e JOIN utilisateur u ON u.id = e.cree_par
+   WHERE u.email LIKE '%-verif@test.local' AND NOT e.public;
+
+-- 4. les comptes : inventaire_lot, stock, séances et le reste partent en CASCADE
 DELETE FROM utilisateur WHERE email LIKE '%-verif@test.local';
+
+-- 5. leurs exercices personnels, maintenant que leurs séances ne les citent plus
+DELETE FROM exercice WHERE id IN (SELECT id FROM exercices_verif);
 ```
 
 **Pourquoi cet ordre.** Chaque aliment appartient à un compte
@@ -81,6 +97,16 @@ DELETE FROM utilisateur WHERE email LIKE '%-verif@test.local';
 aliments. Mais `stock.aliment_id` est en `RESTRICT`, et PostgreSQL ne garantit pas
 l'ordre de deux cascades parties du même compte — d'où le stock, puis les
 aliments, puis le compte, comme le fait `ComptesController::supprimer`.
+
+**Et les exercices personnels.** Un exercice créé par un compte jetable
+(`POST /api/exercices` par un administrateur jetable, ou en SQL) n'est **pas**
+emporté par le compte : `exercice.cree_par` est en `SET NULL`, et l'exercice
+resterait sans auteur ni publication, visible de personne. Le supprimer
+**avant** le compte n'est possible que si aucune de ses séances ni aucun de ses
+modèles ne le cite (`seance_exercice` et `modele_exercice` sont en `RESTRICT`) ;
+d'où le relevé, puis le compte, puis l'exercice. `DELETE /api/comptes/{id}`,
+avec un jeton administrateur, fait exactement cela depuis le 17 septembre 2026
+— et laisse en place un exercice qu'un autre compte cite encore.
 
 ### Prouver qu'il ne reste rien
 
