@@ -7,18 +7,22 @@ namespace App\Entity;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Patch;
-use ApiPlatform\Metadata\Post;
-use App\State\ProprietaireProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
-use Symfony\Component\Validator\Constraints as Assert;
 
-/** « Mon frigo » : ce que possede UN utilisateur. Quantites en grammes. */
+/**
+ * « Mon frigo » : ce que possede UN utilisateur. Quantites en grammes.
+ *
+ * EN LECTURE SEULE PAR API PLATFORM, depuis le 17 septembre 2026. Le stock
+ * s'ecrit par `/api/mon-frigo` (`FrigoController`, `FrigoBase::definirStock`),
+ * qui verifie la propriete, l'emplacement et la source du frigo. `POST`,
+ * `PATCH` et `DELETE /api/stocks` n'etaient appeles par aucune version du
+ * front, contournaient ces controles, et un doublon y repondait 500.
+ * Voir `StockEnLectureSeuleTest`.
+ */
 #[ORM\Entity]
 #[ORM\Table(name: 'stock')]
 #[ORM\UniqueConstraint(columns: ['utilisateur_id', 'aliment_id', 'emplacement_id'])]
@@ -26,12 +30,8 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(),
         new Get(security: "object.getUtilisateur() == user"),
-        new Post(processor: ProprietaireProcessor::class),
-        new Patch(security: "object.getUtilisateur() == user", processor: ProprietaireProcessor::class),
-        new Delete(security: "object.getUtilisateur() == user"),
     ],
     normalizationContext: ['groups' => ['stock:lire']],
-    denormalizationContext: ['groups' => ['stock:ecrire']],
     security: "is_granted('ROLE_USER')",
     paginationItemsPerPage: 300,
 )]
@@ -50,23 +50,20 @@ class Stock implements ProprieteUtilisateur
 
     #[ORM\ManyToOne(targetEntity: Aliment::class)]
     #[ORM\JoinColumn(name: 'aliment_id', nullable: false)]
-    #[Assert\NotNull]
-    #[Groups(['stock:lire', 'stock:ecrire'])]
+    #[Groups(['stock:lire'])]
     private ?Aliment $aliment = null;
 
     #[ORM\ManyToOne(targetEntity: Emplacement::class)]
     #[ORM\JoinColumn(name: 'emplacement_id', nullable: false)]
-    #[Assert\NotNull]
-    #[Groups(['stock:lire', 'stock:ecrire'])]
+    #[Groups(['stock:lire'])]
     private ?Emplacement $emplacement = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 9, scale: 2, options: ['default' => 0])]
-    #[Assert\PositiveOrZero]
-    #[Groups(['stock:lire', 'stock:ecrire'])]
+    #[Groups(['stock:lire'])]
     private string $quantite = '0';
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
-    #[Groups(['stock:lire', 'stock:ecrire'])]
+    #[Groups(['stock:lire'])]
     private ?\DateTimeImmutable $peremption = null;
 
     #[ORM\Column(name: 'maj_le', type: Types::DATETIMETZ_IMMUTABLE)]
