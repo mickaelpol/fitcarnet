@@ -79,7 +79,7 @@ class PlanRepas implements ProprieteUtilisateur
     #[Groups(['plan:lire', 'plan:ecrire'])]
     private string $libelle = '';
 
-    #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'cree_le', type: Types::DATETIMETZ_IMMUTABLE)]
     #[Groups(['plan:lire'])]
     private \DateTimeImmutable $creeLe;
 
@@ -103,7 +103,7 @@ class PlanRepas implements ProprieteUtilisateur
      * plan « cuisine » sur un frigo intact — c'est-a-dire le double comptage
      * qu'on vient de corriger, pris par l'autre bout.
      */
-    #[ORM\Column(name: 'cuisine_le', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[ORM\Column(name: 'cuisine_le', type: Types::DATETIMETZ_IMMUTABLE, nullable: true)]
     #[Groups(['plan:lire'])]
     private ?\DateTimeImmutable $cuisineLe = null;
 

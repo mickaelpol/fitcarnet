@@ -107,7 +107,7 @@ class Complement implements ProprieteUtilisateur
     #[Groups(['complement:lire', 'complement:ecrire'])]
     private string $repas = 'R1';
 
-    #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'cree_le', type: Types::DATETIMETZ_IMMUTABLE)]
     private \DateTimeImmutable $creeLe;
 
     public function __construct()

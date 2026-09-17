@@ -85,7 +85,7 @@ class Modele implements ProprieteUtilisateur
     #[Groups(['modele:lire', 'modele:ecrire'])]
     private ?string $type = null;
 
-    #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'cree_le', type: Types::DATETIMETZ_IMMUTABLE)]
     #[Groups(['modele:lire'])]
     private \DateTimeImmutable $creeLe;
 

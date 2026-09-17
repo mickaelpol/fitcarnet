@@ -155,10 +155,18 @@ projet**, et son échec ne veut rien dire. Le lot 0 de l'audit le proposait comm
 garde-fou — la proposition était mauvaise. Les deux vrais contrôles sont
 `verifier-schema.sh` et `verifier-migrations.sh`.
 
-Une divergence déclarative subsiste et reste **sans effet** : les entités
-déclarent `datetime_immutable` là où la base est `TIMESTAMPTZ`. Doctrine lit et
-écrit correctement ; changer le mapping ferait courir plus de risque que la
-divergence n'en pose.
+**Une colonne `TIMESTAMPTZ` se déclare `Types::DATETIMETZ_IMMUTABLE`, jamais
+`DATETIME_IMMUTABLE`.** Ce paragraphe a affirmé jusqu'au 17 septembre 2026 que
+la divergence était « sans effet » : elle datait chaque ligne écrite par l'API
+de deux heures dans le futur. PHP tourne en `Europe/Paris`, la session
+PostgreSQL en UTC, et une heure écrite sans fuseau était prise pour de l'UTC.
+`datetimetz_immutable` est remplacé dans `doctrine.yaml` par
+`App\Doctrine\DateAvecFuseauType`, qui relit aussi les valeurs posées par
+`now()` (microsecondes) — le type de DBAL lève `InvalidFormat` dessus.
+`DatesAvecFuseauTest` refuse toute colonne datée sans fuseau hors
+`jeton_rafraichissement`, seule table en `TIMESTAMP WITHOUT TIME ZONE`.
+Les lignes écrites avant la correction gardent leur décalage : on ne peut pas
+distinguer, ligne à ligne, ce que l'API a écrit de ce que la base a posé.
 
 ## Index et plans de requête
 

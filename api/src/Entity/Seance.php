@@ -73,7 +73,7 @@ class Seance implements ProprieteUtilisateur
     #[Groups(['seance:lire', 'seance:ecrire'])]
     private ?Modele $modele = null;
 
-    #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'cree_le', type: Types::DATETIMETZ_IMMUTABLE)]
     #[Groups(['seance:lire'])]
     private \DateTimeImmutable $creeLe;
 

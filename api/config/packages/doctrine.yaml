@@ -5,6 +5,10 @@ doctrine:
         use_savepoints: true
         mapping_types:
             citext: string
+        # Les colonnes `TIMESTAMPTZ` s'ecrivent AVEC leur decalage, et se
+        # relisent meme posees par `now()` (microsecondes) : voir la classe.
+        types:
+            datetimetz_immutable: App\Doctrine\DateAvecFuseauType
 
         # La base est creee et maintenue par nos scripts SQL et nos migrations.
         # Ce filtre empeche Doctrine de proposer la suppression des objets

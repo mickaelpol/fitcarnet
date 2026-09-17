@@ -108,7 +108,7 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['utilisateur:lire'])]
     private bool $actif = true;
 
-    #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'cree_le', type: Types::DATETIMETZ_IMMUTABLE)]
     #[Groups(['utilisateur:lire'])]
     private \DateTimeImmutable $creeLe;
 

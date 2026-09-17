@@ -80,7 +80,7 @@ class CuissonHabituelle
     #[ORM\JoinColumn(name: 'mode_cuisson_id', nullable: true, onDelete: 'CASCADE')]
     private ?ModeCuisson $modeCuisson = null;
 
-    #[ORM\Column(name: 'maj_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'maj_le', type: Types::DATETIMETZ_IMMUTABLE)]
     private \DateTimeImmutable $majLe;
 
     public function __construct()

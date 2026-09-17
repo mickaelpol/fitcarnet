@@ -69,7 +69,7 @@ class Stock implements ProprieteUtilisateur
     #[Groups(['stock:lire', 'stock:ecrire'])]
     private ?\DateTimeImmutable $peremption = null;
 
-    #[ORM\Column(name: 'maj_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'maj_le', type: Types::DATETIMETZ_IMMUTABLE)]
     #[Groups(['stock:lire'])]
     private \DateTimeImmutable $majLe;
 

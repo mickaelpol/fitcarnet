@@ -282,7 +282,7 @@ class Exercice
     #[ORM\JoinColumn(name: 'cree_par', nullable: true, onDelete: 'SET NULL')]
     private ?Utilisateur $creePar = null;
 
-    #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(name: 'cree_le', type: Types::DATETIMETZ_IMMUTABLE)]
     private \DateTimeImmutable $creeLe;
 
     public function __construct() { $this->creeLe = new \DateTimeImmutable(); }
