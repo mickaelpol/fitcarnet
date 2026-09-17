@@ -27,10 +27,9 @@ use Symfony\Bundle\SecurityBundle\Security;
  * etiquette qui promet la confidentialite sans la fournir est pire qu'une
  * etiquette absente, parce qu'on lui fait confiance.
  *
- * POURQUOI « PUBLIC », ET NON « SANS AUTEUR » COMME POUR ALIMENT
+ * POURQUOI « PUBLIC », ET NON « SANS AUTEUR »
  *
- * `FiltreAliment` dit « commun OU le mien » : un aliment est commun quand il
- * n'a pas d'auteur. Ici la regle porte sur `public`, ce qui laisse une
+ * La regle porte sur `public`, et non sur l'absence d'auteur : cela laisse une
  * troisieme possibilite — un exercice publie MAIS attribue. Un administrateur
  * peut ainsi verser au catalogue commun l'exercice bien redige de quelqu'un
  * sans en effacer la paternite.

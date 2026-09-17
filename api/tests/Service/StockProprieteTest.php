@@ -42,7 +42,7 @@ final class StockProprieteTest extends TestCase
         }
 
         self::assertInstanceOf(\RuntimeException::class, $refus,
-            'poser du stock sur un aliment qui n\'est ni commun ni le mien doit etre refuse');
+            'poser du stock sur un aliment qui n\'est pas le mien doit etre refuse');
         self::assertSame([], $ecritures,
             'et refuse AVANT d\'ecrire : une ligne posee rendrait l\'aliment de la victime indelebile');
     }
@@ -51,7 +51,7 @@ final class StockProprieteTest extends TestCase
     {
         /* SANS CE TEMOIN, UN CONTROLE QUI REFUSE TOUT LE MONDE PASSERAIT POUR
            UNE CORRECTION. C'est le meme frigo, la meme methode : seule change
-           la reponse a « cet aliment est-il commun, ou le mien ? ». */
+           la reponse a « cet aliment est-il le mien ? ». */
         $ecritures = [];
         $base = self::frigoBase($ecritures, alimentAccessible: true);
 
@@ -59,6 +59,26 @@ final class StockProprieteTest extends TestCase
 
         self::assertCount(2, $ecritures,
             'le DELETE puis l\'INSERT de la transaction doivent partir comme avant');
+    }
+
+    public function testSeulsLesAlimentsDuDemandeurSontAccessibles(): void
+    {
+        $requetes = [];
+        $cnx = self::createStub(Connection::class);
+        $cnx->method('fetchFirstColumn')->willReturnCallback(
+            static function (string $sql) use (&$requetes): array {
+                $requetes[] = $sql;
+
+                return [];
+            });
+
+        (new FrigoBase($cnx))->alimentsAccessibles(self::utilisateur(), [42]);
+
+        self::assertCount(1, $requetes);
+        self::assertStringContainsString('utilisateur_id = :u', $requetes[0],
+            'un aliment n\'est accessible qu\'a son proprietaire');
+        self::assertStringNotContainsString('IS NULL', $requetes[0],
+            'un aliment sans proprietaire n\'existe pas, et ne doit ouvrir aucune porte');
     }
 
     private static function utilisateur(): Utilisateur
@@ -77,7 +97,7 @@ final class StockProprieteTest extends TestCase
 
         $cnx->method('fetchFirstColumn')->willReturnCallback(
             static function (string $sql, array $params = []) use ($alimentAccessible): array {
-                // « cet aliment est-il commun, ou le mien ? », posee en lot
+                // « cet aliment est-il le mien ? », posee en lot
                 return $alimentAccessible ? \array_values((array) ($params['a'] ?? [])) : [];
             });
 

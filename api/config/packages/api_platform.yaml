@@ -3,8 +3,8 @@ api_platform:
     version: 1.0.0
     description: >
         Séances de musculation, stock d'ingrédients et calcul de repas.
-        Chaque utilisateur ne voit que ses propres données ; les référentiels
-        (aliments, exercices) sont communs.
+        Chaque utilisateur ne voit que ses propres données, aliments compris ;
+        le catalogue d'exercices est commun.
 
     formats:
         jsonld: ['application/ld+json']

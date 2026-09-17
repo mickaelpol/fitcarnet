@@ -29,12 +29,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * suspend, un doute.
  *
  * Un compte supprime emporte tout, par cascade de la base : seances, series,
- * plans, cibles, habitudes de cuisson, stock, jetons, ET SES ALIMENTS PRIVES.
+ * plans, cibles, habitudes de cuisson, stock, jetons, ET SES ALIMENTS.
  * Rien de tout cela ne se restaure sans une sauvegarde.
- *
- * Les aliments COMMUNS, eux, restent : ils n'appartiennent a personne. Seuls
- * partent ceux que ce compte avait crees pour lui — les laisser en faisait
- * des aliments publics, ce qui est l'inverse de la regle.
  *
  * On COMPTE donc ce qui sera detruit et on le renvoie avec la liste. Un
  * « Supprimer ? Oui / Non » qui ne dit pas ce qu'on detruit n'est pas une
@@ -173,23 +169,13 @@ final class ComptesController extends AbstractController
      * Une seule instruction, donc, et la base fait le reste dans sa propre
      * transaction.
      *
-     * UNE EXCEPTION, ET ELLE EST IMPORTANTE : LES ALIMENTS PRIVES.
+     * UNE EXCEPTION : SES ALIMENTS.
      *
-     * `aliment.cree_par` est en `ON DELETE SET NULL`. Un aliment prive dont on
-     * supprime le proprietaire perd donc son auteur — et `FiltreAliment` ne
-     * lit QUE `creePar IS NULL OR creePar = user`, jamais la colonne `public`.
-     * Resultat : l'aliment prive de quelqu'un DEVENAIT VISIBLE DE TOUS. C'est
-     * l'inverse exact de la regle posee dans `AlimentProcessor` — « sur des
-     * valeurs nutritionnelles, l'erreur de l'un ne doit pas fausser la diete
-     * des autres ».
-     *
-     * Et quand le nom collisionnait avec un aliment commun existant, le
-     * `SET NULL` violait `aliment_nom_commun_unique` : 500 illisible, et le
-     * compte devenait indelebile.
-     *
-     * On supprime donc explicitement ce qui lui appartenait, dans l'ordre que
-     * les cles etrangeres imposent — `stock.aliment_id` est en RESTRICT, il
-     * faut le vider d'abord.
+     * `aliment.utilisateur_id` est en `ON DELETE CASCADE`, mais
+     * `stock.aliment_id` est en RESTRICT, et PostgreSQL ne garantit pas
+     * l'ordre dans lequel il deroule deux cascades partant du meme compte. On
+     * supprime donc explicitement ses aliments, dans l'ordre que les cles
+     * etrangeres imposent — le stock qui les vise d'abord.
      */
     #[Route('/comptes/{id}', methods: ['DELETE'])]
     public function supprimer(string $id): JsonResponse
@@ -210,16 +196,16 @@ final class ComptesController extends AbstractController
         }
 
         $this->cnx->transactional(function () use ($id): void {
-            /* Les lignes de stock qui visent ses aliments prives, quel qu'en
+            /* Les lignes de stock qui visent ses aliments, quel qu'en
                soit le proprietaire. Une ligne appartenant a quelqu'un d'autre
                ne devrait pas exister — c'etait la faille corrigee dans
                `FrigoController` — mais si elle existe, elle bloquerait tout
                par la contrainte RESTRICT. */
             $this->cnx->executeStatement(
-                'DELETE FROM stock WHERE aliment_id IN (SELECT id FROM aliment WHERE cree_par = :u)',
+                'DELETE FROM stock WHERE aliment_id IN (SELECT id FROM aliment WHERE utilisateur_id = :u)',
                 ['u' => $id],
             );
-            $this->cnx->executeStatement('DELETE FROM aliment WHERE cree_par = :u', ['u' => $id]);
+            $this->cnx->executeStatement('DELETE FROM aliment WHERE utilisateur_id = :u', ['u' => $id]);
             $this->cnx->executeStatement('DELETE FROM utilisateur WHERE id = :id', ['id' => $id]);
         });
 

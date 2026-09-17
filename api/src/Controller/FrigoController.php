@@ -372,8 +372,8 @@ final class FrigoController extends AbstractController
         /* LE MEME CONTROLE QUE SUR /mon-frigo/stock, QUI MANQUAIT ICI.
            Constat E-01 de l'audit du 7 septembre 2026 : cette route ecrit du
            stock par un autre chemin, et ne demandait a personne si l'aliment
-           vise etait commun ou celui du demandeur. Bob posait 1 g sur l'aliment
-           prive d'Alice, et Alice ne pouvait plus supprimer le sien.
+           vise etait celui du demandeur. Bob posait 1 g sur l'aliment d'Alice,
+           et Alice ne pouvait plus supprimer le sien.
 
            Au DEPOT, pas a l'application : le lot part en tache de fond, et un
            refus rendu une heure plus tard n'a plus personne devant l'ecran.

@@ -33,9 +33,9 @@ use Symfony\Component\Security\Core\User\UserInterface;
  * qu'une etiquette absente : on lui fait confiance.
  *
  * Decision du 14 septembre 2026 : les exercices personnels le deviennent
- * vraiment. La regle est « PUBLIC ou LE MIEN », et non « commun ou le mien »
- * comme pour Aliment — la nuance permet a un administrateur de publier un
- * exercice sans en effacer l'auteur.
+ * vraiment. La regle est « PUBLIC ou LE MIEN », et non « sans auteur ou le
+ * mien » — la nuance permet a un administrateur de publier un exercice sans
+ * en effacer l'auteur.
  *
  * Les 1338 exercices du catalogue importe sont `public = true` : ils restent
  * visibles de tous, sans migration de donnees.
@@ -83,7 +83,7 @@ final class FiltreExerciceTest extends TestCase
     /**
      * « AND » lie plus fort que « OR » : le bloc doit rester entier face a une
      * recherche ajoutee ensuite, sans quoi tout le catalogue public echapperait
-     * au filtre de recherche. Meme invariant que FiltreAliment.
+     * au filtre de recherche.
      */
     public function testLeORResteUnBlocFaceAUneRechercheAjouteeEnsuite(): void
     {
@@ -110,7 +110,7 @@ final class FiltreExerciceTest extends TestCase
 
     /**
      * Le temoin : ce filtre ne connait que les exercices. Applique a Aliment,
-     * il poserait un `public` sur une entite qui n'a pas la meme regle.
+     * il poserait un `public` sur une entite qui n'en a pas.
      */
     public function testUneAutreEntiteNEstPasTouchee(): void
     {
@@ -120,7 +120,7 @@ final class FiltreExerciceTest extends TestCase
         self::filtre(new Utilisateur())->applyToCollection($qb, self::generateur(), Aliment::class);
 
         self::assertSame($avant, $qb->getDQL(),
-            'ce filtre ne doit toucher que Exercice : Aliment releve de FiltreAliment');
+            'ce filtre ne doit toucher que Exercice : Aliment releve de FiltreProprietaire');
     }
 
     private static function filtre(?UserInterface $utilisateur): FiltreExercice

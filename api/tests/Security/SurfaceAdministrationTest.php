@@ -74,7 +74,7 @@ final class SurfaceAdministrationTest extends TestCase
      * `Utilisateur` n'y figure pas : ce n'est pas un catalogue, c'est le
      * proprietaire lui-meme, et ModeleExposeTest dit deja ce qui le protege.
      */
-    private const CATALOGUES_COMMUNS = ['Aliment', 'Emplacement', 'Exercice', 'ModeCuisson'];
+    private const CATALOGUES_COMMUNS = ['Emplacement', 'Exercice', 'ModeCuisson'];
 
     /**
      * LA SURFACE D'ADMINISTRATION, EXHAUSTIVE.
@@ -103,9 +103,6 @@ final class SurfaceAdministrationTest extends TestCase
         // le corriger. Ne pas transformer en ROLE_ADMIN seul.
         'Exercice::Patch',
         'FusionExercice::Post',
-
-        // --- catalogue des aliments : meme regle qu'Exercice::Patch
-        'Aliment::Patch',
 
         // --- les comptes
         'Utilisateur::Get',          // ou soi-meme
@@ -218,9 +215,9 @@ final class SurfaceAdministrationTest extends TestCase
      * compte renomme ou supprime la reference de tout le monde.
      *
      * La creation n'est pas couverte ici, et c'est delibere : elle est cadree
-     * par le PROCESSEUR, pas par l'expression — `AlimentProcessor` et
-     * `ExerciceProcessor` posent `creePar` sur un Post, ce qu'aucune lecture
-     * d'attribut ne peut verifier. Voir leurs tests dedies.
+     * par le PROCESSEUR, pas par l'expression — `ExerciceProcessor` pose
+     * `creePar` sur un Post, ce qu'aucune lecture d'attribut ne peut verifier.
+     * Voir son test dedie.
      */
     #[DataProvider('ecrituresSurUnCatalogueCommun')]
     public function testUneEcritureSurUnCatalogueCommunExigeLAdminOuLAuteur(

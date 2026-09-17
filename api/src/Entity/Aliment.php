@@ -22,7 +22,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
- * Referentiel COMMUN. Valeurs pour 100 g DU PRODUIT TEL QU'ON LE PESE — riz sec,
+ * Un aliment d'un compte. Valeurs pour 100 g DU PRODUIT TEL QU'ON LE PESE — riz sec,
  * viande crue, legume cru. C'est la regle 3 du projet, et il n'y a plus d'autre
  * etat : `ratio` n'annonce qu'un POIDS SERVI et n'entre dans aucune macro.
  *
@@ -30,14 +30,15 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
  *  - volaille  : valeurs crues, ratio 0.75 ; poisson 0.85 — ils PERDENT de l'eau
  *
  * CE COMMENTAIRE A DIT L'INVERSE JUSQU'AU 16 SEPTEMBRE 2026 : « feculents :
- * valeurs CUITES, ratio = cuit/sec (riz 3) ». C'etait la convention abolie par
- * `db/manuel/18-un-seul-etat.sql` — trois champs pour un seul fait, donc trois
- * facons de se contredire, et un compte qui mangeait jusqu'a trois fois trop de
- * glucides. Le code avait ete refait, pas ce docblock : celui que lit en
+ * valeurs CUITES, ratio = cuit/sec (riz 3) ». C'etait la convention abolie
+ * avec la colonne `etat_reference` — trois champs pour un seul fait, donc
+ * trois facons de se contredire, et un compte qui mangeait jusqu'a trois fois
+ * trop de glucides. Le code avait ete refait, pas ce docblock : celui que lit en
  * premier quiconque ecrit un import. Trouve par deux agents de controle le
  * meme jour.
  *
- * Tout le monde peut en creer ; personne ne peut en supprimer (integrite du stock).
+ * Il appartient toujours a un compte, et seul ce compte le voit : ses valeurs
+ * sont celles du produit que cette personne a achete.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'aliment')]
@@ -46,24 +47,18 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         new GetCollection(),
         new Get(),
         new Post(security: "is_granted('ROLE_USER')", processor: AlimentProcessor::class),
-        // Chacun corrige ses propres aliments ; l'administrateur reste seul
-        // a pouvoir toucher aux 50 de reference, qui n'appartiennent a personne.
-        // Meme processeur qu'a la creation, mais il regarde l'OPERATION et non
-        // l'etat du champ : `$operation instanceof Post`. Ce commentaire disait
-        // « il ne pose le proprietaire que s'il manque » -- la formulation exacte
-        // du bug M-01, ou corriger un aliment commun se l'appropriait et le
-        // retirait a tout le monde. Corrige le 14 septembre 2026, commentaire
-        // rectifie le 15. Il rattrape aussi le doublon de nom, aux deux
-        // operations.
+        // Chacun corrige et supprime ses propres aliments. `FiltreProprietaire`
+        // ne laisse de toute facon charger que les siens : l'expression le
+        // redit, pour qu'une regression du filtre ne suffise pas a ouvrir.
         new Patch(
-            security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user",
+            security: 'object.getUtilisateur() == user',
             processor: AlimentProcessor::class,
         ),
-        // Supprimer n'est possible que sur SES aliments. Un commun ne se
-        // supprime jamais : d'autres comptes s'en servent comme reference.
-        // Un compte lisant Grocy n'a rien ici — tout s'y passe dans Grocy.
+        // La suppression est refusee s'il en reste en stock : voir le
+        // processeur. Un compte lisant Grocy n'a rien ici — tout s'y passe
+        // dans Grocy.
         new Delete(
-            security: 'object.getCreePar() == user',
+            security: 'object.getUtilisateur() == user',
             processor: AlimentSuppressionProcessor::class,
         ),
     ],
@@ -73,7 +68,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     paginationItemsPerPage: 200,
 )]
 #[ApiFilter(SearchFilter::class, properties: ['nom' => 'ipartial', 'categorie' => 'exact', 'codeBarres' => 'exact'])]
-class Aliment
+class Aliment implements ProprieteUtilisateur
 {
     public const CATEGORIES = ['prot', 'fec', 'leg', 'ole', 'huile', 'lait', 'fruit', 'autre'];
 
@@ -85,18 +80,17 @@ class Aliment
     private ?int $id = null;
 
     /**
-     * Pas de « unique: true » ici : l'unicite n'est plus globale mais PAR
-     * PROPRIETAIRE, portee par deux index partiels que Doctrine ne sait pas
-     * exprimer (voir db/manuel/10-aliment-unicite-par-proprietaire.sql).
-     * Deux comptes peuvent nommer pareil ; un compte ne le peut pas deux fois.
+     * Pas de « unique: true » ici : l'unicite est PAR COMPTE, portee par
+     * l'index fonctionnel `aliment_nom_unique_par_compte` (utilisateur_id,
+     * lower(nom)), que Doctrine ne sait pas exprimer. Deux comptes peuvent
+     * nommer pareil ; un compte ne le peut pas deux fois.
      */
     #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank]
     /* PLAFONDS DE LONGUEUR — CONSTAT F-08, 15 SEPTEMBRE 2026.
        `POST /api/aliments` est ouvert a ROLE_USER, `nom` et `codeBarres` sont
        des `TEXT` : aucune borne, ni ici ni en base. Les deux plafonds sont
-       tires des donnees reelles — pire cas mesure sur les 50 aliments de
-       reference : nom 24 caracteres. Un code-barres EAN-13 en fait 13, un
+       tires des donnees reelles — pire cas mesure : nom 24 caracteres. Un code-barres EAN-13 en fait 13, un
        GTIN-14 quatorze ; 64 laisse la place aux formats exotiques sans
        laisser passer un fichier. Un plafond sous ce que la base porte deja
        rendrait la ligne existante inenregistrable au PATCH. */
@@ -157,16 +151,13 @@ class Aliment
     private ?string $codeBarres = null;
 
     #[ORM\Column(type: Types::TEXT, options: ['default' => 'manuel'])]
-    #[Assert\Choice(choices: ['manuel', 'openfoodfacts', 'reference'])]
+    #[Assert\Choice(choices: ['manuel', 'openfoodfacts'])]
     #[Groups(['aliment:lire'])]
     private string $source = 'manuel';
 
-    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => true])]
-    private bool $public = true;
-
     #[ORM\ManyToOne(targetEntity: Utilisateur::class)]
-    #[ORM\JoinColumn(name: 'cree_par', nullable: true, onDelete: 'SET NULL')]
-    private ?Utilisateur $creePar = null;
+    #[ORM\JoinColumn(name: 'utilisateur_id', nullable: false, onDelete: 'CASCADE')]
+    private ?Utilisateur $utilisateur = null;
 
     #[ORM\Column(name: 'cree_le', type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $creeLe;
@@ -222,10 +213,8 @@ class Aliment
     public function setCodeBarres(?string $v): self { $this->codeBarres = $v; return $this; }
     public function getSource(): string { return $this->source; }
     public function setSource(string $v): self { $this->source = $v; return $this; }
-    public function isPublic(): bool { return $this->public; }
-    public function setPublic(bool $v): self { $this->public = $v; return $this; }
-    public function getCreePar(): ?Utilisateur { return $this->creePar; }
-    public function setCreePar(?Utilisateur $u): self { $this->creePar = $u; return $this; }
+    public function getUtilisateur(): ?Utilisateur { return $this->utilisateur; }
+    public function setUtilisateur(?Utilisateur $utilisateur): self { $this->utilisateur = $utilisateur; return $this; }
     public function getCreeLe(): \DateTimeImmutable { return $this->creeLe; }
 
     /**

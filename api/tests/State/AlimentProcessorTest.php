@@ -10,98 +10,81 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Aliment;
 use App\Entity\Utilisateur;
 use App\State\AlimentProcessor;
+use App\State\ProprietaireProcessor;
+use Doctrine\DBAL\Driver\Exception as ExceptionDuPilote;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
- * CORRIGER UN ALIMENT COMMUN NE DOIT PAS SE L'APPROPRIER.
+ * Un aliment appartient au compte qui le cree, et un nom deja pris chez ce
+ * compte se dit en toutes lettres.
  *
- * CONSTAT M-01 DE L'AUDIT DU 7 SEPTEMBRE 2026.
- *
- * Le processeur posait le proprietaire « seulement s'il manque ». C'est juste
- * a la creation, et faux partout ailleurs : un aliment de reference a
- * precisement `creePar = NULL`. Quand l'administrateur corrigeait la valeur
- * nutritionnelle d'un des ~50 aliments communs, le processeur la lui
- * attribuait et posait `public = false` — `FiltreAliment` faisait alors
- * DISPARAITRE cet aliment du catalogue de tous les autres comptes.
- *
- * Ce n'etait pas une fuite mais une perte d'acces silencieuse a une donnee
- * partagee, declenchee par le geste le plus normal de l'administration. Aucun
- * ecran ne le disait.
- *
- * Le remede tient en un mot : l'OPERATION fait foi, pas l'etat du champ.
+ * La pose du proprietaire est celle de toutes les entites rattachees a un
+ * compte : `ProprietaireProcessor`, sur un Post, depuis le jeton et jamais
+ * depuis le corps de la requete. `AlimentProcessor` n'y ajoute qu'une chose :
+ * l'index `aliment_nom_unique_par_compte` ne se verifie qu'a l'insertion, et
+ * son refus doit arriver a l'ecran comme une phrase, pas comme un SQLSTATE.
  */
 final class AlimentProcessorTest extends TestCase
 {
-    public function testUnAlimentCreeAppartientAuCompteConnecteEtLuiResteConfidentiel(): void
+    public function testUnAlimentCreeAppartientAuCompteConnecte(): void
     {
         $alice = new Utilisateur();
         $aliment = (new Aliment())->setNom('Skyr maison');
 
         $recus = [];
-        self::processeur($alice, $recus)->process($aliment, new Post());
+        $rendu = self::processeur($alice, $recus)->process($aliment, new Post());
 
-        self::assertSame($alice, $aliment->getCreePar(),
+        self::assertSame($alice, $aliment->getUtilisateur(),
             'un aliment saisi doit revenir a son auteur');
-        self::assertFalse($aliment->isPublic(),
-            'sur des valeurs nutritionnelles, l\'erreur de l\'un ne doit pas fausser la diete des autres');
         self::assertSame([$aliment], $recus,
             'le processeur doit toujours passer la main a la persistance');
+        self::assertSame($aliment, $rendu);
     }
 
-    /**
-     * LE CONSTAT M-01 LUI-MEME.
-     */
-    public function testCorrigerUnAlimentCommunNeLeRetirePasDuCatalogue(): void
-    {
-        $commun = (new Aliment())->setNom('Riz basmati');   // creePar NULL, public true
-
-        $recus = [];
-        self::processeur(new Utilisateur(), $recus)->process($commun, new Patch());
-
-        self::assertNull($commun->getCreePar(),
-            'corriger un aliment de reference ne doit pas se l\'approprier');
-        self::assertTrue($commun->isPublic(),
-            'l\'aliment doit rester dans le catalogue de tous les comptes');
-    }
-
-    /**
-     * Le temoin : modifier son propre aliment ne doit rien changer non plus.
-     * Sans lui, un processeur qui ne ferait plus RIEN passerait le test
-     * precedent sans qu'on s'en apercoive.
-     */
-    public function testModifierSonPropreAlimentNeChangeNiAuteurNiConfidentialite(): void
+    public function testModifierSonAlimentNeChangePasDeProprietaire(): void
     {
         $alice = new Utilisateur();
-        $sien = (new Aliment())->setNom('Skyr maison')->setCreePar($alice)->setPublic(false);
+        $sien = (new Aliment())->setNom('Skyr maison')->setUtilisateur($alice);
 
         $recus = [];
-        self::processeur($alice, $recus)->process($sien, new Patch());
+        self::processeur(new Utilisateur(), $recus)->process($sien, new Patch());
 
-        self::assertSame($alice, $sien->getCreePar());
-        self::assertFalse($sien->isPublic());
+        self::assertSame($alice, $sien->getUtilisateur(),
+            'seule la creation pose le proprietaire');
     }
 
-    public function testSansCompteConnecteAucunAuteurNEstInvente(): void
+    public function testUnNomDejaPrisSeDitEnToutesLettres(): void
     {
-        $aliment = (new Aliment())->setNom('Orphelin');
+        $aliment = (new Aliment())->setNom('Riz blanc, cru');
 
         $recus = [];
-        self::processeur(null, $recus)->process($aliment, new Post());
+        $refus = null;
+        try {
+            self::processeur(new Utilisateur(), $recus, doublon: true)->process($aliment, new Post());
+        } catch (\Throwable $e) {
+            $refus = $e;
+        }
 
-        self::assertNull($aliment->getCreePar(),
-            'aucun auteur ne doit etre pose quand personne n\'est connecte');
+        self::assertInstanceOf(UnprocessableEntityHttpException::class, $refus,
+            'un doublon de nom est une erreur de saisie (422), pas une panne (500)');
+        self::assertStringContainsString('« Riz blanc, cru »', $refus->getMessage());
     }
 
     /**
      * @param list<mixed> $recus les objets reellement transmis a la persistance
      */
-    private static function processeur(?UserInterface $utilisateur, array &$recus): AlimentProcessor
+    private static function processeur(?Utilisateur $utilisateur, array &$recus, bool $doublon = false): AlimentProcessor
     {
         $persistance = self::createStub(ProcessorInterface::class);
         $persistance->method('process')->willReturnCallback(
-            static function (mixed $donnee) use (&$recus): mixed {
+            static function (mixed $donnee) use (&$recus, $doublon): mixed {
+                if ($doublon) {
+                    throw new UniqueConstraintViolationException(
+                        self::createStub(ExceptionDuPilote::class), null);
+                }
                 $recus[] = $donnee;
 
                 return $donnee;
@@ -110,6 +93,6 @@ final class AlimentProcessorTest extends TestCase
         $security = self::createStub(Security::class);
         $security->method('getUser')->willReturn($utilisateur);
 
-        return new AlimentProcessor($persistance, $security);
+        return new AlimentProcessor(new ProprietaireProcessor($persistance, $security));
     }
 }

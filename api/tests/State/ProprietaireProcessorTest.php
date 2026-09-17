@@ -8,7 +8,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\Aliment;
+use App\Entity\Emplacement;
 use App\Entity\Seance;
 use App\Entity\Utilisateur;
 use App\State\ProprietaireProcessor;
@@ -72,13 +72,13 @@ final class ProprietaireProcessorTest extends TestCase
      */
     public function testUneEntiteSansProprietaireTraverseIntacte(): void
     {
-        $aliment = new Aliment();
+        $emplacement = new Emplacement();
 
         $recus = [];
-        self::processeur(new Utilisateur(), $recus)->process($aliment, self::operation());
+        self::processeur(new Utilisateur(), $recus)->process($emplacement, self::operation());
 
-        self::assertSame([$aliment], $recus,
-            'un Aliment n\'est pas une ProprieteUtilisateur : il doit etre persiste tel quel');
+        self::assertSame([$emplacement], $recus,
+            'un Emplacement n\'est pas une ProprieteUtilisateur : il doit etre persiste tel quel');
     }
 
     /**

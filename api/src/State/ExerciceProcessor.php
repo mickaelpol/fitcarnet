@@ -56,8 +56,7 @@ final readonly class ExerciceProcessor implements ProcessorInterface
            un exercice du CATALOGUE COMMUN a precisement `creePar = NULL`. Le
            PATCH par lequel un administrateur renseigne une video se serait
            approprie l'exercice, et `public = false` l'aurait fait disparaitre
-           du catalogue de tout le monde. C'est le constat M-01, deja survenu
-           sur AlimentProcessor — le meme piege, a dix lignes de distance. */
+           du catalogue de tout le monde. */
         if ($data instanceof Exercice && $operation instanceof Post) {
             $utilisateur = $this->security->getUser();
             if ($utilisateur instanceof Utilisateur) {

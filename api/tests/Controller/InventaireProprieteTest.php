@@ -24,7 +24,7 @@ use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
  *
  * CONSTAT E-01 DE L'AUDIT DU 7 SEPTEMBRE 2026.
  *
- * `POST /mon-frigo/stock` verifie que l'aliment vise est commun ou celui du
+ * `POST /mon-frigo/stock` verifie que l'aliment vise est celui du
  * demandeur — `alimentAccessible()`, ajoute expres pour fermer cette faille.
  * Son jumeau `POST /mon-frigo/inventaire` fait le meme travail par un autre
  * chemin et n'a jamais recu le meme controle : il ne valide que le prefixe
@@ -104,7 +104,7 @@ final class InventaireProprieteTest extends TestCase
                     return 7;   // l'identifiant du lot depose
                 }
 
-                // « cet aliment est-il commun, ou le mien ? »
+                // « cet aliment est-il le mien ? »
                 return $alimentAccessible ? 1 : false;
             });
         $cnx->method('fetchFirstColumn')->willReturnCallback(

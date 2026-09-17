@@ -20,14 +20,6 @@ services:
             - { name: api_platform.doctrine.orm.query_extension.collection, priority: 100 }
             - { name: api_platform.doctrine.orm.query_extension.item, priority: 100 }
 
-    # Référentiel commun : on ne voit que les aliments communs et les siens.
-    # FiltreProprietaire ne peut pas s'en charger — le propriétaire d'un
-    # aliment est facultatif, la règle est « commun OU le mien ».
-    App\Doctrine\FiltreAliment:
-        tags:
-            - { name: api_platform.doctrine.orm.query_extension.collection, priority: 100 }
-            - { name: api_platform.doctrine.orm.query_extension.item, priority: 100 }
-
     # Catalogue d'exercices : « public OU le mien ». La règle porte sur
     # `public` et non sur l'absence d'auteur — un administrateur peut ainsi
     # publier l'exercice de quelqu'un sans en effacer la paternité.

@@ -6,6 +6,7 @@ namespace App\Tests\Doctrine;
 
 use App\Doctrine\FiltreProprietaire;
 use App\Entity\Aliment;
+use App\Entity\Exercice;
 use App\Entity\Seance;
 use App\Entity\Utilisateur;
 use Doctrine\ORM\EntityManagerInterface;
@@ -96,19 +97,38 @@ final class FiltreProprietaireTest extends TestCase
     }
 
     /**
+     * Un aliment porte les valeurs du produit que SON proprietaire a achete :
+     * aucun autre compte ne le lit, ni en liste ni par son identifiant.
+     */
+    public function testUnAlimentNEstLuQueParSonProprietaire(): void
+    {
+        $alice = new Utilisateur();
+
+        foreach (['collection', 'item'] as $portee) {
+            $qb = self::requete(Aliment::class);
+            'collection' === $portee
+                ? self::filtre($alice)->applyToCollection($qb, self::generateur(), Aliment::class)
+                : self::filtre($alice)->applyToItem($qb, self::generateur(), Aliment::class, ['id' => 1]);
+
+            self::assertStringContainsString('o.utilisateur = :utilisateur_courant', $qb->getDQL(),
+                "{$portee} : les aliments d'un compte ne doivent etre lus que par lui");
+        }
+    }
+
+    /**
      * Le temoin. Sans lui, un filtre qui restreindrait TOUT ressemblerait a une
-     * protection correcte : `Aliment` a son propre filtre, « commun OU le mien »
-     * (voir FiltreAlimentTest), et celui-ci ne doit pas s'en meler.
+     * protection correcte : `Exercice` a son propre filtre, « public OU le mien »
+     * (voir FiltreExerciceTest), et celui-ci ne doit pas s'en meler.
      */
     public function testUneEntiteNonMarqueeNEstPasTouchee(): void
     {
-        $qb = self::requete(Aliment::class);
+        $qb = self::requete(Exercice::class);
         $avant = $qb->getDQL();
 
-        self::filtre(new Utilisateur())->applyToCollection($qb, self::generateur(), Aliment::class);
+        self::filtre(new Utilisateur())->applyToCollection($qb, self::generateur(), Exercice::class);
 
         self::assertSame($avant, $qb->getDQL(),
-            'Aliment n\'est pas une ProprieteUtilisateur : ce filtre doit le laisser passer');
+            'Exercice n\'est pas une ProprieteUtilisateur : ce filtre doit le laisser passer');
     }
 
     private static function filtre(?UserInterface $utilisateur): FiltreProprietaire

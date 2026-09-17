@@ -37,10 +37,6 @@ final class ModeleExposeTest extends TestCase
      * proprietaire, et voila ce qui la protege a la place ».
      */
     private const DEROGATIONS = [
-        'Aliment' => 'Proprietaire FACULTATIF : les ~50 aliments de reference '
-            . "n'appartiennent a personne. FiltreAliment applique la regle "
-            . '« commun OU le mien » ; FiltreProprietaire ne saurait pas le faire.',
-
         'Emplacement' => 'Referentiel commun en lecture seule (GetCollection + Get). '
             . 'Aucune donnee personnelle : des noms de bacs et de placards.',
 
@@ -60,7 +56,7 @@ final class ModeleExposeTest extends TestCase
         // toujours pas `ProprieteUtilisateur`, parce que la regle n'est pas
         // « le mien » mais « public OU le mien » — un exercice peut etre
         // publie ET attribue, ce que `FiltreProprietaire` ne sait pas dire.
-        'Exercice' => 'Proprietaire FACULTATIF, comme Aliment, mais la regle porte sur '
+        'Exercice' => 'Proprietaire FACULTATIF, et la regle porte sur '
             . '`public` et non sur l\'absence d\'auteur : FiltreExercice applique '
             . '« public OU le mien », ce qui autorise un exercice publie SANS effacer '
             . 'sa paternite. FiltreProprietaire ne saurait pas l\'exprimer.',
@@ -246,23 +242,34 @@ final class ModeleExposeTest extends TestCase
      * promesse mensongere et ouvert un blocage, faute d'avoir regarde le
      * chemin d'ECRITURE en meme temps que celui de lecture.
      *
-     * La regle retenue est celle d'`Aliment`, qui vit ainsi depuis toujours --
-     * pas un motif invente pour l'occasion.
      */
     public function testUnAuteurPeutCorrigerCeQuIlACree(): void
     {
-        foreach ([Aliment::class, Exercice::class] as $classe) {
-            $nom = (new \ReflectionClass($classe))->getShortName();
-            $expressions = self::expressionsDeSecurite($classe);
-            $patch = $expressions['Patch'] ?? null;
+        $patch = self::expressionsDeSecurite(Exercice::class)['Patch'] ?? null;
 
-            self::assertNotNull($patch, "{$nom} : aucune regle de securite sur le Patch.");
-            self::assertStringContainsString(
-                'object.getCreePar() == user', $patch,
-                "{$nom} : l'auteur d'une donnee doit pouvoir la corriger. Sans cela, "
-                . 'un catalogue filtre la rend inmodifiable par tout le monde -- son '
-                . "auteur n'a pas le droit, et l'administrateur ne la voit plus.");
-        }
+        self::assertNotNull($patch, 'Exercice : aucune regle de securite sur le Patch.');
+        self::assertStringContainsString(
+            'object.getCreePar() == user', $patch,
+            "Exercice : l'auteur d'une donnee doit pouvoir la corriger. Sans cela, "
+            . 'un catalogue filtre la rend inmodifiable par tout le monde -- son '
+            . "auteur n'a pas le droit, et l'administrateur ne la voit plus.");
+    }
+
+    /**
+     * Un aliment porte les valeurs du produit que SON proprietaire a achete :
+     * il est filtre comme toute donnee d'un compte, sans derogation.
+     */
+    public function testUnAlimentEstUneDonneeDeSonCompte(): void
+    {
+        self::assertTrue(
+            (new \ReflectionClass(Aliment::class))->implementsInterface(ProprieteUtilisateur::class),
+            'Aliment doit implementer ProprieteUtilisateur : sans cela, FiltreProprietaire '
+            . 'ne le filtre pas et chaque compte lit les aliments de tous les autres.');
+
+        self::assertStringContainsString(
+            'object.getUtilisateur() == user',
+            self::expressionsDeSecurite(Aliment::class)['Patch'] ?? '',
+            'seul le proprietaire d\'un aliment le corrige');
     }
 
     /**

@@ -66,10 +66,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 
            CE QUE CE N'ETAIT PAS : une fuite. `ExerciceProcessor` posait deja
            `creePar` et `public = false`, donc un exercice cree par un compte
-           ordinaire restait invisible des autres, exactement comme un aliment.
-           `Aliment::Post` reste d'ailleurs a ROLE_USER pour cette raison — la
-           difference entre les deux catalogues n'est pas de securite, elle est
-           d'usage : l'ecran des aliments cree, celui des exercices non.
+           ordinaire restait invisible des autres. `Aliment::Post` reste a
+           ROLE_USER : la difference n'est pas de securite, elle est d'usage —
+           l'ecran des aliments cree, celui des exercices non.
 
            EN SUSPENS, ET C'EST VOLONTAIRE : `ExerciceProcessor` continue de
            poser `public = false`. Un administrateur qui cree ici obtient donc
@@ -96,8 +95,7 @@ use Symfony\Component\Validator\Constraints as Assert;
                E8 avait rendu les exercices personnels vraiment prives ; le Patch etant
                reserve a ROLE_ADMIN, plus personne ne pouvait les corriger : l'auteur
                n'avait pas le droit, et l'administrateur ne les voyait plus, `FiltreExercice`
-               etant une extension Doctrine qui ignore les roles. Meme regle qu'`Aliment`,
-               qui vit ainsi depuis toujours. */
+               etant une extension Doctrine qui ignore les roles. */
             security: "is_granted('ROLE_ADMIN') or object.getCreePar() == user",
             processor: ExerciceProcessor::class,
         ),

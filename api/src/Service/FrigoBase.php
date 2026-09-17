@@ -11,12 +11,9 @@ use Doctrine\DBAL\Connection;
 /**
  * Lit les aliments et les stocks depuis la base fitcarnet.
  *
- * Deux origines cohabitent, comme pour les exercices :
- *   - les aliments COMMUNS, verifies, disponibles pour tous ;
- *   - ceux que l'utilisateur a crees, qui lui restent PRIVES.
- *
- * Ce cloisonnement est volontaire : sur des valeurs nutritionnelles, l'erreur
- * d'un utilisateur fausserait silencieusement la diete des autres.
+ * Un aliment appartient a un compte, et le frigo n'en montre que les siens :
+ * sur des valeurs nutritionnelles, l'erreur d'un utilisateur fausserait
+ * silencieusement la diete des autres.
  */
 final readonly class FrigoBase
 {
@@ -40,12 +37,7 @@ final readonly class FrigoBase
                     ON  s.aliment_id = a.id
                     AND s.utilisateur_id = :utilisateur
              LEFT   JOIN emplacement e ON e.id = s.emplacement_id
-             -- UNIQUEMENT ses aliments. Les 50 de reference restent lisibles
-             -- par /api/aliments, ou ils servent de point de depart a une
-             -- creation, mais ils n encombrent pas le frigo : on y verrait
-             -- des aliments qu on n a jamais mis, et creer sa propre version
-             -- d un commun donnerait deux lignes pour la meme chose.
-             WHERE  a.cree_par = :utilisateur
+             WHERE  a.utilisateur_id = :utilisateur
              GROUP  BY a.id
              ORDER  BY a.nom',
             ['utilisateur' => $utilisateur->getId()],
@@ -64,9 +56,9 @@ final readonly class FrigoBase
             /* Il y avait ici une colonne `etat_reference`, lue puis
                transmise. Elle disait a quel etat se rapportaient les macros
                ci-dessus — et elle pouvait dire le contraire de ce que Grocy
-               deduisait pour le meme aliment. Elle a ete supprimee de la base
-               par db/manuel/18-un-seul-etat.sql : les valeurs decrivent
-               desormais toujours le produit tel qu'on le pese. */
+               deduisait pour le meme aliment. Elle a ete supprimee de la
+               base : les valeurs decrivent desormais toujours le produit tel
+               qu'on le pese. */
             stock: (float) $l['quantite'],
             emplacement: null !== $l['emplacement'] ? (string) $l['emplacement'] : null,
             peseeAvant: null !== $l['pesee_avant'] ? (float) $l['pesee_avant'] : null,
@@ -79,7 +71,7 @@ final readonly class FrigoBase
 
     /** Fixe la quantite d'un aliment dans le frigo de l'utilisateur. */
     /**
-     * CES ALIMENTS SONT-ILS COMMUNS, OU LES MIENS ?
+     * CES ALIMENTS SONT-ILS LES MIENS ?
      *
      * LA REGLE N'EXISTE QU'ICI, ET C'EST TOUT L'INTERET. Elle vivait dans
      * `FrigoController`, devant une seule de ses routes ; sa jumelle
@@ -102,7 +94,7 @@ final readonly class FrigoBase
 
         return \array_map('\intval', $this->cnx->fetchFirstColumn(
             'SELECT id FROM aliment
-              WHERE id IN (:a) AND (cree_par IS NULL OR cree_par = :u)',
+              WHERE id IN (:a) AND utilisateur_id = :u',
             ['a' => $idsAliments, 'u' => $utilisateur->getId()],
             ['a' => ArrayParameterType::INTEGER],
         ));

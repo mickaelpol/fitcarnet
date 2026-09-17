@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Validation;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
- * LE CATALOGUE COMMUN EST OUVERT EN ECRITURE : IL DOIT AU MOINS ETRE BORNE.
+ * DES CHAMPS TEXTE OUVERTS EN ECRITURE : ILS DOIVENT AU MOINS ETRE BORNES.
  *
  * CONSTAT F-08 DE L'AUDIT DU 7 SEPTEMBRE 2026.
  *
@@ -30,7 +30,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * sur un exercice importe echouerait sur un champ que personne n'a touche, en
  * designant un champ sans rapport avec le geste. C'est pourquoi les plafonds
  * ont ete tires des donnees REELLES, mesurees le 15 septembre 2026 sur les
- * 1338 exercices importes et les 50 aliments de reference :
+ * 1338 exercices importes et sur les aliments en base :
  *
  *   nom 67 · nomFr 90 · instructions 975 · musclesSecondaires 56
  *   equipement 20 · muscleCible 21 · partieCorps 10 · formatPrescrit 18
@@ -45,7 +45,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * repetes qui sert ici n'est pas une URL, et `Assert\Url` la refuserait pour
  * la mauvaise raison.
  */
-final class BornesDuCatalogueCommunTest extends TestCase
+final class BornesDesChampsTexteTest extends TestCase
 {
     /**
      * Les plafonds attendus, et le pire cas reellement observe en base.
@@ -70,7 +70,7 @@ final class BornesDuCatalogueCommunTest extends TestCase
      * @param class-string $classe
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('champsBornes')]
-    public function testUnChampDuCatalogueCommunRefuseUnTexteDemesure(
+    public function testUnChampTexteRefuseUnTexteDemesure(
         string $classe,
         string $champ,
         int $plafond,
@@ -91,7 +91,7 @@ final class BornesDuCatalogueCommunTest extends TestCase
      * @param class-string $classe
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('champsBornes')]
-    public function testUnChampDuCatalogueCommunAccepteUnTexteDeTailleNormale(
+    public function testUnChampTexteAccepteUnTexteDeTailleNormale(
         string $classe,
         string $champ,
         int $plafond,
