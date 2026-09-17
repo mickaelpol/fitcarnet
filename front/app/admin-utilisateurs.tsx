@@ -10,6 +10,7 @@ import {
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { Confirmer } from '@/composants/confirmer';
 import { C, E, P, R, T } from '@/theme';
+import { contenuEnMots, enumeration } from '@/calcul/contenuCompte';
 
 /**
  * ÉCRAN D'ADMINISTRATION : inviter quelqu'un.
@@ -202,8 +203,8 @@ export default function AdminUtilisateurs() {
         <Discret style={s.aide}>
           Désactiver est <Texte style={{ color: C.vif }}>réversible</Texte> : le
           carnet reste intact et la personne le retrouve à la réactivation.
-          Supprimer ne l’est pas — séances, séries, plans et objectifs partent
-          avec le compte.
+          Supprimer ne l’est pas — séances, séries, plans, objectifs, aliments
+          et stock partent avec le compte.
         </Discret>
 
         {(comptes.data ?? []).map((c) => (
@@ -226,10 +227,7 @@ export default function AdminUtilisateurs() {
 
             <Discret style={s.aide} numberOfLines={1}>{c.email}</Discret>
             <Discret style={s.aide}>
-              {c.contenu.seances} séance{c.contenu.seances > 1 ? 's' : ''}
-              {' · '}{c.contenu.series} série{c.contenu.series > 1 ? 's' : ''}
-              {' · '}{c.contenu.modeles} modèle{c.contenu.modeles > 1 ? 's' : ''}
-              {' · '}{c.contenu.plans} plan{c.contenu.plans > 1 ? 's' : ''}
+              {contenuEnMots(c.contenu).join(' · ')}
             </Discret>
 
             {/* SON PROPRE COMPTE N'A PAS DE BOUTONS.
@@ -290,10 +288,8 @@ export default function AdminUtilisateurs() {
         visible={aSupprimer !== null}
         titre={`Supprimer le compte de ${aSupprimer?.nom ?? ''} ?`}
         message={aSupprimer === null ? '' : [
-          `${aSupprimer.contenu.seances} séance(s), ${aSupprimer.contenu.series} série(s), `,
-          `${aSupprimer.contenu.modeles} modèle(s) et ${aSupprimer.contenu.plans} plan(s) `,
+          `${enumeration(contenuEnMots(aSupprimer.contenu))} `,
           'seront effacés définitivement. Rien ne se restaure sans une sauvegarde. ',
-          'Ses aliments et son stock partent avec lui. ',
           'Si tu veux seulement lui retirer l’accès, désactive plutôt : le carnet est conservé.',
         ].join('')}
         onConfirmer={() => {

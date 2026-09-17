@@ -57,6 +57,9 @@ final class ComptesController extends AbstractController
      * Les compteurs ne sont pas decoratifs : ce sont eux qui rendent la
      * suppression pensable. « Supprimer Marie » ne veut rien dire ;
      * « supprimer Marie et ses 34 seances » se decide.
+     *
+     * Aliments et stock y sont depuis le 17 septembre 2026 : ils partent avec
+     * le compte, et un compte sans seance peut avoir un frigo plein.
      */
     #[Route('/comptes', methods: ['GET'])]
     public function lister(): JsonResponse
@@ -66,6 +69,8 @@ final class ComptesController extends AbstractController
                     (SELECT count(*) FROM seance     s WHERE s.utilisateur_id = u.id) AS seances,
                     (SELECT count(*) FROM modele     m WHERE m.utilisateur_id = u.id) AS modeles,
                     (SELECT count(*) FROM plan_repas p WHERE p.utilisateur_id = u.id) AS plans,
+                    (SELECT count(*) FROM aliment    a WHERE a.utilisateur_id = u.id) AS aliments,
+                    (SELECT count(*) FROM stock      k WHERE k.utilisateur_id = u.id) AS stock,
                     (SELECT count(*) FROM serie sr
                        JOIN seance_exercice se ON se.id = sr.seance_exercice_id
                        JOIN seance s2 ON s2.id = se.seance_id
@@ -97,6 +102,8 @@ final class ComptesController extends AbstractController
                         'series' => (int) $l['series'],
                         'modeles' => (int) $l['modeles'],
                         'plans' => (int) $l['plans'],
+                        'aliments' => (int) $l['aliments'],
+                        'stock' => (int) $l['stock'],
                     ],
                 ];
             }, $lignes),

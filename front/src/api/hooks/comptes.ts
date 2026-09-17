@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../client';
+import type { ContenuCompte } from '../../calcul/contenuCompte';
 
 /**
  * UNE INVITATION, VUE DE L'ÉCRAN D'ADMINISTRATION.
@@ -107,7 +108,8 @@ export interface Compte {
   creeLe: string;
   /** ce compte est celui de l'administrateur qui regarde l'écran */
   moi: boolean;
-  contenu: { seances: number; series: number; modeles: number; plans: number };
+  /** ce que la suppression détruirait ; voir `calcul/contenuCompte.ts` */
+  contenu: ContenuCompte;
 }
 
 export const useComptes = () =>
@@ -136,7 +138,7 @@ export function useActiverCompte() {
   });
 }
 
-/** Supprimer. Emporte séances, séries, plans, cibles et habitudes. */
+/** Supprimer. Emporte séances, séries, plans, cibles, habitudes, aliments et stock. */
 export function useSupprimerCompte() {
   const qc = useQueryClient();
 
