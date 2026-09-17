@@ -96,6 +96,14 @@ ALTER TABLE cible        DROP CONSTRAINT IF EXISTS cible_valeurs_positives;
 ALTER TABLE stock        DROP CONSTRAINT IF EXISTS stock_quantite_positive;
 ALTER TABLE serie        DROP CONSTRAINT IF EXISTS serie_valeurs_positives;
 ALTER TABLE modele_serie DROP CONSTRAINT IF EXISTS modele_serie_valeurs_positives;
+-- La base d'avant la migration 36 portait aussi le CHECK écrit dans la
+-- colonne `quantite`, doublon de `stock_quantite_positive` (constat 02#14).
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stock_quantite_check') THEN
+        ALTER TABLE stock ADD CONSTRAINT stock_quantite_check CHECK (quantite >= 0);
+    END IF;
+END $$;
 SQL
 
 # ------------------------------------------------ retour avant la migration 35
@@ -257,6 +265,21 @@ restantes=$(psql_ -tAc "
     SELECT (SELECT count(*) FROM aliment WHERE kcal_100 < 0 OR prot_100 < 0 OR gluc_100 < 0 OR lip_100 < 0)
          + (SELECT count(*) FROM cible   WHERE kcal < 0 OR prot < 0 OR gluc < 0 OR lip < 0)
          + (SELECT count(*) FROM serie   WHERE reps < 0 OR poids < 0);")
+
+# ------------------------------------------------ contraintes en double
+# Deux CHECK identiques sur la même colonne ne protègent pas deux fois : ils
+# se contredisent le jour où l'on en change un seul. Constat 02#14.
+doublons=$(psql_ -tAc "
+    SELECT count(*) FROM (
+        SELECT conrelid, pg_get_constraintdef(oid) FROM pg_constraint
+         WHERE contype = 'c' AND connamespace = 'public'::regnamespace
+         GROUP BY 1, 2 HAVING count(*) > 1) d;")
+if [[ "$doublons" != "0" ]]; then
+    rouge "  ✗ $doublons contrainte(s) CHECK en double après les migrations"
+    manquantes=$((manquantes + doublons))
+else
+    gris "  ✓ aucune contrainte CHECK en double"
+fi
 
 # ------------------------------------------ stock sur l'aliment d'un autre
 # La ligne étrangère doit être partie, la légitime restée — et la base doit

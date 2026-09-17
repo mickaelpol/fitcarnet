@@ -173,7 +173,9 @@ CREATE TABLE stock (
     utilisateur_id UUID     NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
     aliment_id     BIGINT   NOT NULL,
     emplacement_id SMALLINT NOT NULL REFERENCES emplacement(id),
-    quantite       NUMERIC(9,2) NOT NULL DEFAULT 0 CHECK (quantite >= 0),  -- en grammes
+    -- En grammes. Positive ou nulle : c'est `stock_quantite_positive`, plus bas,
+    -- qui le garantit — un second CHECK écrit ici le doublait (constat 02#14).
+    quantite       NUMERIC(9,2) NOT NULL DEFAULT 0,
     peremption     DATE,
     maj_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (utilisateur_id, aliment_id, emplacement_id),
