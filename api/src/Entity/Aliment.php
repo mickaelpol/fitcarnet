@@ -104,21 +104,32 @@ class Aliment implements ProprieteUtilisateur
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $categorie = 'autre';
 
+    /* LES QUATRE MACROS SONT OBLIGATOIRES, ET UN ZÉRO SE DIT — 17 SEPTEMBRE 2026.
+       Elles valaient `'0'` par défaut : une clé absente du corps de
+       `POST /api/aliments` devenait un zéro enregistré, sans un mot (règle 6).
+       Elles partent désormais de `null`, et `NotNull` refuse l'absence en 422,
+       avec le même conseil que l'écran. Voir `AlimentMacrosObligatoiresTest`. */
     #[ORM\Column(name: 'kcal_100', type: Types::DECIMAL, precision: 7, scale: 2)]
+    #[Assert\NotNull(message: self::MACRO_ABSENTE)]
     #[Assert\PositiveOrZero]
-    private string $kcal100 = '0';
+    private ?string $kcal100 = null;
 
     #[ORM\Column(name: 'prot_100', type: Types::DECIMAL, precision: 6, scale: 2)]
+    #[Assert\NotNull(message: self::MACRO_ABSENTE)]
     #[Assert\PositiveOrZero]
-    private string $prot100 = '0';
+    private ?string $prot100 = null;
 
     #[ORM\Column(name: 'gluc_100', type: Types::DECIMAL, precision: 6, scale: 2)]
+    #[Assert\NotNull(message: self::MACRO_ABSENTE)]
     #[Assert\PositiveOrZero]
-    private string $gluc100 = '0';
+    private ?string $gluc100 = null;
 
     #[ORM\Column(name: 'lip_100', type: Types::DECIMAL, precision: 6, scale: 2)]
+    #[Assert\NotNull(message: self::MACRO_ABSENTE)]
     #[Assert\PositiveOrZero]
-    private string $lip100 = '0';
+    private ?string $lip100 = null;
+
+    private const MACRO_ABSENTE = 'Valeur manquante : écris 0 si l’aliment n’en contient pas.';
 
     /**
      * Fibres pour 100 g, facultatif. Convention europeenne : comptees 2 kcal/g
@@ -187,17 +198,17 @@ class Aliment implements ProprieteUtilisateur
     public function getCategorie(): string { return $this->categorie; }
     public function setCategorie(string $v): self { $this->categorie = $v; return $this; }
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
-    public function getKcal100(): float { return (float) $this->kcal100; }
-    public function setKcal100(float|string $v): self { $this->kcal100 = (string) $v; return $this; }
+    public function getKcal100(): ?float { return null !== $this->kcal100 ? (float) $this->kcal100 : null; }
+    public function setKcal100(float|string|null $v): self { $this->kcal100 = null !== $v ? (string) $v : null; return $this; }
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
-    public function getProt100(): float { return (float) $this->prot100; }
-    public function setProt100(float|string $v): self { $this->prot100 = (string) $v; return $this; }
+    public function getProt100(): ?float { return null !== $this->prot100 ? (float) $this->prot100 : null; }
+    public function setProt100(float|string|null $v): self { $this->prot100 = null !== $v ? (string) $v : null; return $this; }
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
-    public function getGluc100(): float { return (float) $this->gluc100; }
-    public function setGluc100(float|string $v): self { $this->gluc100 = (string) $v; return $this; }
+    public function getGluc100(): ?float { return null !== $this->gluc100 ? (float) $this->gluc100 : null; }
+    public function setGluc100(float|string|null $v): self { $this->gluc100 = null !== $v ? (string) $v : null; return $this; }
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
-    public function getLip100(): float { return (float) $this->lip100; }
-    public function setLip100(float|string $v): self { $this->lip100 = (string) $v; return $this; }
+    public function getLip100(): ?float { return null !== $this->lip100 ? (float) $this->lip100 : null; }
+    public function setLip100(float|string|null $v): self { $this->lip100 = null !== $v ? (string) $v : null; return $this; }
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     public function getFibres100(): ?float { return null !== $this->fibres100 ? (float) $this->fibres100 : null; }
     public function setFibres100(float|string|null $v): self { $this->fibres100 = null !== $v ? (string) $v : null; return $this; }

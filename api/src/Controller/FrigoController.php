@@ -227,14 +227,29 @@ final class FrigoController extends AbstractController
             return $this->json(['erreur' => 'Le ratio doit être positif.'], 422);
         }
 
+        /* UNE MACRO ABSENTE N'EST PAS UN ZÉRO (règle 6). Jusqu'au 17 septembre
+           2026, `?? 0` écrivait dans Grocy un zéro que personne n'avait donné ;
+           c'est le jumeau de la correction faite le même jour sur
+           `Aliment` (NotNull). Voir `ValeursGrocyObligatoiresTest`. */
+        $macros = [];
+        foreach (['prot100', 'gluc100', 'lip100'] as $cle) {
+            $valeur = $donnees[$cle] ?? null;
+            if (!\is_numeric($valeur) || (float) $valeur < 0) {
+                return $this->json([
+                    'erreur' => 'Protéines, glucides et lipides sont obligatoires : écris 0 si l’aliment n’en contient pas.',
+                ], 422);
+            }
+            $macros[$cle] = (float) $valeur;
+        }
+
         try {
             $this->grocy->enregistrerValeurs(
                 $idProduit,
                 categorie: $categorie,
                 kcal100: $kcal100,
-                prot100: (float) ($donnees['prot100'] ?? 0),
-                gluc100: (float) ($donnees['gluc100'] ?? 0),
-                lip100: (float) ($donnees['lip100'] ?? 0),
+                prot100: $macros['prot100'],
+                gluc100: $macros['gluc100'],
+                lip100: $macros['lip100'],
                 fibres100: self::nombreOuNull($donnees['fibres100'] ?? null),
                 ratio: $ratio,
                 peseeAvant: self::nombreOuNull($donnees['peseeAvant'] ?? null),
