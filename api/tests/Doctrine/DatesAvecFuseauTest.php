@@ -51,10 +51,25 @@ final class DatesAvecFuseauTest extends TestCase
         'JetonRafraichissement::vuLe',
     ];
 
-    public function testAucuneColonneAvecFuseauNEstDeclareeSansFuseau(): void
+    /**
+     * TOUTE COLONNE QUI PORTE UNE HEURE PASSE PAR LE TYPE DU PROJET.
+     *
+     * La première version ne regardait que le `type` ÉCRIT dans l'attribut, et
+     * seulement `datetime` et `datetime_immutable`. `revue-fitcarnet` a refait
+     * la panne de deux façons qu'elle laissait passer, le 17 septembre 2026 :
+     * un `#[ORM\Column]` sans type sur une propriété `\DateTimeImmutable` —
+     * Doctrine en déduit `datetime_immutable`, les deux heures reviennent — et
+     * `Types::DATETIMETZ_MUTABLE`, que le projet ne remplace pas, et dont la
+     * lecture lève `InvalidFormat` sur toute valeur posée par `now()`.
+     *
+     * La règle se lit donc à l'envers : une propriété datée n'a droit qu'à
+     * `datetimetz_immutable`, à un type de DATE seule, ou à une dérogation
+     * écrite dans `SANS_FUSEAU`.
+     */
+    public function testToutesLesHeuresPassentParLeTypeDuProjet(): void
     {
         $fautives = [];
-        $vues = 0;
+        $derogations = [];
 
         foreach (glob(__DIR__ . '/../../src/Entity/*.php') ?: [] as $fichier) {
             $classe = 'App\\Entity\\' . basename($fichier, '.php');
@@ -64,25 +79,52 @@ final class DatesAvecFuseauTest extends TestCase
 
             foreach ((new \ReflectionClass($classe))->getProperties() as $propriete) {
                 foreach ($propriete->getAttributes(Column::class) as $attribut) {
-                    $type = $attribut->newInstance()->type;
-                    if (!\in_array($type, [Types::DATETIME_MUTABLE, Types::DATETIME_IMMUTABLE], true)) {
+                    $type = $attribut->newInstance()->type ?? self::typeDeduit($propriete);
+                    if (null === $type || \in_array($type, self::JOURS_SEULS, true)) {
+                        continue;
+                    }
+                    if (!\in_array($type, self::HEURES, true)) {
                         continue;
                     }
 
-                    ++$vues;
                     $nom = basename($fichier, '.php') . '::' . $propriete->getName();
-                    if (!\in_array($nom, self::SANS_FUSEAU, true)) {
-                        $fautives[] = $nom;
+                    if (Types::DATETIME_IMMUTABLE === $type && \in_array($nom, self::SANS_FUSEAU, true)) {
+                        $derogations[] = $nom;
+                    } elseif (Types::DATETIMETZ_IMMUTABLE !== $type) {
+                        $fautives[] = "{$nom} ({$type})";
                     }
                 }
             }
         }
 
         self::assertSame([], $fautives,
-            'Ces colonnes sont en TIMESTAMPTZ et declarees sans fuseau : PHP y ecrit '
-            . "l'heure de Paris, PostgreSQL la lit en UTC. Utiliser Types::DATETIMETZ_IMMUTABLE.");
-        self::assertSame(\count(self::SANS_FUSEAU), $vues,
+            "Ces colonnes portent une heure sans passer par le type du projet : Types::DATETIMETZ_IMMUTABLE, "
+            . "ou une derogation ecrite dans SANS_FUSEAU pour une colonne TIMESTAMP sans fuseau.");
+        self::assertEqualsCanonicalizing(self::SANS_FUSEAU, $derogations,
             'une derogation ne designe plus rien : la retirer de SANS_FUSEAU');
+    }
+
+    private const HEURES = [
+        Types::DATETIME_MUTABLE, Types::DATETIME_IMMUTABLE,
+        Types::DATETIMETZ_MUTABLE, Types::DATETIMETZ_IMMUTABLE,
+        Types::TIME_MUTABLE, Types::TIME_IMMUTABLE,
+    ];
+
+    private const JOURS_SEULS = [Types::DATE_MUTABLE, Types::DATE_IMMUTABLE];
+
+    /** Ce que Doctrine déduit d'une propriété datée dont l'attribut ne dit rien. */
+    private static function typeDeduit(\ReflectionProperty $propriete): ?string
+    {
+        $type = $propriete->getType();
+        if (!$type instanceof \ReflectionNamedType) {
+            return null;
+        }
+
+        return match (true) {
+            is_a($type->getName(), \DateTimeImmutable::class, true) => Types::DATETIME_IMMUTABLE,
+            is_a($type->getName(), \DateTimeInterface::class, true) => Types::DATETIME_MUTABLE,
+            default => null,
+        };
     }
 
     public function testLeTypeAvecFuseauEstCeluiDuProjet(): void
