@@ -305,7 +305,8 @@ nutriments de 200 g de brocoli cru sont encore dans les 150 g cuits. Compter
 sur le poids pesé est donc exact — et c'est le SEUL état que l'application
 connaisse désormais. Il y a eu un champ pour dire si les valeurs se
 rapportaient au cru ou au cuit ; il a été supprimé, avec tout le code qui
-rattrapait ses contradictions (voir `db/manuel/18-un-seul-etat.sql`).
+rattrapait ses contradictions (la migration `18-un-seul-etat.sql`, qui l'a
+retiré, ne vit plus que dans l'historique git).
 
 **Un piège qui a coûté cher.** Pour un féculent, le rendement se simplifie
 entre les deux colonnes : le poids à peser est le même à 2,26 comme à 4,68,

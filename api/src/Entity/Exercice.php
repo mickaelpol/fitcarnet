@@ -157,7 +157,7 @@ class Exercice
        formatPrescrit 18. Chaque plafond garde au moins un facteur deux de
        marge — un plafond sous la longueur d'une ligne existante rendrait le
        PATCH d'administration impossible sur cette ligne, en designant un
-       champ que personne n'a touche. `BornesDuCatalogueCommunTest` fige les
+       champ que personne n'a touche. `BornesDesChampsTexteTest` fige les
        deux bouts : le refus du demesure ET l'acceptation du mesure. */
 
     #[ORM\Id]

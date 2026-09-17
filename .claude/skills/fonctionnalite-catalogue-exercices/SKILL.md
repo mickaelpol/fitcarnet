@@ -180,7 +180,7 @@ libellés ; le français ne vit que du côté de l'écran.
     données réelles (`:150-163`) : nom 150, nomFr 150, instructions 4000,
     musclesSecondaires 255, vidéo 500. Un dépassement doit rendre 422 en
     **désignant le champ**. Déjà figé par
-    `api/tests/Entity/BornesDuCatalogueCommunTest.php`.
+    `api/tests/Entity/BornesDesChampsTexteTest.php`.
 18. **Pas de cache HTTP sur ce catalogue** — la réponse ne doit porter ni
     `max-age` ni `shared-max-age` : entre deux caches, on garde celui qu'on peut
     invalider (`:116-140`). Une correction faite par l'administrateur doit être

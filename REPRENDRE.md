@@ -67,10 +67,34 @@ deux fois, identique à celle d'une base neuve.
 5. Réduire alors cette section à une ligne : c'est la dernière trace, dans le
    dépôt, du modèle précédent.
 
-**Base de développement.** Déjà passée par la 34. Sa sauvegarde d'avant
-passage n'a été gardée que dans le dossier temporaire de la session.
+**Base de développement.** Chaque poste a la sienne, et **chacune doit passer
+par la 34** : `db/manuel/rattraper-dev.sh` après le `git pull`. Sans lui, le
+code attend `utilisateur_id` et la base a encore `cree_par` — le frigo de dev
+tombe. Les deux postes y sont passés le 17 septembre ; sur le second, 64
+aliments sont devenus 14 (les 50 sans propriétaire, qu'aucun stock, plan ni
+habitude ne citait), stock, plans et exercices inchangés. Les sauvegardes
+d'avant passage n'ont été gardées que dans le dossier temporaire des sessions.
 `jeu-essai.sql` crée désormais lui-même ses 8 aliments (valeurs CIQUAL) : le
 rejouer sur un compte d'essai si le frigo de dev paraît vide.
+
+**Trouvé en reprenant sur le second poste, et corrigé :**
+`sauvegarde.sh --catalogue` exportait encore la table `aliment` — les aliments
+de tous les comptes, sous la mention « AUCUNE donnée personnelle », dans un
+fichier qu'une autre base refuse. Il n'exporte plus que les emplacements et les
+exercices, et `verifier-migrations.sh` refuse désormais toute table exportée
+qui porte `utilisateur_id` (vu rouge avant la correction). Quatre renvois vers
+des fichiers disparus ont été redressés au passage (`BornesDuCatalogueCommunTest`
+×2, `18-un-seul-etat.sql`, `useAliments` dans l'audit).
+
+**Deux points trouvés en chemin, hors de ce chantier, à trancher :**
+
+- **`exercice.cree_par` part aussi dans l'export catalogue.** Un exercice privé
+  est une donnée de compte, mais `pg_dump -t` ne filtre pas par ligne : la
+  table part entière. Aucun exercice privé en dev aujourd'hui ; le contrôle de
+  `verifier-migrations.sh` ne le voit pas, et son commentaire le dit.
+- **`import_carnet.py:167` insère encore dans `modele.partage`**, colonne
+  retirée le 15 septembre (migration 33). Le script échouerait à sa première
+  création de modèle.
 
 ---
 

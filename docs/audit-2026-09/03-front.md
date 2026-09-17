@@ -343,7 +343,7 @@ Créer `src/api/hooks/` avec un **barrel** `index.ts` qui ré-exporte tout, pour
 |---|---|---|
 | `hooks/decimales.ts` | 290-326, 717-731, 927-958 | `versDecimales`, `cibleEnEcriture`, `nombreEnTexte`, `serieEnEcriture`, `seanceEnEcriture`, `modeleEnEcriture` — **à faire en premier**, tout le reste en dépend |
 | `hooks/auth.ts` | 16-116 | `useConnexion`, `useDeconnexion`, `useMoi` |
-| `hooks/referentiels.ts` | 118-211 | `REFERENTIEL`, `useAliments`, `useExercices`, `useExerciceDetail`, `useMajExercice`, `useFusionExercices` |
+| `hooks/referentiels.ts` | 118-211 | `REFERENTIEL`, `useExercices`, `useExerciceDetail`, `useMajExercice`, `useFusionExercices` |
 | `hooks/frigo.ts` | 213-518 | les 10 hooks du frigo + `EchecInventaire`, `SuiviInventaire` |
 | `hooks/cuissons.ts` | 520-533, 535-586, 673-709 | recolle lecture et écriture, aujourd'hui **séparées par 140 lignes** |
 | `hooks/plans.ts` | 588-671 | `PlanRepas`, `usePlans`, `useEnregistrerPlan`, `useSupprimerPlan`, `useMarquerCuisine` |

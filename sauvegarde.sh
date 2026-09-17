@@ -10,9 +10,10 @@
 # Deux formats, deux usages :
 #   - complet   (.dump) : restauration à l'identique, y compris ton compte.
 #                         C'est ce qu'il faut pour peupler une production VIDE.
-#   - catalogue (.sql)  : aliments, exercices, emplacements — aucune donnée
+#   - catalogue (.sql)  : exercices, emplacements — aucune donnée
 #                         personnelle. À utiliser si la production contient
-#                         déjà des comptes.
+#                         déjà des comptes. Les aliments n'en sont pas :
+#                         chacun appartient à un compte.
 #
 # UN FICHIER QUI PORTE SON NOM DÉFINITIF EST COMPLET. Tout ce qui s'écrit ici
 # passe d'abord par un « .partiel », renommé seulement après relecture. Voir
@@ -121,9 +122,15 @@ sauvegarde_catalogue() {
     # Même « .partiel » que pour le dump complet : un export interrompu au
     # milieu d'un INSERT reste un fichier .sql d'apparence normale, et psql le
     # rejouera jusqu'à la ligne coupée avant d'échouer, base à moitié peuplée.
+    #
+    # AUCUNE TABLE QUI PORTE `utilisateur_id`. Le 17 septembre 2026, `-t aliment`
+    # figurait encore ici : les aliments de tous les comptes partaient sous la
+    # mention « AUCUNE donnée personnelle », dans un fichier que l'autre base
+    # refuse, faute des comptes qu'il désigne. `verifier-migrations.sh` lit la
+    # liste ci-dessous et la confronte au schéma.
     if ! dc exec -T "$SERVICE" pg_dump -U "$UTILISATEUR" -d "$BASE" \
         --data-only --column-inserts \
-        -t aliment -t emplacement -t exercice \
+        -t emplacement -t exercice \
         > "$PARTIEL"; then
         echec "pg_dump a échoué. Aucun catalogue n'a été écrit."
     fi
@@ -140,7 +147,7 @@ sauvegarde_catalogue() {
     echo "→ $fichier ($(du -h "$fichier" | cut -f1))"
     echo
     echo "Ce fichier ne contient AUCUNE donnée personnelle :"
-    echo "  ni compte, ni séance, ni modèle, ni stock, ni objectif."
+    echo "  ni compte, ni aliment, ni séance, ni modèle, ni stock, ni objectif."
 }
 
 # ------------------------------------------------------------ restauration
