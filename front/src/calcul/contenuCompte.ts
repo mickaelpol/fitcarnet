@@ -13,6 +13,9 @@ export interface ContenuCompte {
   plans: number;
   aliments: number;
   stock: number;
+  cibles: number;
+  complements: number;
+  exercices: number;
 }
 
 const compte = (n: number, singulier: string, pluriel: string): string =>
@@ -27,6 +30,9 @@ export function contenuEnMots(c: ContenuCompte): string[] {
     compte(c.plans, 'plan', 'plans'),
     compte(c.aliments, 'aliment', 'aliments'),
     compte(c.stock, 'ligne de stock', 'lignes de stock'),
+    compte(c.cibles, 'objectif', 'objectifs'),
+    compte(c.complements, 'complément', 'compléments'),
+    compte(c.exercices, 'exercice personnel', 'exercices personnels'),
   ];
 }
 

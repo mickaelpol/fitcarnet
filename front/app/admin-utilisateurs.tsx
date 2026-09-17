@@ -203,8 +203,9 @@ export default function AdminUtilisateurs() {
         <Discret style={s.aide}>
           Désactiver est <Texte style={{ color: C.vif }}>réversible</Texte> : le
           carnet reste intact et la personne le retrouve à la réactivation.
-          Supprimer ne l’est pas — séances, séries, plans, objectifs, aliments
-          et stock partent avec le compte.
+          Supprimer ne l’est pas — séances, modèles, plans, objectifs,
+          compléments, aliments, stock et exercices personnels partent avec le
+          compte.
         </Discret>
 
         {(comptes.data ?? []).map((c) => (

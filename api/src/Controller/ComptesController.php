@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\Utilisateur;
 use App\Service\JetonsRafraichissement;
 use App\Service\ProtectionDuCompte;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,9 +29,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * geste a faire dans 99 % des cas — quelqu'un qui part, un acces qu'on
  * suspend, un doute.
  *
- * Un compte supprime emporte tout, par cascade de la base : seances, series,
- * plans, cibles, habitudes de cuisson, stock, jetons, ET SES ALIMENTS.
- * Rien de tout cela ne se restaure sans une sauvegarde.
+ * Un compte supprime emporte tout : seances, series, modeles, plans, cibles,
+ * complements, habitudes de cuisson, inventaires, stock, jetons, SES ALIMENTS
+ * et SES EXERCICES PERSONNELS. Rien de tout cela ne se restaure sans une
+ * sauvegarde.
  *
  * On COMPTE donc ce qui sera detruit et on le renvoie avec la liste. Un
  * « Supprimer ? Oui / Non » qui ne dit pas ce qu'on detruit n'est pas une
@@ -58,8 +60,11 @@ final class ComptesController extends AbstractController
      * suppression pensable. « Supprimer Marie » ne veut rien dire ;
      * « supprimer Marie et ses 34 seances » se decide.
      *
-     * Aliments et stock y sont depuis le 17 septembre 2026 : ils partent avec
-     * le compte, et un compte sans seance peut avoir un frigo plein.
+     * Aliments, stock, cibles, complements et exercices personnels y sont
+     * depuis le 17 septembre 2026 : ils partent avec le compte, et un compte
+     * sans seance peut avoir un frigo plein. Habitudes de cuisson et
+     * inventaires partent aussi, sans etre comptes : ils ne se ressaisissent
+     * pas, ils se refont en cuisinant et en recomptant.
      */
     #[Route('/comptes', methods: ['GET'])]
     public function lister(): JsonResponse
@@ -71,6 +76,9 @@ final class ComptesController extends AbstractController
                     (SELECT count(*) FROM plan_repas p WHERE p.utilisateur_id = u.id) AS plans,
                     (SELECT count(*) FROM aliment    a WHERE a.utilisateur_id = u.id) AS aliments,
                     (SELECT count(*) FROM stock      k WHERE k.utilisateur_id = u.id) AS stock,
+                    (SELECT count(*) FROM cible      c WHERE c.utilisateur_id = u.id) AS cibles,
+                    (SELECT count(*) FROM complement o WHERE o.utilisateur_id = u.id) AS complements,
+                    (SELECT count(*) FROM exercice   e WHERE e.cree_par = u.id AND NOT e.public) AS exercices,
                     (SELECT count(*) FROM serie sr
                        JOIN seance_exercice se ON se.id = sr.seance_exercice_id
                        JOIN seance s2 ON s2.id = se.seance_id
@@ -104,6 +112,9 @@ final class ComptesController extends AbstractController
                         'plans' => (int) $l['plans'],
                         'aliments' => (int) $l['aliments'],
                         'stock' => (int) $l['stock'],
+                        'cibles' => (int) $l['cibles'],
+                        'complements' => (int) $l['complements'],
+                        'exercices' => (int) $l['exercices'],
                     ],
                 ];
             }, $lignes),
@@ -174,16 +185,19 @@ final class ComptesController extends AbstractController
      * code finirait par mentir — il suffit d'ajouter une table en oubliant de
      * revenir ici.
      *
-     * Une seule instruction, donc, et la base fait le reste dans sa propre
-     * transaction.
+     * Une instruction pour le compte, donc, et la base fait le reste. DEUX
+     * EXCEPTIONS, dans la meme transaction.
      *
-     * UNE EXCEPTION : SES ALIMENTS.
-     *
+     * SES ALIMENTS.
      * `aliment.utilisateur_id` est en `ON DELETE CASCADE`, mais
      * `stock.aliment_id` est en RESTRICT, et PostgreSQL ne garantit pas
      * l'ordre dans lequel il deroule deux cascades partant du meme compte. On
      * supprime donc explicitement ses aliments, dans l'ordre que les cles
      * etrangeres imposent — le stock qui les vise d'abord.
+     *
+     * SES EXERCICES PERSONNELS. `exercice.cree_par` est en `SET NULL` : la
+     * cascade les laisserait sans auteur ni publication, visibles de
+     * personne. On les releve avant, et on les retire apres — voir le corps.
      */
     #[Route('/comptes/{id}', methods: ['DELETE'])]
     public function supprimer(string $id): JsonResponse
@@ -205,17 +219,40 @@ final class ComptesController extends AbstractController
         }
 
         $this->cnx->transactional(function () use ($id): void {
-            /* Les lignes de stock qui visent ses aliments, quel qu'en
-               soit le proprietaire. Une ligne appartenant a quelqu'un d'autre
-               ne devrait pas exister — c'etait la faille corrigee dans
-               `FrigoController` — mais si elle existe, elle bloquerait tout
-               par la contrainte RESTRICT. */
+            /* Le stock qui vise ses aliments, puis ses aliments. Depuis la
+               migration 35, seul son propre stock peut les viser ; la
+               suppression explicite reste pour l'ordre, que deux cascades
+               parties du meme compte ne garantissent pas. */
             $this->cnx->executeStatement(
                 'DELETE FROM stock WHERE aliment_id IN (SELECT id FROM aliment WHERE utilisateur_id = :u)',
                 ['u' => $id],
             );
             $this->cnx->executeStatement('DELETE FROM aliment WHERE utilisateur_id = :u', ['u' => $id]);
+
+            /* SES EXERCICES PERSONNELS, RELEVES AVANT. `exercice.cree_par` est
+               en `SET NULL` : sans ce releve, le compte parti, on ne saurait
+               plus lesquels etaient a lui, et ils resteraient sans auteur ni
+               publication — visibles de personne. */
+            $exercices = $this->cnx->fetchFirstColumn(
+                'SELECT id FROM exercice WHERE cree_par = :u AND NOT public', ['u' => $id]);
+
             $this->cnx->executeStatement('DELETE FROM utilisateur WHERE id = :id', ['id' => $id]);
+
+            /* APRES le compte, dont les seances et les modeles les citaient
+               encore (RESTRICT). Un exercice qu'un AUTRE compte cite toujours
+               — possible pour une seance d'avant le 14 septembre 2026, quand
+               les exercices personnels se voyaient de tous — reste en place :
+               le supprimer ferait echouer toute la suppression. */
+            if ([] !== $exercices) {
+                $this->cnx->executeStatement(
+                    'DELETE FROM exercice e
+                      WHERE e.id IN (:ids) AND NOT e.public
+                        AND NOT EXISTS (SELECT 1 FROM seance_exercice se WHERE se.exercice_id = e.id)
+                        AND NOT EXISTS (SELECT 1 FROM modele_exercice me WHERE me.exercice_id = e.id)',
+                    ['ids' => $exercices],
+                    ['ids' => ArrayParameterType::INTEGER],
+                );
+            }
         });
 
         return $this->json(['supprime' => true, 'email' => (string) $cible['email']]);

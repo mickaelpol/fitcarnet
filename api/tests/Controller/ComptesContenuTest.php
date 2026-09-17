@@ -43,6 +43,7 @@ final class ComptesContenuTest extends TestCase
                     'source_frigo' => 'base', 'cree_le' => '2026-09-17 09:25:10+00',
                     'seances' => 0, 'series' => 0, 'modeles' => 0, 'plans' => 0,
                     'aliments' => 12, 'stock' => 9,
+                    'cibles' => 4, 'complements' => 3, 'exercices' => 2,
                 ]];
             });
 
@@ -55,12 +56,77 @@ final class ComptesContenuTest extends TestCase
         self::assertMatchesRegularExpression(
             '/count\(\*\)\s+FROM\s+stock\s+\w+\s+WHERE\s+\w+\.utilisateur_id\s*=\s*u\.id/i', $requetes[0],
             'le stock du compte n\'est pas compte');
+        foreach (['cible', 'complement'] as $table) {
+            self::assertMatchesRegularExpression(
+                "/count\\(\\*\\)\\s+FROM\\s+{$table}\\s+\\w+\\s+WHERE\\s+\\w+\\.utilisateur_id\\s*=\\s*u\\.id/i", $requetes[0],
+                "la table {$table} part avec le compte et n'est pas comptee");
+        }
+        self::assertMatchesRegularExpression(
+            '/count\(\*\)\s+FROM\s+exercice\s+\w+\s+WHERE\s+\w+\.cree_par\s*=\s*u\.id\s+AND\s+NOT\s+\w+\.public/i',
+            $requetes[0], 'les exercices personnels du compte ne sont pas comptes');
 
         self::assertSame(
-            ['seances' => 0, 'series' => 0, 'modeles' => 0, 'plans' => 0, 'aliments' => 12, 'stock' => 9],
+            ['seances' => 0, 'series' => 0, 'modeles' => 0, 'plans' => 0, 'aliments' => 12, 'stock' => 9,
+                'cibles' => 4, 'complements' => 3, 'exercices' => 2],
             $corps['comptes'][0]['contenu'],
             'un compte sans seance mais au frigo plein doit l\'annoncer'
         );
+    }
+
+    /**
+     * LES EXERCICES PERSONNELS PARTENT AVEC LE COMPTE — SANS BLOQUER SUR CEUX
+     * QU'UN AUTRE CITE ENCORE.
+     *
+     * `exercice.cree_par` est en `ON DELETE SET NULL` : supprimer le compte
+     * laissait ses exercices privés sans auteur et non publics, donc visibles
+     * de personne — des lignes mortes. Relevé par `revue-fitcarnet` le
+     * 17 septembre 2026. Mais avant le 14 septembre un exercice « perso » se
+     * voyait de tous, et la séance d'un autre compte peut en citer un :
+     * `seance_exercice.exercice_id` est en RESTRICT, et le supprimer ferait
+     * échouer toute la suppression. On relève donc les identifiants AVANT,
+     * et on ne retire APRÈS que ceux que plus personne ne cite.
+     */
+    public function testLaSuppressionRetireSesExercicesPersonnelsQuePersonneNeCite(): void
+    {
+        $ecritures = [];
+        $moi = new Utilisateur();
+        $cible = '0b4d6c2e-8f3a-4c1b-9d7e-5a6b7c8d9e0f';
+
+        $cnx = self::createStub(Connection::class);
+        $cnx->method('fetchAssociative')->willReturn(
+            ['id' => $cible, 'email' => 'marie@test.local', 'nom' => 'Marie', 'roles' => 'ROLE_USER', 'actif' => true]);
+        $cnx->method('fetchOne')->willReturn(2);
+        $cnx->method('fetchFirstColumn')->willReturnCallback(
+            static fn (string $sql): array => \str_contains($sql, 'FROM exercice') ? [7, 8] : []);
+        $cnx->method('transactional')->willReturnCallback(static fn (callable $t): mixed => $t());
+        $cnx->method('executeStatement')->willReturnCallback(
+            static function (string $sql) use (&$ecritures): int {
+                $ecritures[] = \preg_replace('/\s+/', ' ', $sql);
+
+                return 1;
+            });
+
+        $reponse = self::controleur($cnx, $moi)->supprimer($cible);
+
+        self::assertSame(200, $reponse->getStatusCode());
+        $compte = self::rang($ecritures, 'DELETE FROM utilisateur');
+        $exercices = self::rang($ecritures, 'DELETE FROM exercice');
+        self::assertGreaterThan($compte, $exercices,
+            'avant la suppression du compte, ses seances citent encore ces exercices : RESTRICT refuserait');
+        self::assertStringContainsString('NOT EXISTS (SELECT 1 FROM seance_exercice', $ecritures[$exercices],
+            'un exercice que la seance d\'un autre compte cite encore doit rester');
+        self::assertStringContainsString('NOT EXISTS (SELECT 1 FROM modele_exercice', $ecritures[$exercices]);
+    }
+
+    /** @param list<string> $ecritures */
+    private static function rang(array $ecritures, string $debut): int
+    {
+        foreach ($ecritures as $i => $sql) {
+            if (\str_starts_with(\ltrim($sql), $debut)) {
+                return $i;
+            }
+        }
+        self::fail("aucune ecriture « {$debut} »");
     }
 
     private static function controleur(Connection $cnx, Utilisateur $moi): ComptesController
