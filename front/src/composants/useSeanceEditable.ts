@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { Seance } from '@/api/types';
 import { useEnregistrerSeance, useSeance } from '../api/hooks';
 import { avecIdentifiantSeance } from '../calcul/blocSeance';
+import { dateLocale } from '../calcul/dates';
 import { abonnerMesure, appliquerResultats, prendreResultats } from './etatMesure';
 import { useSauvegardeAuto } from './sauvegardeAuto';
 import type { EtatSauvegarde } from './sauvegardeAuto';
@@ -32,7 +33,10 @@ import type { EtatSauvegarde } from './sauvegardeAuto';
  *      endroit qui détient l'état — qu'on l'écrit.
  */
 
-const aujourdhui = (): string => new Date().toISOString().slice(0, 10);
+/* LE JOUR LOCAL, PAS CELUI D'UTC. `toISOString().slice(0, 10)` datait de la
+   veille une séance créée entre minuit et 1 h (2 h l'été) — constat 04#9,
+   corrigé le 17 septembre 2026. */
+const aujourdhui = (): string => dateLocale(new Date());
 
 export function useSeanceEditable(id: string): {
   /** l'état local, source de vérité tant que l'écran est monté */
