@@ -182,7 +182,7 @@ done <<< "$migrations"
 # Une migration peut « réussir » sans rien poser : sans ON_ERROR_STOP, psql
 # continue après une erreur et sort 0. On vérifie donc le résultat, pas le
 # code de sortie.
-gris "Contrôle des garde-fous posés..."
+gris "Contrôle des garde-fous posés, et de leur définition..."
 attendues=(
     aliment_valeurs_positives
     aliment_ratio_borne
@@ -194,16 +194,63 @@ attendues=(
     stock_aliment_du_meme_compte_fkey
 )
 
+# LE NOM NE SUFFIT PAS. Une migration qui poserait la bonne contrainte avec
+# la mauvaise définition — `ON DELETE CASCADE` au lieu de `RESTRICT`, colonnes
+# inversées — passait ici au vert, et `verifier-schema.sh` ne la voit pas non
+# plus : sa base migrée part de `01-schema.sql`, qui porte déjà la contrainte.
+# Relevé par `revue-fitcarnet` le 17 septembre 2026. On compare donc chaque
+# définition à celle d'une base NEUVE, montée dans le même conteneur.
+docker exec -e PGPASSWORD=verif "$CONTENEUR" createdb -U verif neuve
+psql_neuve() { docker exec -i -e PGPASSWORD=verif "$CONTENEUR" psql -U verif -d neuve -v ON_ERROR_STOP=1 -q "$@"; }
+psql_neuve < "$RACINE/db/01-schema.sql"
+psql_neuve < "$RACINE/db/02-donnees.sql"
+
+definition="SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '%s';"
 manquantes=0
 for contrainte in "${attendues[@]}"; do
-    presente=$(psql_ -tAc "SELECT count(*) FROM pg_constraint WHERE conname = '$contrainte';")
-    if [[ "$presente" == "1" ]]; then
-        gris "  ✓ $contrainte"
-    else
+    # shellcheck disable=SC2059
+    migree=$(psql_ -tAc "$(printf "$definition" "$contrainte")")
+    # shellcheck disable=SC2059
+    neuve=$(psql_neuve -tAc "$(printf "$definition" "$contrainte")")
+    if [[ -z "$migree" ]]; then
         rouge "  ✗ $contrainte — absente"
         manquantes=$((manquantes + 1))
+    elif [[ "$migree" != "$neuve" ]]; then
+        rouge "  ✗ $contrainte — la migration ne pose pas la définition d'une base neuve"
+        rouge "      migrée : $migree"
+        rouge "      neuve  : $neuve"
+        manquantes=$((manquantes + 1))
+    else
+        gris "  ✓ $contrainte"
     fi
 done
+
+# ------------------------------------ une base d'avant la 34 est nommée comme telle
+# La migration 34 sera retirée du dépôt une fois la production passée. Une
+# sauvegarde restaurée d'avant le 17 septembre 2026 rejouera alors la 35 sur
+# une table `aliment` qui n'a que `cree_par` : la 35 doit s'arrêter en disant
+# quoi faire, et non sur « column utilisateur_id does not exist », qui
+# désigne la mauvaise migration et laisse la production sans démarrer.
+gris "Base d'avant la migration 34..."
+docker exec -e PGPASSWORD=verif "$CONTENEUR" createdb -U verif ancienne
+psql_ancienne() { docker exec -i -e PGPASSWORD=verif "$CONTENEUR" psql -U verif -d ancienne -v ON_ERROR_STOP=1 -q "$@"; }
+psql_ancienne < "$RACINE/db/01-schema.sql"
+psql_ancienne <<'SQL'
+ALTER TABLE stock   DROP CONSTRAINT stock_aliment_du_meme_compte_fkey;
+ALTER TABLE aliment DROP CONSTRAINT aliment_id_utilisateur_unique;
+ALTER TABLE aliment RENAME COLUMN utilisateur_id TO cree_par;
+SQL
+garde34=0
+if sortie=$(psql_ancienne < "$RACINE/db/manuel/35-stock-et-aliment-du-meme-compte.sql" 2>&1); then
+    rouge "  ✗ la migration 35 passe sur une base d'avant la 34, sans rien dire"
+    garde34=1
+elif grep -q 'migration 34' <<< "$sortie"; then
+    gris "  ✓ la migration 35 s'arrête en nommant la migration 34"
+else
+    rouge "  ✗ la migration 35 échoue sans nommer la cause :"
+    printf '%s\n' "$sortie" | grep -E 'ERROR' | head -2 | sed 's/^/      /'
+    garde34=1
+fi
 
 # ------------------------------------------------------- valeurs nettoyées
 restantes=$(psql_ -tAc "
@@ -269,12 +316,12 @@ done
 (( nonconformes == 0 )) && gris "  ✓ tous les lanceurs s'arrêtent à la première erreur"
 
 echo
-if (( echecs == 0 && manquantes == 0 && nonconformes == 0 && stock_faux == 0 )) && [[ "$restantes" == "0" ]]; then
+if (( echecs == 0 && manquantes == 0 && nonconformes == 0 && stock_faux == 0 && garde34 == 0 )) && [[ "$restantes" == "0" ]]; then
     vert "✓ Les migrations passent sur des données réelles, tous les garde-fous sont posés."
     exit 0
 fi
 
-rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s), $stock_faux défaut(s) de stock entre comptes."
+rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s), $stock_faux défaut(s) de stock entre comptes, $garde34 base ancienne mal nommée."
 rouge "  En l'état, le conteneur applicatif ne redémarrerait pas : entrypoint-prod.sh"
 rouge "  rejoue db/manuel/ à chaque démarrage, avec ON_ERROR_STOP=1 et set -e."
 exit 1

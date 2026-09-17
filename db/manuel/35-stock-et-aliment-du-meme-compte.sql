@@ -28,6 +28,22 @@
 
 BEGIN;
 
+-- UNE BASE D'AVANT LA MIGRATION 34 EST NOMMÉE COMME TELLE. La 34 sera retirée
+-- du dépôt une fois la production passée ; une sauvegarde plus ancienne,
+-- restaurée ensuite, rejouerait cette 35 sur une table qui n'a que
+-- `cree_par`, et la production s'arrêterait sur « column utilisateur_id does
+-- not exist » — un message qui désigne la mauvaise migration.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'aliment'
+                      AND column_name = 'utilisateur_id') THEN
+        RAISE EXCEPTION 'Cette base date d''avant le 17 septembre 2026 (aliment.cree_par). '
+            'Joue d''abord la migration 34, retirée du dépôt : '
+            'git show 1068054:db/manuel/34-aliments-par-compte.sql | psql -v ON_ERROR_STOP=1';
+    END IF;
+END $$;
+
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint
