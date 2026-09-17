@@ -4,35 +4,10 @@ INSERT INTO emplacement (code, libelle, ordre) VALUES
   ('frigo','Frigo',1), ('congelateur','Congélateur',2), ('placard','Placard',3), ('autre','Autre',4)
 ON CONFLICT (code) DO NOTHING;
 -- ---------------------------------------------------------------------
---  PAS DE CATALOGUE D'ALIMENTS DE DÉPART, ET C'EST UNE DÉCISION
+--  AUCUN ALIMENT N'EST SEMÉ : chaque compte saisit les valeurs de ce qu'il
+--  a acheté, telles que l'étiquette les donne. Un compte Grocy les reçoit
+--  de Grocy, fibres comprises.
 -- ---------------------------------------------------------------------
---
---  Il y en a eu un : 50 aliments communs, semés à toute installation et
---  visibles de tous les comptes. Retiré le 14 septembre 2026.
---
---  POURQUOI. Les valeurs nutritionnelles d'un aliment ne sont pas une
---  constante universelle. Deux paquets de la même chose ne portent pas les
---  mêmes chiffres, et en France l'étiquette les donne — y compris les fibres,
---  que les tables américaines omettent. Un utilisateur qui rentre de courses
---  a sous les yeux les valeurs JUSTES pour CE qu'il a acheté ; une moyenne
---  nationale posée d'avance ne peut que le tromper, et lui donne en prime
---  l'impression que la question est réglée.
---
---  C'était d'ailleurs vérifiable : ce catalogue portait encore, en septembre
---  2026, des valeurs de la table factice d'un banc d'essai (constat É7) et
---  deux valeurs de CUIT dans une base qui pèse du CRU. Un catalogue qu'on ne
---  peut pas garantir juste vaut moins que pas de catalogue : c'est la règle 7.
---
---  CE QUI RESTE ICI est structurel, et n'a rien d'un jugement nutritionnel :
---  les emplacements, les modes de cuisson, les exercices de référence.
---
---  POUR UN COMPTE GROCY, la question ne se pose pas : les aliments viennent
---  de Grocy, fibres comprises — `FrigoGrocy` y déclare le champ « Fibres /
---  100 g » et le crée s'il manque.
---
---  Les migrations 14 à 19 corrigeaient ce catalogue. Elles sont conservées et
---  restent idempotentes : sur une base neuve elles ne trouvent rien à mettre
---  à jour, sur une base existante elles gardent leur raison d'être.
 
 -- ---------------------------------------------------------------------
 --  Façons de cuire, partagées par tous les comptes

@@ -438,8 +438,8 @@ describe('Les pesées réelles du 8 août', () => {
   });
 });
 
-describe('Le catalogue de l\'application est sain', () => {
-  it('aucun aliment de référence n\'est inexploitable', () => {
+describe('Le jeu d\'aliments des tests est sain', () => {
+  it('aucun aliment du jeu n\'est inexploitable', () => {
     const mauvais = CATALOGUE.filter(inexploitable)
       .map((a) => `${a.nom} : ${verifierAliment(a).map((d) => d.code).join(', ')}`);
     assert.deepEqual(mauvais, []);

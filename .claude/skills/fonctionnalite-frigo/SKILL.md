@@ -1,6 +1,6 @@
 ---
 name: fonctionnalite-frigo
-description: Savoir ce qu'on a — le stock groupé par emplacement, la recherche sans accents, le détail dépliable, l'ajout d'un aliment depuis le catalogue commun ou de zéro, l'éditeur et son contrôle de cohérence bloquant, la correction et la suppression. À charger avec `epreuve-fonctionnalite` pour éprouver et filmer l'onglet « Mon frigo », mode Stock.
+description: Savoir ce qu'on a — le stock groupé par emplacement, la recherche sans accents, le détail dépliable, l'ajout d'un aliment dans un éditeur vide, l'éditeur et son contrôle de cohérence bloquant, la correction et la suppression. À charger avec `epreuve-fonctionnalite` pour éprouver et filmer l'onglet « Mon frigo », mode Stock.
 ---
 
 # Mon frigo — savoir ce qu'on a
@@ -24,24 +24,23 @@ pas », jamais « zéro ».
 
 Cette fiche couvre le **mode Stock**. Le recomptage complet est dans
 `fonctionnalite-inventaire` ; les deux vivent dans le même écran, sous un
-sélecteur à deux segments (`front/app/(onglets)/frigo.tsx:184-204`).
+sélecteur à deux segments (`front/app/(onglets)/frigo.tsx:153-174`).
 
 ## Ce que l'application propose
 
 | Capacité | Où | `fichier:ligne` |
 |---|---|---|
 | **Stock groupé par emplacement**, dans l'ordre d'un inventaire réel — Frigo, Congélateur, Placard, puis le reste, et « Sans emplacement » en dernier | liste | `front/src/calcul/frigo.ts:14` (`ORDRE_EMPLACEMENTS`), `:21` (`grouperParEmplacement`) |
-| En-tête de section « **Frigo · 6** » — le nom du lieu et son nombre de lignes | liste | `front/app/(onglets)/frigo.tsx:252-254` |
-| **Compteur d'en-tête** « **12 en stock sur 17** », suivi de « **· depuis Grocy** » le cas échéant | en-tête | `front/app/(onglets)/frigo.tsx:207-212`, comptage `:100` |
-| **Recherche par aliment OU par emplacement**, insensible aux accents et à la casse — « congelateur » trouve le Congélateur | champ « Chercher un aliment ou un emplacement » | `front/app/(onglets)/frigo.tsx:218-222`, `front/src/calcul/frigo.ts:45-54`, `front/src/calcul/texte.ts:57` |
+| En-tête de section « **Frigo · 6** » — le nom du lieu et son nombre de lignes | liste | `front/app/(onglets)/frigo.tsx:222-224` |
+| **Compteur d'en-tête** « **12 en stock sur 17** », suivi de « **· depuis Grocy** » le cas échéant | en-tête | `front/app/(onglets)/frigo.tsx:177-182`, comptage `:97` |
+| **Recherche par aliment OU par emplacement**, insensible aux accents et à la casse — « congelateur » trouve le Congélateur | champ « Chercher un aliment ou un emplacement » | `front/app/(onglets)/frigo.tsx:188-192`, `front/src/calcul/frigo.ts:45-54`, `front/src/calcul/texte.ts:57` |
 | **Macros pour 100 g sur chaque ligne**, stock coloré selon qu'il en reste | ligne | `front/src/composants/ligneFrigo.tsx:43-51` |
 | « **soit 1 250 g** » quand l'unité n'est pas le gramme | ligne | `front/src/composants/ligneFrigo.tsx:52-56` |
 | Mention « **poids cru** » / « **poids sec** » quand le rendement n'est pas 1 | ligne | `front/src/composants/ligneFrigo.tsx:35`, `:57-59` |
 | **Détail dépliable** : Pour 100 g, Protéines, Glucides, Lipides, **Fibres si connues**, et « **À la cuisson : 100 g → 230 g** » ou « **poids inchangé** » | carte ouverte | `front/src/composants/ligneFrigo.tsx:63-78` |
 | **Contrôle de cohérence** affiché dans le détail dès que le verdict n'est pas « cohérent » | carte ouverte | `front/src/composants/ligneFrigo.tsx:81-85`, `front/src/calcul/nutrition.ts:45` |
 | « **La quantité se modifie depuis l'inventaire.** » | carte ouverte | `front/src/composants/ligneFrigo.tsx:87-90` |
-| **Ajouter depuis le catalogue commun**, **les aliments qu'on a déjà étant retirés de la liste** | « Ajouter un aliment » → « Partir d'un aliment de référence » | `front/app/(onglets)/frigo.tsx:289-294`, `:362-366`, filtrage `:142-156` |
-| **Créer de zéro** — entrée d'identifiant 0, « aucune valeur préremplie » | même liste | `front/app/(onglets)/frigo.tsx:143`, `:375` (`ALIMENT_VIDE`) |
+| **Ajouter un aliment** — l'éditeur s'ouvre directement, vide : « aucune valeur préremplie » | « Ajouter un aliment » | `front/app/(onglets)/frigo.tsx:259-272`, `:266` ; `front/src/composants/editeurAliment.tsx:35`, `:43` (`ALIMENT_VIDE`) |
 | **Huit catégories** en puces colorées, avec un exemple sous la rangée | éditeur | `front/src/calcul/nutrition.ts:237-246`, rendu `front/src/composants/editeurAliment.tsx:275-299` |
 | **Fibres facultatives** — vide ⇒ `null`, pas zéro | éditeur | `front/src/composants/editeurAliment.tsx:191-195`, `:364-370` |
 | **Contrôle de cohérence permanent** qui **BLOQUE** l'enregistrement sur « incohérent » | éditeur | `front/src/composants/editeurAliment.tsx:220-224` (`valide`), `:381-387` |
@@ -49,12 +48,12 @@ sélecteur à deux segments (`front/app/(onglets)/frigo.tsx:184-204`).
 | **Rendement de cuisson** : cinq guides, ou « **Je préfère mesurer** » → deux pesées → « **Utiliser ce résultat (2,3)** » | éditeur | `front/src/composants/editeurAliment.tsx:392-452`, `front/src/calcul/nutrition.ts:179`, `:193` |
 | **Provenance du rendement** — « ✓ mesuré : 100 g avant cuisson → 230 g après » ou « Valeur courante — mesure-la pour un chiffre propre à ton produit. » | éditeur | `front/src/composants/editeurAliment.tsx:457-465`, `front/src/calcul/nutrition.ts:204` |
 | **Le texte saisi vit à part du nombre** — on tape « 0,8 » sans que le séparateur disparaisse | éditeur | `front/src/composants/editeurAliment.tsx:129-134`, `front/src/calcul/saisieNombre.ts:30` |
-| **Corriger un aliment** — le créateur, ou l'administrateur sur les communs | « Corriger les valeurs » | `front/src/composants/ligneFrigo.tsx:93-95`, `api/src/Entity/Aliment.php:44-47` |
-| **Supprimer, mais seulement le sien** | « Supprimer », visible si `modifiable` | `front/src/composants/ligneFrigo.tsx:98-102`, `api/src/Entity/Aliment.php:51-54` |
+| **Corriger un aliment** — le sien | « Corriger les valeurs » | `front/src/composants/ligneFrigo.tsx:93-95`, `api/src/Entity/Aliment.php:53-56` |
+| **Supprimer, mais seulement le sien** | « Supprimer », visible si `modifiable` | `front/src/composants/ligneFrigo.tsx:98-102`, `api/src/Entity/Aliment.php:60-63` |
 | **Refus de supprimer un aliment encore en stock**, comptage **tous comptes confondus**, 409 nommant le nombre de lignes | API | `api/src/State/AlimentSuppressionProcessor.php:41-51` |
-| **Un aliment créé reste privé** — `creePar` et `public=false` viennent du jeton, jamais du corps | API | `api/src/State/AlimentProcessor.php:48-54` |
-| **Doublon de nom rendu lisible** — 422 avec le nom en clair | API | `api/src/State/AlimentProcessor.php:58-67` |
-| **Tirer pour rafraîchir**, en mode Stock seulement | liste | `front/app/(onglets)/frigo.tsx:245-246` |
+| **Un aliment appartient au compte qui le crée** — `utilisateur` vient du jeton, jamais du corps | API | `api/src/State/AlimentProcessor.php:38` (délègue à `ProprietaireProcessor`) |
+| **Doublon de nom dans le compte rendu lisible** — 422 avec le nom en clair ; deux comptes peuvent nommer pareil | API | `api/src/State/AlimentProcessor.php:39-44`, index `aliment_nom_unique_par_compte` |
+| **Tirer pour rafraîchir**, en mode Stock seulement | liste | `front/app/(onglets)/frigo.tsx:215-216` |
 
 ## Le parcours
 
@@ -62,7 +61,7 @@ sélecteur à deux segments (`front/app/(onglets)/frigo.tsx:184-204`).
 même écran mais une autre API — voir *Limites connues*.
 
 **Données de départ** : `db/manuel/jeu-essai.sql` joué sur le compte jetable. Il
-pose deux aliments privés par catégorie copiés des communs, plus
+pose sept aliments du compte, valeurs CIQUAL du produit tel qu'on le pèse, plus
 « Skyr d'essai (compte ordinaire) », répartis sur trois emplacements, avec des
 quantités décimales, et **laisse deux aliments à zéro**
 (`db/manuel/jeu-essai.sql`, bloc `UPDATE stock SET quantite = 0`).
@@ -70,53 +69,44 @@ quantités décimales, et **laisse deux aliments à zéro**
 ### Consulter
 
 1. Onglet **Mon frigo**. Le segment **Stock** est actif par défaut
-   (`frigo.tsx:57`).
-2. L'en-tête affiche « **N en stock sur M** » (`frigo.tsx:209`). Les sections se
+   (`frigo.tsx:55`).
+2. L'en-tête affiche « **N en stock sur M** » (`frigo.tsx:179`). Les sections se
    suivent : **FRIGO**, **CONGÉLATEUR**, **PLACARD**.
 3. Taper **`poul`**, puis **`congelateur`** (sans accent) dans « Chercher un
    aliment ou un emplacement ». Sans résultat :
-   « **Aucun aliment ne correspond à « xyz ».** » (`frigo.tsx:248-250`).
+   « **Aucun aliment ne correspond à « xyz ».** » (`frigo.tsx:218-220`).
 4. Toucher une ligne : elle se déplie sur les macros, les fibres si elles sont
    connues, et « **À la cuisson** — 100 g → 230 g » (`ligneFrigo.tsx:73-78`).
 
-### Ajouter depuis le catalogue
+### Ajouter un aliment
 
-5. **« Ajouter un aliment »** (`frigo.tsx:291`) → modale
-   **« Partir d'un aliment de référence »** (`frigo.tsx:364`).
-6. Chaque entrée porte son détail « `350 kcal · 7,5 P · 78 G · 0,6 L` »
-   (`frigo.tsx:152-153`). **Un aliment déjà chez soi n'y figure pas**
-   (`frigo.tsx:148`).
-7. Choisir un aliment : l'éditeur s'ouvre prérempli, titre **« Nouvel aliment »**
-   (`editeurAlimentConnecte.tsx:79`).
-
-### Créer de zéro
-
-8. Même bouton → première entrée **« Créer de zéro »**, détail
-   « aucune valeur préremplie » (`frigo.tsx:143`). Tous les champs partent vides
+5. **« Ajouter un aliment »** (`frigo.tsx:269`) : l'éditeur s'ouvre
+   directement, titre **« Nouvel aliment »** (`editeurAlimentConnecte.tsx:79`),
+   sur `ALIMENT_VIDE` (`frigo.tsx:266`). Tous les champs partent vides
    (`editeurAliment.tsx:80-83`).
-9. **Nom** (placeholder « Skyr nature Milbona »), **Quantité déjà en stock
+6. **Nom** (placeholder « Skyr nature Milbona »), **Quantité déjà en stock
    (facultatif)** avec l'aide « Laisse vide si tu n'en as pas encore. L'aliment
    sera créé à zéro et se remplira au prochain inventaire. »
    (`editeurAliment.tsx:259-273`).
-10. **Catégorie** : huit puces — Protéine, Glucide, Légume, Fruit, Oléagineux,
+7. **Catégorie** : huit puces — Protéine, Glucide, Légume, Fruit, Oléagineux,
     Matière grasse, Laitage, Autre (`nutrition.ts:237-246`).
-11. **« Pour 100 g, d'après l'emballage »** : Calories, Protéines, Glucides,
+8. **« Pour 100 g, d'après l'emballage »** : Calories, Protéines, Glucides,
     Lipides (`editeurAliment.tsx:302-323`), puis **Fibres (facultatif)**,
     placeholder « — » (`editeurAliment.tsx:364-370`).
-12. **« Changement de poids à la cuisson »** : cinq guides, ou
+9. **« Changement de poids à la cuisson »** : cinq guides, ou
     **« Je préfère mesurer »** (`editeurAliment.tsx:411-415`).
-13. **« Enregistrer »** (`editeurAliment.tsx:493-499`). La création part en deux
+10. **« Enregistrer »** (`editeurAliment.tsx:493-499`). La création part en deux
     temps : l'aliment, puis sa quantité **même à zéro** — c'est cet appel qui le
     rattache à un emplacement (`editeurAlimentConnecte.tsx:145-157`).
 
 ### Corriger et supprimer
 
-14. Déplier une ligne → **« Corriger les valeurs »** (`ligneFrigo.tsx:93-95`).
-15. Déplier une ligne → **« Supprimer »** (`ligneFrigo.tsx:99-101`) →
+11. Déplier une ligne → **« Corriger les valeurs »** (`ligneFrigo.tsx:93-95`).
+12. Déplier une ligne → **« Supprimer »** (`ligneFrigo.tsx:99-101`) →
     confirmation **« Supprimer « X » ? »** avec le message : « Il quittera
     définitivement ta liste d'aliments. La suppression est refusée s'il t'en
     reste en stock : mets sa quantité à zéro depuis l'inventaire d'abord. »
-    (`frigo.tsx:390-397`).
+    (`frigo.tsx:338-345`).
 
 ## Critères d'acceptation
 
@@ -127,7 +117,7 @@ quantités décimales, et **laisse deux aliments à zéro**
 
 2. **Le compteur d'en-tête ne compte que ce qui reste.** « N en stock sur M » :
    N = aliments à `stock > 0`, M = tous. Les deux lignes laissées à zéro par
-   `jeu-essai.sql` comptent dans M et pas dans N (`frigo.tsx:100`, `:209`).
+   `jeu-essai.sql` comptent dans M et pas dans N (`frigo.tsx:97`, `:179`).
 
 3. **La recherche trouve sans accents, sur le nom ET sur l'emplacement.**
    `congelateur` doit ramener les lignes du **Congélateur**. `filtrerFrigo`
@@ -140,9 +130,11 @@ quantités décimales, et **laisse deux aliments à zéro**
    quand `fibres100` est `null` ou `undefined` — vide n'est pas zéro
    (`ligneFrigo.tsx:70-72`).
 
-5. **Le catalogue ne repropose pas ce qu'on a déjà.** Comparaison par nom
-   `trim().toLowerCase()` (`frigo.tsx:132-135`, `:148`). Ajouter un aliment puis
-   rouvrir la liste : il en a disparu.
+5. **Un nom ne sert qu'une fois par compte.** Créer un second aliment du même
+   nom, à la casse près, est refusé en **422** : « Tu as déjà un aliment nommé
+   « X ». Choisis un autre nom, ou corrige celui qui existe. »
+   (`AlimentProcessor.php:39-44`, index `aliment_nom_unique_par_compte`). Le
+   même nom dans un **autre** compte passe.
 
 6. **L'enregistrement est BLOQUÉ sur « incohérent ».** `valide` exige à la fois
    un nom non vide, **les quatre macros lisibles**, `kcal100 > 0`, un ratio
@@ -155,7 +147,7 @@ quantités décimales, et **laisse deux aliments à zéro**
 7. **Vide ≠ zéro sur les fibres, et jusqu'en base.** Vider le champ Fibres pose
    `fibres100: null` (`editeurAliment.tsx:191-195`), transmis tel quel
    (`editeurAlimentConnecte.tsx:105`), colonne nullable côté API
-   (`api/src/Entity/Aliment.php:119-121`). **Refus** : une macro
+   (`api/src/Entity/Aliment.php:127-129`). **Refus** : une macro
    **obligatoire** vidée ou illisible bloque l'enregistrement au lieu de partir
    à 0 — c'est le correctif du 15 septembre 2026 (`editeurAliment.tsx:61-68`).
 
@@ -171,27 +163,29 @@ quantités décimales, et **laisse deux aliments à zéro**
    `editeurAliment.tsx:440-446`). **Refus** : `nombreSaisi` et non `parseFloat` —
    « 4,2,1 » ne produit aucun ratio (`editeurAliment.tsx:211-213`).
 
-10. **Un aliment créé reste privé.** Après création, en base :
-    `cree_par = <le compte>` et `public = false`, **posés par l'API depuis le
-    jeton** et jamais par le corps (`AlimentProcessor.php:48-54`).
+10. **Un aliment créé appartient à son compte.** Après création, en base :
+    `utilisateur_id = <le compte>`, **posé par l'API depuis le jeton** et
+    jamais par le corps (`AlimentProcessor.php:38`, `ProprietaireProcessor`).
 
 11. **Isolation entre comptes — la faille É1, et où le contrôle vit
-    aujourd'hui.** On ne pose pas de stock sur l'aliment privé d'autrui. Le
+    aujourd'hui.** On ne pose pas de stock sur l'aliment d'autrui. Le
     contrôle est au **point de passage obligé**, `FrigoBase::definirStock`, qui
     lève une exception avant toute écriture
-    (`api/src/Service/FrigoBase.php:131-133`) ; la règle elle-même est
-    `alimentsAccessibles`, « commun **OU** le mien »
-    (`api/src/Service/FrigoBase.php:97-109`). Les deux routes qui écrivent du
+    (`api/src/Service/FrigoBase.php:123-125`) ; la règle elle-même est
+    `alimentsAccessibles`, « le mien »
+    (`api/src/Service/FrigoBase.php:89-101`). Les deux routes qui écrivent du
     stock la posent aussi **en amont**, pour répondre tout de suite :
     `POST /mon-frigo/stock` (`FrigoController.php:122-125`, `:151-153`) et son
-    jumeau `POST /mon-frigo/inventaire` (`FrigoController.php:383-396`).
+    jumeau `POST /mon-frigo/inventaire` (`FrigoController.php:388-395`).
     **Refus attendu : 404**, avec le **même message** que pour « n'existe pas »,
     pour ne pas laisser énumérer les identifiants
     (`FrigoController.php:148-153`).
 
-12. **Supprimer : seulement le sien, jamais un commun.** `Delete` est gardé par
-    `object.getCreePar() == user` (`api/src/Entity/Aliment.php:51-54`) : un
-    aliment commun (`cree_par IS NULL`) n'est supprimable par personne.
+12. **Corriger et supprimer : seulement le sien.** `Patch` et `Delete` sont
+    gardés par `object.getUtilisateur() == user`
+    (`api/src/Entity/Aliment.php:53-56`, `:60-63`), sans passe-droit
+    administrateur ; `FiltreProprietaire` ne laisse de toute façon charger que
+    les aliments du compte.
 
 13. **Refus de supprimer un aliment encore en stock.** 409 : « Cet aliment est
     encore dans un frigo (N ligne(s) de stock). Mets sa quantité à zéro avant de
@@ -202,9 +196,10 @@ quantités décimales, et **laisse deux aliments à zéro**
     se supprime.
 
 14. **Le frigo ne montre que SES aliments.** La requête filtre
-    `WHERE a.cree_par = :utilisateur` (`api/src/Service/FrigoBase.php:48`) : les
-    ~50 communs restent lisibles par `/api/aliments` comme point de départ d'une
-    création, mais n'encombrent pas le frigo.
+    `WHERE a.utilisateur_id = :utilisateur` (`api/src/Service/FrigoBase.php:40`),
+    comme `/api/aliments` par `FiltreProprietaire`. Un compte neuf a un frigo
+    vide : « Ton frigo est vide. Ajoute un aliment pour commencer. »
+    (`frigo.tsx:220`).
 
 15. **Zéro erreur JavaScript**, et aucune requête en échec non voulue.
 
@@ -228,8 +223,8 @@ sed "s/essai@fitcarnet.local/$COMPTE/" /home/micka/perso/fitcarnet/db/manuel/jeu
 
 **Relis l'adresse du `sed` avant Entrée.** Le script refuse un compte qui lit
 Grocy (`RAISE EXCEPTION ... Ce jeu vise un compte ordinaire.`). Il finit par une
-**requête de contrôle** qui donne les trois chiffres attendus — `aliments_a_moi`,
-`en_stock`, `catalogue_de_reference` : **c'est d'elle qu'on tire le « N en stock
+**requête de contrôle** qui donne les deux chiffres attendus — `aliments_a_moi`
+et `en_stock` : **c'est d'elle qu'on tire le « N en stock
 sur M » à vérifier à l'écran**, pas d'un chiffre écrit d'avance.
 
 ### Web
@@ -249,12 +244,13 @@ JETON=$(curl -s -X POST http://localhost:8080/api/connexion \
 curl -s -H "Authorization: Bearer $JETON" http://localhost:8080/api/mon-frigo | head -c 600
 ```
 
-**Le critère 10 (aliment privé)** :
+**Le critère 10 (aliment du compte)** :
 
 ```sql
-SELECT nom, cree_par IS NOT NULL AS a_un_proprietaire, public
-  FROM aliment WHERE nom LIKE '%verif%';
--- attendu : a_un_proprietaire = t, public = f
+SELECT a.nom, u.email
+  FROM aliment a JOIN utilisateur u ON u.id = a.utilisateur_id
+ WHERE a.nom LIKE '%verif%';
+-- attendu : chaque ligne porte l'adresse du compte qui l'a créée
 ```
 
 **Le critère 11 (isolation, faille É1)** — deux comptes, `alice-verif@` et
@@ -290,14 +286,13 @@ Le même refus est couvert sans base par
   (`editeurAliment.tsx:169-183`). Si une saisie s'efface toutes les deux
   secondes pendant un inventaire, c'est cette régression-là.
 - **La suppression envoie `Number(reference.split(':')[1])`**
-  (`frigo.tsx:402`) : sur une référence `grocy:…` le bouton n'existe pas, c'est
+  (`frigo.tsx:350`) : sur une référence `grocy:…` le bouton n'existe pas, c'est
   voulu.
 
 ### Nettoyer
 
-Dans l'ordre de `donnees-de-test` — stock, **puis** aliments, **puis** compte
-(`aliment.cree_par` est en `ON DELETE SET NULL` : l'inverse rendrait ses aliments
-**communs**). Puis recompter et comparer aux chiffres relevés avant de commencer.
+Dans l'ordre de `donnees-de-test`. Supprimer le compte emporte ses aliments
+(`aliment.utilisateur_id` est en `ON DELETE CASCADE`). Puis recompter et comparer aux chiffres relevés avant de commencer.
 
 ## La capture pour la démonstration
 
@@ -310,12 +305,11 @@ en scénarios courts. Dossier :
 | `01-le-stock.webm` | onglet **Mon frigo**, défilé lent sur toute la liste | 25 s | le compteur « N en stock sur M », les sections **FRIGO / CONGÉLATEUR / PLACARD**, les macros pour 100 g |
 | `02-le-detail-et-le-poids-cru.webm` | ouvrir un féculent au rendement ≠ 1 | 30 s | les macros, **« À la cuisson · 100 g → 230 g »**, la mention **poids sec** sur la ligne |
 | `03-chercher.webm` | taper `poul`, effacer, taper `congelateur` **sans accent** | 15 s | la liste se réduit ; l'emplacement est trouvé sans son accent |
-| `04-ajouter-depuis-le-catalogue.webm` | **Ajouter un aliment** → **Partir d'un aliment de référence** → en choisir un → **Enregistrer** | 35 s | la liste des références avec leurs macros, l'éditeur prérempli, la ligne qui apparaît dans sa section |
-| `05-creer-de-zero.webm` | **Ajouter un aliment** → **Créer de zéro** → nom, huit catégories, macros, fibres laissées **vides** | 40 s | les huit puces, le champ **Fibres (facultatif)** laissé vide et l'aide qui l'explique |
-| `06-le-controle-bloque.webm` | saisir des macros incohérentes, montrer le bandeau rouge et le bouton **Enregistrer** éteint, puis corriger | 30 s | **le moment fort** : le verdict passe de rouge à vert et le bouton se rallume |
-| `07-les-kilojoules.webm` | saisir `1473` en calories | 20 s | le bandeau et le bouton **« Convertir : 1473 kJ = 352 kcal »** |
-| `08-mesurer-le-rendement.webm` | **Je préfère mesurer** → `100` / `230` | 25 s | **« Utiliser ce résultat (2,3) »**, puis « ✓ mesuré : 100 g avant cuisson → 230 g après » |
-| `09-supprimer.webm` | supprimer l'aliment créé en 05 ; puis tenter d'en supprimer un **en stock** | 20 s | la confirmation, puis **le refus 409 nommant le nombre de lignes** |
+| `04-ajouter-un-aliment.webm` | **Ajouter un aliment** → l'éditeur vide → nom, huit catégories, macros, fibres laissées **vides** → **Enregistrer** | 40 s | les huit puces, le champ **Fibres (facultatif)** laissé vide et l'aide qui l'explique, la ligne qui apparaît dans sa section |
+| `05-le-controle-bloque.webm` | saisir des macros incohérentes, montrer le bandeau rouge et le bouton **Enregistrer** éteint, puis corriger | 30 s | **le moment fort** : le verdict passe de rouge à vert et le bouton se rallume |
+| `06-les-kilojoules.webm` | saisir `1473` en calories | 20 s | le bandeau et le bouton **« Convertir : 1473 kJ = 352 kcal »** |
+| `07-mesurer-le-rendement.webm` | **Je préfère mesurer** → `100` / `230` | 25 s | **« Utiliser ce résultat (2,3) »**, puis « ✓ mesuré : 100 g avant cuisson → 230 g après » |
+| `08-supprimer.webm` | supprimer l'aliment créé en 04 ; puis tenter d'en supprimer un **en stock** | 20 s | la confirmation, puis **le refus 409 nommant le nombre de lignes** |
 
 **Un contexte Playwright par scénario**, sinon tout tombe dans une seule vidéo.
 La frappe à 60 ms par caractère et les temps morts volontaires viennent de
@@ -343,8 +337,7 @@ La frappe à 60 ms par caractère et les temps morts volontaires viennent de
   `front/src/composants/etapeReglage.tsx:483-523`). Ne pas le chercher ici.
 - **`presentation/features.md` (section B) est périmé sur ses `fichier:ligne`.**
   Il cite `frigo.tsx:222`, `:635`, `:644`, `:658`, `:669`, `:702`, `:730` — or le
-  fichier fait **445 lignes** depuis l'extraction du 15 septembre 2026. Ces
-  éléments vivent désormais dans `ligneFrigo.tsx` et `alertesFrigo.tsx`. Ne pas
+  fichier fait **393 lignes**. Ces éléments vivent dans `ligneFrigo.tsx` et `alertesFrigo.tsx`. Ne pas
   recopier ses numéros.
 - **`presentation/features.md` (section K) est faux sur deux points depuis le
   15 septembre 2026** : `front/src/calcul/texte.ts` **existe**
@@ -354,6 +347,5 @@ La frappe à 60 ms par caractère et les temps morts volontaires viennent de
 - **`front/src/composants/inventaire.tsx` n'existe plus** : la zone d'ombre K du
   14 septembre est réglée par suppression, pas par confirmation.
 - Le chiffre « 12 en stock sur 14 » de la bobine 3.1 **n'est pas garanti** :
-  `jeu-essai.sql` pose deux aliments par catégorie présente dans le catalogue
-  commun, plus un skyr, et en laisse deux à zéro. **Relever le chiffre réel** avec
+  `jeu-essai.sql` pose huit aliments, skyr compris, et en laisse deux à zéro. **Relever le chiffre réel** avec
   la requête de contrôle du script.

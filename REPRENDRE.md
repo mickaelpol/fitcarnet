@@ -5,7 +5,12 @@ machine qui n'a pas suivi les précédentes, **et à tenir à jour** : c'est le 
 endroit qui dit ce que ni le code ni les commits ne racontent — les décisions
 prises, ce qui attend un arbitrage, et par quoi continuer.
 
-**Dernière mise à jour : 17 septembre 2026** — la présentation tient enfin dans
+**Dernière mise à jour : 17 septembre 2026, fin de matinée** — **chaque aliment
+appartient à un compte**, et chacun ne voit que les siens. Voir « Aliments par
+compte : ce qui reste à faire », juste en dessous : **un déploiement et un
+commit de retrait sont en attente.**
+
+**Plus tôt le 17 septembre** — la présentation tient enfin dans
 **un seul fichier** (`presentation/demonstration.md`) derrière **un seul
 script** (`preparer-demonstration.sh`), et les **23 captures existent pour de
 vrai** : elles sont prises par Playwright sur l'application qui tourne, et
@@ -18,7 +23,7 @@ agents** en sont nés, et l'épreuve sur émulateur Android a trouvé que le
 sélecteur de mode tout juste ajouté au modèle **ne commandait rien** (voir
 « Le mode de travail se choisit aussi dans un modèle », plus bas). Corrigé.
 
-**Avant cela, le 15 septembre au soir** : **les 84 constats de l'audit sont
+**Avant cela, le 15 septembre au soir** : **les 79 constats de l'audit sont
 traités, les huit lots clos**. Les trois agents de contrôle ont été lancés sur
 l'ensemble et ont trouvé trois choses qu'aucun test ne voyait (voir plus bas).
 L'application est éprouvée dans un vrai navigateur, écran par écran, et contre
@@ -27,15 +32,57 @@ tourner les vidéos.
 
 ---
 
+## Aliments par compte : ce qui reste à faire
+
+Chantier du 17 septembre 2026, conception et plan dans
+`docs/superpowers/specs/2026-09-17-aliments-tous-personnels-design.md` et
+`docs/superpowers/plans/2026-09-17-aliments-tous-personnels.md`.
+
+**Fait et poussé.** `Aliment` implémente `ProprieteUtilisateur` et passe par
+`FiltreProprietaire` ; `aliment.utilisateur_id` est `NOT NULL ON DELETE
+CASCADE`, le nom est unique par compte (`aliment_nom_unique_par_compte`).
+« Ajouter un aliment » ouvre l'éditeur vide. Schéma, migrations, API, front,
+scripts Python, skills, audit (79 constats) et présentation sont alignés.
+Vérifié : 596 + 29 tests front, 298 tests API, `test_ciqual.py` 181/181,
+`test_ecriture_grocy.py` 34/34, `verifier-schema.sh` « identiques »,
+`verifier-migrations.sh` vert, et la table `aliment` de la base de dev, migrée
+deux fois, identique à celle d'une base neuve.
+
+**Ce qui attend, dans cet ordre :**
+
+1. `sauvegarde-nas.sh` — la migration suivante supprime des lignes en
+   production, sans retour possible autrement.
+2. `deployer-nas.sh`. Au démarrage, `db/manuel/34-aliments-par-compte.sql`
+   amène la base : aliments sans propriétaire supprimés (avec le stock qui les
+   visait), `cree_par` renommée `utilisateur_id`, colonne `public` retirée.
+   Précondition confirmée par le propriétaire : la production tournait déjà sur
+   un `master` contenant la migration 33 — c'est ce qui permet d'avoir retiré
+   les migrations 10 et 14 à 19.
+3. Contrôler en production : `\d aliment` montre `utilisateur_id` NOT NULL et
+   l'index `aliment_nom_unique_par_compte`.
+4. **Supprimer `db/manuel/34-aliments-par-compte.sql`** dans un commit à part,
+   pousser, redéployer. C'est un passage ponctuel : une base neuve naît déjà
+   dans cet état. Une fois retiré, la prochaine migration reprend le numéro 34
+   (`schema-base` le dit déjà).
+5. Réduire alors cette section à une ligne : c'est la dernière trace, dans le
+   dépôt, du modèle précédent.
+
+**Base de développement.** Déjà passée par la 34. Sa sauvegarde d'avant
+passage n'a été gardée que dans le dossier temporaire de la session.
+`jeu-essai.sql` crée désormais lui-même ses 8 aliments (valeurs CIQUAL) : le
+rejouer sur un compte d'essai si le frigo de dev paraît vide.
+
+---
+
 ## L'essentiel en cinq lignes
 
-Un audit complet a relevé **84 constats** (3 critiques, 15 élevés). **Les huit
+Un audit complet a relevé **79 constats** (3 critiques, 14 élevés). **Les huit
 lots sont terminés** — garde-fous, ce qui était cassé, les chiffres faux, la
 sécurité et l'isolation, la base reproductible, les scripts dangereux,
 l'architecture front, les tests du client HTTP, et le lot 8 dans ses vingt
 constats.
 
-État : **625 tests front** (596 + 29 de rendu) · **302 API · 797 assertions**, 7 erreurs PHPStan
+État : **625 tests front** (596 + 29 de rendu) · **298 API · 791 assertions**, 7 erreurs PHPStan
 connues (il y en avait 8), `verifier-schema.sh` et `verifier-migrations.sh` au
 vert, `master` synchronisé. Tout est dans
 [docs/audit-2026-09/](docs/audit-2026-09/README.md), avec un tableau d'avancement.
@@ -81,9 +128,9 @@ vivant (colonne `jeton`, migration 30). Cinq index de jointure créés, cinq
   lot 0 était mauvaise ; la skill `schema-base` porte l'avertissement.
 
 **Une leçon, la plus utile de la journée.** En écrivant `ExerciceProcessor`,
-j'ai recopié le garde `null === getCreePar()` d'`AlimentProcessor` — et donc
-reproduit M-01 une heure après l'avoir lu. Un admin corrigeant un exercice du
-catalogue se le serait approprié. C'est **exactement le motif dominant de
+j'ai recopié le garde « l'auteur est-il encore vide ? » d'un processeur voisin
+— et donc reproduit M-01 une heure après l'avoir lu. Un admin corrigeant un
+exercice du catalogue se le serait approprié. C'est **exactement le motif dominant de
 l'audit**, observé en direct : une décision juste, appliquée à un endroit et
 oubliée à un autre. Les trois processeurs suivent désormais la même règle —
 l'**opération** fait foi, jamais l'état du champ.
@@ -111,7 +158,7 @@ docker compose -f compose.dev.yml up -d
 
 ```bash
 cd front && npm test                                                  # 596 + 29 tests, 0 echec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 302 tests, 797 assertions
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 298 tests, 791 assertions
 db/manuel/verifier-schema.sh                                          # ✓ identiques
 db/manuel/verifier-migrations.sh                                      # ✓ au vert
 ```
@@ -226,7 +273,7 @@ le projet n'aura, lui non plus, que ce qui est écrit.
 
 ## Par quoi continuer
 
-**L'audit est clos, ses huit lots et ses 84 constats.** Ce qui suit est du
+**L'audit est clos, ses huit lots et ses 79 constats.** Ce qui suit est du
 confort ou attend un arbitrage — à une exception près, la première ligne du
 tableau, qui est une clé d'API à révoquer.
 
@@ -974,7 +1021,7 @@ précédente, il est absent (contre-épreuve faite).
 
 ---
 
-## Le riz cuit ne fait pas 130 kcal, et quatre chiffres du catalogue étaient faux
+## Le riz cuit ne fait pas 130 kcal, et quatre chiffres de la fixture étaient faux
 
 **16 septembre 2026.** Le propriétaire a demandé de vérifier « le riz sec vaut
 350 kcal/100 g, pas 130 » — la phrase de la règle 3, répétée dans douze
@@ -997,7 +1044,7 @@ La source fait foi et elle est **dans le dépôt** : `Table_Ciqual_2025.xlsx`.
 > Jones, avec fibres » (348). **C'est la première qu'il faut lire** — elle compte
 > les fibres à 2 kcal/g, c'est-à-dire la règle 4 du projet. J'ai d'abord lu la
 > seconde et écrit 348 partout ; la revue l'a relevé. Le contrôle qui tranche :
-> 350 ÷ 155 = **2,26**, exactement le rendement du catalogue.
+> 350 ÷ 155 = **2,26**, exactement le rendement retenu pour le riz blanc.
 
 **Trois pièges, chacun tombé une fois :**
 
@@ -1012,26 +1059,14 @@ La source fait foi et elle est **dans le dépôt** : `Table_Ciqual_2025.xlsx`.
    absorbé 1,26 fois son poids en eau. Dire « il pèse deux fois et quart plus
    lourd » est juste et plus parlant devant une balance.
 
-### Ce qui était faux dans les données, et qui revenait tout seul
+### Ce qui était faux dans les données
 
-**`db/manuel/16-catalogue-ciqual.sql` réécrivait à chaque démarrage un riz dont
-quatre chiffres sur six n'étaient dans aucune entrée de la table** : prot 7,12,
-gluc 75, lip **1,58** (le double), fibres **3,2** (2,1 ×). Une correction à la
-main revenait au redémarrage suivant — le piège que ce fichier décrit lui-même.
-L'audit avait nommé deux des quatre et les avait tracés jusqu'à la fausse table
-de `test_ecriture_grocy.py`, d'où ils venaient : **les deux sont corrigés**, à la
-source et dans la fixture. Le doublement des fibres déplaçait une cible exprimée
-en glucides *totaux* : c'était un chiffre affiché.
-
-**Et le riz complet portait un rendement de 3** (la valeur d'avant la refonte)
-avec 332,4 kcal : 100 g prescrits s'annonçaient **300 g** dans l'assiette au lieu
-de 187. Une ligne de plus dans la même migration.
-
-> **Restent, connus et non traités** : `Boulgour 83 kcal / 2,5`,
-> `Pates completes 124 / 2,2`, `Semoule 336 / 3` en base de développement. C'est
-> le comportement **documenté** de `18-un-seul-etat.sql` (« on ne convertit que
-> ce qu'on peut prouver »), et `16-catalogue-ciqual.sql` ne couvre que cinq noms.
-> Aucune affirmation n'est fausse ; l'écart existe dans les données.
+**La fausse table de `test_ecriture_grocy.py` portait un riz dont quatre
+chiffres sur six ne sont dans aucune entrée CIQUAL** : prot 7,12, gluc 75, lip
+**1,58** (le double), fibres **3,2** (2,1 ×). L'audit en avait nommé deux et les
+avait tracés jusqu'à cette table : **ils sont corrigés**, à la source et dans la
+fixture. Le doublement des fibres déplaçait une cible exprimée en glucides
+*totaux* : c'était un chiffre affiché.
 
 ### Ce que l'application calcule est juste — et c'est prouvé
 
@@ -1069,7 +1104,7 @@ macros sur les poids *servis*, on obtiendrait **1 207 kcal au lieu de 801** —
   dessus, et il avait raison — un rendement faux ne fait pas mal peser.*
 - **Le docblock de `api/src/Entity/Aliment.php` disait l'inverse de la règle 3**
   (« féculents : valeurs CUITES, ratio = cuit/sec (riz 3) ») : la convention
-  abolie par `18-un-seul-etat.sql`, sur l'entité que lit en premier quiconque
+  que la règle 3 a abolie, sur l'entité que lit en premier quiconque
   écrit un import.
 
 ### Et deux défauts trouvés par la revue, hors du riz
@@ -1229,10 +1264,10 @@ son histoire est déjà racontée ici et dans `NOUVELLE-MACHINE.md`.
 
 ### Les treize faussetés corrigées
 
-La pire après `fitsync` : **`INSTALLATION.md` annonçait « 12 tables, 50 aliments »**
-et donnait la requête pour les compter. Le schéma en a **19**, et
-`db/02-donnees.sql` n'insère **aucun** aliment depuis le 14 septembre — celui
-qui suivait le contrôle obtenait 0 et croyait avoir raté son installation.
+La pire après `fitsync` : **`INSTALLATION.md` annonçait 12 tables et des
+aliments semés** et donnait la requête pour les compter. Le schéma en a **19**,
+et `db/02-donnees.sql` n'insère **aucun** aliment — celui qui suivait le
+contrôle obtenait 0 et croyait avoir raté son installation.
 
 Les autres : `NOUVELLE-MACHINE.md` annonçait **6 skills et 2 agents** (il y en a
 25 et 7 — dix-neuf skills cachées à l'arrivant) · `README.md` disait 852 tests
@@ -1408,10 +1443,10 @@ eux, plus aucune capture n'est reproductible :
 ```bash
 # demo-verif@test.local et demo-admin-verif@test.local, mot de passe DemoFitcarnet2026!
 # jeu-essai.sql PUIS jeu-demo.sql posés dessus, adresse réécrite au passage.
-# Pour les retirer (l'ordre compte : l'aliment AVANT son auteur) :
+# Pour les retirer (l'ordre compte : le stock AVANT les aliments, les aliments AVANT le compte) :
 docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet <<'SQL'
 DELETE FROM stock   WHERE utilisateur_id IN (SELECT id FROM utilisateur WHERE email LIKE '%-verif@test.local');
-DELETE FROM aliment WHERE cree_par       IN (SELECT id FROM utilisateur WHERE email LIKE '%-verif@test.local');
+DELETE FROM aliment WHERE utilisateur_id IN (SELECT id FROM utilisateur WHERE email LIKE '%-verif@test.local');
 DELETE FROM utilisateur WHERE email LIKE '%-verif@test.local';
 SQL
 ```

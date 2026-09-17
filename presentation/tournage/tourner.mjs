@@ -169,7 +169,7 @@ await etape('frigo — le stock', async () => {
   await pause(page, 2);
   await page.mouse.wheel(0, -640);
   await pause(page, 1.5);
-  await cliquer(page, 'Blanc de poulet');  // le détail : valeurs et rendement
+  await cliquer(page, 'Poulet, filet sans peau cru');  // le détail : valeurs et rendement
   await pause(page, 4);
   await page.keyboard.press('Escape').catch(() => {});
   await pause(page, 1);

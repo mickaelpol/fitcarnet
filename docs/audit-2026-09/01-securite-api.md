@@ -6,7 +6,7 @@ Périmètre lu intégralement : `api/src/**`, `api/config/**`, `api/tests/`,
 Vérifications dynamiques : `php bin/console debug:router` (liste réelle des
 routes exposées et de leurs contrôleurs).
 
-Bilan : **0 CRITIQUE, 1 ÉLEVÉE, 3 MOYENNE, 9 FAIBLE.**
+Bilan : **0 CRITIQUE, 1 ÉLEVÉE, 2 MOYENNES, 9 FAIBLES.**
 Aucune fuite de données entre comptes en LECTURE n'a été trouvée. Le socle
 d'isolation (`ProprieteUtilisateur` + `FiltreProprietaire` + `security:` par
 opération) est correct et redondant. Le seul défaut d'autorisation réel est un
@@ -24,7 +24,7 @@ chemin d'ÉCRITURE oublié.
 | `PlanRepas` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Delete | idem — **OK** |
 | `Cible` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** |
 | `Complement` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** |
-| `Aliment` | `creePar` (nullable) | non | oui | GetC, Get, Post, Patch, Delete | `FiltreAliment` (« commun OU le mien ») — **OK** en lecture |
+| `Aliment` | `utilisateur` (NOT NULL) | oui | oui | GetC, Get, Post, Patch, Delete | idem — **OK** |
 | `Exercice` | `creePar` (nullable) | non | oui | GetC, Get, Post, Patch(ADMIN) | **aucun filtre** — catalogue volontairement commun (voir F-04) |
 | `Utilisateur` | — | non | oui | Get, GetC(ADMIN), Post(ADMIN), Patch | `is_granted('ROLE_ADMIN') or object == user` — **OK** |
 | `Emplacement` | — | non | oui | GetC, Get (lecture seule) | référentiel fixe, aucune donnée personnelle — **OK** |
@@ -52,16 +52,16 @@ pare-feu par conception (voir F-06/F-07 pour ce qui les concerne).
   - `api/src/Service/AppliqueInventaire.php:146-179` (application, aucune vérification)
   - à comparer avec `api/src/Controller/FrigoController.php:124-131` et `:157-159`, qui font le contrôle sur l'autre chemin
 
-**Ce qui se passe.** `POST /api/mon-frigo/stock` vérifie que l'aliment visé est
-commun ou celui du demandeur (`alimentAccessible()`, ajouté explicitement pour
+**Ce qui se passe.** `POST /api/mon-frigo/stock` vérifie que l'aliment visé
+appartient au demandeur (`alimentAccessible()`, ajouté explicitement pour
 corriger cette faille — le commentaire aux lignes 106-123 la décrit en détail).
 `POST /api/mon-frigo/inventaire` fait le même travail par un autre chemin et
 **n'a pas reçu le même contrôle** : il ne valide que le préfixe `base:` et la
 positivité de l'identifiant, puis dépose le lot ; le travailleur de fond appelle
 ensuite `FrigoBase::definirStock($utilisateur, $idAliment, $quantite)` sans
 jamais vérifier à qui appartient `$idAliment`. Un compte authentifié peut donc
-poster `{"lignes":[{"reference":"base:<id de l'aliment privé d'Alice>","quantite":1}]}`
-et faire écrire une ligne de stock sur l'aliment privé d'Alice. Conséquence
+poster `{"lignes":[{"reference":"base:<id d'un aliment d'Alice>","quantite":1}]}`
+et faire écrire une ligne de stock sur un aliment d'Alice. Conséquence
 exacte que le commentaire du fichier annonce pour l'autre route : Alice ne peut
 plus supprimer son aliment (`AlimentSuppressionProcessor` compte les lignes de
 stock **tous comptes confondus**, `api/src/State/AlimentSuppressionProcessor.php:41-51`)
@@ -75,7 +75,7 @@ d'énumérer les identifiants d'aliments existants et expose le texte SQL.
 est de le faire au dépôt, avant d'écrire le lot, en une seule requête :
 
 ```sql
-SELECT id FROM aliment WHERE id = ANY(:ids) AND (cree_par IS NULL OR cree_par = :u)
+SELECT id FROM aliment WHERE id = ANY(:ids) AND utilisateur_id = :u
 ```
 
 et refuser le lot (422) si un identifiant manque à l'appel — donc en réutilisant
@@ -85,32 +85,6 @@ trois lignes et protège le jour où un autre appelant déposera un lot.
 Accessoirement, ne renvoyer que `$e->getMessage()` filtré, ou un motif générique,
 pour les échecs de type contrainte.
 **Effort : 45 min à 1 h**, tests unitaires compris (`tests/Service/InventaireUneLigneTest.php` existe déjà).
-
----
-
-## M-01 — ✅ corrigé le 14 septembre 2026 — Un PATCH administrateur privatisait silencieusement un aliment commun
-
-- **Gravité : MOYENNE**
-- **Statut : CORRIGÉ** — l'opération fait foi, plus l'état du champ. Vérifié en base : le cas ne s'était **jamais produit** (50 aliments communs, tous sans auteur et publics), aucune remise en état nécessaire. Le même piège a été trouvé et fermé sur `ExerciceProcessor` et `ProprietaireProcessor` : trois processeurs, une seule règle.
-- **Emplacement :** `api/src/State/AlimentProcessor.php:37-43`, déclenché par `api/src/Entity/Aliment.php:39-43` (`Patch`)
-
-**Ce qui se passe.** `AlimentProcessor` pose le propriétaire « seulement s'il
-manque » — ce qui est juste à la création, mais s'applique aussi au `Patch`. Or
-un aliment de référence a précisément `creePar = NULL`. Quand l'administrateur
-corrige la valeur nutritionnelle d'un des ~50 aliments communs, le processeur
-lui attribue `creePar = <admin>` et `public = false`. `FiltreAliment`
-(`creePar IS NULL OR creePar = :courant`) fait alors **disparaître cet aliment du
-catalogue de tous les autres comptes**, sans qu'aucun écran ne le dise. Ce n'est
-pas une fuite : c'est une perte d'accès silencieuse à une donnée partagée,
-déclenchée par le geste le plus normal de l'administration.
-
-**Correction proposée.** N'affecter le propriétaire qu'à la création, en se
-fiant à l'opération plutôt qu'à l'état du champ — par exemple
-`if ($operation instanceof Post && null === $data->getCreePar())`, ou en testant
-l'absence de `$context['previous_data']` comme le fait déjà
-`UtilisateurProcessor` (`api/src/State/UtilisateurProcessor.php:64-65`).
-**Effort : 15 min** + une requête SQL de remise en état si le cas s'est déjà
-produit (`UPDATE aliment SET cree_par = NULL, public = true WHERE …`).
 
 ---
 
@@ -230,7 +204,7 @@ détournement par cadre (clickjacking) et au *MIME sniffing*.
 
 **Ce qui se passe.** Confirmation point par point :
 - `Exercice` n'implémente pas `ProprieteUtilisateur` et aucune extension Doctrine
-  ne le vise : ni `FiltreProprietaire`, ni `FiltreAliment`. Vérifié par recherche
+  ne le vise, `FiltreProprietaire` compris. Vérifié par recherche
   exhaustive de `creePar` / `cree_par` dans `src/` : **`Exercice::setCreePar()`
   n'est appelé nulle part**. La colonne est donc toujours `NULL`, y compris pour
   les exercices créés par l'API — contrairement à `Aliment`, dont
@@ -255,8 +229,8 @@ détournement par cadre (clickjacking) et au *MIME sniffing*.
    et sa colonne, corriger le commentaire de tri ligne 66-67 qui affirme le
    contraire. **Effort : 20 min.**
 2. **Les exercices « perso » redeviennent privés** : renseigner `creePar` par un
-   processeur calqué sur `AlimentProcessor`, ajouter un `FiltreExercice` calqué
-   sur `FiltreAliment` (`creePar IS NULL OR creePar = :courant`), et autoriser
+   processeur calqué sur `AlimentProcessor`, ajouter un `FiltreExercice`
+   (`creePar IS NULL OR creePar = :courant`), et autoriser
    l'auteur à modifier/supprimer les siens. **Effort : 2 à 3 h**, migration de
    données comprise (les exercices existants restent `NULL` = communs, ce qui est
    le bon défaut).
@@ -343,21 +317,21 @@ utilisée nulle part ailleurs.
 
 ---
 
-## F-08 — Le catalogue commun est ouvert en écriture sans plafond ni suppression
+## F-08 — Le catalogue d'exercices est ouvert en écriture sans plafond ni suppression
 
 - **Gravité : FAIBLE**
 - **Statut : CONFIRMÉ**
-- **Emplacement :** `api/src/Entity/Exercice.php:59` (`Post`, `ROLE_USER`), `:69` (`paginationItemsPerPage: 1500`) ; `api/src/Entity/Aliment.php:34` (`Post`, `ROLE_USER`)
+- **Emplacement :** `api/src/Entity/Exercice.php:59` (`Post`, `ROLE_USER`), `:69` (`paginationItemsPerPage: 1500`)
 
-**Ce qui se passe.** Tout compte authentifié peut créer autant d'`Exercice`
-(catalogue commun servi en une page de 1500 entrées à tous) et d'`Aliment` qu'il
-veut, sans limite de débit ni de volume, et `instructions` est un `TEXT` non
+**Ce qui se passe.** Tout compte authentifié peut créer autant d'`Exercice` qu'il
+veut — dans un catalogue servi à tous en une page de 1500 entrées —, sans limite
+de débit ni de volume, et `instructions` est un `TEXT` non
 borné. C'est un vecteur de dégradation du service, pas de compromission — et
 dans un contexte de quelques comptes de confiance, l'exposition est faible.
 
 **Correction proposée.** Si le besoin s'en fait sentir : `Assert\Length(max: …)`
 sur `nom`, `instructions`, `musclesSecondaires`, et un limiteur de débit Symfony
-sur les deux `Post`.
+sur ce `Post`.
 **Effort : 45 min.**
 
 ---
@@ -383,9 +357,8 @@ en `Patch` et `Delete`). Sinon, laisser tel quel et l'assumer par écrit.
 # Axes sans constat
 
 - **Injection SQL / DQL : rien.** Toutes les requêtes de `src/` sont paramétrées.
-  Les deux seules constructions par `sprintf` (`FiltreProprietaire.php:63`,
-  `FiltreAliment.php:71`) n'interpolent que l'alias racine du `QueryBuilder`,
-  jamais une valeur client. Le seul autre morceau de SQL assemblé est
+  La seule construction par `sprintf` (`FiltreProprietaire.php:63`)
+  n'interpole que l'alias racine du `QueryBuilder`, jamais une valeur client. Le seul autre morceau de SQL assemblé est
   `InventaireLots.php:208`, qui concatène une **constante de classe**
   (`SILENCE_MAXIMAL`).
 - **Élévation de privilèges : rien.** `Utilisateur::$roles` porte
@@ -396,10 +369,9 @@ en `Patch` et `Delete`). Sinon, laisser tel quel et l'assumer par écrit.
   depuis l'application, ce qui rend la protection « dernier administrateur »
   d'autant plus nécessaire.
 - **Désérialisation de champs sensibles : rien.** `roles`, `actif`, `creeLe`,
-  `sourceFrigo`, `Aliment::creePar`, `Aliment::public`, `Exercice::creePar`,
-  `Exercice::source`, `Exercice::public`, `PlanRepas::cuisineLe` et tous les
-  champs `utilisateur` des `ProprieteUtilisateur` sont hors des groupes
-  d'écriture. Vérifié entité par entité.
+  `sourceFrigo`, `Exercice::creePar`, `Exercice::source`, `Exercice::public`,
+  `PlanRepas::cuisineLe` et tous les champs `utilisateur` des
+  `ProprieteUtilisateur` sont hors des groupes d'écriture. Vérifié entité par entité.
 - **Invitations : rien de grave.** Jeton de 32 octets `random_bytes`, stocké en
   SHA-256 seulement, expiration à 7 jours, consommation atomique
   (`UPDATE … WHERE id = :id AND accepte_le IS NULL` dans la transaction de
@@ -430,8 +402,7 @@ en `Patch` et `Delete`). Sinon, laisser tel quel et l'assumer par écrit.
    `FiltreProprietaire` au niveau de la requête SQL (donc y compris sur les
    collections, les filtres de recherche et les items) *et* par un
    `security: "object.getUtilisateur() == user"` par opération. L'un rattrape
-   l'oubli de l'autre. Le cas particulier d'`Aliment` a son propre filtre, avec
-   les parenthèses autour du `OR` — le détail exact qui casse ce genre de garde-fou.
+   l'oubli de l'autre.
 2. **Les champs sensibles sont hors des groupes d'écriture, systématiquement.**
    `roles` et `actif` en lecture seule, `utilisateur`/`creePar` posés par un
    processeur à partir du jeton et jamais du corps de requête. C'est la seule

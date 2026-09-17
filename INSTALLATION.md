@@ -25,11 +25,11 @@ docker compose -f compose.dev.yml exec db psql -U fitcarnet -d fitcarnet -c "
   UNION ALL SELECT 'emplacements', count(*) FROM emplacement;"
 ```
 
-> **Ce contrôle annonçait « 12 tables, 50 aliments » jusqu'au 16 septembre 2026,
-> et il faisait croire à une installation ratée.** Le schéma en compte 19, et
-> `db/02-donnees.sql` n'insère plus un seul aliment depuis le 14 septembre : les
-> valeurs nutritionnelles ne sont pas une constante, deux paquets de la même
-> marque diffèrent. Zéro aliment sur une base neuve est le résultat **attendu**.
+> **Zéro aliment sur une base neuve est le résultat attendu.** Chaque aliment
+> appartient à un compte, et chaque compte saisit les siens : les valeurs
+> nutritionnelles ne sont pas une constante, deux paquets de la même marque
+> diffèrent, et l'étiquette donne les bonnes. `db/02-donnees.sql` ne sème que
+> le structurel — emplacements, façons de cuire.
 
 **Si la base existait déjà**, les fichiers ne sont pas rejoués. Pour repartir
 de zéro — cela **efface tout** :
@@ -142,17 +142,10 @@ base qui EXISTE DÉJÀ, puisque PostgreSQL ne rejoue `db/` qu'à la création du
 volume. Tous ces fichiers sont idempotents, donc `./installer.sh` les joue
 dans les deux cas sans avoir à savoir lequel il a devant lui.
 
-Les migrations de DONNÉES (14 à 19) ne sont pas repliées dans le schéma et ne
-peuvent pas l'être : elles corrigent des valeurs saisies, pas une structure.
-Les 14 et 15 portent maintenant une garde qui les rend sans objet sur une base
-où `etat_reference` n'a jamais existé.
-
 **L'ordre des migrations est écrit à la main dans `installer.sh`**, et ce n'est
-plus un tri alphabétique. `aliment-fibres.sql` passait après `23-…` alors qu'il
-crée la colonne dont 16, 17 et 19 ont besoin : sur une base vierge, trois
-migrations échouaient. `jeu-essai.sql` — un jeu de démonstration — était joué
-comme une migration sur toute installation, et `audit-catalogue.sql`, qui est
-un rapport de lecture, aussi. Les trois sont désormais hors de la boucle.
+plus un tri alphabétique : `aliment-fibres.sql`, qui crée la colonne
+`fibres_100`, passe en tête, avant les migrations numérotées. `jeu-essai.sql` —
+un jeu de démonstration — n'est pas une migration et reste hors de la boucle.
 
 ---
 

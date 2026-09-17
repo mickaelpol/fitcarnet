@@ -36,8 +36,7 @@ export const A = {
      CE SONT DES DONNEES DE TEST, PAS UNE REFERENCE. Le « 130 x 3 » du riz
      vient d'une valeur USDA ; CIQUAL 2025 (colonne « Reglement UE n° 1169
      2011 ») donne 350 au riz blanc cru et 155 au riz blanc cuit, soit un
-     rendement de 2,26. Le catalogue reel (`db/manuel/16-catalogue-ciqual.sql`)
-     porte 350 et 2,26 ; ces fixtures gardent l'ancienne paire parce que les
+     rendement de 2,26. Ces fixtures gardent l'ancienne paire parce que les
      tests s'appuient dessus, et que ce qu'ils eprouvent est la conversion, pas
      la valeur du riz. Note du 16 septembre 2026. */
   boulgour:    a('Boulgour', 'fec', 327.5, 10.75, 60.25, 2.5, 2.5),

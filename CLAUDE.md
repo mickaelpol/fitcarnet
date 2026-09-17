@@ -36,7 +36,7 @@ lui-même se reconstruit : `/graphify .`.
 cd front && npm test          # tsc --noEmit + 596 tests, puis 29 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 302 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 298 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -61,9 +61,10 @@ de redémarrer : ne jamais écrire `SET colonne = NULL` sur une colonne `NOT NUL
 ### 2. Toute entité exposée en API est filtrée par propriétaire
 Une nouvelle entité `#[ApiResource]` avec des opérations implémente `App\Entity\ProprieteUtilisateur`,
 sans quoi `FiltreProprietaire` ne la filtre pas et **tous les comptes voient les données de tous**.
-Exception documentée uniquement : `Aliment` (propriétaire facultatif → `FiltreAliment`, règle
-« commun OU le mien »). Le test d'inventaire du modèle (`api/tests/ModeleExposeTest.php`) refuse
-toute entité non conforme absente de sa liste blanche.
+Aucune exception pour les données d'un compte, `Aliment` compris : chacun ne voit que les siens.
+Seuls les catalogues partagés — exercices (`FiltreExercice`, « public OU le mien »), emplacements,
+modes de cuisson — dérogent, chacun avec sa raison écrite. Le test d'inventaire du modèle
+(`api/tests/ModeleExposeTest.php`) refuse toute entité non conforme absente de sa liste blanche.
 
 Corollaire pour les contrôleurs personnalisés : **vérifier la propriété sur CHAQUE chemin
 d'écriture**, pas seulement sur le principal. La faille de septembre 2026 venait d'un contrôle
@@ -75,14 +76,14 @@ Un légume se pèse cru. Le rendement cru/cuit se dérive des pesées à la lect
 dans les valeurs. Cette règle vaut aussi pour les scripts d'import et pour ce qu'on écrit dans Grocy.
 
 **Les deux chiffres viennent de `Table_Ciqual_2025.xlsx`, à la racine du dépôt** — « Riz blanc, cru »
-350 et « Riz blanc, cuit » 155, d'où le rendement 2,26 du catalogue. **Lire la colonne « Énergie,
+350 et « Riz blanc, cuit » 155, d'où le rendement 2,26 que déduit l'import. **Lire la colonne « Énergie,
 Règlement UE n° 1169/2011 »**, celle qui compte les fibres à 2 kcal/g comme la règle 4 ; la colonne
 voisine « N × facteur Jones » donne 348 et se trompe de convention.
 
 *Deux pièges, tombés tous les deux le 16 septembre 2026.* **Ne pas dire « 130 »** : c'est la valeur
 **USDA** du riz blanc long cuit, pas CIQUAL. **Ne pas dire « basmati »** non plus : le « Riz basmati »
-de l'application est apparié à l'entrée CIQUAL **« Riz blanc, cru »** (`ciqual_vers_grocy.py:294`,
-`:202`), et c'est de là que vient le 2,26. Le vrai basmati a ses propres valeurs — 351 cru, 148 cuit,
+de l'application est apparié à l'entrée CIQUAL **« Riz blanc, cru »** (`ciqual_vers_grocy.py:260`,
+`:170`), et c'est de là que vient le 2,26. Le vrai basmati a ses propres valeurs — 351 cru, 148 cuit,
 soit un rendement de 2,37.
 
 ### 4. Convention EUROPÉENNE des fibres
@@ -164,12 +165,6 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   imbriqués que le front renvoie — essayé et retiré le 15 septembre 2026.
 - Les scripts de la racine ne sont pas des jouets : `installer.sh`, `restaurer-nas.sh`,
   `deployer-nas.sh`, `publier*.sh` déploient ou détruisent. Ne jamais les lancer pour « voir ».
-- `ciqual_vers_grocy.py --exporter-catalogue` écrit dans `db/manuel/16-catalogue-ciqual.sql`,
-  fichier versionné, et y remet des `LIKE '%…%'` non ancrés que la version committée a corrigés
-  à la main. C'est voulu pour une régénération décidée ; ce ne l'était pas pour
-  `test_ecriture_grocy.py`, qui l'appelle. Depuis le 14 septembre 2026 le banc passe `--sortie`
-  vers un temporaire et vérifie en fin de course que le fichier versionné n'a pas bougé.
-  Tout nouveau code qui appelle `--exporter-catalogue` doit passer `--sortie`.
 - `tsconfig.tests.json` n'inclut plus une liste écrite à la main mais **un motif**,
   `src/**/*.test.ts` — la liste manuelle avait laissé `performance.ts` sans test
   pendant des mois. Le piège qui reste : le motif ne couvre que `src/`, donc un
@@ -273,7 +268,7 @@ les skills `superpowers-symfony:ports-and-adapters`, `:cqrs-and-handlers`,
 
 ## Audit
 
-`docs/audit-2026-09/` — 84 constats classés, avec scénarios reproduits et plan de correction en lots.
+`docs/audit-2026-09/` — 79 constats classés, avec scénarios reproduits et plan de correction en lots.
 
 ## graphify
 

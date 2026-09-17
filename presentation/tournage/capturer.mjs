@@ -93,7 +93,7 @@ const CAPTURES = [
     aller: async (p) => {
       await p.goto(`${ADRESSE}/(onglets)/frigo`, { waitUntil: 'networkidle' });
       await p.waitForTimeout(2500);
-      if (!await clic(p, /Blanc de poulet/i)) throw new Error('aucune ligne de stock a ouvrir');
+      if (!await clic(p, /Poulet, filet/i)) throw new Error('aucune ligne de stock a ouvrir');
       if (!await clic(p, /Corriger les valeurs/i)) throw new Error('bouton « Corriger les valeurs » absent');
       await p.waitForTimeout(1500);
     },

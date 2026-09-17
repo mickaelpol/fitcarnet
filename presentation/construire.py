@@ -205,8 +205,8 @@ SLIDES = [
              session d'une heure renouvelée par un jeton révocable · compte désactivé bloqué
              à la requête suivante.</p>
           <h3>Le frigo</h3>
-          <p>Stock par emplacement · recherche sans accents · catalogue commun de 50 aliments
-             vérifiés · création d'un aliment privé · contrôle de cohérence bloquant et
+          <p>Stock par emplacement · recherche sans accents · chaque compte saisit ses
+             aliments, valeurs de l'étiquette · contrôle de cohérence bloquant et
              détection des kilojoules · rendement cru/cuit mesurable · source Grocy en option.</p>
           <h3>L'inventaire</h3>
           <p>Saisie <em>en écarts</em> · un champ vide n'est pas un zéro · dépôt en lot appliqué
@@ -298,8 +298,8 @@ SLIDES = [
         <div class="etage"><span class="tag">4</span><strong>ModeleExposeTest</strong>
           <em>un test refuse toute entité exposée non conforme : l'oubli est impossible</em></div>
       </div>
-      <p class="chute">Une seule exception, documentée : un aliment sans propriétaire est
-         <em>commun à tous</em> — la règle devient « commun OU le mien ».</p>
+      <p class="chute">Une seule exception, documentée : le catalogue d'exercices est
+         <em>commun à tous</em> — la règle devient « public OU le mien ».</p>
     """),
 
     ("technique", "Le solveur de repas", """
@@ -389,7 +389,7 @@ SLIDES = [
     """),
 
     ("qualite", "L'audit du code", """
-      <p class="accroche">84 constats, chacun reproduit avant d'être corrigé.</p>
+      <p class="accroche">79 constats, chacun reproduit avant d'être corrigé.</p>
       <div class="chiffres">
         <div><strong>3</strong><span>critiques</span></div>
         <div><strong>15</strong><span>élevés</span></div>
@@ -502,7 +502,7 @@ SLIDES = [
           <h3>Ce qui est gagné</h3>
           <ul>
             <li>26 000 lignes et 468 tests en cinq semaines, à une personne</li>
-            <li>Un audit de 84 constats mené jusqu'au bout, avec scénarios reproduits</li>
+            <li>Un audit de 79 constats mené jusqu'au bout, avec scénarios reproduits</li>
             <li>Une documentation qui reste vraie, parce qu'elle est vérifiée à chaque session</li>
           </ul>
         </div>
@@ -565,7 +565,7 @@ SLIDES = [
          le batch cooking · une séance, la saisie d'une série et le 1RM qui se recalcule ·
          les programmes</p>
       <p class="meta">Les données couvrent neuf semaines d'usage : 23 séances, 123 séries,
-         14 aliments, 2 plans de repas. La vidéo est muette : elle se commente en direct,
+         8 aliments, 2 plans de repas. La vidéo est muette : elle se commente en direct,
          et chaque parcours est un chapitre — on peut y revenir pendant les questions.</p>
     """),
 ]

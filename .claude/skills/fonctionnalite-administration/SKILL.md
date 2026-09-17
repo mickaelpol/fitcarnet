@@ -141,10 +141,11 @@ champ libre, qui finirait avec « four », « Four », « au four » et « four 
 - **Désactiver supprime aussi les jetons de rafraîchissement** — sinon un compte
   bloqué se prolongerait tout seul pendant des semaines
   (`ComptesController.php:110-115,148-153`).
-- **Suppression : nettoyage ordonné** — les lignes de stock visant ses aliments
-  privés, **puis** ses aliments, **puis** le compte. Sans cet ordre, ses aliments
-  privés perdraient leur auteur (`ON DELETE SET NULL`) et **deviendraient
-  visibles de tous** (`:171-188,207-219`).
+- **Suppression : le compte part avec ses aliments et son stock** — les lignes
+  de stock visant ses aliments, **puis** ses aliments, **puis** le compte, dans
+  une transaction. `aliment.utilisateur_id` est en `ON DELETE CASCADE`, mais
+  `stock.aliment_id` est en `RESTRICT` : l'ordre est écrit à la main pour ne pas
+  dépendre de celui des cascades (`:172-178`, `:198-210`).
 - **Son propre compte n'a aucun bouton** (`admin-utilisateurs.tsx:235-244`).
 
 ## Le parcours
@@ -300,13 +301,14 @@ critères d'isolation.
     pare-feu `api`), et `jeton_rafraichissement` doit être **vide** pour ce
     compte (`ComptesController.php:148-153`).
 28. **Supprimer chiffre ce qui sera détruit** — la confirmation cite séances,
-    séries, modèles et plans, et rappelle que **les aliments créés restent**
-    (`admin-utilisateurs.tsx:289-298`). « Supprimer ? Oui / Non » sans chiffres
+    séries, modèles et plans, et prévient : « **Ses aliments et son stock
+    partent avec lui.** » (`admin-utilisateurs.tsx:291-298`). « Supprimer ? Oui / Non » sans chiffres
     n'est pas une question, c'est un piège.
-29. **Aucun aliment privé ne devient public** — après suppression d'un compte,
-    vérifier qu'il ne reste **aucun** aliment `cree_par IS NULL` qui lui
-    appartenait (`ComptesController.php:171-188`). C'est le critère le plus
-    important de cette section.
+29. **Aucun aliment ne survit au compte supprimé** — après suppression,
+    `SELECT count(*) FROM aliment WHERE utilisateur_id = '<id>'` doit rendre
+    **0**, et aucune ligne de `stock` ne doit viser un aliment disparu
+    (`ComptesController.php:198-210`). C'est le critère le plus important de
+    cette section.
 30. **Compte inexistant → 404**, refus métier → **422**
     (`ComptesController.php:121-123,275-278`).
 31. **Invitation** — le lien n'est rendu qu'**une fois** ; la base n'en garde
@@ -358,8 +360,8 @@ SELECT count(*) FROM serie;                -- identique avant / après
 -- DÉSACTIVATION : les jetons doivent avoir disparu
 SELECT count(*) FROM jeton_rafraichissement WHERE utilisateur_id = :cible;   -- 0
 
--- SUPPRESSION : aucun aliment privé ne doit être devenu commun
-SELECT id, nom FROM aliment WHERE cree_par IS NULL AND nom LIKE '%verif%';   -- 0 ligne
+-- SUPPRESSION : aucun aliment ne survit au compte
+SELECT count(*) FROM aliment WHERE utilisateur_id = '<id>';                  -- 0
 
 -- CUISSONS : deux modes ne partagent jamais un rang
 SELECT ordre, count(*) FROM mode_cuisson GROUP BY ordre HAVING count(*) > 1; -- 0 ligne

@@ -152,16 +152,16 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
 11. **Isolation entre comptes — la faille É1, et où le contrôle vit
     aujourd'hui.** `POST /mon-frigo/inventaire` est le **jumeau** de
     `POST /mon-frigo/stock` : il écrit du stock par un autre chemin, et ne posait
-    aucune question de propriété. Bob déposait 1 g sur l'aliment privé d'Alice,
+    aucune question de propriété. Bob déposait 1 g sur un aliment d'Alice,
     et **l'aliment d'Alice devenait indélébile**.
     Le contrôle vit désormais à **deux** endroits, et c'est voulu :
     - **au dépôt**, pour refuser tout de suite — « un refus rendu une heure plus
       tard n'a plus personne devant l'écran » (`FrigoController.php:372-396`) ;
     - **au point de passage obligé**, `FrigoBase::definirStock`, qui lève avant
       toute écriture quel que soit l'appelant
-      (`api/src/Service/FrigoBase.php:131-133`).
-    La règle elle-même n'existe qu'une fois : `alimentsAccessibles`, « commun
-    **OU** le mien » (`api/src/Service/FrigoBase.php:97-109`).
+      (`api/src/Service/FrigoBase.php:123-125`).
+    La règle elle-même n'existe qu'une fois : `alimentsAccessibles`, « le mien »
+    (`api/src/Service/FrigoBase.php:89-101`).
     **Refus attendu : 404**, « Un aliment de cet inventaire n'existe pas dans ton
     catalogue. » — **sans nommer la ligne fautive**, pour ne pas rendre
     l'énumération confortable (`FrigoController.php:389-394`).
@@ -335,7 +335,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 ```
 
 **Éprouver l'isolation (critère 11)** : Bob dépose un inventaire visant
-l'aliment privé d'Alice.
+un aliment d'Alice.
 
 ```bash
 curl -s -w '\n%{http_code}\n' -X POST \

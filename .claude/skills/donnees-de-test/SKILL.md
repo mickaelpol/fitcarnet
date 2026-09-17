@@ -63,21 +63,24 @@ Le JWT dure une heure. Pour un `POST` API Platform, l'en-tête est
 ## Nettoyer — et l'ordre compte
 
 ```sql
--- 1. le stock d'abord : stock.aliment_id est ON DELETE RESTRICT
+-- 1. le stock qui vise leurs aliments : stock.aliment_id est ON DELETE RESTRICT
 DELETE FROM stock WHERE aliment_id IN
-  (SELECT id FROM aliment WHERE nom LIKE '%verification%');
+  (SELECT a.id FROM aliment a JOIN utilisateur u ON u.id = a.utilisateur_id
+    WHERE u.email LIKE '%-verif@test.local');
 
--- 2. l'aliment ensuite, AVANT son auteur
-DELETE FROM aliment WHERE nom LIKE '%verification%';
+-- 2. leurs aliments
+DELETE FROM aliment WHERE utilisateur_id IN
+  (SELECT id FROM utilisateur WHERE email LIKE '%-verif@test.local');
 
--- 3. le compte en dernier : inventaire_lot et stock partent en CASCADE
+-- 3. les comptes : inventaire_lot, stock et le reste partent en CASCADE
 DELETE FROM utilisateur WHERE email LIKE '%-verif@test.local';
 ```
 
-**Pourquoi l'aliment avant le compte, et pas l'inverse.** `aliment.cree_par` est
-en `ON DELETE SET NULL` : supprimer le compte d'abord ne détruit pas son aliment,
-il le rend **commun** — visible de tous, et impossible à distinguer du catalogue.
-Un déchet silencieux, exactement ce qu'on cherchait à éviter.
+**Pourquoi cet ordre.** Chaque aliment appartient à un compte
+(`aliment.utilisateur_id`, `ON DELETE CASCADE`) : supprimer le compte emporte ses
+aliments. Mais `stock.aliment_id` est en `RESTRICT`, et PostgreSQL ne garantit pas
+l'ordre de deux cascades parties du même compte — d'où le stock, puis les
+aliments, puis le compte, comme le fait `ComptesController::supprimer`.
 
 ### Prouver qu'il ne reste rien
 
@@ -125,7 +128,7 @@ Le motif à reprendre — c'est celui qui a prouvé qu'É8 tenait vraiment :
 1. créer **deux** comptes, `alice-verif@` et `bob-verif@` ;
 2. relever les compteurs avant (`SELECT count(*) FROM exercice`) ;
 3. Alice crée sa donnée par l'**API**, pas en SQL — c'est le chemin réel ;
-4. vérifier en base que les colonnes attendues sont posées (`public`, `cree_par`) ;
+4. vérifier en base que les colonnes attendues sont posées (`public` et `cree_par` pour un exercice, `utilisateur_id` pour un aliment) ;
 5. Alice voit N+1, **Bob voit N** ;
 6. `GET /api/<ressource>/<id>` par Bob rend **404**, par Alice **200** ;
 7. nettoyer, et recompter.
@@ -136,8 +139,7 @@ laisse une liste propre et une fuite par identifiant.
 ## Ce qu'on ne lance jamais
 
 `installer.sh`, `restaurer-nas.sh`, `deployer-nas.sh`, `publier*.sh`,
-`sauvegarde-nas.sh`, `test_ecriture_grocy.py`. Ils déploient, détruisent, ou
-écrivent dans un fichier versionné.
+`sauvegarde-nas.sh`. Ils déploient ou détruisent.
 
 `./sauvegarde.sh` en local est sans danger — et une sauvegarde avant de
 commencer coûte trois secondes.

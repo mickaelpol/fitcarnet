@@ -376,7 +376,7 @@ curl -s -X POST "$BASE/mon-frigo/aliment" -H "Authorization: Bearer $JETON_BASE"
 - **Le compteur « n en stock sur m » ne compte que ce que l'application voit** :
   les produits écartés n'y figurent pas. C'est le bandeau qui les nomme.
 - **La suppression d'un aliment de la liste appelle `DELETE /api/aliments/{id}`**
-  avec `reference.split(':')[1]` (`frigo.tsx:402`) — sur une référence `grocy:`,
+  avec `reference.split(':')[1]` (`frigo.tsx:350`) — sur une référence `grocy:`,
   ce nombre est un identifiant **Grocy**, pas un identifiant d'aliment. C'est
   pour cela que le bouton n'existe pas côté Grocy ; ne pas le réactiver « pour
   voir ».

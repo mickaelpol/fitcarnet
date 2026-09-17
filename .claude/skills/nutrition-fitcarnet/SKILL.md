@@ -43,8 +43,8 @@ fois cuit, gonflé d'eau (rendement **2,26**). Un légume se pèse **cru**.
 >
 > *Deux erreurs corrigées le 16 septembre 2026.* « Pas 130 » : 130 est la valeur
 > **USDA** du riz blanc long cuit, qui circule partout en français sans sa
-> source. Et « basmati » : le « Riz basmati » du catalogue est apparié à l'entrée
-> **« Riz blanc, cru »** (`ciqual_vers_grocy.py:294`) — c'est de 350 / 155 que
+> source. Et « basmati » : le « Riz basmati » de l'import CIQUAL est apparié à l'entrée
+> **« Riz blanc, cru »** (`ciqual_vers_grocy.py:260`) — c'est de 350 / 155 que
 > vient son 2,26, pas des valeurs du basmati, qui donneraient 2,37.
 
 Le rendement cru/cuit se **dérive des pesées à la lecture** ; il ne se stocke pas
@@ -83,8 +83,7 @@ module — il ne recopie pas. Voir la skill `front-fitcarnet`.
 
 ## Attention aux scripts d'import
 
-`test_ecriture_grocy.py` **écrit** dans `db/manuel/16-catalogue-ciqual.sql`, un
-fichier versionné. Et `entrypoint-prod.sh` rejoue `db/manuel/` à **chaque**
-démarrage : une migration qui écrit des données écrase les corrections manuelles à
-chaque redémarrage du conteneur. Le constat 10 de l'audit décrit exactement ça —
-la migration 16 réécrit quatre aliments communs à chaque démarrage.
+Un script d'import écrit dans Grocy ou dans la base, **jamais** dans
+`db/manuel/`. `entrypoint-prod.sh` rejoue ce dossier à **chaque** démarrage : une
+migration qui écrit des données écrase les corrections manuelles à chaque
+redémarrage du conteneur.

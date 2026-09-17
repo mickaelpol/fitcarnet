@@ -16,7 +16,7 @@ lancé. Les deux chemins comparés :
 
 Les 21 migrations passent toutes sans erreur sur B — c'est le bon côté du constat.
 
-Comptage : **1 CRITIQUE, 5 ÉLEVÉES, 6 MOYENNES, 7 FAIBLES.**
+Comptage : **1 CRITIQUE, 5 ÉLEVÉES, 5 MOYENNES, 6 FAIBLES.**
 
 ---
 
@@ -312,44 +312,14 @@ les travailleurs. **Effort : 30 min.**
 
 ---
 
-## 10. La migration 16 réécrit quatre aliments communs à chaque démarrage du conteneur
+## 11. ✅ corrigé le 14 septembre 2026 — Neuf colonnes de clé étrangère sans index
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ**
+**Gravité : MOYENNE — Statut : CORRIGÉ, sur quatre colonnes des neuf** (migration 31). Les cinq autres — `stock.emplacement_id`, `seance.modele_id`, `cuisson_habituelle.mode_cuisson_id`, `invitation.invite_par`, `invitation.utilisateur_id` — sont laissées sans index **délibérément** : tables courtes, jointures rares, aucune contrainte `RESTRICT` à faire respecter. La remarque de `28-muscle-cible-filtrable.sql` vaut aussi dans ce sens — un index que personne n'interroge coûte à chaque écriture. L'index sur `exercice.cree_par` est **partiel** (`WHERE cree_par IS NOT NULL`) : la quasi-totalité des exercices n'ont pas d'auteur, les indexer n'apporterait rien.
 
-**Emplacement** `db/manuel/16-catalogue-ciqual.sql:61,72,83,94` ;
-`docker/entrypoint-prod.sh:124-147`.
-
-**Ce qui se passe.** Quatre `UPDATE aliment SET categorie=…, kcal_100=…, … WHERE cree_par IS NULL
-AND fitcarnet_normaliser(nom) IN (…)` — sans condition sur la valeur actuelle. Rejoués à chaque
-redémarrage. Une correction faite par l'administrateur sur « Amandes », « Brocoli », « Quinoa »
-ou « Riz basmati » depuis l'écran est **silencieusement annulée au redémarrage suivant**.
-
-Le fichier connaît le problème et l'écrit lui-même (lignes 47-51) : « une correction faite à la
-main par l'administrateur était silencieusement annulée au redémarrage suivant. Une valeur
-fausse qui revient toute seule est pire qu'une valeur fausse. » Le correctif appliqué a resserré
-la **cible** du `LIKE` (qui frappait « Lait d'amandes »), pas le **rejeu**. Le comportement
-décrit comme inacceptable est toujours là, sur quatre lignes au lieu de cinq.
-
-Même famille, plus bénin : `db/manuel/aliment-fibres.sql:24`
-(`UPDATE aliment SET public = FALSE WHERE cree_par IS NOT NULL`) rejoué à chaque démarrage —
-cohérent avec `AlimentProcessor.php:41`, donc sans effet visible aujourd'hui.
-
-**Correction proposée.** Ajouter une garde de non-écrasement, comme la migration 29 le fait
-(`AND nom_fr IS NULL`) : par exemple ne rien réécrire si `maj_le` / une colonne de provenance
-indique une saisie humaine, ou marquer ces quatre lignes `source = 'reference'` et n'écrire que
-sur ce marqueur. **Effort : 45 min.**
-
----
-
-## 11. ✅ corrigé le 14 septembre 2026 — Dix colonnes de clé étrangère sans index
-
-**Gravité : MOYENNE — Statut : CORRIGÉ, sur cinq colonnes des dix** (migration 31). Les cinq autres — `stock.emplacement_id`, `seance.modele_id`, `cuisson_habituelle.mode_cuisson_id`, `invitation.invite_par`, `invitation.utilisateur_id` — sont laissées sans index **délibérément** : tables courtes, jointures rares, aucune contrainte `RESTRICT` à faire respecter. La remarque de `28-muscle-cible-filtrable.sql` vaut aussi dans ce sens — un index que personne n'interroge coûte à chaque écriture. Les deux index sur `cree_par` sont **partiels** (`WHERE cree_par IS NOT NULL`) : la quasi-totalité des lignes sont communes, les indexer n'apporterait rien.
-
-**Emplacement** `db/01-schema.sql` (tables `aliment`, `stock`, `exercice`, `modele_exercice`,
+**Emplacement** `db/01-schema.sql` (tables `stock`, `exercice`, `modele_exercice`,
 `modele_serie`, `seance`, `cuisson_habituelle`, `invitation`).
 
 ```
-aliment            cree_par
 stock              aliment_id
 stock              emplacement_id
 exercice           cree_par
@@ -368,13 +338,12 @@ chemin `exercices.series`). Le côté séance a bien son index (`db/01-schema.sq
 ressemble à un oubli, pas à un choix.
 
 Ensuite `stock.aliment_id` : la contrainte `ON DELETE RESTRICT` (`db/01-schema.sql:171`) force
-un balayage complet de `stock` à chaque suppression d'aliment. Et `aliment.cree_par` /
-`exercice.cree_par`, sollicités par `FiltreAliment.php:69-71` (`creePar IS NULL OR creePar = :u`)
-sur un catalogue de 1 300 exercices.
+un balayage complet de `stock` à chaque suppression d'aliment. Et `exercice.cree_par`, sollicité
+dès qu'on filtre par auteur un catalogue de 1 300 exercices.
 
 À l'échelle actuelle (quelques comptes) rien de tout cela ne se sent. La remarque
 `db/manuel/28-muscle-cible-filtrable.sql:28-43` — « un index que personne n'interroge n'est pas
-neutre » — est juste, mais ces dix-là sont interrogés à chaque jointure et à chaque suppression.
+neutre » — est juste, mais ces neuf-là sont interrogés à chaque jointure et à chaque suppression.
 
 **Correction proposée.** Créer au minimum `modele_serie (modele_exercice_id)`,
 `modele_exercice (exercice_id)` et `stock (aliment_id)`. Dans le schéma **et** dans une
@@ -458,28 +427,6 @@ public, la base est joignable. Le raisonnement écrit pour la production
 
 ---
 
-## 16. `aliment.cree_par ON DELETE SET NULL` : rattrapé dans l'application, pas dans la base
-
-**Gravité : FAIBLE — Statut : CONFIRMÉ (reproduit)**. `db/01-schema.sql:113`. Reproduit :
-
-```
-DELETE FROM utilisateur WHERE id='…';
-  ERROR: duplicate key value violates unique constraint "aliment_nom_commun_unique"
-  CONTEXT: UPDATE ONLY "public"."aliment" SET "cree_par" = NULL WHERE …
-```
-
-Et quand il n'y a pas de collision, l'aliment privé devient **commun**, donc visible de tous
-(`FiltreAliment.php:69-71` ne lit que `creePar`, jamais `public`).
-`ComptesController::supprimer()` (`ComptesController.php:190-221`) traite les deux cas
-explicitement et correctement — c'est du bon travail. Le risque résiduel est hors de ce
-chemin : `psql` à la main, un futur script d'administration, une purge RGPD.
-**Correction : passer `aliment.cree_par` en `ON DELETE CASCADE` (le comportement que
-l'application implémente déjà), ce qui rend la base d'accord avec le code. Effort : 30 min,
-schéma + migration.** Note : `exercice.cree_par` est dans le même cas mais sans conséquence,
-le catalogue d'exercices étant partagé.
-
----
-
 ## 17. Aucune purge des invitations expirées
 
 **Gravité : FAIBLE — Statut : CONFIRMÉ.** `db/01-schema.sql:483-501` : la table `invitation`
@@ -535,8 +482,8 @@ installe par-dessus l'ancienne base. Le reste du script est correct :
    un excellent script de reprise.
 
 3. **La base porte les invariants, pas seulement le code.** `aliment_matiere_plausible`,
-   `aliment_ratio_sens` (avec la distinction protéine/légume/féculent), les index uniques
-   partiels par propriétaire, `invitation_en_attente`, `inventaire_lot_un_seul_actif`,
+   `aliment_ratio_sens` (avec la distinction protéine/légume/féculent),
+   `invitation_en_attente`, `inventaire_lot_un_seul_actif`,
    `complement_unique_par_repas` sur `lower(btrim(nom))` : les règles métier vivent là où les
    données s'écrivent, et le raisonnement est écrit à côté. Les contraintes différables sont
    justifiées et ne masquent rien.
@@ -553,6 +500,5 @@ installe par-dessus l'ancienne base. Le reste du script est correct :
    long. Le constat n° 6 est un trou dans une conception par ailleurs solide, pas une absence
    de conception.
 
-6. **Les migrations sont réellement idempotentes** — vérifié en les rejouant intégralement, et
-   les deux plus dangereuses (14 et 15, qui nomment une colonne supprimée depuis) portent une
-   garde `\if` fonctionnelle. L'ordre est écrit à la main plutôt que trié, avec la raison.
+6. **Les migrations sont réellement idempotentes** — vérifié en les rejouant intégralement.
+   L'ordre est écrit à la main plutôt que trié, avec la raison.

@@ -132,11 +132,11 @@ prise fausse.
 ## 5. Nettoyer, et le prouver
 
 Supprime tout ce que l'épreuve a créé, dans l'ordre de `donnees-de-test` (stock,
-puis aliments dont le compte est l'auteur, puis le compte), et montre le résultat :
+puis aliments du compte, puis le compte), et montre le résultat :
 
 ```sql
 SELECT count(*) FROM utilisateur WHERE email LIKE '%@test.local';                        -- 0
-SELECT count(*) FROM aliment WHERE cree_par IS NULL AND nom LIKE '%verif%';               -- 0
+SELECT count(*) FROM aliment WHERE nom LIKE '%verif%';                                   -- 0
 SELECT count(*) FROM seance s LEFT JOIN utilisateur u ON u.id = s.utilisateur_id WHERE u.id IS NULL;  -- 0
 ```
 

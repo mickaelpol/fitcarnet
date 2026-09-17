@@ -93,10 +93,9 @@ démontrer devant un client.
 
 ## Ajouter et corriger un aliment
 
-- **Partir d'un aliment de référence** — les ~50 aliments communs, **ceux qu'on a déjà étant retirés de la liste**. `frigo.tsx:147`
-- **Créer de zéro** — formulaire complet, aucune valeur pré-remplie. `frigo.tsx:571`
+- **« Ajouter un aliment » ouvre l'éditeur vide** — formulaire complet, aucune valeur pré-remplie : on saisit celles de l'étiquette. `frigo.tsx:259`
 - **Création en deux temps** — l'aliment, puis sa quantité (même à zéro : c'est cet appel qui le rattache à un emplacement). Si le second échoue, on le dit sans perdre le premier. `frigo.tsx:247`
-- **Un aliment créé reste privé** — `creePar` et `public=false` viennent du jeton, jamais du corps. Sur des valeurs nutritionnelles, l'erreur de l'un ne doit pas fausser la diète des autres. `AlimentProcessor.php:73`
+- **Un aliment appartient à son compte** — le propriétaire vient du jeton, jamais du corps, et chacun ne voit que les siens. Sur des valeurs nutritionnelles, l'erreur de l'un ne doit pas fausser la diète des autres. `AlimentProcessor.php:38`
 - **Catégorie en puces colorées** parmi huit, avec un exemple sous la rangée. `editeurAliment.tsx:199`
 - **Fibres facultatives** — vide veut dire « non renseigné », pas zéro. `editeurAliment.tsx:228`
 - **Détection des kilojoules** — bandeau et bouton « Convertir : 1473 kJ = 352 kcal », déclenché par le facteur 4,184 ou par le plafond de 900 kcal/100 g. `editeurAliment.tsx:258`
@@ -104,11 +103,11 @@ démontrer devant un client.
 - **Rendement de cuisson** — choix parmi des guides, ou **« Je préfère mesurer »** : poids avant, poids après, et « Utiliser ce résultat (2,3) » ou « Ces deux poids ne sont pas vraisemblables ». `editeurAliment.tsx:302`
 - **Provenance du ratio affichée** — « ✓ mesuré par toi » ou « Valeur courante — mesure-la pour un chiffre propre à ton produit ». `AlimentDisponible.php:103`
 - **Le texte saisi vit à part du nombre** — on peut taper « 0,8 » sans que le séparateur disparaisse. `editeurAliment.tsx:91`
-- **Corriger un aliment** — le créateur ou l'administrateur ; seul l'admin touche aux aliments de référence. `Aliment.php:39`
-- **Supprimer un aliment, mais seulement le sien** — un aliment commun ne se supprime jamais. `Aliment.php:46`
+- **Corriger un aliment, mais seulement le sien** — son propriétaire, et lui seul. `Aliment.php:53`
+- **Supprimer un aliment, mais seulement le sien.** `Aliment.php:60`
 - **Refus de supprimer un aliment encore en stock** — comptage **tous comptes confondus** (le filtre de propriété masquerait justement les lignes qu'il faut voir), 409 nommant le nombre de lignes. Les lignes à zéro sont supprimées silencieusement. `AlimentSuppressionProcessor.php:131`
-- **Doublon de nom rendu lisible** — l'unicité vit dans des index partiels que Doctrine ne sait pas pré-vérifier ; l'exception devient un 422 avec le nom en clair. `AlimentProcessor.php:85`
-- **Recherche et filtres sur le catalogue** — nom (partiel), catégorie, code-barres, tri par nom, 200 par page. `Aliment.php:56`
+- **Doublon de nom rendu lisible** — un nom par compte, casse ignorée : l'unicité vit dans un index fonctionnel que Doctrine ne sait pas pré-vérifier ; l'exception devient un 422 avec le nom en clair. `AlimentProcessor.php:39`
+- **Recherche et filtres sur ses aliments** — nom (partiel), catégorie, code-barres, tri par nom, 200 par page. `Aliment.php:56`
 
 ## Le frigo Grocy
 
@@ -396,8 +395,8 @@ démontrer devant un client.
 - **Désactiver ou réactiver** — la désactivation supprime aussi les jetons de rafraîchissement, sinon un compte bloqué se prolongerait tout seul pendant des semaines. `ComptesController.php:117`
 - **Refus de se bloquer soi-même** — irréversible depuis l'application. Refus, pas confirmation. `ProtectionDuCompte.php:158`
 - **Refus de bloquer ou supprimer le dernier administrateur actif** — comptage des admins **actifs**, test `<= 1` pour qu'un état incohérent n'ouvre pas la porte. `ProtectionDuCompte.php:207`
-- **Suppression qui chiffre ce qui sera détruit** et rappelle que les aliments créés restent, car ils servent à tout le monde. `admin-utilisateurs.tsx:286`
-- **Nettoyage ordonné avant suppression** — les lignes de stock visant ses aliments privés, puis ses aliments : sinon ses aliments deviendraient visibles de tous. `ComptesController.php:189`
+- **Suppression qui chiffre ce qui sera détruit** — séances, séries, modèles, plans — et prévient que ses aliments et son stock partent avec lui. `admin-utilisateurs.tsx:290`
+- **Nettoyage ordonné avant suppression** — les lignes de stock visant ses aliments, puis ses aliments, puis le compte : la contrainte RESTRICT du stock bloquerait sinon la cascade. `ComptesController.php:198`
 - **Son propre compte n'a aucun bouton.** `admin-utilisateurs.tsx:235`
 
 ---
@@ -448,7 +447,6 @@ Ces garanties sont **éprouvées par test de propriétés** — 250 frigos aléa
 - **Cache prudent, hors ligne toléré** — les données restent affichées pendant un rechargement : une salle de sport mal couverte ne vide pas l'écran. `_layout.tsx:22`
 - **Cache relu depuis le disque avant le premier rendu** — au démarrage à froid, les écrans s'affichent avec les données de la veille. `_layout.tsx:113`
 - **Isolation automatique par propriétaire** — toute entité marquée voit ses requêtes restreintes ; non authentifié donne `1 = 0`. `FiltreProprietaire.php:48`
-- **Règle « commun OU le mien » pour les aliments**, avec les parenthèses qui évitent de neutraliser les filtres de recherche. `FiltreAliment.php:120`
 - **Chargement complet anti-N+1** — une séance et ses séries en une requête, là où il en fallait environ 200. `ChargementComplet.php:205`
 - **Le propriétaire vient du jeton, jamais du corps.** `ProprietaireProcessor.php:27`
 - **Documentation de l'API fermée** — `/api/docs` réservé aux administrateurs, `/api` authentifié. Les deux étaient publics. `security.yaml:119`

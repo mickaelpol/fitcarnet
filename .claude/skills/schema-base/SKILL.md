@@ -55,12 +55,12 @@ Deux conséquences qu'on paie cher si on les oublie :
   Les lanceurs tournent avec `ON_ERROR_STOP=1` : une erreur arrête tout, elle
   n'est plus avalée.
 - **Une migration qui écrit des données écrase les corrections manuelles à chaque
-  redémarrage.** C'est le constat 10, et il tient toujours :
-  `16-catalogue-ciqual.sql` réécrit **cinq** aliments communs (amande, brocoli,
-  quinoa, riz basmati, riz complet) à chaque démarrage. Une correction faite à la
-  main sur l'un d'eux revient à la suivante — il faut la faire **dans le
-  fichier**. Depuis le 14 septembre, `db/02-donnees.sql` ne sème plus d'aliment
-  commun : sur une base neuve, cette migration ne trouve rien à réécrire.
+  redémarrage.** C'est le constat 10. Une migration qui écrit des données
+  borne donc chaque écriture aux lignes qui ne l'ont pas encore reçue :
+  `29-noms-francais.sql` ne traduit un exercice que si `nom_fr IS NULL` et
+  `source <> 'perso'`, si bien qu'une traduction saisie à la main n'est jamais
+  écrasée. `db/02-donnees.sql` ne sème aucun aliment : chaque compte saisit les
+  siens.
 
 Écrire donc : `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`,
 `DROP CONSTRAINT IF EXISTS` puis `ADD CONSTRAINT`, `CREATE INDEX IF NOT EXISTS`,
@@ -73,7 +73,7 @@ Les lanceurs ne portent pas une liste fichier par fichier, mais **un ordre
 explicite fait de motifs** :
 
 ```bash
-db/manuel/aliment-fibres.sql   # d'abord : crée fibres_100, dont 16, 17 et 19 ont besoin
+db/manuel/aliment-fibres.sql   # d'abord : crée fibres_100, pesee_avant et pesee_apres
 db/manuel/1[0-9]-*.sql
 db/manuel/2[0-9]-*.sql
 db/manuel/3[0-9]-*.sql
@@ -85,7 +85,7 @@ Il en découle trois règles :
   l'ordre de son numéro.
 - **Un fichier dont le nom commence par une lettre n'est PAS joué**, et c'est
   voulu : `jeu-essai.sql` et `jeu-demo.sql` sont des jeux de démonstration,
-  `audit-catalogue.sql` un rapport de lecture, `cibles.sql` les objectifs d'un
+  `cibles.sql` les objectifs d'un
   compte, à jouer à la main une fois le compte créé. L'ancien tri alphabétique
   jouait `jeu-essai.sql` comme une migration, sur toute installation. Un numéro
   sous 10 ne correspond à aucun motif non plus.

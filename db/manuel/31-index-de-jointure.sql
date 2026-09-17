@@ -5,7 +5,7 @@
 --  CONSTAT 11 DU RAPPORT « DONNÉES ET INFRASTRUCTURE », 7 septembre 2026.
 --
 --  PostgreSQL n'indexe pas les clés étrangères tout seul, contrairement à
---  MySQL. Dix colonnes en manquaient. On n'en crée que QUATRE, et le choix est
+--  MySQL. Neuf colonnes en manquaient. On n'en crée que QUATRE, et le choix est
 --  délibéré : `28-muscle-cible-filtrable.sql` rappelle qu'« un index que
 --  personne n'interroge n'est pas neutre » — il coûte à chaque écriture, et
 --  encombre les décisions du planificateur. Ceux-ci sont interrogés à chaque

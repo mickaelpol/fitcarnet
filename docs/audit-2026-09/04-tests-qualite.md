@@ -1,6 +1,6 @@
 # Audit couverture de tests et robustesse — fitcarnet
 
-Audit en lecture seule. Aucun fichier du projet modifié. Deux suites tentées à l'exécution (résultats bruts plus bas) ; les scripts Python de la racine n'ont **pas** été exécutés (consigne, et l'un d'eux est destructeur — voir constat 3).
+Audit en lecture seule. Aucun fichier du projet modifié. Deux suites tentées à l'exécution (résultats bruts plus bas) ; les scripts Python de la racine n'ont **pas** été exécutés (consigne).
 
 Périmètre lu : `api/tests/` (8 fichiers, 1 336 lignes), `front/src/**/*.test.ts` (16 fichiers, 4 275 lignes), `test_ciqual.py`, `test_ecriture_grocy.py`, et la logique métier correspondante (`api/src/`, `front/src/`, `front/app/`). `front/dist/` et `node_modules/` ignorés.
 
@@ -10,7 +10,7 @@ Périmètre lu : `api/tests/` (8 fichiers, 1 336 lignes), `front/src/**/*.test.t
 
 | Chemin critique | État | Fichiers de test |
 |---|---|---|
-| **Isolation des données entre comptes** | **NON COUVERT** | *aucun* — zéro occurrence de `FiltreProprietaire`, `FiltreAliment`, `ProprietaireProcessor` ou `CompteActif` dans `api/tests/` |
+| **Isolation des données entre comptes** | **NON COUVERT** | *aucun* — zéro occurrence de `FiltreProprietaire`, `ProprietaireProcessor` ou `CompteActif` dans `api/tests/` |
 | Authentification (connexion par mot de passe, compte désactivé) | **NON COUVERT** | *aucun* |
 | Rafraîchissement de jeton | **NON COUVERT** | *aucun* côté API ; côté front `uneSeuleFois.test.ts` ne couvre que le dédoublonnage d'appels concurrents, pas `renouveler()` |
 | Déconnexion / révocation de jeton | **NON COUVERT** | *aucun* |
@@ -61,7 +61,7 @@ PHP 8.4.8 CLI est présent mais `/usr/lib/php/20240924/` ne contient ni `dom.so`
 
 ### Scripts Python — non exécutés
 
-Consigne respectée. Par ailleurs `test_ecriture_grocy.py` **écrit dans un fichier versionné** du dépôt (constat 3) : c'était le bon appel.
+Consigne respectée.
 
 ---
 
@@ -105,45 +105,23 @@ Recommandation de fond : ce bug aurait été attrapé gratuitement par PHPStan/P
 
 ### 2. **Aucun test ne vérifie l'isolation des données entre comptes**
 **Gravité : CRITIQUE — Statut : CONFIRMÉ**
-`api/src/Doctrine/FiltreProprietaire.php`, `api/src/Doctrine/FiltreAliment.php`, `api/src/State/ProprietaireProcessor.php`, `api/src/Security/CompteActif.php`, `api/config/services.yaml:18-28`
+`api/src/Doctrine/FiltreProprietaire.php`, `api/src/State/ProprietaireProcessor.php`, `api/src/Security/CompteActif.php`, `api/config/services.yaml:18-28`
 
-C'est le point le plus important de cet audit, et la réponse est nette : **zéro test**. Aucun fichier de `api/tests/` ne mentionne l'une de ces quatre classes.
+C'est le point le plus important de cet audit, et la réponse est nette : **zéro test**. Aucun fichier de `api/tests/` ne mentionne l'une de ces trois classes.
 
 Le code lui-même est **bon** — je l'ai lu ligne à ligne :
 - `FiltreProprietaire` s'applique en collection **et** en item, et pose `1 = 0` pour un non-authentifié ;
-- `FiltreAliment` parenthèse correctement son `OR` (le commentaire dit pourquoi) ;
 - les entités filles (`Serie`, `SeanceExercice`, `ModeleExercice`, `ModeleSerie`) portent `#[ApiResource(operations: [])]` : pas d'exposition directe ;
-- `Aliment` : `Patch` en `ROLE_ADMIN or object.getCreePar() == user`, `Delete` en propriété stricte, `creePar` et `public` hors du groupe `aliment:ecrire` ;
+- `Aliment` : `Patch` et `Delete` en propriété stricte, `utilisateur` hors du groupe `aliment:ecrire` ;
 - les 8 contrôleurs scopent tous par `$this->getUser()` — vérifié un par un.
 
 Mais **rien ne le tient**. Toute la garantie repose sur deux `tags:` dans `services.yaml` et sur le fait que chaque nouvelle entité pense à implémenter `ProprieteUtilisateur`. Un renommage de tag, une priorité changée, une entité oubliée, un contrôleur ajouté sans `WHERE utilisateur_id` : rien ne le signalerait, et la panne est silencieuse — un utilisateur voit les données d'un autre sans que personne ne le sache.
 
 Deux garde-fous sans base de données sont possibles tout de suite :
 - **un test unitaire de `FiltreProprietaire`** avec un `QueryBuilder` réel sur un `EntityManager` bouchonné et un `Security` bouchonné, vérifiant les deux branches (`1 = 0` non authentifié, `andWhere('… .utilisateur = :utilisateur_courant')` authentifié) ;
-- **un test d'inventaire du modèle** : parcourir `src/Entity/*.php`, et pour chaque classe portant `#[ApiResource]` avec des opérations non vides, exiger qu'elle implémente `ProprieteUtilisateur`, ou qu'elle figure dans une liste blanche explicite (`Aliment`, `Exercice`, `Emplacement`, `ModeCuisson`, `Utilisateur`). Ce test-là attrape la vraie panne : l'entité qu'on ajoute six mois plus tard sans y penser.
+- **un test d'inventaire du modèle** : parcourir `src/Entity/*.php`, et pour chaque classe portant `#[ApiResource]` avec des opérations non vides, exiger qu'elle implémente `ProprieteUtilisateur`, ou qu'elle figure dans une liste blanche explicite (`Exercice`, `Emplacement`, `ModeCuisson`, `Utilisateur`). Ce test-là attrape la vraie panne : l'entité qu'on ajoute six mois plus tard sans y penser.
 
 **Effort : 2-3 h pour les deux.** Un test d'intégration HTTP « A ne voit pas le stock de B » demanderait une base de test dédiée ; à évaluer séparément (~1 j).
-
----
-
-### 3. **`test_ecriture_grocy.py` écrase une migration versionnée et y réintroduit un bug de facteur 20**
-**Gravité : ÉLEVÉE — Statut : CONFIRMÉ**
-`test_ecriture_grocy.py:367-372` → `ciqual_vers_grocy.py:660-662` et `:780-782`
-
-Le banc d'essai lance `ciqual_vers_grocy.py --exporter-catalogue` dans un `TemporaryDirectory`. Mais `exporter_catalogue()` n'écrit **pas** dans le dossier courant : la destination est absolue et calée sur le script —
-
-```python
-CHEMIN_CATALOGUE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                "db", "manuel", "16-catalogue-ciqual.sql")
-```
-
-— et l'écriture est inconditionnelle (`os.makedirs(...)` puis `open(..., "w")`), sans garde `--appliquer`. Le fichier **est suivi par git** (`git ls-files db/manuel/16-catalogue-ciqual.sql` le confirme).
-
-**Pourquoi c'est régressif et pas seulement salissant.** Le fichier committé a été corrigé à la main après génération : son propre commentaire (`db/manuel/16-catalogue-ciqual.sql:39-59`) explique que les `LIKE '%…%'` non ancrés attrapaient « Lait d'amandes » et lui écrivaient 631 kcal / 52,5 g de lipides ; les clauses actuelles sont des `IN ('amandes', 'amande', …)`. Le générateur, lui, produit toujours du `LIKE '%{mot}%'` (`ciqual_vers_grocy.py:711-712`). **Relancer le test réintroduit le bug**, et le même commentaire précise qu'`entrypoint-prod.sh` rejoue les migrations à chaque démarrage.
-
-Indice qu'un tel écrasement a **déjà eu lieu** : le fichier committé ne porte que 4 `UPDATE`, aux valeurs exactes de la table **factice** du test (350/7,12/75,0/1,58 pour le riz = `test_ecriture_grocy.py:184` ; 631/21,4/8,8/52,5 pour l'amande = `:198`), alors que `CORRESPONDANCE` compte ~50 entrées et que l'en-tête du SQL parle de « 50 aliments de reference ».
-
-**Correction.** Rendre la destination paramétrable (`--sortie CHEMIN`, défaut inchangé) et faire pointer le test vers son dossier temporaire ; ancrer les motifs générés (`IN (…)` ou `= 'mot'`) pour que régénérer ne casse plus rien ; échapper les apostrophes dans les motifs (`ciqual_vers_grocy.py:711` n'échappe rien — « beurre d'arachide » produit du SQL invalide). **Effort : 2 h.**
 
 ---
 
@@ -151,7 +129,7 @@ Indice qu'un tel écrasement a **déjà eu lieu** : le fichier committé ne port
 **Gravité : ÉLEVÉE — Statut : CONFIRMÉ**
 `api/src/Entity/Exercice.php:48-62`, `:136`, `:206` ; `front/app/admin-exercices.tsx:299`
 
-`Exercice` porte `private bool $public = true;` et `private ?Utilisateur $creePar = null;`. Or, sur tout `api/src/`, `creePar` n'apparaît que dans `FiltreAliment` (qui ne concerne **que** `Aliment`) et dans deux commentaires. Concrètement :
+`Exercice` porte `private bool $public = true;` et `private ?Utilisateur $creePar = null;`. Or, sur tout `api/src/`, `creePar` n'est lu ni écrit nulle part, hors deux commentaires. Concrètement :
 
 - aucune extension Doctrine ne restreint la collection `Exercice` ;
 - `new Post(security: "is_granted('ROLE_USER')")` n'a **aucun processeur** : `creePar` reste `null` et `public` reste `true` à la création ;
@@ -159,9 +137,9 @@ Indice qu'un tel écrasement a **déjà eu lieu** : le fichier committé ne port
 
 Et l'écran les étiquette explicitement « ★ exercice personnel » (`front/app/admin-exercices.tsx:299`, `:613`). Un utilisateur crée « Développé couché — variante épaule opérée », et un autre compte le voit, marqué comme personnel.
 
-C'est en partie délibéré (le commentaire du `Patch` dit « le catalogue est commun »), mais alors **les deux colonnes `public` et `creePar` sont du code mort qui promet une confidentialité que rien n'applique** — et elles contredisent frontalement la règle posée pour `Aliment` (`AlimentProcessor.php:17-24` : « ceux qu'un utilisateur saisit ne sortent pas de chez lui »).
+C'est en partie délibéré (le commentaire du `Patch` dit « le catalogue est commun »), mais alors **les deux colonnes `public` et `creePar` sont du code mort qui promet une confidentialité que rien n'applique** — et elles contredisent frontalement la règle posée pour `Aliment`, dont aucun ne sort du compte qui l'a saisi.
 
-**Correction, au choix, mais il faut choisir :** soit un `FiltreExercice` sur le modèle de `FiltreAliment` (`public = true OR creePar = :user`) plus un processeur qui pose `creePar`/`public` à la création — **~2 h** ; soit supprimer les deux colonnes et assumer un catalogue commun, en changeant l'étiquette de l'écran — **~1 h**. Dans les deux cas, un test.
+**Correction, au choix, mais il faut choisir :** soit un `FiltreExercice` (`public = true OR creePar = :user`) plus un processeur qui pose `creePar`/`public` à la création — **~2 h** ; soit supprimer les deux colonnes et assumer un catalogue commun, en changeant l'étiquette de l'écran — **~1 h**. Dans les deux cas, un test.
 
 ---
 
@@ -172,7 +150,7 @@ C'est en partie délibéré (le commentaire du `Patch` dit « le catalogue est c
 Deux problèmes qui se cumulent, dans un script d'amorçage qui écrit dans **les mêmes champs personnalisés Grocy** que `ciqual_vers_grocy.py` :
 
 1. **Convention incompatible.** `grocy_macros.py:105` : `# --- feculents : valeurs CUITES, ratio = cuit / sec ---`, avec « riz basmati » à 130 kcal. Toute la refonte de l'API (`RendementPlausible.php`, `AlimentDisponible.php`, `plausibilite.ts`) repose sur l'inverse : « les valeurs décrivent TOUJOURS le produit tel qu'on le pèse », donc 350 kcal pour du riz sec. Un produit amorcé par `grocy_macros.py` fait donc **peser environ trois fois trop** de riz, silencieusement — précisément la panne que la refonte a éliminée côté application.
-2. **Appariement par sous-chaîne sans borne de mot** (`:176`) : `all(mot in cle for mot in reference.split())`. « Lait d'amandes » (clé `lait d amandes`) apparie la référence `amandes` et reçoit 575 kcal / 49,5 g de lipides. C'est **littéralement le bug documenté et corrigé à la main** dans `db/manuel/16-catalogue-ciqual.sql:41-45`, toujours présent ici.
+2. **Appariement par sous-chaîne sans borne de mot** (`:176`) : `all(mot in cle for mot in reference.split())`. « Lait d'amandes » (clé `lait d amandes`) apparie la référence `amandes` et reçoit 575 kcal / 49,5 g de lipides.
 
 Accessoirement, `grocy_macros.py` ignore `fibres100` (`CHAMPS`, `:73-85`) alors que `ciqual_vers_grocy.py:593` le crée et l'écrit ; et « semoule complete » y subsiste (`:113`) alors que `test_ciqual.py:197-199` exige justement sa disparition des tables de l'autre script. Les deux scripts ont divergé sans que rien ne le signale.
 
@@ -279,7 +257,7 @@ for rendement in (1.87, 2.26, 3.0, 4.68, 5.5):
 
 Sur les ~38 `verifier()` de ce fichier, **3 seulement appellent une fonction du script cible** (`sens_du_rendement`, `desaccords`, `valeurs_saisies_a_la_main`) ; le reste vérifie la cohérence des **tables de données**, ce qui est utile mais n'est pas de la couverture de code.
 
-À l'inverse, `test_ecriture_grocy.py` (48 vérifications) est un vrai test bout-en-bout : il lance de vrais sous-processus contre un Grocy bouchonné en local, et couvre la protection `source_valeurs = "moi"`, le refus d'un grain apparié à une entrée cuite, le rendement à contresens, et l'idempotence au rejeu. C'est de la bonne matière — gâchée par le constat 3.
+À l'inverse, `test_ecriture_grocy.py` (48 vérifications) est un vrai test bout-en-bout : il lance de vrais sous-processus contre un Grocy bouchonné en local, et couvre la protection `source_valeurs = "moi"`, le refus d'un grain apparié à une entrée cuite, le rendement à contresens, et l'idempotence au rejeu. C'est de la bonne matière.
 
 **Correction.** Supprimer `test_ciqual.py:111-129`. **Effort : 15 min.**
 
@@ -342,18 +320,6 @@ Le reste de ce fichier est bon : les corps envoyés sont capturés et vérifiés
 C'est exactement l'inverse de la règle posée par la refonte, martelée dans `RendementPlausible.php:20-24`, `AlimentDisponible.php:36-40` et `plausibilite.ts:24-27` : « les macros décrivent TOUJOURS le produit tel qu'on le pèse ». Ce commentaire est sur l'entité qui définit le schéma — c'est le premier endroit qu'on lit avant de saisir un aliment, et il conseille précisément l'erreur (valeurs cuites sur un féculent) que `plausibilite.ts` bloque ensuite sous le code `valeurs_deja_cuites`. Même remarque pour la fin de la ligne 26 : « personne ne peut en supprimer », alors qu'une opération `Delete` existe (`:46-49`).
 
 **Correction : 15 min.**
-
----
-
-### 17. **On peut poser du stock sur un aliment commun, que le frigo ne montrera jamais**
-**Gravité : FAIBLE — Statut : CONFIRMÉ (le code) / SUSPECTÉ (l'atteignabilité)**
-`api/src/Controller/FrigoController.php:124-131` vs `api/src/Service/FrigoBase.php:44-47`
-
-`alimentAccessible()` autorise `cree_par IS NULL OR cree_par = :u`, donc `POST /mon-frigo/stock` accepte un aliment **commun**. Mais `FrigoBase::lire()` filtre `WHERE a.cree_par = :utilisateur` (le commentaire assume ce choix). La ligne de stock est donc écrite et **jamais affichée** : quantité perdue sans un mot.
-
-Ce qu'il reste à vérifier : je n'ai pas trouvé de chemin d'écran qui l'atteigne — `frigo.tsx:552` n'appelle `useDefinirStock` qu'avec `cree.id`, l'identifiant d'un aliment que le compte vient de créer. Le trou est donc dans l'API, pas dans l'application.
-
-**Correction.** Aligner `alimentAccessible()` sur `cree_par = :u` seul, ou faire remonter les communs stockés dans `lire()`. **Effort : 1 h.**
 
 ---
 

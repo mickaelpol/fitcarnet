@@ -48,7 +48,7 @@ de la démonstration.
 
 | Ordre | Fichier | Ce qu'il pose | Ce qu'il ne pose pas |
 |---|---|---|---|
-| **1er** | `db/manuel/jeu-essai.sql` | les **aliments privés et le stock** — 14 aliments, 14 lignes de stock, de quoi exercer le frigo et l'inventaire | aucune séance, aucune cible, aucun plan |
+| **1er** | `db/manuel/jeu-essai.sql` | les **aliments du compte et le stock** — 8 aliments, 8 lignes de stock, de quoi exercer le frigo et l'inventaire | aucune séance, aucune cible, aucun plan |
 | **2e** | `db/manuel/jeu-demo.sql` | l'**historique** : 4 cibles, 3 programmes, 9 séances hebdomadaires, 2 plans de repas, et un 1RM qui monte de 50,7 à 63,3 kg | **ni aliments ni stock** — son propre en-tête le dit |
 
 En développement, sur le conteneur `fitcarnet-db-dev` :
@@ -253,16 +253,15 @@ erreur connue (« zone 70–80 % », alors que c'est 70 à 90 %).
 
 | | Ce qu'on montre | Où c'est | Bobine |
 |---|---|---|---|
-| | Le stock **groupé par emplacement** — frigo, congélateur, placard — dans l'ordre d'un inventaire réel, avec « 12 en stock sur 14 » | `/(onglets)/frigo` | 3.1 |
-| | Le détail d'un aliment : macros, catégorie, et **« 100 g → 75 g »** à la cuisson | ouvrir « Blanc de poulet » | 3.2 |
+| | Le stock **groupé par emplacement** — frigo, congélateur, placard — dans l'ordre d'un inventaire réel, avec « 6 en stock sur 8 » | `/(onglets)/frigo` | 3.1 |
+| | Le détail d'un aliment : macros, catégorie, et **« 100 g → 78 g »** à la cuisson | ouvrir « Poulet, filet sans peau cru » | 3.2 |
 | ◐ | Le rendement de cuisson est **mesurable** (poids avant / après → « Utiliser ce résultat (2,3) »). Et les catégories sont **huit**, pas trois : Protéine, Glucide, Légume, Fruit, Oléagineux, Matière grasse, Laitage, Autre | éditeur d'aliment | 3.2 |
 | + | **Recherche** par aliment ou par emplacement, insensible aux accents | champ « Rechercher » | 3.3 |
-| | Ajouter depuis le **catalogue commun** — 50 aliments de référence, et **les aliments déjà présents en sont retirés** | Ajouter un aliment | 3.4 |
-| | Créer un aliment **de zéro** : il reste privé, il ne pollue pas le catalogue commun | Ajouter → Créer de zéro | 3.5 |
+| | **Ajouter un aliment** : l'éditeur s'ouvre vide, on saisit les valeurs de l'étiquette. L'aliment **appartient au compte** : aucun autre ne le voit | Ajouter un aliment | 3.4 |
 | + | **Contrôle de cohérence permanent** des valeurs, **blocage** de l'enregistrement sur « incohérent », et **détection des kilojoules** (« Convertir : 1473 kJ = 352 kcal ») | éditeur d'aliment | 3.5 |
 | + | **Fibres facultatives** — vide veut dire « non renseigné », pas zéro | éditeur d'aliment | 3.5 |
 | | Corriger une quantité, supprimer un aliment | ligne de stock | 3.6, 3.7 |
-| + | **On ne supprime pas n'importe quoi** : jamais un aliment commun, jamais un aliment encore en stock (409 nommant le nombre de lignes) | — | 3.7 |
+| + | **On ne supprime pas n'importe quoi** : seulement ses propres aliments, et jamais un aliment encore en stock (409 nommant le nombre de lignes) | — | 3.7 |
 | + | **Le frigo Grocy** — lecture des stocks, création d'un produit depuis l'application, produits écartés faute de valeurs, signalement des incomplets, survie à une panne de Grocy. Sur Grocy, **la suppression est refusée et le nom non modifiable** | `/(onglets)/frigo` avec `GROCY_URL` | **impasse**, voir fin de partie III |
 
 ## D · L'inventaire
@@ -485,12 +484,12 @@ l'enchaînement parfait : le montage recolle.
 
 **3.1 — Le stock** · 25 s
 *Geste* : onglet **Mon frigo**, défile lentement sur toute la liste.
-*À l'écran* : « 12 en stock sur 14 », les aliments groupés par emplacement.
+*À l'écran* : « 6 en stock sur 8 », les aliments groupés par emplacement.
 *Tu dis* : « Voilà ce qu'il y a dans le frigo. Rangé par emplacement — frigo, congélateur, placard — avec les valeurs pour cent grammes. »
 
 **3.2 — Le détail, et le poids cru** · 30 s
-*Geste* : ouvre « Blanc de poulet ».
-*À l'écran* : macros, et **« 100 g → 75 g »** à la cuisson.
+*Geste* : ouvre « Poulet, filet sans peau cru ».
+*À l'écran* : macros, et **« 100 g → 78 g »** à la cuisson.
 *Tu dis* : « Et la mention qui décide de tout : poids cru. Le riz blanc sec vaut 350 kilocalories aux cent grammes ; cuit, il n'en vaut plus que 155, parce qu'il pèse deux fois et quart plus lourd. Si on confond les deux, tous les chiffres de l'application sont faux. Ici on pèse toujours cru, et le rendement de cuisson est écrit. »
 
 > **Deux mots à ne pas dire : « 130 » et « basmati ».**
@@ -500,8 +499,8 @@ l'enchaînement parfait : le montage recolle.
 > viennent de la table française CIQUAL.
 >
 > **Basmati** est tout aussi faux : la paire **350 / 155** est celle du **riz
-> blanc** dans CIQUAL, et c'est elle qui donne le rendement **2,26** du
-> catalogue. Le vrai basmati donne 351 au cru et 148 au cuit, soit 2,37.
+> blanc** dans CIQUAL, et c'est elle qui donne le rendement **2,26** de
+> l'aliment « Riz blanc, cru ». Le vrai basmati donne 351 au cru et 148 au cuit, soit 2,37.
 >
 > Et attention au **2,26 lui-même** : le riz *pèse* 2,26 fois plus, il n'a pas
 > « absorbé deux fois et demie son poids en eau » — il en a absorbé 1,26 fois son
@@ -512,14 +511,14 @@ l'enchaînement parfait : le montage recolle.
 *Geste* : tape « poul » dans le champ de recherche.
 *Tu dis* : « Sur un frigo de quarante lignes, on cherche. »
 
-**3.4 — Ajouter depuis le catalogue** · 35 s
-*Geste* : **Ajouter un aliment** → la liste des 50 aliments de référence → choisis-en un.
-*Tu dis* : « Cinquante aliments de référence, vérifiés, communs à tous les comptes. On part de là plutôt que de retaper des valeurs. »
+**3.4 — Ajouter un aliment** · 35 s
+*Geste* : **Ajouter un aliment** → l'éditeur s'ouvre vide → saisis un nom et les valeurs d'une étiquette.
+*Tu dis* : « Je rentre de courses : je recopie l'étiquette. Deux paquets de la même chose ne portent pas les mêmes chiffres, alors c'est celle-ci qui compte. Et cet aliment est à moi : aucun autre compte ne le voit. »
 
-**3.5 — Créer de zéro** · 40 s
-*Geste* : **Ajouter un aliment** → **Créer de zéro** → saisis un nom et des valeurs.
-*À l'écran* : le contrôle de cohérence, et le blocage si les valeurs ne peuvent pas être vraies.
-*Tu dis* : « Et si le produit n'y est pas, on le crée. Il reste privé : personne d'autre ne le verra, et il ne polluera pas le catalogue commun. Et l'application refuse d'enregistrer des valeurs qui ne peuvent pas être vraies. »
+**3.5 — Des valeurs impossibles** · 40 s
+*Geste* : dans le même éditeur, entre des valeurs qui ne peuvent pas être vraies, puis corrige-les et enregistre.
+*À l'écran* : le contrôle de cohérence, et le blocage tant que les valeurs sont incohérentes.
+*Tu dis* : « Et l'application refuse d'enregistrer des valeurs qui ne peuvent pas être vraies. »
 
 **3.6 — Corriger une quantité** · 15 s
 *Geste* : modifie la quantité d'une ligne à la main.
@@ -619,7 +618,7 @@ l'enchaînement parfait : le montage recolle.
 **5.4 — L'inventaire** · 40 s
 *Geste* : onglet **Inventaire**. Corrige **trois** lignes seulement.
 *À l'écran* : le compteur « n écart ».
-*Tu dis* : « Une fois par semaine, je pèse. Je ne ressaisis pas quatorze aliments : je corrige les trois qui ont bougé. Une ligne que je ne touche pas n'est pas un zéro — elle n'a pas été comptée, et son stock ne bouge pas. »
+*Tu dis* : « Une fois par semaine, je pèse. Je ne ressaisis pas tout le frigo : je corrige les trois qui ont bougé. Une ligne que je ne touche pas n'est pas un zéro — elle n'a pas été comptée, et son stock ne bouge pas. »
 *Geste* : appuie sur **Réinitialiser**, puis ressaisis.
 *Tu dis* : « Et si je me trompe, je repars. »
 
@@ -796,7 +795,7 @@ conforme ».
 | 13:00 – 15:00 | **Le carnet** — séances, 1RM, progression | bobine 7, ou vidéo 2:34 → fin |
 | 15:00 – 18:00 | La pile, et un seul code pour trois cibles | slides 12-13, 17 |
 | 18:00 – 22:00 | **L'isolation des comptes** + le solveur + l'inventaire asynchrone | slides 14-16 |
-| 22:00 – 26:00 | **Les garanties** — tests, TDD, l'audit et ses 84 constats | slides 18-23 |
+| 22:00 – 26:00 | **Les garanties** — tests, TDD, l'audit et ses 79 constats | slides 18-23 |
 | 26:00 – 29:00 | **Comment c'est construit** — l'outillage IA, les agents | slides 24-27 |
 | 29:00 – 30:00 | Ce qu'on ne promet pas, et la suite | — |
 
@@ -918,7 +917,7 @@ la panne si on te le demande, pas avant :**
 |---|---|
 | Tests front | **625** (596 purs + 29 de rendu) |
 | Tests API | **302**, 797 assertions, sans base ni noyau |
-| Audit de septembre 2026 | **84 constats** (3 critiques, 15 élevés), **8 lots, tous clos** |
+| Audit de septembre 2026 | **79 constats** (3 critiques, 14 élevés), **8 lots, tous clos** |
 | Catalogue d'exercices | ~1 338 entrées |
 | Inventaire des capacités | **288**, chacune avec fichier et ligne |
 
@@ -1000,7 +999,7 @@ invitation. C'est un choix, pas une limite technique.
 **« Et si l'IA écrit du code faux ? »**
 > C'est pour ça que le test est écrit avant, et qu'on le regarde échouer. Et que
 > rien n'est déclaré terminé sans la sortie des tests collée dans la
-> conversation. L'audit qui a trouvé 84 constats a été mené avec le même outil.
+> conversation. L'audit qui a trouvé 79 constats a été mené avec le même outil.
 
 **« C'est utilisable par quelqu'un d'autre que vous ? »**
 > L'application est multi-comptes, par invitation. Techniquement oui. Le produit

@@ -1,6 +1,6 @@
 ---
 name: isolation-donnees
-description: L'isolation des données entre comptes dans fitcarnet — ProprieteUtilisateur, FiltreProprietaire, FiltreAliment, et le corollaire « vérifier la propriété sur CHAQUE chemin d'écriture ». À charger avant d'exposer une entité en API, d'écrire un contrôleur personnalisé, un processeur d'état, ou tout code qui écrit une donnée rattachée à un compte.
+description: L'isolation des données entre comptes dans fitcarnet — ProprieteUtilisateur, FiltreProprietaire, FiltreExercice, et le corollaire « vérifier la propriété sur CHAQUE chemin d'écriture ». À charger avant d'exposer une entité en API, d'écrire un contrôleur personnalisé, un processeur d'état, ou tout code qui écrit une donnée rattachée à un compte.
 ---
 
 # Isolation des données entre comptes
@@ -19,15 +19,20 @@ Ce qui suit a été écrit à partir de failles réelles, chacune datée.
 | `App\State\ProprietaireProcessor` | Pose le propriétaire à la création — le filtre ne sert à rien sans lui. |
 | `api/tests/ModeleExposeTest.php` | Refuse toute entité `#[ApiResource]` non conforme absente de sa liste blanche. |
 
-**Deux exceptions documentées**, toutes deux des référentiels partagés que le
-filtre strict rendrait inutilisables :
+Les aliments sont des données de compte comme les autres : `Aliment` implémente
+`ProprieteUtilisateur`, et chacun ne voit que les siens. `AlimentProcessor`
+enveloppe `ProprietaireProcessor` et traduit un doublon de nom dans le compte
+(`aliment_nom_unique_par_compte`) en 422.
+
+**Une seule exception filtrée à part**, un référentiel partagé que le filtre
+strict rendrait inutilisable (les emplacements et les modes de cuisson, eux, sont
+en lecture seule et dérogent dans `ModeleExposeTest` sans filtre) :
 
 | Entité | Filtre | Règle | Pourquoi pas le filtre strict |
 |---|---|---|---|
-| `Aliment` | `FiltreAliment` | **commun OU le mien** | le propriétaire est facultatif : un aliment sans `cree_par` est commun |
 | `Exercice` | `FiltreExercice` | **public OU le mien** | la règle porte sur `public`, ce qui autorise un exercice **publié mais attribué** — un administrateur verse au catalogue commun l'exercice de quelqu'un sans en effacer la paternité |
 
-`Exercice` a rejoint la liste le 14 septembre 2026 (constat É8) : `public` et
+`Exercice` a reçu ce filtre le 14 septembre 2026 (constat É8) : `public` et
 `creePar` existaient depuis l'origine sans que rien ne les renseigne ni ne les
 lise, pendant que l'écran promettait « ★ exercice personnel ». Une étiquette qui
 promet la confidentialité sans la fournir est pire qu'une étiquette absente.
@@ -52,9 +57,9 @@ Un filtre Doctrine protège la **lecture**. Il ne dit rien de ce qu'un contrôle
 personnalisé écrit à partir d'un identifiant reçu dans le corps de la requête.
 
 - **Septembre 2026, faille É1.** `POST /api/mon-frigo/stock` vérifiait que
-  l'aliment visé était commun ou celui du demandeur. Son jumeau
+  l'aliment visé appartenait au demandeur. Son jumeau
   `POST /api/mon-frigo/inventaire`, qui écrit le même stock par un autre chemin,
-  n'avait jamais reçu ce contrôle. Bob posait 1 g sur l'aliment privé d'Alice, et
+  n'avait jamais reçu ce contrôle. Bob posait 1 g sur un aliment d'Alice, et
   l'aliment d'Alice devenait **indélébile** : `AlimentSuppressionProcessor` compte
   les lignes de stock tous comptes confondus, et l'application n'offrait à Alice
   aucun moyen de défaire ce blocage. Ce n'était pas une fuite — c'était pire, un
@@ -88,7 +93,7 @@ d'inventaire il ne nomme pas la ligne fautive.
 ## Le filet, et ce qu'il couvre
 
 **C3 fermé le 14 septembre 2026.** Quatre fichiers éprouvent le dispositif, sans
-base ni noyau — `tests/Doctrine/FiltreProprietaireTest`, `FiltreAlimentTest`,
+base ni noyau — `tests/Doctrine/FiltreProprietaireTest`, `FiltreExerciceTest`,
 `tests/State/ProprietaireProcessorTest`, `tests/Security/CompteActifTest`. Chaque
 témoin a été **vu échouer** en cassant le code qu'il protège.
 
@@ -99,10 +104,10 @@ Ce qu'ils figent, et qu'il ne faut pas défaire :
 | `applyToItem` filtre autant que `applyToCollection` | sinon `GET /api/seances/{id}` rend la séance d'un autre, liste propre |
 | Non authentifié → `1 = 0` | un filtre qui « ne s'applique pas » ouvre la base entière |
 | Une entité non marquée n'est pas touchée | le témoin : un filtre qui restreint tout ressemble à une protection |
-| Le `OR` de `FiltreAliment` reste un bloc | `AND` lie plus fort que `OR` : disjoint, le catalogue commun échappe à la recherche |
+| Le `OR` de `FiltreExercice` reste un bloc | `AND` lie plus fort que `OR` : disjoint, le catalogue public échappe à la recherche |
 | Un propriétaire déjà posé n'est jamais écrasé | modifier la donnée d'un autre ne doit pas se l'approprier |
 
-**Une idée reçue corrigée au passage** : le commentaire de `FiltreAliment` disait
-ses parenthèses « indispensables ». Elles ne le sont pas — Doctrine parenthèse
+**Une idée reçue corrigée au passage** : on a longtemps cru les parenthèses du
+`OR` de `FiltreExercice` « indispensables ». Elles ne le sont pas — Doctrine parenthèse
 déjà toute partie contenant `OR` (`Query\Expr\Composite`, DDC-1237). On les garde
 pour l'intention, mais ce n'est pas d'elles que dépend l'isolation.

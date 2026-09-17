@@ -5,7 +5,7 @@ description: Comment relire du code sur fitcarnet — les huit motifs de défaut
 
 # Relire du code sur fitcarnet
 
-Un audit de 84 constats a été mené le 7 septembre 2026, puis corrigé lot par lot.
+Un audit de 79 constats a été mené le 7 septembre 2026, puis corrigé lot par lot.
 Ce document ne dit pas ce qu'est du bon code en général : il dit **ce qui a
 réellement mordu ici**, dans l'ordre où ça rapporte de regarder.
 
@@ -35,9 +35,6 @@ Un contrôle posé devant une porte, absent devant sa jumelle.
 - **D7.** Le corps de `grammesSaisis` réécrit mot pour mot 35 lignes plus bas,
   sous un commentaire proclamant « UN SEUL ENDROIT DÉCIDE CE QU'EST UNE SAISIE
   VALABLE ».
-- **D8.** Le filtre des aliments ajoutables calculé deux fois dans une modale qui
-  n'indexe **que par position** : une divergence aurait ajouté un aliment pour un
-  autre, en silence.
 
 **À faire** : `grep` le nom de la fonction appelée, pas seulement la route. Puis
 compter les appelants. Le remède est toujours le même — **descendre le contrôle
@@ -46,12 +43,12 @@ recopiée devant trois portes finira par manquer devant la quatrième.
 
 ### 2. Le garde qui regarde l'état au lieu de l'intention
 
-- **M-01, et il a été REPRODUIT le jour même de sa correction.** `AlimentProcessor`
-  posait le propriétaire « seulement s'il manque » — juste à la création, faux
-  partout ailleurs, car un aliment de référence a précisément `creePar = NULL`.
-  Le PATCH d'administration se l'appropriait donc et le retirait à tout le monde.
-  Puis `ExerciceProcessor`, écrit une heure après la lecture du constat, a copié
-  le même garde.
+- **Septembre 2026.** `ExerciceProcessor` posait le propriétaire « seulement
+  s'il manque » — juste à la création, faux partout ailleurs, car un exercice du
+  catalogue commun a précisément `creePar = NULL`. Le PATCH par lequel un
+  administrateur renseigne une vidéo se l'appropriait donc, et `public = false`
+  le retirait du catalogue de tout le monde. Le garde teste désormais
+  l'opération (`$operation instanceof Post`).
 
 **À faire** : devant `if (null === $x->getChamp())`, demander **ce que ce test
 cherche vraiment à savoir**. Si la réponse est « est-ce une création ? », alors
@@ -65,9 +62,6 @@ il suffit de vérifier qu'elle est tenue.
 
 - `cleDHabitude` : « CETTE FONCTION EST LA SEULE À NORMALISER, dans tout le
   projet ». Elle avait **six** concurrentes.
-- `FiltreAliment` : « parenthèses indispensables ». Vérifié — Doctrine parenthèse
-  déjà toute partie contenant `OR` (`Composite`, DDC-1237) ; les retirer ne change
-  pas un caractère du DQL.
 - `CLAUDE.md` annonçait `front/src/calcul/texte.ts` comme module de référence.
   Le fichier n'existait pas.
 - `db/01-schema.sql` : « CE FICHIER DÉCRIT LA BASE TELLE QU'ELLE EST
@@ -87,7 +81,8 @@ L'audit en a trouvé **douze**.
   nom qu'il était censé garantir. Le code et sa garantie pouvaient diverger sans
   qu'un seul test tombe — le test validait sa propre copie.
 - Un test qui **ment sur son scénario** protège le défaut : celui d'É8 passait une
-  opération `Post` en prétendant décrire un `PATCH`, ce qui masquait M-01.
+  opération `Post` en prétendant décrire un `PATCH`, ce qui masquait le garde
+  du motif 2.
 
 **À faire** : pour chaque test, se demander **quelle modification du code le
 ferait tomber**. Si aucune ne vient, le test est décoratif. La preuve se fait en
@@ -124,10 +119,14 @@ endroit où « je ne sais pas » devient « zéro » sans le dire.
 Règle 7, et c'est la plus grave sur une application de nutrition : ce qui
 s'affiche sera pesé et mangé.
 
-- Le catalogue commun a porté pendant un mois les valeurs d'une **fixture de
-  test** : riz à 1,58 g de lipides au lieu de 0,79.
-- Le seed semait des valeurs de **cuit** dans une base qui pèse du **cru** :
-  boulgour à 83 kcal quand le sec en fait 347. Facteur 4.
+- **16 septembre 2026.** Trois champs pour un seul fait — les macros, `ratio`
+  et `etat_reference` — pouvaient se contredire : des féculents décrits cuits
+  étaient lus comme secs, et un compte mangeait jusqu'à **trois fois** trop de
+  glucides. La colonne a disparu ; les valeurs décrivent toujours le produit tel
+  qu'on le pèse.
+- « Le riz sec vaut 350 kcal/100 g, pas 130 » : la phrase de la règle 3,
+  répétée dans douze documents, était à moitié fausse. 130 est une valeur
+  **USDA** ; CIQUAL donne 155 pour le riz blanc cuit (16 septembre 2026).
 
 **À faire** : devant tout nombre en dur, demander **d'où il vient**. Une valeur
 sans source traçable est suspecte. Et un refus explicite vaut mieux qu'une valeur

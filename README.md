@@ -103,7 +103,7 @@ front/        Expo — 16 écrans, 38 composants, le solveur de repas, 17 module
   src/calcul/     nutrition, cuisson, performance, plausibilité
 db/           01-schema.sql (19 tables) + manuel/ (24 migrations numérotées + 5 utilitaires)
 docker/       Dockerfile, Caddyfile, point d'entrée de production
-docs/         audit-2026-09/ — 84 constats classés
+docs/         audit-2026-09/ — 79 constats classés
 .claude/      outillage : skills du projet, agents, hooks, réglages
 ```
 
@@ -141,7 +141,7 @@ valeur.
 | [DEPLOIEMENT.md](DEPLOIEMENT.md) | mettre en production sur le NAS **et livrer une nouvelle version** |
 | [CALCULATEUR.md](CALCULATEUR.md) | le calculateur de repas : parcours et décisions |
 | [CLAUDE.md](CLAUDE.md) | les sept règles non négociables du projet |
-| [docs/audit-2026-09/](docs/audit-2026-09/README.md) | audit complet, 84 constats et leur plan de correction |
+| [docs/audit-2026-09/](docs/audit-2026-09/README.md) | audit complet, 79 constats et leur plan de correction |
 
 ---
 

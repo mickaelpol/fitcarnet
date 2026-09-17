@@ -7,14 +7,12 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 | Rapport | Constats |
 |---|---|
-| [01 — Sécurité API](01-securite-api.md) | 0 critique · 1 élevée · 3 moyennes · 9 faibles |
-| [02 — Données et infrastructure](02-donnees-infra.md) | 1 critique · 5 élevées · 6 moyennes · 7 faibles |
+| [01 — Sécurité API](01-securite-api.md) | 0 critique · 1 élevée · 2 moyennes · 9 faibles |
+| [02 — Données et infrastructure](02-donnees-infra.md) | 1 critique · 5 élevées · 5 moyennes · 6 faibles |
 | [03 — Architecture front](03-front.md) ⚠️ | 0 critique · 5 élevées · 14 moyennes · 14 faibles — **ce rapport décrit l'arborescence d'AVANT le lot 6 et n'a pas été réécrit**. `hooks.ts` n'existe plus (éclaté en `src/api/hooks/`), et tous ses numéros de ligne sont périmés. Il reste utile pour le *raisonnement* de chaque constat, jamais pour localiser du code |
-| [04 — Tests et robustesse](04-tests-qualite.md) | 2 critiques · 4 élevées · 6 moyennes · 7 faibles |
+| [04 — Tests et robustesse](04-tests-qualite.md) | 2 critiques · 3 élevées · 6 moyennes · 6 faibles |
 
-**Total : 3 critiques, 15 élevées, ~29 moyennes, ~37 faibles** (après dédoublonnage entre rapports).
-
-**+ C4**, découvert le 14 septembre 2026 en corrigeant É7 et **tranché le jour même** : le catalogue d'aliments de départ portait des valeurs de fixture de test. Il a été supprimé plutôt que reconstitué. Voir ci-dessous.
+**Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
 ## Ce que l'audit dit du projet
 
@@ -31,7 +29,7 @@ sur son jumeau. La formule d'Epley est bornée dans le module de référence et 
 dans deux hooks. La convention européenne des fibres est respectée dans `nutrition.ts` et ignorée
 dans `plausibilite.ts`, deux fichiers voisins.
 
-**La conséquence pratique : le remède principal n'est pas de corriger 84 lignes, c'est de supprimer
+**La conséquence pratique : le remède principal n'est pas de corriger 79 lignes, c'est de supprimer
 les duplications et d'installer les quatre garde-fous automatiques qui auraient attrapé la moitié de
 cette liste sans intervention humaine.** D'où le lot 0 ci-dessous.
 
@@ -87,33 +85,25 @@ créée par aucune migration, présente dans aucune entité, référencée par a
 au dépôt le script qui construit A et B et exige un diff vide. ~2 h.*
 
 ### C3 — ✅ corrigé le 14 septembre 2026 — Aucun test ne vérifiait l'isolation entre comptes
-`api/tests/` — **CONFIRMÉ (absence), désormais couvert par 18 témoins**
+`api/tests/` — **CONFIRMÉ (absence), désormais couvert par 13 témoins**
 
-**Ce qui a été fait.** Quatre fichiers, sans base ni noyau, un par pièce du dispositif :
-`FiltreProprietaireTest` (5), `FiltreAlimentTest` (5), `ProprietaireProcessorTest` (4),
-`CompteActifTest` (4). Chaque témoin a été **mis en échec** en cassant le code qu'il protège,
-avant d'être conservé — la restriction retirée de `applyToItem`, le `1 = 0` supprimé, le garde
-`is_a()` court-circuité, le propriétaire écrasé, le compte désactivé laissé passer.
+**Ce qui a été fait.** Trois fichiers, sans base ni noyau, un par pièce du dispositif :
+`FiltreProprietaireTest` (5), `ProprietaireProcessorTest` (4), `CompteActifTest` (4). Chaque
+témoin a été **mis en échec** en cassant le code qu'il protège, avant d'être conservé — la
+restriction retirée de `applyToItem`, le `1 = 0` supprimé, le garde `is_a()` court-circuité, le propriétaire écrasé, le compte désactivé laissé passer.
 
-**Deux choses apprises en chemin, qui ne figuraient nulle part :**
-
-- Le commentaire de `FiltreAliment` disait ses parenthèses « indispensables ». Elles ne le sont
-  pas : Doctrine parenthèse déjà toute partie contenant `OR` au moment de combiner les conditions
-  (`Query\Expr\Composite`, correctif DDC-1237). Les retirer ne change pas un caractère du DQL.
-  Elles sont conservées — elles disent l'intention — mais le commentaire a été corrigé, et le test
-  éprouve désormais l'invariant plutôt que la mécanique.
-- `ProprietaireProcessor` ne pose le propriétaire que s'il est absent. Vérifié : la propriété
-  `utilisateur` n'appartient à aucun groupe de `denormalizationContext`, un client ne peut donc pas
-  la transmettre. Le garde protège un PATCH, pas une usurpation.
+**Une chose apprise en chemin, qui ne figurait nulle part :** `ProprietaireProcessor` ne pose le
+propriétaire que s'il est absent. Vérifié : la propriété `utilisateur` n'appartient à aucun groupe
+de `denormalizationContext`, un client ne peut donc pas la transmettre. Le garde protège un PATCH,
+pas une usurpation.
 
 <details><summary>Le constat d'origine</summary>
 
 
-Aucune occurrence de `FiltreProprietaire`, `FiltreAliment`, `ProprietaireProcessor` ni `CompteActif`
-dans les tests. Le code, lui, **est bon** : relu ligne à ligne, le filtre s'applique en collection
-et en item, avec `1 = 0` pour un non-authentifié, le `OR` de `FiltreAliment` est correctement
-parenthésé, les entités filles sont en `operations: []`, et les 8 contrôleurs scopent tous par
-`getUser()`.
+Aucune occurrence de `FiltreProprietaire`, `ProprietaireProcessor` ni `CompteActif` dans les
+tests. Le code, lui, **est bon** : relu ligne à ligne, le filtre s'applique en collection et en
+item, avec `1 = 0` pour un non-authentifié, les entités filles sont en `operations: []`, et les
+8 contrôleurs scopent tous par `getUser()`.
 
 C'est donc un risque, pas un défaut actif — mais toute la garantie d'isolation tient à **deux
 `tags:` dans `services.yaml`** et au fait que chaque nouvelle entité pense à implémenter
@@ -128,54 +118,14 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
 
 ---
 
-### C4 — ✅ tranché le 14 septembre 2026 — Le catalogue d'aliments de départ est supprimé
-`db/02-donnees.sql` — **découvert en corrigeant É7, résolu par une décision produit**
-
-**Le constat.** L'écrasement de É7 n'avait pas seulement supprimé 49 `UPDATE` : il avait laissé à
-leur place les valeurs de la **table factice du banc d'essai**. Vérifié contre la table de l'Anses :
-le riz portait 1,58 g de lipides au lieu de 0,79, et 3,20 g de fibres au lieu de 1,53. Deux lignes
-portaient en outre des valeurs de **cuit** dans une base qui pèse du cru — boulgour à 83 kcal quand
-le boulgour sec en fait 347 — ce que le seed signalait déjà lui-même.
-
-**Ce que j'avais mal jugé, et qui a été corrigé par l'auteur du projet.** J'avais compté « 44
-aliments sur 50 sans fibres » comme un défaut. C'en est un seulement si l'application confond
-absence et zéro — or elle ne le fait pas : `controler()` distingue `fibresConnues`, élargit son
-seuil de tolérance et l'écrit à l'écran (« sans les fibres le contrôle reste approximatif »). C'est
-la règle 6 correctement appliquée. Il n'y avait rien à corriger de ce côté.
-
-**La décision, et son motif.** Le catalogue de départ est **supprimé**, plutôt que reconstitué. Les
-valeurs nutritionnelles ne sont pas une constante universelle : deux paquets du même produit ne
-portent pas les mêmes chiffres, et en France l'étiquette les donne — fibres comprises, là où les
-tables américaines les omettent. Un utilisateur qui rentre de courses a sous les yeux les valeurs
-justes pour *ce qu'il a acheté* ; une moyenne nationale posée d'avance ne peut que le tromper, en
-lui donnant l'impression que la question est réglée. Pour un compte Grocy, la question ne se pose
-pas : `FrigoGrocy` déclare le userfield « Fibres / 100 g », le crée s'il manque, le lit et l'écrit.
-
-Reconstituer 53 `UPDATE` aurait de surcroît demandé des correspondances arbitraires. Preuve par
-l'exemple : Ciqual contient « Riz thaï ou basmati, cru » (351 · 78,4 · 0,63 · 1,06), mais la
-migration visait « Riz blanc, cru » — **même la version saine d'août utilisait la mauvaise entrée**.
-
-**Ce qui a été fait.** Le bloc `INSERT INTO aliment` retiré de `db/02-donnees.sql` ; les
-emplacements, modes de cuisson et exercices — structurels — conservés. Les migrations 14 à 19 sont
-**gardées telles quelles**, idempotentes : sans catalogue elles ne trouvent rien à corriger, et sur
-une base existante elles gardent leur raison d'être. Chacune porte désormais un en-tête le disant.
-`installer.sh` n'annonce plus « 0 aliments » comme une anomalie.
-
-**Ce qui n'a délibérément PAS été fait** : rien n'est supprimé des bases existantes. `stock.aliment_id`
-est en `ON DELETE RESTRICT`, et surtout `plan_repas.contenu` est du **JSON** — un aliment supprimé
-qui y figure laisserait le plan incohérent sans la moindre erreur SQL. La suppression se fait donc
-à la main, depuis l'écran, aliment par aliment.
-
----
-
-## Les 15 constats élevés
+## Les 14 constats élevés
 
 ### Sécurité
 - **É1** — ✅ **corrigé le 8 septembre 2026.** L'inventaire différé n'avait aucun contrôle de
   propriété sur l'aliment. `FrigoController.php:332-390` + `AppliqueInventaire.php:146-179`. Le
   chemin jumeau (`POST /api/mon-frigo/stock`) avait reçu `alimentAccessible()` pour corriger
   exactement cette faille ; `POST /api/mon-frigo/inventaire` ne l'avait pas eu. Un compte pouvait
-  écrire une ligne de stock sur l'aliment privé d'un autre, qui ne pouvait alors plus le supprimer.
+  écrire une ligne de stock sur l'aliment d'un autre, qui ne pouvait alors plus le supprimer.
 
   **Ce qui a été fait.** Le contrôle est posé **au dépôt** du lot, en une requête pour tout
   l'inventaire, et refuse en 404 sans nommer la ligne fautive — distinguer « n'existe pas » de
@@ -236,15 +186,6 @@ qui y figure laisserait le plan incohérent sans la moindre erreur SQL. La suppr
   office d'ordre de dépendances marche jusqu'au jour où un nom commence par une lettre ».
 
 ### Cohérence des données et scripts
-- **É7** — ✅ **corrigé le 14 septembre 2026**, et l'écrasement est **daté**. Le banc passe désormais
-  `--sortie` vers un temporaire, et une garde compare le SHA-256 du fichier versionné avant/après :
-  retirer `--sortie` fait tomber le banc (vérifié, 38/49 au lieu de 49/49).
-
-  L'historique confirme le soupçon : `1e40ba7` (48 UPDATE) → `a09b029` (53) → `f5dbb94` (53) →
-  **`c0f6f10` (4)**, un commit intitulé « Batch cooking » sans aucun rapport. Les 4 survivants sont
-  exactement les 4 aliments que la table factice sait produire.
-
-  ⚠️ **Ce que É7 cachait est plus grave que É7** — voir le constat **C4** ci-dessous.
 - **É8** — ✅ **corrigé le 14 septembre 2026.** Les exercices « personnels » étaient visibles de
   tous : `Exercice` portait `public` et `creePar` sans que rien ne les renseigne ni ne les lise —
   `setCreePar()` n'avait pas un seul appelant — pendant que l'écran affichait
@@ -252,10 +193,9 @@ qui y figure laisserait le plan incohérent sans la moindre erreur SQL. La suppr
 
   **Décision prise : les rendre vraiment privés.** `ExerciceProcessor` pose l'auteur et
   `public = false` à la création, `FiltreExercice` applique « **public OU le mien** » en collection
-  et en item. La règle porte sur `public`, et non sur l'absence d'auteur comme pour `Aliment` : la
-  nuance ouvre une troisième possibilité, l'exercice **publié mais attribué**, par où un
-  administrateur verse au catalogue commun l'exercice bien rédigé de quelqu'un sans en effacer la
-  paternité. C'est le `PATCH` d'administration, déjà réservé à `ROLE_ADMIN`, qui publie.
+  et en item. La règle porte sur `public`, et non sur l'absence d'auteur : la nuance ouvre une
+  troisième possibilité, l'exercice **publié mais attribué**, par où un administrateur verse au
+  catalogue d'exercices l'exercice bien rédigé de quelqu'un sans en effacer la paternité. C'est le `PATCH` d'administration, déjà réservé à `ROLE_ADMIN`, qui publie.
 
   Les 1 338 exercices importés sont `public = true` : ils restent visibles de tous, **aucune
   migration de données n'a été nécessaire**.
@@ -274,8 +214,8 @@ qui y figure laisserait le plan incohérent sans la moindre erreur SQL. La suppr
   mais le filtrage rend la limite plus visible.
 - **É9** — `grocy_macros.py:105-113` écrit dans les mêmes champs Grocy avec la **convention inverse**
   (valeurs cuites, riz basmati à 130 kcal contre 350 sec) : un produit amorcé ainsi fait peser ~3×
-  trop de riz. Et son appariement sans borne de mot fait recevoir 575 kcal à « Lait d'amandes » —
-  littéralement le bug corrigé à la main dans la migration 16. *1 h (supprimer) à 4 h (aligner).*
+  trop de riz. Et son appariement sans borne de mot fait recevoir 575 kcal à « Lait d'amandes ».
+  *1 h (supprimer) à 4 h (aligner).*
 
 ### Front — chiffres faux montrés à l'utilisateur
 - **É10** — `front/src/api/client.ts` (342 lignes) n'a **aucun test** : rejeu sur 401, distinction
@@ -317,9 +257,9 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **0 — garde-fous** | ✅ | `CLAUDE.md`, PHPStan niveau 5, `ModeleExposeTest`, `verifier-schema.sh`, `verifier-migrations.sh`, glob des tests, 2 hooks |
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ | É11, É12, É13, É15, M2, M3 · **M1 et M4 faits le 15 septembre** — M1 affichait un écart de 2 kcal/g de fibres en mode glucides totaux (7,5 g suffisaient à accuser une cible atteignable) ; M4 a reçu un seuil **relatif**, choisi sur 134 860 pivots mesurés |
-| **3 — sécurité et isolation** | ✅ | É1, C3, É8, M-01, M-02, M-03 · **M-02 complet le 15 septembre** : `GET /api/mes-sessions` et `DELETE /api/mes-sessions/{id}` |
+| **3 — sécurité et isolation** | ✅ | É1, C3, É8, M-02, M-03 · **M-02 complet le 15 septembre** : `GET /api/mes-sessions` et `DELETE /api/mes-sessions/{id}` |
 | **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** |
-| **5 — scripts dangereux** | ✅ | É4, É7, `sauvegarde.sh` (É9 fait le 8 sept.) · a révélé **C4**, tranché |
+| **5 — scripts dangereux** | ✅ | É4, `sauvegarde.sh` (É9 fait le 8 sept.) |
 | **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → **1 295** lignes · `composer.ts` **817** → 135 · `cuisson.ts` **611** → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
 | **7 — tests manquants** | ✅ | `client.ts` : 22 témoins, chacun prouvé par une **mutation** qui le tue (29 mutations au banc). `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
 | **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
@@ -381,15 +321,14 @@ assurance est pire qu'un refus de répondre.
 
 ### Lot 3 — Sécurité et isolation · ~5 h
 É1 (propriété sur l'inventaire) · C3 (tests d'isolation) · É8 (décision produit sur les exercices) ·
-M-01 à M-03 du rapport sécurité.
+M-02 et M-03 du rapport sécurité.
 
 ### Lot 4 — Base reproductible · ~4 h
 C2 (double écriture) · É5 (install dev) · É6 (course sur les lots) · index de clés étrangères
 manquants · divergences entités ↔ schéma.
 
 ### Lot 5 — Scripts dangereux · ~3 h
-É4 (restauration sous travailleurs actifs) · É7 (test qui écrase une migration) · É9
-(`grocy_macros.py`) · `sauvegarde.sh` sans fichier `.partiel`.
+É4 (restauration sous travailleurs actifs) · É9 (`grocy_macros.py`) · `sauvegarde.sh` sans fichier `.partiel`.
 
 ### Lot 6 — Architecture front · ~2-3 jours
 Découpage de `repas.tsx` (2 316 lignes, 4 écrans, 17 `useState`) et de `hooks.ts` (1 228 lignes),
@@ -401,5 +340,5 @@ dont deux élevés.
 É10 (client HTTP) · `performance.ts` · le câblage des chemins critiques non couverts.
 
 ### Lot 8 — Le reste
-Les ~37 constats faibles, dont beaucoup sont des corrections de 5 minutes (code mort, commentaires
+Les ~35 constats faibles, dont beaucoup sont des corrections de 5 minutes (code mort, commentaires
 périmés, permission `RECORD_AUDIO` inutile déclarée en double).
