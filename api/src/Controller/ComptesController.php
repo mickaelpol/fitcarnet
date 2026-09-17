@@ -137,6 +137,7 @@ final class ComptesController extends AbstractController
             $raison = ProtectionDuCompte::raisonDeRefuserBlocage(
                 estMoi: $this->estMoi($id),
                 cibleEstAdmin: $this->estAdmin($cible),
+                cibleEstActive: (bool) $cible['actif'],
                 adminsActifs: $this->administrateursActifs(),
             );
         }
@@ -195,6 +196,7 @@ final class ComptesController extends AbstractController
         $raison = ProtectionDuCompte::raisonDeRefuserSuppression(
             estMoi: $this->estMoi($id),
             cibleEstAdmin: $this->estAdmin($cible),
+            cibleEstActive: (bool) $cible['actif'],
             adminsActifs: $this->administrateursActifs(),
         );
 

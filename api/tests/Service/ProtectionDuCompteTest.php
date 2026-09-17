@@ -19,7 +19,7 @@ final class ProtectionDuCompteTest extends TestCase
     public function testOnNeSeBloquePasSoiMeme(): void
     {
         $raison = ProtectionDuCompte::raisonDeRefuserBlocage(
-            estMoi: true, cibleEstAdmin: true, adminsActifs: 5,
+            estMoi: true, cibleEstAdmin: true, cibleEstActive: true, adminsActifs: 5,
         );
 
         self::assertNotNull($raison);
@@ -29,7 +29,7 @@ final class ProtectionDuCompteTest extends TestCase
     public function testOnNeSeSupprimePasSoiMeme(): void
     {
         self::assertNotNull(ProtectionDuCompte::raisonDeRefuserSuppression(
-            estMoi: true, cibleEstAdmin: false, adminsActifs: 3,
+            estMoi: true, cibleEstAdmin: false, cibleEstActive: true, adminsActifs: 3,
         ));
     }
 
@@ -39,17 +39,17 @@ final class ProtectionDuCompteTest extends TestCase
            Un administrateur qui n'est pas le dernier peut quand meme se
            retirer l'acces qu'il utilise pour tout le reste. */
         self::assertNotNull(ProtectionDuCompte::raisonDeRefuserBlocage(
-            estMoi: true, cibleEstAdmin: false, adminsActifs: 9,
+            estMoi: true, cibleEstAdmin: false, cibleEstActive: true, adminsActifs: 9,
         ));
     }
 
     public function testLeDernierAdministrateurActifEstIntouchable(): void
     {
         $blocage = ProtectionDuCompte::raisonDeRefuserBlocage(
-            estMoi: false, cibleEstAdmin: true, adminsActifs: 1,
+            estMoi: false, cibleEstAdmin: true, cibleEstActive: true, adminsActifs: 1,
         );
         $suppression = ProtectionDuCompte::raisonDeRefuserSuppression(
-            estMoi: false, cibleEstAdmin: true, adminsActifs: 1,
+            estMoi: false, cibleEstAdmin: true, cibleEstActive: true, adminsActifs: 1,
         );
 
         self::assertNotNull($blocage);
@@ -60,20 +60,20 @@ final class ProtectionDuCompteTest extends TestCase
     public function testUnAdministrateurParmiPlusieursSeBloque(): void
     {
         self::assertNull(ProtectionDuCompte::raisonDeRefuserBlocage(
-            estMoi: false, cibleEstAdmin: true, adminsActifs: 2,
+            estMoi: false, cibleEstAdmin: true, cibleEstActive: true, adminsActifs: 2,
         ));
         self::assertNull(ProtectionDuCompte::raisonDeRefuserSuppression(
-            estMoi: false, cibleEstAdmin: true, adminsActifs: 2,
+            estMoi: false, cibleEstAdmin: true, cibleEstActive: true, adminsActifs: 2,
         ));
     }
 
     public function testUnCompteOrdinaireNEstProtegeParRien(): void
     {
         self::assertNull(ProtectionDuCompte::raisonDeRefuserBlocage(
-            estMoi: false, cibleEstAdmin: false, adminsActifs: 1,
+            estMoi: false, cibleEstAdmin: false, cibleEstActive: true, adminsActifs: 1,
         ));
         self::assertNull(ProtectionDuCompte::raisonDeRefuserSuppression(
-            estMoi: false, cibleEstAdmin: false, adminsActifs: 1,
+            estMoi: false, cibleEstAdmin: false, cibleEstActive: true, adminsActifs: 1,
         ));
     }
 
@@ -83,7 +83,23 @@ final class ProtectionDuCompteTest extends TestCase
            un `=== 1` au lieu d'un `<= 1`, ce cas passerait, et on supprimerait
            le compte administrateur qui restait. */
         self::assertNotNull(ProtectionDuCompte::raisonDeRefuserSuppression(
-            estMoi: false, cibleEstAdmin: true, adminsActifs: 0,
+            estMoi: false, cibleEstAdmin: true, cibleEstActive: true, adminsActifs: 0,
+        ));
+    }
+
+    /**
+     * CONSTAT 04#12 DE L'AUDIT, CORRIGÉ LE 17 SEPTEMBRE 2026.
+     *
+     * Un administrateur DÉSACTIVÉ ne compte pas parmi les actifs : le
+     * supprimer ne retire à personne la main sur l'application. La règle ne
+     * regardait que son rôle, si bien qu'avec un seul administrateur actif —
+     * celui qui agit — la suppression d'un ancien administrateur désactivé
+     * était refusée comme s'il s'agissait du dernier.
+     */
+    public function testUnAdministrateurDesactiveSeSupprimeQuandIlNeResteQuUnActif(): void
+    {
+        self::assertNull(ProtectionDuCompte::raisonDeRefuserSuppression(
+            estMoi: false, cibleEstAdmin: true, cibleEstActive: false, adminsActifs: 1,
         ));
     }
 

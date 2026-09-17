@@ -25,12 +25,13 @@ final class ProtectionDuCompte
      * Peut-on desactiver ce compte ?
      *
      * @param bool $estMoi        la cible est l'administrateur qui agit
-     * @param bool $cibleEstAdmin la cible porte ROLE_ADMIN
-     * @param int  $adminsActifs  nombre d'administrateurs ACTIFS, cible comprise
+     * @param bool $cibleEstAdmin  la cible porte ROLE_ADMIN
+     * @param bool $cibleEstActive la cible est active, donc comptee dans $adminsActifs
+     * @param int  $adminsActifs   nombre d'administrateurs ACTIFS, cible comprise si elle l'est
      *
      * @return string|null la raison du refus, ou null si c'est permis
      */
-    public static function raisonDeRefuserBlocage(bool $estMoi, bool $cibleEstAdmin, int $adminsActifs): ?string
+    public static function raisonDeRefuserBlocage(bool $estMoi, bool $cibleEstAdmin, bool $cibleEstActive, int $adminsActifs): ?string
     {
         /* SE BLOQUER SOI-MEME EST UNE PORTE QUI SE VERROUILLE DE L'INTERIEUR.
            La requete suivante serait refusee — y compris celle qui servirait a
@@ -41,7 +42,7 @@ final class ProtectionDuCompte
                 . 'la requête suivante serait refusée, y compris celle qui te réactiverait.';
         }
 
-        return self::dernierAdministrateur($cibleEstAdmin, $adminsActifs)
+        return self::dernierAdministrateur($cibleEstAdmin, $cibleEstActive, $adminsActifs)
             ? 'C’est le dernier administrateur actif. Le désactiver laisserait '
                 . 'l’application sans personne pour gérer les comptes.'
             : null;
@@ -55,13 +56,13 @@ final class ProtectionDuCompte
      * ses cibles et ses habitudes. Rien de tout cela ne se restaure sans une
      * sauvegarde.
      */
-    public static function raisonDeRefuserSuppression(bool $estMoi, bool $cibleEstAdmin, int $adminsActifs): ?string
+    public static function raisonDeRefuserSuppression(bool $estMoi, bool $cibleEstAdmin, bool $cibleEstActive, int $adminsActifs): ?string
     {
         if ($estMoi) {
             return 'Tu ne peux pas supprimer ton propre compte depuis l’application.';
         }
 
-        return self::dernierAdministrateur($cibleEstAdmin, $adminsActifs)
+        return self::dernierAdministrateur($cibleEstAdmin, $cibleEstActive, $adminsActifs)
             ? 'C’est le dernier administrateur actif. Nomme quelqu’un d’autre avant de le supprimer.'
             : null;
     }
@@ -84,9 +85,15 @@ final class ProtectionDuCompte
      * Un compte incoherent — zero administrateur actif, par exemple apres une
      * intervention en base — ne doit pas ouvrir la porte par accident. Avec
      * `=== 1`, un zero passerait, et on supprimerait le compte qui restait.
+     *
+     * UNE CIBLE DESACTIVEE N'EST LE DERNIER DE PERSONNE. Elle n'est pas comptee
+     * parmi les actifs : la retirer ne prive l'application d'aucun
+     * administrateur. La regle ne regardait que le role jusqu'au 17 septembre
+     * 2026 (constat 04#12), et refusait la suppression d'un ancien
+     * administrateur des qu'il ne restait qu'un actif — celui qui agit.
      */
-    private static function dernierAdministrateur(bool $cibleEstAdmin, int $adminsActifs): bool
+    private static function dernierAdministrateur(bool $cibleEstAdmin, bool $cibleEstActive, int $adminsActifs): bool
     {
-        return $cibleEstAdmin && $adminsActifs <= 1;
+        return $cibleEstAdmin && $cibleEstActive && $adminsActifs <= 1;
     }
 }
