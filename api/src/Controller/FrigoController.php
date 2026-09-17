@@ -155,9 +155,15 @@ final class FrigoController extends AbstractController
             return $this->json(['erreur' => 'Cet aliment n’existe pas dans ton catalogue.'], 404);
         }
 
-        $this->base->definirStock(
-            $utilisateur, $idAliment, $quantite,
-            isset($donnees['emplacementId']) ? (int) $donnees['emplacementId'] : null);
+        /* L'EMPLACEMENT VIENT AUSSI DU CORPS. Un identifiant inconnu atteignait
+           la cle etrangere et la reponse etait un 500 avec le SQL, jusqu'au
+           17 septembre 2026 (`EmplacementInconnuTest`). */
+        $idEmplacement = isset($donnees['emplacementId']) ? (int) $donnees['emplacementId'] : null;
+        if (null !== $idEmplacement && !$this->base->emplacementExiste($idEmplacement)) {
+            return $this->json(['erreur' => 'Cet emplacement n’existe pas.'], 422);
+        }
+
+        $this->base->definirStock($utilisateur, $idAliment, $quantite, $idEmplacement);
 
         return $this->json(['ok' => true]);
     }

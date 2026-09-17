@@ -100,6 +100,13 @@ final readonly class FrigoBase
         ));
     }
 
+    /** Les emplacements sont un referentiel commun, sans proprietaire. */
+    public function emplacementExiste(int $idEmplacement): bool
+    {
+        return false !== $this->cnx->fetchOne(
+            'SELECT 1 FROM emplacement WHERE id = :e', ['e' => $idEmplacement]);
+    }
+
     public function definirStock(
         Utilisateur $utilisateur,
         int $idAliment,
