@@ -18,7 +18,7 @@
 --
 --  Puis :
 --    docker compose -f compose.dev.yml exec -T db \
---      psql -U fitcarnet -d fitcarnet < db/manuel/jeu-essai.sql
+--      psql -v ON_ERROR_STOP=1 -U fitcarnet -d fitcarnet < db/manuel/jeu-essai.sql
 --
 --  Idempotent : relancer remet les quantités aux valeurs ci-dessous et
 --  n'ajoute aucun doublon.

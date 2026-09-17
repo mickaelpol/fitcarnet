@@ -114,9 +114,9 @@ restaurer() {
     [[ -f "$fichier" ]] || { echo "Fichier introuvable : $fichier" >&2; exit 1; }
 
     # Un « .partiel » est une écriture interrompue, pas une sauvegarde. Le
-    # restaurer, ce serait écraser la base avec la moitié d'un dump — et par
-    # dessus le marché il partirait dans la branche `psql` faute de finir
-    # par `.dump`.
+    # restaurer, ce serait écraser la base avec la moitié d'un dump. Le refus
+    # ci-dessous des fichiers qui ne finissent pas par `.dump` l'attraperait
+    # aussi ; celui-ci dit pourquoi, et quoi en faire.
     if [[ "$fichier" == *.partiel ]]; then
         echec "« $fichier » est une écriture interrompue, pas une sauvegarde. À supprimer."
     fi

@@ -89,14 +89,17 @@ fi
 dire "$NOMBRE sauvegarde(s) dans $DOSSIER"
 
 # ---------------------------------------------------------------------
-#  POUR RESTAURER, le jour venu :
+#  POUR RESTAURER, le jour venu : ./restaurer-nas.sh --essai, puis
+#  ./restaurer-nas.sh --vraiment. Voir DEPLOIEMENT.md.
 #
-#    docker stop fitcarnet-app
-#    docker exec fitcarnet-db psql -U fitcarnet -d postgres \
-#      -c "DROP DATABASE fitcarnet WITH (FORCE)"
-#    docker exec fitcarnet-db psql -U fitcarnet -d postgres \
-#      -c "CREATE DATABASE fitcarnet OWNER fitcarnet"
-#    docker exec -i fitcarnet-db pg_restore -U fitcarnet -d fitcarnet \
-#      --no-owner --no-privileges < /volume1/docker/sauvegardes-fitcarnet/....dump
-#    docker start fitcarnet-app
+#  Une procédure manuelle vivait ici jusqu'au 17 septembre 2026. Elle
+#  n'arrêtait que `fitcarnet-app` : les deux travailleurs d'inventaire
+#  (`fitcarnet-taches`) continuaient de tourner, et les lots restaurés en
+#  attente seraient repartis vers Grocy avec d'anciennes quantités — le
+#  défaut É4 de l'audit, que `restaurer-nas.sh` corrige. Relevé par
+#  `verite-documentaire`.
+#
+#  UNE SAUVEGARDE D'AVANT LE 17 SEPTEMBRE 2026 (colonne `aliment.cree_par`)
+#  ne redémarre plus seule une fois la migration 34 retirée du dépôt : la 35
+#  s'arrête et dit de rejouer la 34 depuis l'historique git.
 # ---------------------------------------------------------------------

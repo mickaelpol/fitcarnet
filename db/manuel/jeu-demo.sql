@@ -21,7 +21,7 @@
 --      tirage, une semaine sur deux les jambes. Les neuf séances de poussée
 --      portent une progression suivie au développé (40 kg → 50 kg en neuf
 --      semaines, à répétitions constantes : +2,5 kg toutes les deux semaines,
---      ce que la boucle pose ligne 222) : c'est elle qui fait vivre la courbe
+--      ce que la boucle pose ligne 228) : c'est elle qui fait vivre la courbe
 --      de 1RM et la table des paliers ;
 --    - deux plans de repas au format v3, dont un déjà cuisiné.
 --
@@ -32,10 +32,16 @@
 --  Prérequis — le compte, sans --admin ni --grocy, puis le frigo :
 --    docker compose -f compose.dev.yml exec app php bin/console \
 --      fitcarnet:creer-utilisateur demo@fitcarnet.local "Démo fitcarnet"
---    sed 's/essai@/demo@/' db/manuel/jeu-essai.sql | docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet
+--    sed 's/essai@/demo@/' db/manuel/jeu-essai.sql | docker compose -f compose.dev.yml exec -T db psql -v ON_ERROR_STOP=1 -U fitcarnet -d fitcarnet
 --
 --  Puis :
---    docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet < db/manuel/jeu-demo.sql
+--    docker compose -f compose.dev.yml exec -T db psql -v ON_ERROR_STOP=1 -U fitcarnet -d fitcarnet < db/manuel/jeu-demo.sql
+--
+--  `-v ON_ERROR_STOP=1` N'EST PAS UNE COQUETTERIE. Sans lui, un refus du
+--  garde-fou s'affiche, puis psql joue quand même le SELECT de fin et sort
+--  en 0 : la sortie ressemble à une réussite. Relevé par `revue-fitcarnet`
+--  le 17 septembre 2026 ; `db/manuel/verifier-jeux.sh` joue ces commandes
+--  avec l'option.
 --
 --  IL EST REJOUABLE, ET IL EFFACE AVANT DE POSER — séances, modèles, plans,
 --  cibles du compte visé. Un garde-fou refuse donc un compte qui a déjà des
@@ -95,7 +101,7 @@ BEGIN
     --
     --  On refuse donc de toucher a un compte qui a deja vecu. Pour repasser
     --  sur un compte de demonstration deja garni, c'est un geste conscient :
-    --      psql -v ecraser=oui -f db/manuel/jeu-demo.sql
+    --      psql -v ON_ERROR_STOP=1 -v ecraser=oui -f db/manuel/jeu-demo.sql
     -- ----------------------------------------------------------------
     SELECT count(*) INTO v_existant FROM seance WHERE utilisateur_id = v_utilisateur;
 
@@ -281,7 +287,8 @@ BEGIN
     --  décrémenter et doit donc les nommer par leur id.
     --
     --  Le premier est déjà cuisiné (`cuisine_le` renseigné) : c'est lui qui
-    --  montre le bouton « J'ai cuisiné » dans son état d'après.
+    --  montre l'état d'après — le bouton « J'ai cuisiné » n'y est plus
+    --  (`front/src/composants/planRelu.tsx`).
     -- ----------------------------------------------------------------
     INSERT INTO plan_repas (utilisateur_id, libelle, cree_le, cuisine_le, contenu)
     VALUES (
