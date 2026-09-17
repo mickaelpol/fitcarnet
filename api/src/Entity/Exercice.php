@@ -32,7 +32,8 @@ use Symfony\Component\Validator\Constraints as Assert;
  * atteignait PostgreSQL, et remontait sous forme d'exception de contrainte —
  * pas de 422 lisible, pas de champ designe, juste un echec brut.
  *
- * Et `POST` est ouvert a ROLE_USER : n'importe quel utilisateur pouvait le
+ * Et `POST` etait alors ouvert a ROLE_USER (il est reserve a l'administrateur
+ * depuis le 15 septembre 2026) : n'importe quel utilisateur pouvait le
  * declencher en ajoutant « Developpe couche », un nom qui existe forcement
  * dans un catalogue de 1338 entrees.
  *
@@ -146,7 +147,8 @@ class Exercice
     public const MODES = ['charge', 'iso', 'chrono'];
 
     /* PLAFONDS DE LONGUEUR — CONSTAT F-08, 15 SEPTEMBRE 2026.
-       `POST /api/exercices` est ouvert a ROLE_USER et ces colonnes sont des
+       `POST /api/exercices` etait ouvert a ROLE_USER (administrateur seul
+       depuis le 15 septembre 2026) et ces colonnes sont des
        `TEXT` : rien, ni ici ni en base, n'empechait un compte de deposer
        plusieurs mega-octets dans un catalogue servi en UNE page de 1500
        entrees a tout le monde. Degradation de service, pas compromission.

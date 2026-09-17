@@ -124,7 +124,7 @@ const r2 = (v: number): string => v.toFixed(2);
  *    de la phrase écrite pour lui, vingt lignes plus bas dans ce fichier.
  *
  * La règle posée ici est **exactement celle de la base** (`aliment_ratio_sens`,
- * `db/01-schema.sql:152`) et **celle de l'API** (`RendementPlausible::sens`) :
+ * `db/01-schema.sql:137`) et **celle de l'API** (`RendementPlausible::sens`) :
  * un féculent absorbe de l'eau, une protéine et un légume en perdent. C'est la
  * seule façon qu'un écran ne propose pas ce que le serveur rejettera.
  *

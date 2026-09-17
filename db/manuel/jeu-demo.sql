@@ -17,10 +17,12 @@
 --  Ce fichier pose donc neuf semaines de vie du compte :
 --    - quatre cibles nutritionnelles, une par moment de repas ;
 --    - trois programmes (Push, Pull, Legs) avec leurs séries prescrites ;
---    - neuf séances hebdomadaires, dont une progression suivie au développé
---      (40 kg → 50 kg en neuf semaines, à répétitions constantes : +2,5 kg
---      toutes les deux semaines, ce que la boucle pose ligne 209) : c'est elle
---      qui fait vivre la courbe de 1RM et la table des paliers ;
+--    - vingt-trois séances (123 séries) : chaque semaine une poussée et un
+--      tirage, une semaine sur deux les jambes. Les neuf séances de poussée
+--      portent une progression suivie au développé (40 kg → 50 kg en neuf
+--      semaines, à répétitions constantes : +2,5 kg toutes les deux semaines,
+--      ce que la boucle pose ligne 222) : c'est elle qui fait vivre la courbe
+--      de 1RM et la table des paliers ;
 --    - deux plans de repas au format v3, dont un déjà cuisiné.
 --
 --  LES CHIFFRES SONT PLAUSIBLES, PAS ALÉATOIRES. Une progression de 2,5 kg

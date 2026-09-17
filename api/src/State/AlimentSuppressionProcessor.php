@@ -19,9 +19,11 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  * message illisible. On verifie avant, pour dire ce qui bloque et quoi faire.
  *
  * Le stock est interroge en SQL direct plutot que par une association Doctrine :
- * « Stock » est une ProprieteUtilisateur, donc soumise a FiltreProprietaire, qui
- * masquerait les lignes des autres comptes. Or ce sont precisement celles-la
- * qu'il faut voir pour savoir si la suppression est sure.
+ * « Stock » est une ProprieteUtilisateur, donc soumise a FiltreProprietaire, et
+ * le comptage ne doit dependre d'aucun filtre pour dire ce que la base
+ * refusera. Il a longtemps compte ainsi des lignes posees par d'AUTRES comptes
+ * (faille E1) ; depuis la migration 35, la base n'en accepte plus aucune — seul
+ * le stock du proprietaire peut viser son aliment.
  */
 final readonly class AlimentSuppressionProcessor implements ProcessorInterface
 {

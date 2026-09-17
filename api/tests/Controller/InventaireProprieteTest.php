@@ -47,7 +47,7 @@ use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
  */
 final class InventaireProprieteTest extends TestCase
 {
-    public function testUnInventaireSurLAlimentPriveDUnAutreEstRefuse(): void
+    public function testUnInventaireSurLAlimentDUnAutreEstRefuse(): void
     {
         $requetes = [];
         $controleur = self::controleur($requetes, alimentAccessible: false);
