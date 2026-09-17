@@ -255,7 +255,7 @@ décisions et non des pannes :
 14. **Une période partage un seul frigo, dans l'ordre du temps.** Deux repas qui
     réclament chacun 400 g de brocoli quand il en reste 500 : le premier est
     servi, le second est plafonné et **le dit** (`periode.ts:177`,
-    `garanties.test.ts:904`). Cocher ses jours à rebours doit donner **le même
+    `garanties.test.ts:910`). Cocher ses jours à rebours doit donner **le même
     résultat** (`periode.ts:205`).
 15. **Le stock promis à un plan prévu est indisponible.** Enregistrer un plan,
     puis en composer un second : le second ne doit pas reprendre les mêmes
@@ -279,7 +279,7 @@ décisions et non des pannes :
 20. **La convention glucidique ne se retourne jamais contre l'utilisateur**
     (garantie I.8, `garanties.test.ts:527`) : cocher « fibres comprises » ne doit
     **jamais** faire servir **plus** de féculent.
-21. **On ne signale que ce qui manque vraiment** (`garanties.test.ts:843`) : pas
+21. **On ne signale que ce qui manque vraiment** (`garanties.test.ts:849`) : pas
     de « Aucune huile utilisable » au petit-déjeuner, qui n'en sert pas
     (`repasVocabulaire.ts:175`, `carteRepas.tsx:335`).
 22. **Le refus quand il n'y a pas de solution.** Trois aliments trop semblables
@@ -301,8 +301,8 @@ jetable chargé avec `jeu-essai.sql` **et** `jeu-demo.sql` (relire l'adresse du
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'
 curl -s http://localhost:8080/api/etat
-/home/micka/perso/fitcarnet/db/manuel/rattraper-dev.sh
-npm --prefix /home/micka/perso/fitcarnet/front run build:web
+"$(git rev-parse --show-toplevel)"/db/manuel/rattraper-dev.sh
+npm --prefix "$(git rev-parse --show-toplevel)"/front run build:web
 ```
 
 **Éprouver les avertissements demande de fabriquer le cas.** Ils ne s'affichent
@@ -313,7 +313,7 @@ jetable** (jamais sur une donnée qu'on n'a pas créée) :
 |---|---|
 | `grain_sec_invraisemblable` | un aliment `fec`, rendement `2,3`, **83 kcal/100 g** |
 | `valeurs_deja_cuites` | un aliment `fec`, rendement `3,5`, **99 kcal/100 g** (350 une fois multiplié) |
-| `feculent_qui_retrecit` | un aliment `fec` avec un rendement **`0,41`** |
+| `feculent_qui_retrecit` | un aliment `fec` avec un rendement **`0,41`** — **impossible à créer sur un compte tenu en base** : l'éditeur (`rendementPossible`), l'API (`RendementPlausible::sens`) et la base (`aliment_ratio_sens`) refusent un féculent sous 1. Seul un produit Grocy peut le porter |
 | fibres inconnues | une cible **en glucides totaux** + un aliment `fec` sans fibres |
 | `systeme_singulier` | deux féculents quasi identiques et rien d'autre d'utilisable |
 | `lipides_incompressibles` | une protéine grasse, **aucun oléagineux** en stock |
@@ -325,7 +325,7 @@ jetable** (jamais sur une donnée qu'on n'a pas créée) :
 plus courte pour les chiffres :
 
 ```bash
-cd /home/micka/perso/fitcarnet/front && npm test
+cd "$(git rev-parse --show-toplevel)"/front && npm test
 ```
 
 **Pièges propres à cet écran :**

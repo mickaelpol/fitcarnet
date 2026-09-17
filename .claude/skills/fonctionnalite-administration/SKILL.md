@@ -61,14 +61,14 @@ Trois barrières, et elles ne se valent pas :
 
 Les quatre gardes d'écran subsistent (« **Cet écran est réservé à
 l'administrateur.** » — `admin-exercices.tsx:55`, `admin-fusion.tsx:65`,
-`admin-cuissons.tsx:55`, `admin-utilisateurs.tsx:83`) mais **ne protègent rien
+`admin-cuissons.tsx:55`, `admin-utilisateurs.tsx:84`) mais **ne protègent rien
 aujourd'hui**, `children` n'étant monté que si `admin === true`. Ils sont gardés
 pour le jour où le portier serait déplacé.
 
 **La surface d'administration côté API est écrite, exhaustive et vérifiée dans
-les deux sens** : `api/tests/Security/SurfaceAdministrationTest.php:89-127`
+les deux sens** : `api/tests/Security/SurfaceAdministrationTest.php:89-124`
 (`SURFACE`). Une porte fermée sans être inscrite échoue **autant** qu'une porte
-inscrite qu'on aurait rouverte (`:257-273`). S'y ajoutent
+inscrite qu'on aurait rouverte (`:254-270`). S'y ajoutent
 `- { path: ^/api/docs, roles: ROLE_ADMIN }`
 (`api/config/packages/security.yaml`) : la carte de l'API n'est pas publique.
 
@@ -99,7 +99,7 @@ que l'écran reçoit (`:46-51`).
 ### Fusionner deux exercices
 
 Une suppression est **impossible** dès qu'un exercice figure dans une séance
-(`ON DELETE RESTRICT`, `db/01-schema.sql:295,334`) — et c'est heureux. La fusion
+(`ON DELETE RESTRICT`, `db/01-schema.sql:288,327`) — et c'est heureux. La fusion
 transfère l'historique **avant** de supprimer :
 `api/src/State/FusionExerciceProcessor.php:52-90`.
 
@@ -132,21 +132,23 @@ champ libre, qui finirait avec « four », « Four », « au four » et « four 
 
 - Invitation : on saisit une adresse, on obtient **un lien affiché une seule
   fois** — le serveur n'en garde qu'une empreinte, comme un mot de passe
-  (`front/app/admin-utilisateurs.tsx:37-40,155-160` ·
+  (`front/app/admin-utilisateurs.tsx:38-41,156-161` ·
   `api/src/Controller/InvitationsController.php:183-188`).
 - Une nouvelle invitation **remplace** celle qui attendait (`:130-136,163-179`).
 - Liste avec le contenu en chiffres : « *n* séances · *n* séries · *n* modèles ·
-  *n* plans » (`api/src/Controller/ComptesController.php:62-105` ·
-  `front/app/admin-utilisateurs.tsx:228-233`).
+  *n* plans · *n* aliments · *n* lignes de stock »
+  (`api/src/Controller/ComptesController.php:64-111` ·
+  `front/app/admin-utilisateurs.tsx:229-231`, mise en mots
+  `front/src/calcul/contenuCompte.ts:22-31`).
 - **Désactiver supprime aussi les jetons de rafraîchissement** — sinon un compte
   bloqué se prolongerait tout seul pendant des semaines
-  (`ComptesController.php:110-115,148-153`).
+  (`ComptesController.php:116-121,154-161`).
 - **Suppression : le compte part avec ses aliments et son stock** — les lignes
   de stock visant ses aliments, **puis** ses aliments, **puis** le compte, dans
   une transaction. `aliment.utilisateur_id` est en `ON DELETE CASCADE`, mais
   `stock.aliment_id` est en `RESTRICT` : l'ordre est écrit à la main pour ne pas
-  dépendre de celui des cascades (`:172-178`, `:198-210`).
-- **Son propre compte n'a aucun bouton** (`admin-utilisateurs.tsx:235-244`).
+  dépendre de celui des cascades (`:179-185`, `:205-217`).
+- **Son propre compte n'a aucun bouton** (`admin-utilisateurs.tsx:233-242`).
 
 ## Le parcours
 
@@ -178,7 +180,7 @@ critères d'isolation.
    porte « **Renommer** », « **Supprimer** » et les flèches ↑ ↓.
 6. **Inviter quelqu'un** : « **Adresse électronique** » → « **Créer le lien** »
    → le lien, avec « **Copier le lien** » (web) ou « **Envoyer le lien** »
-   (mobile), puis « **Envoyé ✓** » (`admin-utilisateurs.tsx:150-154`). Plus bas,
+   (mobile), puis « **Envoyé ✓** » (`admin-utilisateurs.tsx:151-155`). Plus bas,
    « **Comptes** » : « **Désactiver** » / « **Réactiver** » / « **Supprimer** ».
 
 ## Critères d'acceptation
@@ -206,7 +208,7 @@ critères d'isolation.
    est précisément ce que ce test interdit.
 5. **Aucune route de contrôleur sans garde** — chaque `#[Route]` porte un
    `#[IsGranted]`, ou figure dans `SANS_GARDE` **avec sa raison écrite**
-   (`SurfaceAdministrationTest:48-66,154-183`). Les cinq dérogations sont servies
+   (`SurfaceAdministrationTest:48-66,151-180`). Les cinq dérogations sont servies
    par un pare-feu `security: false` : `etat`, `rafraichir`, `deconnexion`,
    `invitation/verifier`, `invitation/accepter`.
 6. **`/api/invitations` ≠ `/api/invitation/`** — la barre oblique finale du
@@ -285,13 +287,13 @@ critères d'isolation.
     désactiver ton propre compte : la requête suivante serait refusée, y compris
     celle qui te réactiverait. » (`api/src/Service/ProtectionDuCompte.php:39-42`).
     Un **refus**, pas une confirmation. L'écran ne propose même aucun bouton
-    (`admin-utilisateurs.tsx:240-244`) : **éprouver quand même par l'API**.
+    (`admin-utilisateurs.tsx:238-242`) : **éprouver quand même par l'API**.
 24. **Refus de se supprimer soi-même** — « Tu ne peux pas supprimer ton propre
     compte depuis l'application. » (`ProtectionDuCompte.php:60-62`).
 25. **Refus de bloquer ou supprimer le dernier administrateur actif** — on
     compte les **actifs**, et le test est `<= 1` et non `=== 1`, pour qu'un état
     incohérent (zéro admin actif) n'ouvre pas la porte par accident
-    (`:88-91` · `ComptesController.php:259-265`). Déjà figé par
+    (`:88-91` · `ComptesController.php:257-263`). Déjà figé par
     `api/tests/Service/ProtectionDuCompteTest.php`
     (`testLeDernierAdministrateurActifEstIntouchable`,
     `testZeroAdministrateurActifNOuvrePasLaPorte`).
@@ -299,18 +301,20 @@ critères d'isolation.
 27. **Désactiver coupe la session en cours** — après désactivation, le jeton du
     compte visé doit être refusé **à la requête suivante** (`CompteActif` sur le
     pare-feu `api`), et `jeton_rafraichissement` doit être **vide** pour ce
-    compte (`ComptesController.php:148-153`).
+    compte (`ComptesController.php:154-161`).
 28. **Supprimer chiffre ce qui sera détruit** — la confirmation cite séances,
-    séries, modèles et plans, et prévient : « **Ses aliments et son stock
-    partent avec lui.** » (`admin-utilisateurs.tsx:291-298`). « Supprimer ? Oui / Non » sans chiffres
-    n'est pas une question, c'est un piège.
+    séries, modèles, plans, aliments et lignes de stock : « *n* séances, *n*
+    séries, *n* modèles, *n* plans, *n* aliments et *n* lignes de stock
+    **seront effacés définitivement.** » (`admin-utilisateurs.tsx:287-294`,
+    `front/src/calcul/contenuCompte.ts:22-38`). « Supprimer ? Oui / Non » sans
+    chiffres n'est pas une question, c'est un piège.
 29. **Aucun aliment ne survit au compte supprimé** — après suppression,
     `SELECT count(*) FROM aliment WHERE utilisateur_id = '<id>'` doit rendre
     **0**, et aucune ligne de `stock` ne doit viser un aliment disparu
-    (`ComptesController.php:198-210`). C'est le critère le plus important de
+    (`ComptesController.php:205-217`). C'est le critère le plus important de
     cette section.
 30. **Compte inexistant → 404**, refus métier → **422**
-    (`ComptesController.php:121-123,275-278`).
+    (`ComptesController.php:127-129,273-276`).
 31. **Invitation** — le lien n'est rendu qu'**une fois** ; la base n'en garde
     qu'une empreinte (`InvitationsController.php:183-188`). Inviter une adresse
     déjà titulaire d'un compte est refusé en nommant la personne (`:149-157`).
@@ -371,16 +375,16 @@ SELECT ordre, count(*) FROM mode_cuisson GROUP BY ordre HAVING count(*) > 1; -- 
 
 - **Ne jamais éprouver la suppression de compte sur autre chose qu'un compte
   jetable créé pour l'épreuve.** Rien ne se restaure sans une sauvegarde
-  (`ComptesController.php:30-32`).
+  (`ComptesController.php:31-33`).
 - **Un 403 attendu n'est pas une panne** : sur cette fiche, le 403 *est* le
   résultat. Ce qui serait une panne, c'est un **200**.
 - **Le portier fait qu'aucune requête ne part** (critère 2) : chercher des 403
   dans l'onglet réseau d'un compte ordinaire et n'en trouver aucun est le
   **succès**, pas un échec d'épreuve.
-- `ComptesController` porte son garde **sur la classe** (`:48`),
+- `ComptesController` porte son garde **sur la classe** (`:45`),
   `InvitationsController` **sur chaque méthode** (`:91,139,202`). Une lecture qui
   ne regarde qu'un niveau déclarerait l'autre sans protection —
-  `SurfaceAdministrationTest:350-382` lit les deux.
+  `SurfaceAdministrationTest:347-379` lit les deux.
 - **La fusion est définitive** : la faire sur deux exercices jetables, jamais sur
   le catalogue réel de la base de développement.
 - **Ne pas lancer `bin/phpunit` depuis l'hôte** : le PHP de l'hôte n'a ni `dom`,
@@ -397,7 +401,7 @@ administrateur**.
 | `01-catalogue.webm` | Compte → **Gestion des exercices**, défiler, en ouvrir un | 60 s | les compteurs et la jauge, les six filtres, puis l'éditeur avec ses puces |
 | `02-fusion.webm` | **Fusionner des exercices** → deux doublons → la confirmation | 40 s | « Correspondances probables » avec leur pourcentage, puis « Ton historique est conservé, mais l'opération est définitive. » |
 | `03-cuissons.webm` | **Façons de cuire** → ajouter un mode → le remonter | 25 s | l'avertissement sur la fournée partagée, et l'échange de rangs |
-| `04-comptes.webm` | **Inviter quelqu'un** → « Comptes » → désactiver un compte, réactiver | 30 s | les compteurs « *n* séances · *n* séries · *n* modèles · *n* plans », et la pastille « Désactivé » |
+| `04-comptes.webm` | **Inviter quelqu'un** → « Comptes » → désactiver un compte, réactiver | 30 s | les compteurs « *n* séances · *n* séries · *n* modèles · *n* plans · *n* aliments · *n* lignes de stock », et la pastille « Désactivé » |
 | `05-refus.webm` *(hors bobine 8)* | son propre compte dans la liste | 15 s | « C'est ton compte. Rien à faire ici : un administrateur ne peut ni se désactiver ni se supprimer lui-même. » |
 
 **Ce qui n'est PAS tournable en l'état** : la prise **8.2 du plan de tournage**
@@ -405,7 +409,7 @@ administrateur**.
 d'exercice** — il n'existe pas de hook de création dans
 `front/src/api/hooks/referentiels.ts`, et un `POST` par l'API produirait de
 toute façon un exercice **privé**, invisible des autres comptes
-(`api/src/State/ExerciceProcessor.php:61-67`). Le signaler à l'auteur du plan
+(`api/src/State/ExerciceProcessor.php:60-66`). Le signaler à l'auteur du plan
 plutôt que de mettre en scène un geste impossible.
 
 **Impasse connue du plan** : la source **Grocy** (B11 à B13) n'est tournable que
@@ -423,7 +427,7 @@ si `GROCY_URL` est renseigné sur l'instance filmée ; sinon l'écran affiche
   la création du compte (le lien ouvert dans un navigateur sans session). Le
   contrôleur est lu, le parcours réel ne l'est pas.
 - **Non vérifié ici** : l'envoi du lien par la feuille de partage **Android**
-  (`Share.share`, `admin-utilisateurs.tsx:78`). Sur le web c'est le
+  (`Share.share`, `admin-utilisateurs.tsx:79`). Sur le web c'est le
   presse-papiers du navigateur, qui n'a pas le même comportement — passer par
   `verification-android`.
 - **Non vérifié ici** : le nombre réel d'exercices, de traduits et de vidéos —

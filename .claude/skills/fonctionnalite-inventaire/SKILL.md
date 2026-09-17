@@ -18,35 +18,35 @@ une ligne qu'on n'a pas touchée n'est **pas** un zéro (règle 6).
 Et une fois envoyé, l'inventaire ne doit plus dépendre de l'écran. Le 14 août
 2026, PHP s'est arrêté à 30 s au milieu de quarante lignes pendant que Grocy
 continuait d'appliquer : **frigo à moitié corrigé, et personne pour le dire**
-(`api/src/Controller/FrigoController.php:310-317`). Une requête HTTP a une durée
+(`api/src/Controller/FrigoController.php:313-320`). Une requête HTTP a une durée
 maximale, un inventaire n'en a pas. Depuis, le dépôt répond tout de suite et un
 travailleur de fond applique.
 
 Cette fiche couvre le **mode Inventaire**. La consultation et les fiches
 d'aliments sont dans `fonctionnalite-frigo` ; les deux partagent un seul écran
-et une seule liste (`front/app/(onglets)/frigo.tsx:35-41`).
+et une seule liste (`front/app/(onglets)/frigo.tsx:33-39`).
 
 ## Ce que l'application propose
 
 | Capacité | Où | `fichier:ligne` |
 |---|---|---|
-| **Bascule Stock / Inventaire** sans changer la liste, son ordre ni son regroupement | en-tête | `front/app/(onglets)/frigo.tsx:184-204`, `:214-217` |
-| **Champs préremplis avec le stock connu**, à la valeur **exacte** et non à son affichage arrondi | à l'entrée | `front/app/(onglets)/frigo.tsx:20-33` (`stocksInitiaux`) |
-| **Saisie conservée d'une visite à l'autre** — revenir sur l'onglet ne rappelle plus le stock par-dessus un inventaire en cours | `entrerInventaire` | `front/app/(onglets)/frigo.tsx:158-172` |
-| **Compteur d'en-tête** « **3/17 vérifiés · 2 écarts** » | en-tête | `front/app/(onglets)/frigo.tsx:210` |
+| **Bascule Stock / Inventaire** sans changer la liste, son ordre ni son regroupement | en-tête | `front/app/(onglets)/frigo.tsx:153-173`, `:183-186` |
+| **Champs préremplis avec le stock connu**, à la valeur **exacte** et non à son affichage arrondi | à l'entrée | `front/app/(onglets)/frigo.tsx:18-31` (`stocksInitiaux`) |
+| **Saisie conservée d'une visite à l'autre** — revenir sur l'onglet ne rappelle plus le stock par-dessus un inventaire en cours | `entrerInventaire` | `front/app/(onglets)/frigo.tsx:127-141` |
+| **Compteur d'en-tête** « **3/17 vérifiés · 2 écarts** » | en-tête | `front/app/(onglets)/frigo.tsx:179` |
 | **Case « vérifié » par ligne**, purement visuelle, **jamais transmise** — barre le nom et atténue la carte | ligne | `front/src/composants/ligneFrigo.tsx:124-134`, `:139`, `:183-184` |
 | **Écart signalé** — bordure vive et « **était 1 250 g** » sous le nom | ligne | `front/src/composants/ligneFrigo.tsx:123`, `:143-147` |
 | **Saisie illisible bordée de rouge** — la ligne ne partira pas, et ça se voit | ligne | `front/src/composants/ligneFrigo.tsx:150-155` |
 | **Une saisie vide n'est pas un zéro** | calcul | `front/src/calcul/frigo.ts:67-74`, `:82-83` |
 | **Seuil d'arrondi 0,001** — en deçà, c'est l'affichage, pas la balance | calcul | `front/src/calcul/frigo.ts:65`, `:90` |
-| **Les écarts se calculent sur TOUT le frigo**, pas sur ce que la recherche laisse voir | écran | `front/app/(onglets)/frigo.tsx:96-98` |
-| **Bouton à libellé variable** — « Aucun écart à envoyer » / « Enregistrer 3 corrections » / « Envoi… » / « Inventaire en cours… » | pied | `front/app/(onglets)/frigo.tsx:332-338` |
-| **Réinitialiser** — repart du stock connu et décoche tout | pied | `front/app/(onglets)/frigo.tsx:306-312` |
-| **Le dépôt répond 202 immédiatement** | API | `api/src/Controller/FrigoController.php:326`, `:406-409` |
-| **Un seul inventaire à la fois par compte** — index unique partiel, 409 | API + base | `api/src/Service/InventaireLots.php:87-95`, `db/01-schema.sql:601-603` |
+| **Les écarts se calculent sur TOUT le frigo**, pas sur ce que la recherche laisse voir | écran | `front/app/(onglets)/frigo.tsx:92-94` |
+| **Bouton à libellé variable** — « Aucun écart à envoyer » / « Enregistrer 3 corrections » / « Envoi… » / « Inventaire en cours… » | pied | `front/app/(onglets)/frigo.tsx:308-314` |
+| **Réinitialiser** — repart du stock connu et décoche tout | pied | `front/app/(onglets)/frigo.tsx:282-288` |
+| **Le dépôt répond 202 immédiatement** | API | `api/src/Controller/FrigoController.php:329`, `:409-412` |
+| **Un seul inventaire à la fois par compte** — index unique partiel, 409 | API + base | `api/src/Service/InventaireLots.php:87-95`, `db/01-schema.sql:592-594` |
 | **Bannière « Tu peux quitter l'écran, ça continue tout seul »** avec le compteur venu du **serveur** | en-tête | `front/src/composants/alertesFrigo.tsx:81-88` |
-| **Résultat affiché 15 minutes** — « Inventaire appliqué : 12 correction(s). » ou « … 2 refusée(s) — motif · motif » | en-tête | `front/src/composants/alertesFrigo.tsx:90-107`, borne `front/app/(onglets)/frigo.tsx:112-124` |
-| **Sondage toutes les 2 s** tant que le lot tourne, **fenêtre non focalisée comprise** ; le frigo n'est relu qu'une fois, au passage à « terminé » | hook | `front/src/api/hooks/frigo.ts:223-227`, `:236`, `:243-268` |
+| **Résultat affiché 15 minutes** — « Inventaire appliqué : 12 correction(s). » ou « … 2 refusée(s) — motif · motif » | en-tête | `front/src/composants/alertesFrigo.tsx:90-107`, borne `front/app/(onglets)/frigo.tsx:108-120` |
+| **Sondage toutes les 2 s** tant que le lot tourne, **fenêtre non focalisée comprise** ; le frigo n'est relu qu'une fois, au passage à « terminé » | hook | `front/src/api/hooks/frigo.ts:220-224`, `:233`, `:240-265` |
 | **Prise de lot exclusive** — `FOR UPDATE SKIP LOCKED` + jeton par travailleur | service | `api/src/Service/InventaireLots.php:108-143` |
 | **Reprise exacte** — `traites` incrémenté après **chaque** ligne, la reprise repart de là | service | `api/src/Service/InventaireLots.php:154-160`, `api/src/Service/AppliqueInventaire.php:87`, `:101-117` |
 | **Lot abandonné détecté par le SILENCE**, pas par l'ancienneté — plus de 2 min sans signe de vie | service | `api/src/Service/InventaireLots.php:50`, `:217-224` |
@@ -63,10 +63,10 @@ rien de la saisie "0,8" ».
 **Le travailleur de fond doit tourner** — sans lui le lot reste « en_attente »
 et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
 
-1. Onglet **Mon frigo** → segment **Inventaire** (`frigo.tsx:194-203`).
+1. Onglet **Mon frigo** → segment **Inventaire** (`frigo.tsx:163-172`).
    Les champs se préremplissent avec le stock connu, **sauf si une saisie est
-   déjà en cours** (`frigo.tsx:166-169`).
-2. L'en-tête passe à « **0/17 vérifiés · 0 écart** » (`frigo.tsx:210`).
+   déjà en cours** (`frigo.tsx:135-138`).
+2. L'en-tête passe à « **0/17 vérifiés · 0 écart** » (`frigo.tsx:179`).
 3. Corriger **trois lignes seulement**. Chaque écart fait apparaître la bordure
    vive et « **était 1 250 g** » (`ligneFrigo.tsx:143-147`), et le compteur monte
    à « **3 écarts** ».
@@ -74,12 +74,12 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
    « vérifiés » monte (`ligneFrigo.tsx:124-134`). **Cette case ne part jamais au
    serveur.**
 5. **« Réinitialiser »** repart du stock connu et décoche tout
-   (`frigo.tsx:306-312`).
+   (`frigo.tsx:282-288`).
 6. Le bouton d'envoi dit **« Enregistrer 3 corrections »**
-   (`frigo.tsx:338`). Il est éteint s'il n'y a aucun écart, pendant l'envoi, et
-   **tant qu'un inventaire tourne** (`frigo.tsx:329`).
+   (`frigo.tsx:314`). Il est éteint s'il n'y a aucun écart, pendant l'envoi, et
+   **tant qu'un inventaire tourne** (`frigo.tsx:305`).
 7. Appuyer. La saisie est vidée et l'écran **revient au mode Stock**
-   (`frigo.tsx:320-324`) — le serveur tient désormais la liste.
+   (`frigo.tsx:296-300`) — le serveur tient désormais la liste.
 8. En haut : « **Inventaire en cours — 0 / 3 ligne(s). Tu peux quitter l'écran,
    ça continue tout seul.** » (`alertesFrigo.tsx:84-85`).
 9. Changer d'onglet, revenir. La bannière est devenue « **Inventaire appliqué :
@@ -106,45 +106,45 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
    (`front/src/calcul/frigo.ts:65`, `:90`). C'est pour cela que les champs sont
    préremplis avec la valeur **exacte** et non son affichage : préremplir
    « 1234,6 » pour un stock de 1234,56 créerait un écart de 0,04 sur une ligne
-   que personne n'a touchée (`frigo.tsx:20-31`).
+   que personne n'a touchée (`frigo.tsx:18-29`).
 
 4. **La case « vérifié » ne part jamais au serveur.** Cocher dix lignes sans rien
    corriger laisse le bouton sur « **Aucun écart à envoyer** » et **désactivé**
-   (`frigo.tsx:329`, `:336-337`). L'état `vus` n'apparaît dans aucun corps de
-   requête (`frigo.tsx:62`, `:264-266`).
+   (`frigo.tsx:305`, `:312-313`). L'état `vus` n'apparaît dans aucun corps de
+   requête (`frigo.tsx:59`, `:233-235`).
 
 5. **Le libellé du bouton dit l'état réel**, dans cet ordre de priorité :
    « Inventaire en cours… » (un lot tourne, venu du **serveur**) › « Envoi… » ›
    « Aucun écart à envoyer » › « Enregistrer N correction(s) »
-   (`frigo.tsx:332-338`). Le singulier/pluriel suit N.
+   (`frigo.tsx:308-314`). Le singulier/pluriel suit N.
 
 6. **Les écarts portent sur tout le frigo, pas sur la recherche.** Saisir un
    écart, **puis** filtrer sur autre chose : le compteur d'écarts ne baisse pas
-   et l'envoi emporte la ligne filtrée (`frigo.tsx:96-98`).
+   et l'envoi emporte la ligne filtrée (`frigo.tsx:92-94`).
 
 7. **Réinitialiser repart du stock connu ET décoche tout**
-   (`frigo.tsx:308`).
+   (`frigo.tsx:284`).
 
 8. **Le dépôt répond 202, avec l'identifiant et le total**, sans avoir touché au
-   stock (`FrigoController.php:406-409`).
+   stock (`FrigoController.php:409-412`).
 
 9. **Refus au dépôt** — chacun observable :
-   - aucune ligne ⇒ **422** « Aucune ligne à envoyer. » (`:336-338`) ;
+   - aucune ligne ⇒ **422** « Aucune ligne à envoyer. » (`:339-341`) ;
    - plus de **500** lignes ⇒ **422** « Inventaire trop gros : N lignes pour 500
-     au maximum. » (`:48`, `:339-345`) ;
+     au maximum. » (`:48`, `:342-348`) ;
    - référence d'une autre source ⇒ **422** « Référence étrangère à ton frigo :
-     … » (`:356-360`) ;
+     … » (`:359-363`) ;
    - identifiant ≤ 0 **ou quantité négative** ⇒ **422** « Ligne invalide : … »
-     (`:365-367`) ;
+     (`:368-370`) ;
    - **deux lignes sur la même référence** ⇒ dédoublonnées, la dernière gagne,
-     une seule part (`:347-370`) ;
+     une seule part (`:350-373`) ;
    - un inventaire tourne déjà ⇒ **409** « Un inventaire est déjà en cours pour
      ce compte. Attends qu'il finisse. » (`InventaireLots.php:93-94`,
-     `FrigoController.php:398-404`).
+     `FrigoController.php:401-407`).
 
 10. **Un seul inventaire à la fois, et c'est la BASE qui tranche.** L'index
     unique partiel `inventaire_lot_un_seul_actif` sur `(utilisateur_id)` où
-    `statut IN ('en_attente','en_cours')` (`db/01-schema.sql:601-603`) ; le code
+    `statut IN ('en_attente','en_cours')` (`db/01-schema.sql:592-594`) ; le code
     n'interroge pas avant d'écrire, il **rattrape la violation**
     (`InventaireLots.php:87-95`) — lire d'abord se ferait doubler par le second
     appui, qui est exactement le cas à couvrir.
@@ -154,21 +154,26 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
     `POST /mon-frigo/stock` : il écrit du stock par un autre chemin, et ne posait
     aucune question de propriété. Bob déposait 1 g sur un aliment d'Alice,
     et **l'aliment d'Alice devenait indélébile**.
-    Le contrôle vit désormais à **deux** endroits, et c'est voulu :
+    Le contrôle vit désormais à **deux** endroits du code, et c'est voulu :
     - **au dépôt**, pour refuser tout de suite — « un refus rendu une heure plus
-      tard n'a plus personne devant l'écran » (`FrigoController.php:372-396`) ;
+      tard n'a plus personne devant l'écran » (`FrigoController.php:375-399`) ;
     - **au point de passage obligé**, `FrigoBase::definirStock`, qui lève avant
       toute écriture quel que soit l'appelant
-      (`api/src/Service/FrigoBase.php:123-125`).
+      (`api/src/Service/FrigoBase.php:124-126`).
     La règle elle-même n'existe qu'une fois : `alimentsAccessibles`, « le mien »
-    (`api/src/Service/FrigoBase.php:89-101`).
+    (`api/src/Service/FrigoBase.php:89-101`). Et la base la garantit d'elle-même :
+    la clé étrangère composite `stock_aliment_du_meme_compte_fkey` refuse toute
+    ligne de stock posée sur l'aliment d'un autre compte
+    (`db/01-schema.sql:186-188`, migration
+    `db/manuel/35-stock-et-aliment-du-meme-compte.sql`).
     **Refus attendu : 404**, « Un aliment de cet inventaire n'existe pas dans ton
     catalogue. » — **sans nommer la ligne fautive**, pour ne pas rendre
-    l'énumération confortable (`FrigoController.php:389-394`).
+    l'énumération confortable (`FrigoController.php:392-397`).
     Éprouvé sans base par `api/tests/Controller/InventaireProprieteTest.php:50`
     (refusé) et `:66` (son propre aliment passe).
     Le contrôle **ne s'applique qu'à la source `base`** : une référence `grocy:`
-    désigne un produit que la table `aliment` ne connaît pas (`:382`).
+    désigne un produit que la table `aliment` ne connaît pas
+    (`FrigoController.php:384-386`).
 
 12. **Reprise exacte après coupure.** `traites` est incrémenté **après chaque
     ligne** (`AppliqueInventaire.php:101-117`), et la reprise repart de cet index
@@ -205,13 +210,13 @@ et la bannière ne bouge jamais. Voir *Comment l'éprouver*.
     état**, avec `fini_le` formaté en **ISO 8601 UTC par PostgreSQL** — le format
     natif est refusé par Safari et `Date.parse` y rendrait `NaN`
     (`InventaireLots.php:233-241`). Le résultat s'efface au bout de **15 minutes**
-    (`frigo.tsx:112-124`).
+    (`frigo.tsx:108-120`).
 
 18. **Le sondage s'arrête tout seul.** 2 000 ms tant que le statut est
     `en_attente` ou `en_cours`, `false` ensuite
-    (`front/src/api/hooks/frigo.ts:223-227`) ; et il bat **même fenêtre non
-    focalisée** (`:236`), sans quoi la notification ne partirait jamais. Le frigo
-    n'est invalidé **qu'au passage** à « terminé », une seule fois (`:252-268`).
+    (`front/src/api/hooks/frigo.ts:220-224`) ; et il bat **même fenêtre non
+    focalisée** (`:233`), sans quoi la notification ne partirait jamais. Le frigo
+    n'est invalidé **qu'au passage** à « terminé », une seule fois (`:249-265`).
 
 19. **Survie du travailleur** : compte supprimé entre le dépôt et le traitement
     ⇒ le lot échoue proprement sur « Le compte n'existe plus. »
@@ -229,12 +234,14 @@ Le mode Inventaire ne prouve rien sans lui : le lot resterait « en_attente ».
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'
 curl -s http://localhost:8080/api/etat
-/home/micka/perso/fitcarnet/db/manuel/rattraper-dev.sh
+"$(git rev-parse --show-toplevel)"/db/manuel/rattraper-dev.sh
 ```
 
 ```bash
+DEPOT="$(git rev-parse --show-toplevel)"   # la racine du dépôt : son chemin change d'un poste à l'autre
 COMPTE=inv-verif@test.local
-sed "s/essai@fitcarnet.local/$COMPTE/" /home/micka/perso/fitcarnet/db/manuel/jeu-essai.sql \
+set -o pipefail   # sans lui, un fichier introuvable donne à psql une entrée vide, et psql sort 0
+sed "s/essai@fitcarnet.local/$COMPTE/" "$DEPOT/db/manuel/jeu-essai.sql" \
   | docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -v ON_ERROR_STOP=1
 ```
 
@@ -358,23 +365,23 @@ SELECT count(*) FROM stock WHERE aliment_id = <id d'Alice>;  -- inchangé
 - **Sans travailleur, rien ne se passe et l'écran a raison** : la bannière dit
   « Inventaire en cours » indéfiniment. Vérifier `statut` en base avant de
   conclure à un bug du front.
-- **Le bouton reste éteint tant qu'un lot tourne** (`frigo.tsx:329`). Après une
+- **Le bouton reste éteint tant qu'un lot tourne** (`frigo.tsx:305`). Après une
   épreuve interrompue, un lot resté « en_cours » bloque le bouton **et** le
   dépôt suivant (409) : le débloquer en lançant le travailleur, pas en
   supprimant la ligne.
 - **Le résultat s'efface au bout de 15 minutes.** Une bannière absente ne veut
   pas dire que l'inventaire a échoué — relire le lot en base.
 - **`contrainte inventaire_lot_avancement_coherent`** impose `total > 0` et
-  `traites <= total` (`db/01-schema.sql:594-595`) : un lot fabriqué à la main
+  `traites <= total` (`db/01-schema.sql:585-586`) : un lot fabriqué à la main
   hors de ces bornes est refusé par la base.
 - **La permission de notification est demandée au moment de l'envoi**, pas au
-  démarrage (`front/src/api/hooks/frigo.ts:184-192`). Sur le web elle ne
+  démarrage (`front/src/api/hooks/frigo.ts:181-189`). Sur le web elle ne
   s'affiche pas ; sur Android une boîte système peut décaler la capture.
 
 ### Nettoyer
 
 `inventaire_lot` part en **CASCADE** avec le compte
-(`db/01-schema.sql:575`) — mais le stock et les aliments, non. Ordre de
+(`db/01-schema.sql:566`) — mais le stock et les aliments, non. Ordre de
 `donnees-de-test` : stock, puis aliments, puis compte. Puis recompter.
 
 ```sql
@@ -433,8 +440,8 @@ tronquer la prise.
   effet visible.
 - **`presentation/features.md` (section C) est périmé sur ses `fichier:ligne`** :
   il cite `frigo.tsx:730`, `:749`, `:423`, `:416`, `:118`, `:127` et
-  `api/hooks.ts:460` — or `frigo.tsx` fait **445 lignes** depuis l'extraction du
-  15 septembre 2026, et `front/src/api/hooks.ts` **n'existe plus** : les hooks
+  `api/hooks.ts:460` — or `frigo.tsx` fait **392 lignes** (mesuré le
+  17 septembre 2026), et `front/src/api/hooks.ts` **n'existe plus** : les hooks
   sont éclatés dans `front/src/api/hooks/` (ici `frigo.ts`). Ne pas recopier ses
   numéros.
 - **Le plafond de 500 lignes ne protège plus d'une minuterie** et son ancienne
@@ -444,5 +451,5 @@ tronquer la prise.
 - **`stocksInitiaux` vit dans l'écran et non dans `src/calcul/frigo.ts`**, à côté
   de `ecartsInventaire` dont il est le pendant : **un test posé là ne serait
   jamais exécuté**, `tsconfig.tests.json` ne couvrant que `src/`
-  (`front/app/(onglets)/frigo.tsx:20-31`). Toute épreuve de son comportement
+  (`front/app/(onglets)/frigo.tsx:18-29`). Toute épreuve de son comportement
   passe donc par l'écran, pas par un test unitaire.

@@ -5,9 +5,10 @@
 > Relevé le 15 septembre 2026. `src/api/hooks.ts` **n'existe plus** — il a été
 > éclaté en dix modules sous `src/api/hooks/` — donc la section 2 entière et la
 > trentaine de renvois `hooks.ts:826`, `:906`, `:158-163` pointent dans le vide.
-> Les tailles annoncées non plus ne valent plus : `composer.ts` 780 → **135**,
-> `cuisson.ts` 611 → **22**, `repas.tsx` 2 316 → **650**, `frigo.tsx` 827 →
-> **445**, `admin-exercices.tsx` 711 → **195**, `seance/[id].tsx` 430 → **324**.
+> Les tailles annoncées non plus ne valent plus (mesurées au `wc -l` le
+> 17 septembre 2026) : `composer.ts` 780 → **135**, `cuisson.ts` 611 → **22**,
+> `repas.tsx` 2 316 → **655**, `frigo.tsx` 827 → **392**, `admin-exercices.tsx`
+> 711 → **195**, `seance/[id].tsx` 430 → **340**.
 >
 > Les constats **F4, F10, F11, F13 sont faits**, F12 pour l'essentiel.
 >

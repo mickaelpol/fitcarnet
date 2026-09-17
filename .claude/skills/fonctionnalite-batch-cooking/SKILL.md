@@ -35,13 +35,13 @@ qu'il était prévu, et pas tel que le frigo l'a contraint.
 | **Seules les nouveautés sont écrites**, et la dernière décision gagne | — | `habitudesCuisson.ts:126`, `:138` |
 | **Écriture au passage au batch cooking**, en un seul `PUT` | — | `front/src/composants/usePlanCalcule.ts:159`, `front/src/api/hooks/cuissons.ts:74` |
 | **Fournées groupées par façon de cuire**, quantités additionnées sur la période | étape Cuisiner | `fournees.ts:127` |
-| **« On pèse sec »**, dit à l'endroit où la question se pose | étape Cuisiner | `front/src/composants/etapeBatch.tsx:111` |
-| **Répartition en boîtes**, une par repas, en poids **cuit** | étape Cuisiner | `fournees.ts:226`, `etapeBatch.tsx:144` |
+| **« On pèse sec »**, dit à l'endroit où la question se pose | étape Cuisiner | `front/src/composants/etapeBatch.tsx:114` |
+| **Répartition en boîtes**, une par repas, en poids **cuit** | étape Cuisiner | `fournees.ts:226`, `etapeBatch.tsx:147` |
 | **Deux colonnes, `boîte` et `1 pers.`** | idem | `front/src/composants/tablesPlan.tsx:59` |
-| **« à ajouter au moment de manger »** | idem | `etapeBatch.tsx:180` |
-| **Les compléments du repas dans sa boîte** | idem | `etapeBatch.tsx:206` |
+| **« à ajouter au moment de manger »** | idem | `etapeBatch.tsx:183` |
+| **Les compléments du repas dans sa boîte** | idem | `etapeBatch.tsx:209` |
 | **Liste de courses** — la période résolue **deux fois** | idem | `front/src/solveur/periode.ts:253`, `etapeBatch.tsx:73` |
-| **Enregistrer le plan** sous un nom libre | idem | `etapeBatch.tsx:217`, `front/src/calcul/planFige.ts:98` |
+| **Enregistrer le plan** sous un nom libre | idem | `etapeBatch.tsx:220`, `front/src/calcul/planFige.ts:98` |
 | **Vocabulaire administré** — seul l'administrateur ajoute une façon de cuire | API | `api/src/Entity/ModeCuisson.php:49` |
 
 ### Les chiffres et les règles qui font foi
@@ -102,31 +102,31 @@ aussi **au moins une façon de cuire** dans la table `mode_cuisson`.
    viande crue. La cuisson n'ajoute que de l'eau — elle change le poids, jamais
    les calories — et l'eau absorbée varie d'une fois sur l'autre. Sec, le chiffre
    est toujours le même. Tout ce qui partage une fournée part ensemble. »***
-   (`:111-117`).
+   (`:114-120`).
 9. Une carte par fournée : le **libellé du mode** en titre, puis
-   **« 640 g à peser en tout »** (`etapeBatch.tsx:125-127`), puis une ligne
+   **« 640 g à peser en tout »** (`etapeBatch.tsx:128-130`), puis une ligne
    `pastille · nom · N g` par aliment, **triée par poids décroissant**
    (`fournees.ts:168`).
 10. Si rien ne se cuit : **« Aucun aliment de ce plan ne se cuit. Il n'y a rien à
-    mettre en fournée — passe directement aux boîtes. »** (`etapeBatch.tsx:120`).
-11. **« À répartir · 8 boîtes »** (`etapeBatch.tsx:141`), suivi de :
+    mettre en fournée — passe directement aux boîtes. »** (`etapeBatch.tsx:123`).
+11. **« À répartir · 8 boîtes »** (`etapeBatch.tsx:144`), suivi de :
     ***« Ces poids-là sont ceux du produit CUIT. La colonne « boîte » est ce
     qu'on y met pour tout le monde ; la colonne « 1 pers. », en doré, est ce que
-    TU te sers le jour venu pour tenir tes macros. »*** (`:144-148`).
+    TU te sers le jour venu pour tenir tes macros. »*** (`:147-151`).
 12. Une boîte par repas, dans l'ordre où on les mangera. Titre
     **« Aujourd'hui · Midi »** (`repas.tsx:176-184`), résumé
     **« 480 g cuits  ·  2 personnes  ·  3 à ajouter après »**
-    (`etapeBatch.tsx:158-160`).
+    (`etapeBatch.tsx:161-163`).
 13. Dépliée : l'en-tête **`aliment` · `boîte` · `1 pers.`**
     (`tablesPlan.tsx:59`), les lignes cuites, puis — s'il y en a — le titre
     **« à ajouter au moment de manger »** et les lignes **en gris, pastille
-    comprise** (`etapeBatch.tsx:178-192`, `tablesPlan.tsx:77`).
+    comprise** (`etapeBatch.tsx:181-195`, `tablesPlan.tsx:77`).
 14. Enfin les **compléments de ce repas**, sous le titre **« compléments »**
-    (`etapeBatch.tsx:206`, `front/src/composants/complements.tsx:113`). Ils sont
+    (`etapeBatch.tsx:209`, `front/src/composants/complements.tsx:113`). Ils sont
     relus à chaque affichage, jamais figés.
 15. Pied d'écran : le champ **« Enregistrer ce plan sous »** (marque-page
     *« Semaine du 11/08 »*), le bouton **« Enregistrer »** → **« Enregistrement… »**,
-    et **« ← Revenir au plan »** (`etapeBatch.tsx:217-245`). Après
+    et **« ← Revenir au plan »** (`etapeBatch.tsx:220-248`). Après
     l'enregistrement, **tout repart de zéro** et la liste des plans s'ouvre, comme
     preuve (`repas.tsx:340-346`).
 
@@ -176,7 +176,7 @@ aussi **au moins une façon de cuire** dans la table `mode_cuisson`.
     son test croisé la compare à celle de `repartition`
     (`front/src/calcul/poidsServi.ts:59-76`).
 14. **La colonne « 1 pers. » vaut pour une personne, quelle que soit la tablée**
-    (garantie I.11, `front/src/solveur/garanties.test.ts:720`) : cuisiner pour
+    (garantie I.11, `front/src/solveur/garanties.test.ts:726`) : cuisiner pour
     trois ne déplace pas l'assiette. Une boîte pour trois contient trois
     portions, mais **ses macros ne valent que pour une**.
 15. **Ce qui ne se cuit pas est listé à part et se voit.** Le titre « à ajouter au
@@ -201,8 +201,8 @@ aussi **au moins une façon de cuire** dans la table `mode_cuisson`.
     (`api/src/Entity/CuissonHabituelle.php:69-81`,
     `front/src/api/hooks/cuissons.ts:111-118`).
 20. **Une clé de boîte illisible n'affiche pas les compléments d'un repas tiré au
-    sort** : `lireLaCle` rend `null` et la ligne est omise (`etapeBatch.tsx:152`,
-    `:206`, `front/src/solveur/periode.ts:142`).
+    sort** : `lireLaCle` rend `null` et la ligne est omise (`etapeBatch.tsx:155`,
+    `:209`, `front/src/solveur/periode.ts:142`).
 21. **Le plan enregistré est un instantané.** Il porte des noms et des grammes,
     la date de chaque boîte **résolue au moment où on fige**, et le champ `repas`
     en code — **sans repli sur `'R1'`** (`planFige.ts:98-145`). Un repli aurait
@@ -221,7 +221,7 @@ aussi **au moins une façon de cuire** dans la table `mode_cuisson`.
     volontairement **communes** : tout le monde lit, seul l'administrateur écrit
     (`ModeCuisson.php:51-57`).
 25. **Jamais d'erreur en silence** : un échec d'enregistrement du plan affiche le
-    message du serveur sous le bouton (`etapeBatch.tsx:238`).
+    message du serveur sous le bouton (`etapeBatch.tsx:241`).
 
 ## Comment l'éprouver
 
@@ -275,7 +275,7 @@ quantité à acheter (critère 17).
 **Les modules se prouvent aussi sans écran :**
 
 ```bash
-cd /home/micka/perso/fitcarnet/front && npm test
+cd "$(git rev-parse --show-toplevel)"/front && npm test
 ```
 
 `fournees.test.ts`, `habitudesCuisson.test.ts`, `poidsServi.test.ts`,

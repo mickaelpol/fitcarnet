@@ -48,12 +48,16 @@ de la démonstration.
 
 | Ordre | Fichier | Ce qu'il pose | Ce qu'il ne pose pas |
 |---|---|---|---|
-| **1er** | `db/manuel/jeu-essai.sql` | les **aliments du compte et le stock** — 8 aliments, 8 lignes de stock, de quoi exercer le frigo et l'inventaire | aucune séance, aucune cible, aucun plan |
-| **2e** | `db/manuel/jeu-demo.sql` | l'**historique** : 4 cibles, 3 programmes, 9 séances hebdomadaires, 2 plans de repas, et un 1RM qui monte de 50,7 à 63,3 kg | **ni aliments ni stock** — son propre en-tête le dit |
+| **1er** | `db/manuel/jeu-essai.sql` | les **aliments du compte et le stock** — 8 aliments, 8 lignes de stock dont 6 garnies (deux restent à zéro), de quoi exercer le frigo et l'inventaire | aucune séance, aucune cible, aucun plan |
+| **2e** | `db/manuel/jeu-demo.sql` | l'**historique** : 4 cibles, 3 programmes, 23 séances (123 séries) sur neuf semaines, 2 plans de repas, et un 1RM qui monte de 50,7 à 63,3 kg | **ni aliments ni stock** — son propre en-tête le dit |
 
-En développement, sur le conteneur `fitcarnet-db-dev` :
+En développement, sur le conteneur `fitcarnet-db-dev`, **depuis la racine du
+dépôt** — les chemins `db/manuel/…` sont relatifs à elle :
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
+set -o pipefail   # sans lui, un jeu introuvable donne à psql une entrée vide, et psql sort 0
+
 # le compte, sans --admin ni --grocy
 docker compose -f compose.dev.yml exec app php bin/console \
     fitcarnet:creer-utilisateur demo@fitcarnet.local "Démo fitcarnet"
@@ -68,9 +72,11 @@ docker compose -f compose.dev.yml exec -T db psql -U fitcarnet -d fitcarnet \
 ```
 
 Sur la production (NAS), les conteneurs s'appellent `fitcarnet-app` et
-`fitcarnet-db` — **et non `…-dev`, qui sont ceux de ta machine** :
+`fitcarnet-db` — **et non `…-dev`, qui sont ceux de ta machine**. Les fichiers
+sont lus sur ta machine, toujours depuis la racine du dépôt :
 
 ```bash
+cd "$(git rev-parse --show-toplevel)" && set -o pipefail
 sed 's/essai@fitcarnet.local/demo@ton-domaine/' db/manuel/jeu-essai.sql \
   | ssh nas 'docker exec -i fitcarnet-db psql -U fitcarnet -d fitcarnet'
 
@@ -86,6 +92,12 @@ seule chose qui sépare un compte de démonstration de ton compte personnel.
 > réel. Si le message apparaît sur un compte qui est bien celui de démonstration,
 > relance avec `psql -v ecraser=oui`. **Si le message nomme ton compte
 > personnel, arrête tout** : l'adresse est fausse.
+>
+> `db/manuel/verifier-jeux.sh` éprouve cette procédure dans un PostgreSQL
+> jetable : les deux jeux, leurs chiffres (8 aliments, 8 lignes de stock,
+> 23 séances, 123 séries, 2 plans, 4 cibles), le refus sans `-v ecraser=oui` et
+> la remise à zéro avec. Jusqu'au 17 septembre 2026, cette option ne levait pas
+> le garde-fou.
 
 **Aucun des deux n'est joué au démarrage.** Ni `installer.sh` ni
 `entrypoint-prod.sh` ne les nomment, et leurs listes sont écrites à la main :
@@ -260,7 +272,7 @@ erreur connue (« zone 70–80 % », alors que c'est 70 à 90 %).
 | | **Ajouter un aliment** : l'éditeur s'ouvre vide, on saisit les valeurs de l'étiquette. L'aliment **appartient au compte** : aucun autre ne le voit | Ajouter un aliment | 3.4 |
 | + | **Contrôle de cohérence permanent** des valeurs, **blocage** de l'enregistrement sur « incohérent », et **détection des kilojoules** (« Convertir : 1473 kJ = 352 kcal ») | éditeur d'aliment | 3.5 |
 | + | **Fibres facultatives** — vide veut dire « non renseigné », pas zéro | éditeur d'aliment | 3.5 |
-| | Corriger une quantité, supprimer un aliment | ligne de stock | 3.6, 3.7 |
+| | Corriger une quantité — **par le segment Inventaire** : en mode Stock, la ligne dit « La quantité se modifie depuis l'inventaire. » — et supprimer un aliment | Frigo → Inventaire ; ligne de stock | 3.6, 3.7 |
 | + | **On ne supprime pas n'importe quoi** : seulement ses propres aliments, et jamais un aliment encore en stock (409 nommant le nombre de lignes) | — | 3.7 |
 | + | **Le frigo Grocy** — lecture des stocks, création d'un produit depuis l'application, produits écartés faute de valeurs, signalement des incomplets, survie à une panne de Grocy. Sur Grocy, **la suppression est refusée et le nom non modifiable** | `/(onglets)/frigo` avec `GROCY_URL` | **impasse**, voir fin de partie III |
 
@@ -379,7 +391,7 @@ administration.
 |---|---|---|---|
 | + | **Catalogue d'exercices** : six filtres, compteurs, validation du lien YouTube, et **seuls les champs modifiés sont envoyés** | `/admin-exercices` | 8.1 |
 | + | **Fusionner deux exercices**, avec report de l'historique des séances | `/admin-fusion` | 8.3 |
-| + | **Façons de cuire** — c'est cette table qui alimente les rendements cru/cuit du calculateur | `/admin-cuissons` | 8.4 |
+| + | **Façons de cuire** — c'est cette table qui regroupe les fournées du batch cooking : deux aliments partent ensemble s'ils portent la même ligne. Les rendements cru/cuit, eux, sont portés par chaque aliment | `/admin-cuissons` | 8.4 |
 | + | **Comptes** : inviter, désactiver (les données restent), réactiver, supprimer **en chiffrant ce qui sera détruit**, et **refus de se bloquer soi-même ou de bloquer le dernier administrateur** | `/admin-utilisateurs` | 8.5, 1.4 |
 | ✗ | **Créer un exercice** — réservé à l'administrateur depuis le 15 septembre 2026, et **aucun écran ne le propose, pour personne**. Un exercice créé par l'API naît privé, sans moyen de le publier. **Le plan 8.2 n'est pas filmable** | — | — |
 
@@ -509,7 +521,7 @@ l'enchaînement parfait : le montage recolle.
 
 **3.3 — Chercher** · 15 s
 *Geste* : tape « poul » dans le champ de recherche.
-*Tu dis* : « Sur un frigo de quarante lignes, on cherche. »
+*Tu dis* : « Ici, huit lignes. Un vrai frigo en compte vite quarante : on cherche. »
 
 **3.4 — Ajouter un aliment** · 35 s
 *Geste* : **Ajouter un aliment** → l'éditeur s'ouvre vide → saisis un nom et les valeurs d'une étiquette.
@@ -521,10 +533,16 @@ l'enchaînement parfait : le montage recolle.
 *Tu dis* : « Et l'application refuse d'enregistrer des valeurs qui ne peuvent pas être vraies. »
 
 **3.6 — Corriger une quantité** · 15 s
-*Geste* : modifie la quantité d'une ligne à la main.
+*Geste* : déplie une ligne, puis bascule sur le segment **Inventaire** : le champ
+de cette ligne est prérempli avec le stock connu.
+*À l'écran* : en mode Stock, « La quantité se modifie depuis l'inventaire. » —
+aucun champ de quantité sur la ligne.
+*Tu dis* : « Une quantité ne se corrige pas au jugé : elle se pèse, dans
+l'inventaire. On y revient en bobine 5. »
 
 **3.7 — Supprimer** · 20 s
-*Geste* : supprime l'aliment créé en 3.5.
+*Geste* : supprime l'aliment créé en 3.5 (enregistré sans quantité : un aliment
+encore en stock est refusé, 409).
 *Tu dis* : « Et on peut le retirer. »
 
 > **Remise à zéro** : rejoue `jeu-essai.sql`.
@@ -742,7 +760,7 @@ l'enchaînement parfait : le montage recolle.
 
 **8.4 — Les façons de cuire** · 25 s
 *Geste* : **Cuissons** → ajoute un mode.
-*Tu dis* : « La table des cuissons : plancha, vapeur, four. C'est elle qui alimente les rendements cru-cuit du calculateur. »
+*Tu dis* : « La table des cuissons : plancha, vapeur, four. C'est elle qui forme les fournées du batch cooking : deux aliments cuits de la même façon partent ensemble. »
 
 **8.5 — Les comptes** · 30 s
 *Geste* : **Utilisateurs** → désactive un compte, réactive-le. Montre le refus de se bloquer soi-même.
@@ -915,13 +933,14 @@ la panne si on te le demande, pas avant :**
 
 | | |
 |---|---|
-| Tests front | **625** (596 purs + 29 de rendu) |
-| Tests API | **302**, 797 assertions, sans base ni noyau |
-| Audit de septembre 2026 | **79 constats** (3 critiques, 14 élevés), **8 lots, tous clos** |
+| Tests front | **632** (600 purs + 32 de rendu) |
+| Tests API | **307**, 819 assertions, sans base ni noyau |
+| Audit de septembre 2026 | **79 constats** (3 critiques, 14 élevés), **9 lots (0 à 8), tous clos** |
 | Catalogue d'exercices | ~1 338 entrées |
 | Inventaire des capacités | **288**, chacune avec fichier et ligne |
 
-> **Les compteurs vieillissent.** Ceux-ci ont été relevés le 16 septembre 2026.
+> **Les compteurs vieillissent.** Ceux-ci ont été relevés le 16 septembre 2026, et
+> les tests recomptés le 17.
 > Avant de les annoncer, relance `cd front && npm test` et
 > `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'` et **lis la
 > sortie** : annoncer un chiffre qu'on n'a pas recompté est exactement la faute

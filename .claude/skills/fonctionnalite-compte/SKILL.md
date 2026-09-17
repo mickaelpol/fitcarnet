@@ -36,9 +36,9 @@ un fait, alors que rien n'avait été reçu.
 | **Une route qui ne peut rendre que soi** — `GET /api/moi`, six champs écrits à la main | API | `api/src/Controller/MoiController.php:80-95` |
 | **Écran en erreur plutôt qu'écran faux** — le contenu ne s'affiche que reçu | idem | `front/src/composants/cadreCompte.tsx:56-62`, `compte.tsx:32` |
 | **« Se déconnecter » dans les trois états**, hors de toute condition | idem | `cadreCompte.tsx:64-68` |
-| **Changer son mot de passe ou son adresse** — mot de passe actuel exigé | **API seulement** | `api/src/State/UtilisateurProcessor.php:93-95`, `:125-144` |
-| **L'administrateur en est dispensé sur autrui, jamais sur lui-même** | idem | `UtilisateurProcessor.php:129-133` |
-| **Toutes les sessions révoquées** au changement de mot de passe, la courante comprise | idem | `UtilisateurProcessor.php:105-113` |
+| **Changer son mot de passe ou son adresse** — mot de passe actuel exigé | **API seulement** | `api/src/State/UtilisateurProcessor.php:93-95`, `:128-147` |
+| **L'administrateur en est dispensé sur autrui, jamais sur lui-même** | idem | `UtilisateurProcessor.php:132-136` |
+| **Toutes les sessions révoquées** au changement de mot de passe, la courante comprise | idem | `UtilisateurProcessor.php:105-116` |
 | **Cinq sonneries de fin de repos**, jouées au toucher | écran Réglages | `front/app/reglages.tsx:29-47`, `front/src/composants/sonnerie.ts:33-64` |
 | **Réglage propre à l'appareil** — « Ce choix est enregistré sur cet appareil. » | idem | `reglages.tsx:54-57`, `sonnerie.ts:69`, `:85-89` |
 | **Réécouter la sonnerie choisie** | idem | `reglages.tsx:50-52` |
@@ -88,7 +88,7 @@ Administration. **Données de départ** : aucune.
 3. Bouton **`Mes objectifs par repas`** (voir `fonctionnalite-objectifs`), puis
    l'encart replié **`Compléments alimentaires`** (même fiche).
 4. Bouton **`Réglages de l'app`** → écran dont l'en-tête est
-   **« Réglages de l'app »** (`_layout.tsx:210`) :
+   **« Réglages de l'app »** (`front/app/_layout.tsx:210`) :
    - étiquette **`SONNERIE DE FIN DE REPOS`**, puis *« Touche une ligne pour
      l'entendre. Le téléphone vibre en plus du son, pour les séances où il reste
      dans la poche. »* (`reglages.tsx:23-27`) ;
@@ -139,7 +139,7 @@ aucun composant de `front/` ne l'appelle (voir *Limites connues*). Le chemin ré
 est `PATCH /api/utilisateurs/{id}`, autorisé par
 `security: "is_granted('ROLE_ADMIN') or object == user"`
 (`api/src/Entity/Utilisateur.php:33`), et le processeur fait trois choses dans cet
-ordre (`UtilisateurProcessor.php:61-116`) :
+ordre (`UtilisateurProcessor.php:61-119`) :
 
 1. **exiger le mot de passe actuel** dès qu'on change le mot de passe **ou**
    l'adresse (`:93-95`). Sans cette règle, un jeton volé pendant une heure
@@ -148,17 +148,18 @@ ordre (`UtilisateurProcessor.php:61-116`) :
    connecter avec les siens ;
 2. **hacher**, puis oublier le clair (`:97-101`) ;
 3. **révoquer toutes les sessions**, la courante comprise, et **après** la
-   persistance seulement (`:105-113`).
+   persistance seulement, par `JetonsRafraichissement::revoquerTout`
+   (`:105-116`).
 
 Deux refus, avec leurs textes exacts :
 
 - **« Indique ton mot de passe actuel pour changer ton mot de passe ou ton
-  adresse. »** — 422 (`:135-139`) ;
-- **« Mot de passe actuel incorrect. »** — accès refusé (`:141-143`).
+  adresse. »** — 422 (`:138-142`) ;
+- **« Mot de passe actuel incorrect. »** — accès refusé (`:144-146`).
 
 La comparaison se fait contre **l'ancien hachage** (`$precedent`), jamais contre
 l'objet déjà désérialisé — sans quoi on validerait le nouveau mot de passe contre
-lui-même (`:121-124`).
+lui-même (`:124-126`).
 
 ## Critères d'acceptation
 
@@ -223,19 +224,19 @@ lui-même (`:121-124`).
 17. **L'administration n'apparaît que pour un administrateur** (`compte.tsx:83`),
     **et taper `/admin-utilisateurs` à la main ne monte pas l'écran** pour un
     compte ordinaire : il est renvoyé sur l'onglet Compte, et **aucune requête
-    `/api/invitations` ni `/api/comptes` ne doit partir** (`_layout.tsx:88-97`).
+    `/api/invitations` ni `/api/comptes` ne doit partir** (`front/app/_layout.tsx:88-97`).
     C'est vérifiable dans l'onglet réseau : zéro 403.
 18. **Refus : changer son mot de passe sans donner l'actuel → 422** avec « Indique
     ton mot de passe actuel pour changer ton mot de passe ou ton adresse. »
-    (`UtilisateurProcessor.php:135-139`). Idem pour un changement d'adresse seul.
+    (`UtilisateurProcessor.php:138-142`). Idem pour un changement d'adresse seul.
 19. **Refus : mot de passe actuel faux → accès refusé**, « Mot de passe actuel
-    incorrect. » (`:141-143`), et **rien n'est écrit** en base.
+    incorrect. » (`:144-146`), et **rien n'est écrit** en base.
 20. **Un changement de mot de passe révoque toutes les sessions.** Après le
     `PATCH`, `SELECT count(*) FROM jeton_rafraichissement` pour ce compte doit
     valoir **0**, la session qui a fait le changement comprise, et l'ancien jeton
-    de rafraîchissement doit être refusé (`UtilisateurProcessor.php:109-112`).
+    de rafraîchissement doit être refusé (`UtilisateurProcessor.php:115`).
 21. **Un administrateur est dispensé du mot de passe actuel sur autrui, jamais
-    sur lui-même** (`:129-133`) : le même `PATCH` sur son propre compte doit
+    sur lui-même** (`:132-136`) : le même `PATCH` sur son propre compte doit
     exiger le mot de passe.
 22. **Isolation (règle 2) : un compte ordinaire ne peut lire que lui-même.**
     `GET /api/utilisateurs` répond 403 (`Utilisateur.php:30`) ;
@@ -255,8 +256,8 @@ comportement écran verrouillé. Voir la skill `verification-android`.
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'
 curl -s http://localhost:8080/api/etat            # {"ok":true}
-/home/micka/perso/fitcarnet/db/manuel/rattraper-dev.sh
-npm --prefix /home/micka/perso/fitcarnet/front run build:web
+"$(git rev-parse --show-toplevel)"/db/manuel/rattraper-dev.sh
+npm --prefix "$(git rev-parse --show-toplevel)"/front run build:web
 ```
 
 **Deux comptes jetables** (`donnees-de-test`) : un ordinaire et un

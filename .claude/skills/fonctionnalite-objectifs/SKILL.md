@@ -181,7 +181,7 @@ rangée **« Avec quel repas »** (`Matin`/`Midi`/`16 h`/`Soir`). Après un ajou
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'
 curl -s http://localhost:8080/api/etat
-npm --prefix /home/micka/perso/fitcarnet/front run build:web
+npm --prefix "$(git rev-parse --show-toplevel)"/front run build:web
 ```
 
 **Le geste, pas l'appel.** Ces critères portent sur un formulaire : ils se

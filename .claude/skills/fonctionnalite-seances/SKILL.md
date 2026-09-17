@@ -39,30 +39,30 @@ rien.
 | **Quinze vignettes de muscles**, dont « Autre » ; un seul groupe à la fois, le même appui deux fois enlève le filtre | feuille d'ajout | `front/src/composants/choixMuscle.tsx:76-138`, 14 groupes `src/muscles/groupes.ts:36-77` + `AUTRE:78` |
 | **Recherche textuelle** sans accents ni casse, qui se cumule au filtre muscle | champ **« Rechercher… »** | `front/src/composants/choixAliment.tsx:50-62`, `:97` |
 | **Le type de la séance filtre le catalogue** — un exercice sans groupe reste proposé partout | feuille d'ajout | `front/app/seance/[id].tsx:62-82`, filtre `:64-65` |
-| Les exercices sont nommés en français quand la traduction existe | partout | `front/app/seance/[id].tsx:73`, `front/src/composants/exerciceSeance.tsx:130` |
-| Consulter la fiche de l'exercice (vidéo, muscles, matériel, exécution) | pastille **i**, libellé d'accessibilité **« Comment faire cet exercice »** | `front/src/composants/exerciceSeance.tsx:132-142` |
+| Les exercices sont nommés en français quand la traduction existe | partout | `front/app/seance/[id].tsx:73`, `front/src/composants/exerciceSeance.tsx:121` |
+| Consulter la fiche de l'exercice (vidéo, muscles, matériel, exécution) | pastille **i**, libellé d'accessibilité **« Comment faire cet exercice »** | `front/src/composants/exerciceSeance.tsx:123-133` |
 | **Trois modes de travail : Charge · Tenue · Chrono** — changer de mode **n'interrompt pas** une mesure en cours | rangée sous le nom de l'exercice | voir l'encadré ci-dessous |
 | Saisir répétitions et charge, série par série | lignes de série | `front/src/composants/serie.tsx:47-67` |
-| Mesurer une tenue (un chrono **par série**) ou un « for time » (un temps **total**) | selon le mode | `front/src/composants/serie.tsx:70-79`, total `exerciceSeance.tsx:196-205` |
+| Mesurer une tenue (un chrono **par série**) ou un « for time » (un temps **total**) | selon le mode | `front/src/composants/serie.tsx:70-79`, total `exerciceSeance.tsx:181-190` |
 | **Cocher une série remplit les champs vides avec l'objectif**, puis relance le repos | case à cocher | `front/src/composants/serie.tsx:26-35` |
-| Ajouter ou supprimer une série | **« + Série »**, croix **×** | `front/src/composants/exerciceSeance.tsx:284-286`, `:300-306` |
+| Ajouter ou supprimer une série | **« + Série »**, croix **×** | `front/src/composants/exerciceSeance.tsx:269-271`, `:285-291` |
 | **Pré-remplissage par la dernière fois** : charges et répétitions réellement faites → à défaut le format prescrit → à défaut 3 séries | à l'ajout de l'exercice | `front/src/calcul/blocSeance.ts:80-100`, source `front/src/api/hooks/seances.ts:49-75` |
-| Raccourci **« ↓ 12×25 · 12×27,5 »** — recharge les valeurs de la dernière séance en objectifs (4 au plus affichées) | à droite des modes | `front/src/composants/exerciceSeance.tsx:100-109`, aperçu `:112-122`, `:180-190` |
-| Notes par exercice, repliables, avec aperçu **« ✎ … »** quand elles sont remplies | **« ▼ Notes »** | `front/src/composants/exerciceSeance.tsx:262-281` |
-| Bilan par exercice : **RÉPÉTITIONS · KG SOULEVÉS · TEMPS** | bas de la carte | `front/src/composants/exerciceSeance.tsx:230-251` |
+| Raccourci **« ↓ 12×25 · 12×27,5 »** — recharge les valeurs de la dernière séance en objectifs (4 au plus affichées) | à droite des modes | `front/src/composants/exerciceSeance.tsx:96-105`, puce `:165-175`, aperçu `front/src/calcul/blocSeance.ts:141-164` |
+| Notes par exercice, repliables, avec aperçu **« ✎ … »** quand elles sont remplies | **« ▼ Notes »** | `front/src/composants/exerciceSeance.tsx:247-266` |
+| Bilan par exercice : **RÉPÉTITIONS · KG SOULEVÉS · TEMPS** | bas de la carte | `front/src/composants/exerciceSeance.tsx:215-236` |
 | Réordonner les exercices : poignée **⠿** à maintenir, **ou** flèches ▲ ▼ | sur mobile et sur le web | `front/src/composants/listeDeplacable.tsx:28-73`, jumeau web `listeDeplacable.web.tsx` |
 | **Sauvegarde automatique 2,5 s** après la dernière frappe, forcée au passage en arrière-plan et à la sortie de l'écran | point coloré + libellé | `front/src/composants/sauvegardeAuto.ts:22`, `:67-88` |
 | Cinq états lisibles, le **motif** de l'échec en clair, et **« Réessayer l'enregistrement »** | en-tête de la séance | `front/src/composants/sauvegardeAuto.ts:118-124`, affichage `front/app/seance/[id].tsx:176-192`, `:242-246` |
 | **Transformer la séance en modèle** — ce qui a été fait devient l'objectif | **« ★ Enregistrer comme modèle »** | `front/app/seance/[id].tsx:222-231`, conversion `front/src/api/hooks/seances.ts:127-154` |
-| Retirer un exercice, supprimer la séance — les deux confirmés en nommant ce qui part | **« Retirer l'exercice »**, **« Supprimer la séance »** | `front/src/composants/exerciceSeance.tsx:308-315`, `front/app/seance/[id].tsx:248-256`, `:298-308` |
+| Retirer un exercice, supprimer la séance — les deux confirmés en nommant ce qui part | **« Retirer l'exercice »**, **« Supprimer la séance »** | `front/src/composants/exerciceSeance.tsx:293-300`, `front/app/seance/[id].tsx:248-256`, `:298-308` |
 
 > **Le sélecteur Charge / Tenue / Chrono : parler du comportement, pas du chemin.**
-> Au 16 septembre 2026 il vit dans `front/src/composants/exerciceSeance.tsx:14-18`
-> (les clés sont `charge`, `iso`, `chrono` ; les libellés affichés sont
-> **Charge**, **Tenue**, **Chrono**) et il est rendu à `:167-191`. **Il est en
-> cours d'extraction vers un composant partagé** pour servir aussi dans
-> l'éditeur de modèle (décision du 16 septembre 2026, reportée dans
-> `presentation/demonstration.md`, partie II·J).
+> Depuis le 16 septembre 2026 il vit dans `front/src/composants/choixMode.tsx`
+> (table `MODES` `:9-13` — les clés sont `charge`, `iso`, `chrono` ; les
+> libellés affichés sont **Charge**, **Tenue**, **Chrono** — et composant
+> `ChoixMode` `:45-68`). Il est partagé : l'écran de séance le rend à
+> `exerciceSeance.tsx:162-176`, l'éditeur de modèle aussi (décision du
+> 16 septembre 2026, reportée dans `presentation/demonstration.md`, partie II·J).
 > **Éprouve le comportement, jamais le fichier** : les trois libellés, la
 > bascule, et le fait qu'une mesure en cours continue de tourner pendant la
 > bascule (`front/src/composants/etatMesure.ts:1-17`). Revérifie le chemin avant
@@ -127,7 +127,7 @@ n'ont de quoi s'afficher.
 5. **Les trois modes changent ce qu'on saisit.** Charge → répétitions + kg ;
    Tenue → un chronomètre **par série** ; Chrono → un chronomètre **total** au-dessus
    des séries, étiqueté « Temps total de l'exercice »
-   (`serie.tsx:47-79`, `exerciceSeance.tsx:196-205`).
+   (`serie.tsx:47-79`, `exerciceSeance.tsx:181-190`).
 6. **Basculer de mode n'interrompt pas une mesure en cours.** Lancer une tenue,
    passer en Charge : le bandeau du haut continue de compter
    (`etatMesure.ts:1-17`). Voir `fonctionnalite-minuteur`.
@@ -152,7 +152,7 @@ n'ont de quoi s'afficher.
     déjà saisie ne doit **pas** être écrasée par l'objectif (`serie.tsx:29-31`).
 13. **Le raccourci « ↓ » n'apparaît que s'il a quelque chose à proposer**, et
     recharge en **objectifs**, pas en valeurs réalisées
-    (`exerciceSeance.tsx:100-109`, `:180`).
+    (`exerciceSeance.tsx:96-105`, `:165`).
 14. **Réordonner marche des deux façons et sur les deux plateformes** : poignée
     ⠿ maintenue, et flèches ▲ ▼ (`listeDeplacable.tsx:39-73`). Après
     réordonnancement, `ordre` est renuméroté de 0 à n-1 (`seance/[id].tsx:151-153`).
@@ -170,7 +170,7 @@ n'ont de quoi s'afficher.
 18. **La première sauvegarde ne fait pas perdre la saisie.** Sur une séance
     neuve, taper sans interruption pendant l'enregistrement initial : l'écran ne
     doit **pas** naviguer ni se remonter, et rien de ce qui a été tapé ne doit
-    disparaître (`useSeanceEditable.ts:65-68`, `blocSeance.ts:137-138`).
+    disparaître (`useSeanceEditable.ts:65-68`, `blocSeance.ts:180-181`).
 19. **Le passage en modèle transporte le réalisé.** « ★ Enregistrer comme
     modèle » : les répétitions et charges **faites** deviennent les cibles du
     modèle ; à défaut, les cibles d'origine (`hooks/seances.ts:143-145`).
@@ -219,7 +219,7 @@ docker exec fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -c \
   577 tests étaient au vert pendant que 42,5 kg s'enregistrait 425.
 
 ```bash
-npm --prefix /home/micka/perso/fitcarnet/front test
+npm --prefix "$(git rev-parse --show-toplevel)"/front test
 ```
 
 ## La capture pour la démonstration
@@ -248,7 +248,7 @@ Reprend la **bobine 7** de `presentation/demonstration.md` (plans 7.1, 7.2,
 
 - **Le plan 7.4 a longtemps décrit un « bandeau ambre en haut de l'exercice »
   qui n'existe pas.** Ce qu'on voit est une **puce bordée d'ambre** portant
-  « ↓ 12×25 · 12×27,5 » (`exerciceSeance.tsx:180-190`) — un bouton, pas un
+  « ↓ 12×25 · 12×27,5 » (`exerciceSeance.tsx:165-175`) — un bouton, pas un
   bandeau, et il **applique** les valeurs quand on le touche. **Corrigé dans
   `presentation/demonstration.md` le 17 septembre 2026** : le plan 7.4 dit
   désormais « touche la puce ambre », et porte l'encadré qui raconte l'erreur.
@@ -256,7 +256,7 @@ Reprend la **bobine 7** de `presentation/demonstration.md` (plans 7.1, 7.2,
   de la section E ne correspondent plus (voir l'encadré en tête de fiche), et il
   annonce encore « zone 70–80 % » (faux, c'est 70 à 90 %).
 - **L'éditeur de modèle n'a pas encore de sélecteur de mode** : le mode y est
-  hérité du mode par défaut de l'exercice (`front/app/modele/[id].tsx:86`).
+  hérité du mode par défaut de l'exercice (`front/app/modele/[id].tsx:87`).
   L'extraction du sélecteur est décidée mais **non terminée** au 16 septembre
   2026. Ne pas éprouver ici ce qui n'existe pas encore là-bas.
 - **Non vérifié : le comportement hors ligne complet.** Le cache disque est

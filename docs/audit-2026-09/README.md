@@ -42,8 +42,10 @@ trancher : l'intention est déjà écrite.
 
 ## Les 3 constats critiques
 
-### C1 — « J'ai cuisiné » échoue en production pour un compte Grocy
-`api/src/Controller/PlansController.php:155` — **CONFIRMÉ, bug actif aujourd'hui**
+### C1 — ✅ corrigé le 7 septembre 2026 — « J'ai cuisiné » échouait en production pour un compte Grocy
+`api/src/Controller/PlansController.php:155` — **CONFIRMÉ à l'audit, corrigé depuis** (lot 1) : la
+déduction Grocy passe désormais par `DeductionGrocy`, une ligne à la fois
+(`PlansController.php:155-161`). Le constat d'origine suit, au présent de l'audit.
 
 `$this->grocy->inventorier($nouvellesQuantites)` appelle une méthode qui n'existe plus :
 `FrigoGrocy` est une `final readonly class` dont la seule méthode d'inventaire est
@@ -60,8 +62,10 @@ tard » que ce bouton existe pour éviter.
 *Correction : boucler sur `inventorierUn()` en reprenant la forme de `FrigoController.php:301`.
 30 min, 1 h avec test.* **PHPStan niveau 5 l'aurait attrapé gratuitement — voir lot 0.**
 
-### C2 — La double écriture du schéma n'est pas tenue
-`db/01-schema.sql` — **CONFIRMÉ, reproduit par diff de deux bases réelles**
+### C2 — ✅ corrigé le 14 septembre 2026 — La double écriture du schéma n'était pas tenue
+`db/01-schema.sql` — **CONFIRMÉ à l'audit par diff de deux bases réelles, corrigé depuis** (lot 4) :
+`db/manuel/verifier-schema.sh` construit les deux bases et les déclare identiques. Le constat
+d'origine suit, au présent de l'audit.
 
 Deux bases ont été construites dans un PostgreSQL 16 jetable — A depuis `01-schema.sql` seul,
 B depuis A plus les 24 migrations dans l’ordre d'`installer.sh` — et leurs `pg_dump --schema-only`
@@ -139,12 +143,15 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   brut rendu au client, qui appartient à **M-03**.
 
 ### Données et infrastructure
-- **É2** — `25-garde-fous.sql:37-41,85-88` fait `UPDATE … SET kcal_100 = NULL` sur une colonne
+- **É2** — ✅ **corrigé le 7 septembre 2026** (lot 1) : la migration pose `= 0`. Le constat
+  d'origine : `25-garde-fous.sql:37-41,85-88` fait `UPDATE … SET kcal_100 = NULL` sur une colonne
   `NOT NULL`. Reproduit : `ERROR: null value … violates not-null constraint`, contrainte non posée.
   Comme `entrypoint-prod.sh:139` utilise `ON_ERROR_STOP=1` + `exit 1` sous `set -e`, **le jour où une
   seule valeur négative existe — le cas que ce fichier dit avoir constaté — le conteneur applicatif
   ne redémarre plus.** *Correction : `= 0` au lieu de `= NULL`. 20 min.*
-- **É3** — `installer.sh:167` joue les migrations sans `ON_ERROR_STOP` : psql continue après erreur
+- **É3** — ✅ **corrigé le 7 septembre 2026** (lot 1) : `installer.sh` joue désormais chaque
+  migration avec `ON_ERROR_STOP=1`. Le constat d'origine : `installer.sh:167` joue les migrations
+  sans `ON_ERROR_STOP` : psql continue après erreur
   et sort 0, l'installateur affiche « ✓ » sur un échec. C'est le mécanisme exact par lequel une
   divergence s'installe sans bruit. *15 min.*
 - **É4** — ✅ **corrigé le 14 septembre 2026.** `restaurer-nas.sh` n'arrêtait que `fitcarnet-app` ;
@@ -212,36 +219,46 @@ liste blanche explicite. C'est (b) qui attrape la vraie panne. 2-3 h.*
   10 témoins, chacun vu échouer. Le `PATCH` reste réservé à `ROLE_ADMIN` : **l'auteur d'un exercice
   privé ne peut toujours pas le corriger lui-même** — c'était déjà le cas avant, rien ne régresse,
   mais le filtrage rend la limite plus visible.
-- **É9** — `grocy_macros.py:105-113` écrit dans les mêmes champs Grocy avec la **convention inverse**
+- **É9** — ✅ **réglé le 8 septembre 2026** (lot 5) : `grocy_macros.py` a été supprimé. Le constat
+  d'origine : `grocy_macros.py:105-113` écrivait dans les mêmes champs Grocy avec la **convention inverse**
   (valeurs cuites, riz basmati à 130 kcal contre 350 sec) : un produit amorcé ainsi fait peser ~3×
   trop de riz. Et son appariement sans borne de mot fait recevoir 575 kcal à « Lait d'amandes ».
   *1 h (supprimer) à 4 h (aligner).*
 
 ### Front — chiffres faux montrés à l'utilisateur
-- **É10** — `front/src/api/client.ts` (342 lignes) n'a **aucun test** : rejeu sur 401, distinction
+- **É10** — ✅ **corrigé le 15 septembre 2026** (lot 7) : `front/src/api/client.test.ts`. Le
+  constat d'origine : `front/src/api/client.ts` (342 lignes) n'a **aucun test** : rejeu sur 401, distinction
   panne réseau / refus serveur, corps non-JSON. Tout est bien écrit, rien n'est vérifié. *4 h.*
-- **É11** — **Trois formules d'Epley** aux règles de validité différentes (`performance.ts:26-38`
+- **É11** — ✅ **corrigé le 7 septembre 2026** (lot 2) : la formule n'est plus écrite que dans
+  `front/src/calcul/performance.ts`. Le constat d'origine : **trois formules d'Epley** aux règles
+  de validité différentes (`performance.ts:26-38`
   avec plafond à 15 reps, `hooks.ts:905-907` plafond recopié en dur, `hooks.ts:825-826` **sans
   plafond**). L'écran de séance consomme les deux dernières : 30 répétitions à 40 kg créent un
   « record » de **79,96 kg**, et chaque séance suivante s'affiche en recul face à un record fantôme
   que la formule elle-même déclare invalide. *~1 h.*
-- **É12** — Un « reste » déclaré **rétrécit la liste de courses**. `composer.ts:713-718,754-760` :
+- **É12** — ✅ **corrigé le 7 septembre 2026** (lot 2). Le constat d'origine : un « reste »
+  déclaré **rétrécit la liste de courses**. `composer.ts:713-718,754-760` :
   `plafonds` survit à la passe « frigo plein » censée n'en avoir aucun. Reproduit : sans reste,
   liste = `[Riz, 20 g]` ; en déclarant « il me reste 80 g de riz », liste = `[]`, pour un plan
   cuisiné **identique**. Fait sous-acheter, et ça ne se voit qu'au supermarché. *15 min + 1 test.*
-  ⚠️ *Ce code fait partie du travail non encore committé — c'est le meilleur moment.*
-- **É13** — `plausibilite.ts:49-50` applique la formule **américaine** d'Atwater (fibres ignorées),
+- **É13** — ✅ **corrigé le 7 septembre 2026** (lot 2) : `kcalAtwater` compte les fibres à
+  2 kcal/g. Le constat d'origine : `plausibilite.ts:49-50` applique la formule **américaine**
+  d'Atwater (fibres ignorées),
   celle que `nutrition.ts:4-7` interdit explicitement quatre fichiers plus loin. Reproduit sur des
   graines de chia : « 486 kcal déclarées, mais ses macros en font 378 » — alors que dans la
   convention de l'app le calcul juste donne 445,8 et qu'**aucune des deux valeurs saisies n'est
   fausse**. Le module dont la raison d'être est de repérer les données qui mentent accuse une donnée
   juste, sur toute la famille des oléagineux. *10 min (+ ajuster `plausibilite.test.ts:165`).*
-- **É14** — **Session morte sans porte de sortie.** Trois décisions correctes qui s'enferment :
+- **É14** — ✅ **corrigé en deux temps** (lot 1) : un volet le 7 septembre 2026, les deux autres le
+  15 (voir plus bas). Le constat d'origine : **session morte sans porte de sortie.** Trois
+  décisions correctes qui s'enferment :
   `client.ts:145-146` rend `false` sans appeler `terminerSession()` ; le portier de `_layout.tsx:70`
   ne teste que la présence d'une chaîne, donc un JWT expiré compte comme « connecté » ;
   et `compte.tsx:24-26` place le `if (isError)` **avant** le seul bouton de déconnexion de toute
   l'application. Seule issue pour l'utilisateur : effacer les données de l'app. *~30 min.*
-- **É15** — `sauvegardeAuto.ts:33-53` abandonne l'envoi si un autre est en vol, **sans réessai
+- **É15** — ✅ **corrigé le 7 septembre 2026** (lot 2) ; la règle de concurrence vit depuis dans
+  `front/src/composants/envoiSerialise.ts`. Le constat d'origine : `sauvegardeAuto.ts:33-53`
+  abandonne l'envoi si un autre est en vol, **sans réessai
   programmé**. En salle : on coche une série, on tape la charge suivante, on appuie sur Retour →
   la charge n'est jamais envoyée, et rien ne le signale. C'est exactement le cas que le commentaire
   des lignes 55-58 dit couvrir. *~1 h.*

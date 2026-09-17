@@ -29,22 +29,22 @@ existent pour cette raison, et ils sont le cœur de ce qu'il faut éprouver.
 
 | Ce que l'utilisateur voit | Où | `fichier:ligne` |
 |---|---|---|
-| **Le 1RM estimé** d'un exercice : la meilleure de ses séries courtes | disque, en tête de la carte d'exercice | `front/src/calcul/performance.ts:47-59`, rendu `front/src/composants/exerciceSeance.tsx:149-156` |
+| **Le 1RM estimé** d'un exercice : la meilleure de ses séries courtes | disque, en tête de la carte d'exercice | `front/src/calcul/performance.ts:47-59`, rendu `front/src/composants/exerciceSeance.tsx:140-147` |
 | **Formule d'Epley**, `poids × (1 + 0,0333 × reps)`, écrite **à un seul endroit** | — | `front/src/calcul/performance.ts:31`, `:35-36` |
 | **Garde-fou 1 — plafond de 15 répétitions.** Au-delà, l'estimation est **refusée** : on mesure l'endurance, pas la force | — | `front/src/calcul/performance.ts:19`, appliqué `:52` |
 | **Garde-fou 2 — une série d'une répétition est prise telle quelle**, sans les 3,3 % qu'Epley ajouterait | — | `front/src/calcul/performance.ts:54`, et `:127` pour le calculateur |
 | **La couleur du disque dit la progression, pas la charge** : vert au-dessus de +3 %, ambre stable, rouge en baisse, gris sans comparaison | disque | `front/src/composants/disqueRM.tsx:21`, `:23-37` |
 | **L'écart depuis la dernière fois** : « ▲ +2,5 kg », « = stable », « 1re fois » | sous le disque | `front/src/composants/disqueRM.tsx:39-41`, `:83-91` |
 | **Records antérieurs**, strictement **avant** la date de la séance ouverte | alimente la comparaison | `front/src/calcul/historiqueSeances.ts:34-54`, ligne de garde `:41` |
-| **Courbe de progression** — 1RM en mode Charge, **volume** dans les autres modes ; à partir de **2 séances** ; « +7,5 kg sur 6 séances » | sous les séries | `front/src/composants/sparkline.tsx:13-74`, choix `exerciceSeance.tsx:222-227` |
-| **Table des paliers**, dépliée au tap sur le disque | carte d'exercice | `front/src/composants/exerciceSeance.tsx:163`, `disqueRM.tsx:200-205` |
+| **Courbe de progression** — 1RM en mode Charge, **volume** dans les autres modes ; à partir de **2 séances** ; « +7,5 kg sur 6 séances » | sous les séries | `front/src/composants/sparkline.tsx:13-74`, choix `exerciceSeance.tsx:207-212` |
+| **Table des paliers**, dépliée au tap sur le disque | carte d'exercice | `front/src/composants/exerciceSeance.tsx:154`, `disqueRM.tsx:200-205` |
 | **Zone de progression · 70 à 90 %**, par pas de 2,5 %, puis **Échauffement** à 60 / 50 / 40 % | table des paliers | `front/src/calcul/performance.ts:181-194`, libellés `disqueRM.tsx:169`, `:180` |
 | **Sous 70 %, la charge est donnée mais pas les répétitions** — un tiret cadratin, jamais un zéro | table des paliers | `front/src/composants/disqueRM.tsx:108-119`, règle `performance.ts:209-210` |
 | **L'arrondi suit la salle** — 2,5 kg par défaut, 1 kg seulement quand la zone de travail s'effondre | table des paliers | `front/src/calcul/performance.ts:256-265`, `:216` |
 | **Deux paliers de même charge ne font qu'une ligne** — « 90–82,5 % · 17,5 kg » | table des paliers | `front/src/calcul/performance.ts:294-326`, libellé `disqueRM.tsx:100-106` |
 | **Calculateur de charge** — « J'ai soulevé … kg » × « Répétitions réussies » → 1RM, arrondi réglable **1 / 2,5 / 5 kg**, et la même table | bouton **« ⚖ RM »**, barre du bas | `front/src/composants/calculateurRM.tsx:20-139`, bouton `front/src/composants/chrono.tsx:126-130` |
-| **Avertissement séries longues** — « N séries de plus de 15 répétitions : comptées dans le volume, mais écartées du 1RM » | sous le bilan | `front/src/composants/exerciceSeance.tsx:253-260` |
-| **Bilan par exercice** — RÉPÉTITIONS · KG SOULEVÉS · TEMPS | bas de la carte | `front/src/composants/exerciceSeance.tsx:230-251`, calcul `performance.ts:96-108` |
+| **Avertissement séries longues** — « N séries de plus de 15 répétitions : comptées dans le volume, mais écartées du 1RM » | sous le bilan | `front/src/composants/exerciceSeance.tsx:238-245` |
+| **Bilan par exercice** — RÉPÉTITIONS · KG SOULEVÉS · TEMPS | bas de la carte | `front/src/composants/exerciceSeance.tsx:215-236`, calcul `performance.ts:96-108` |
 
 **Les deux chemins vers le 1RM doivent s'accorder** — la carte d'exercice
 (`rmDesSeries`) et le calculateur (`estimerDepuisEssai`) donnaient 103,3 kg
@@ -59,21 +59,21 @@ point de comparaison**, et tout s'affiche « 1re fois ».
 
 1. **Ouvrir une séance** qui contient un exercice déjà fait plusieurs fois.
 2. **Saisir une série** : 8 répétitions à 47,5 kg. Le disque apparaît dès qu'une
-   série est exploitable (`exerciceSeance.tsx:149`), affiche le 1RM arrondi au
+   série est exploitable (`exerciceSeance.tsx:140`), affiche le 1RM arrondi au
    dixième (`disqueRM.tsx:77-79`), et l'unité « 1RM kg » (`:52`).
 3. **Lire la couleur et l'écart** : « ▲ +2,5 kg » si l'on dépasse de plus de 3 %
    le meilleur 1RM antérieur, « = stable » si l'écart est négligeable, « 1re
    fois » s'il n'y a rien à comparer (`disqueRM.tsx:83-91`).
 4. **Toucher le disque** : la **table des paliers** se déplie
-   (`exerciceSeance.tsx:153`, `:163`). En-têtes : « % du 1RM », « Charge »,
+   (`exerciceSeance.tsx:144`, `:154`). En-têtes : « % du 1RM », « Charge »,
    « Répétitions » (`disqueRM.tsx:162-164`). Puis « Zone de progression · 70 à
    90 % » et « Échauffement ».
 5. **Lire la note du bas** : « Sous 70 % du maximum, la charge est indiquée mais
    pas les répétitions : l'estimation d'Epley dépasserait 15 répétitions, où
    elle ne veut plus rien dire. » (`disqueRM.tsx:187-194`).
 6. **La courbe** s'affiche sous les séries dès qu'il y a **plus d'un point**
-   (`exerciceSeance.tsx:222`), titrée « Progression du 1RM » en mode Charge,
-   « Volume soulevé » sinon (`:223`, `:226`), avec « +7,5 kg sur 6 séances »
+   (`exerciceSeance.tsx:207`), titrée « Progression du 1RM » en mode Charge,
+   « Volume soulevé » sinon (`:208`, `:211`), avec « +7,5 kg sur 6 séances »
    (`sparkline.tsx:68`).
 7. **Le calculateur** : bouton **« ⚖ RM »** dans la barre du bas
    (`chrono.tsx:126-130`). Titre « Calculateur de RM », champs « J'ai soulevé »
@@ -96,7 +96,7 @@ point de comparaison**, et tout s'affiche « 1re fois ».
 3. **La série longue est dite, pas cachée.** Le même cas doit afficher
    « 1 série de plus de 15 répétitions : comptée dans le volume, mais écartée du
    1RM — au-delà, on mesure l'endurance et non la force. »
-   (`exerciceSeance.tsx:253-260`). Un refus muet ne serait pas acceptable.
+   (`exerciceSeance.tsx:238-245`). Un refus muet ne serait pas acceptable.
 4. **Une série d'une répétition est prise telle quelle.** 1 × 100 kg → **100 kg**,
    et non 103,3 (`performance.ts:54`). **À vérifier sur les deux chemins** : la
    carte d'exercice **et** le calculateur « ⚖ RM » (`:127`). C'est exactement là
@@ -143,7 +143,7 @@ point de comparaison**, et tout s'affiche « 1re fois ».
     ligne médiane, pas des barres pleines (`:31`).
 16. **La courbe change de nature avec le mode.** En Charge : « Progression du
     1RM ». En Tenue ou Chrono : « Volume soulevé » — parce que le 1RM n'a pas de
-    sens sur une série longue (`exerciceSeance.tsx:222-227`).
+    sens sur une série longue (`exerciceSeance.tsx:207-212`).
 17. **Le bilan compte tout, le 1RM non.** Une série de 30 × 40 kg doit apparaître
     dans « KG SOULEVÉS » (1 200) et dans « RÉPÉTITIONS » (30) tout en étant
     exclue du 1RM (`performance.ts:62-73`, `:96-108`). C'est la distinction
@@ -163,7 +163,7 @@ comparant le nombre affiché au nombre calculé à la main.
 
 ```bash
 # la règle de référence, isolée — le test tombe si une formule est recopiée
-npm --prefix /home/micka/perso/fitcarnet/front test
+npm --prefix "$(git rev-parse --show-toplevel)"/front test
 ```
 
 Les modules de référence sont éprouvés par `front/src/calcul/performance.test.ts`
@@ -173,7 +173,7 @@ l'épreuve à l'écran** : le défaut historique n'était pas dans la formule, i
 
 **Les pièges propres à cette fonctionnalité :**
 
-- **Le disque n'apparaît qu'avec une série exploitable** (`exerciceSeance.tsx:149`).
+- **Le disque n'apparaît qu'avec une série exploitable** (`exerciceSeance.tsx:140`).
   Répétitions ou charge manquantes, charge nulle, plus de 15 répétitions : pas de
   disque. Ne pas le lire comme une panne d'affichage.
 - **Le bouton « ⚖ RM » ouvre le calculateur, pas le disque.** Depuis l'écran de
@@ -207,17 +207,17 @@ pourquoi, se distingue de toutes celles qui affichent 79,96 kg sans broncher.
 
 ## Limites connues
 
-- **L'API publie son propre 1RM, et il ne suit pas les deux garde-fous.**
-  `SeanceExercice::getRmEstime()` (`api/src/Entity/SeanceExercice.php:129-146`)
-  recalcule Epley **sans plafond de répétitions** (`:136` ne teste que `reps < 1`)
-  et **sans** le cas de la série d'une répétition — elle y reçoit les 3,3 %
-  qu'Epley ajoute. Le champ est exposé dans le groupe `seance:lire` et vaut donc
-  pour tout consommateur de l'API. **Le front ne l'utilise pas** : l'écran de
-  séance recalcule depuis les séries via `performance.ts`
-  (`exerciceSeance.tsx:63`), et aucun écart n'est visible à l'écran. Mais c'est
-  une **sixième écriture de la formule**, divergente, et contraire à la règle 5.
-  Relevé le 16 septembre 2026, **non corrigé** — à signaler, pas à corriger dans
-  une épreuve (`epreuve-fonctionnalite`, règle 3).
+- **L'API publie son propre 1RM, seconde écriture assumée de la formule.**
+  `SeanceExercice::getRmEstime()` (`api/src/Entity/SeanceExercice.php:152-173`)
+  recalcule Epley côté serveur, avec **les deux mêmes garde-fous** depuis le
+  16 septembre 2026 : les séries de plus de 15 répétitions sont écartées
+  (`:162-164`), une série d'une répétition vaut sa charge (`:166`). Avant ce
+  correctif, une série de 93 répétitions à 32 kg y donnait 131 kg
+  (`:129-151`). PHP ne pouvant importer `performance.ts`, la règle 5 est tenue
+  par un test : `api/tests/Entity/RmEstimeTest.php` aligne les deux écritures,
+  et tombe si l'une évolue sans l'autre. Le champ est exposé dans le groupe
+  `seance:lire` ; **le front ne l'utilise pas**, l'écran de séance recalcule
+  depuis les séries via `performance.ts` (`exerciceSeance.tsx:59`).
 - **`presentation/features.md:294` dit « zone 70–80 % »** : faux, c'est 70 à
   90 %. Déjà signalé par `presentation/demonstration.md` (partie V, point 4),
   toujours pas corrigé dans `features.md`.

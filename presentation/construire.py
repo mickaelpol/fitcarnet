@@ -360,13 +360,14 @@ SLIDES = [
     # ================================================================== ACTE 3
     ("qualite", "Ce qui garantit que ça marche", """
       <div class="chiffres">
-        <div><strong>468</strong><span>tests automatisés</span></div>
+        <div><strong>939</strong><span>tests automatisés</span></div>
         <div><strong>6 769</strong><span>lignes de test</span></div>
         <div><strong>26 %</strong><span>du code est du test</span></div>
         <div><strong>120</strong><span>commits en 5 semaines</span></div>
       </div>
-      <p class="chute">362 tests côté front (<code>node:test</code>), 106 côté API (PHPUnit), exécutés en
-         moins d'une seconde chacun. Une suite qu'on n'attend pas est une suite qu'on lance.</p>
+      <p class="chute">632 tests côté front (<code>node:test</code>, dont 32 de rendu), 307 côté API
+         (PHPUnit), comptés le 17 septembre 2026 : quelques secondes pour l'ensemble. Une suite
+         qu'on n'attend pas est une suite qu'on lance.</p>
     """),
 
     ("qualite", "Le TDD, sans exception", """
@@ -392,8 +393,8 @@ SLIDES = [
       <p class="accroche">79 constats, chacun reproduit avant d'être corrigé.</p>
       <div class="chiffres">
         <div><strong>3</strong><span>critiques</span></div>
-        <div><strong>15</strong><span>élevés</span></div>
-        <div><strong>4 lots</strong><span>déjà traités</span></div>
+        <div><strong>14</strong><span>élevés</span></div>
+        <div><strong>9 lots</strong><span>tous clos</span></div>
         <div><strong>0</strong><span>constat effacé sans preuve</span></div>
       </div>
       <p class="chute">Garde-fous automatiques, pannes réelles, chiffres faux montrés à l'utilisateur,
@@ -408,7 +409,7 @@ SLIDES = [
           <h3>Le défaut</h3>
           <p>Une route vérifiait la propriété de l'aliment. Sa jumelle, qui écrit le même stock par
              un autre chemin, ne l'avait jamais reçue.</p>
-          <p>Conséquence : un compte pouvait poser 1 g sur l'aliment privé d'un autre, qui ne pouvait
+          <p>Conséquence : un compte pouvait poser 1 g sur l'aliment d'un autre compte, qui ne pouvait
              alors plus le supprimer. Pas une fuite — un blocage impossible à défaire.</p>
         </div>
         <div>

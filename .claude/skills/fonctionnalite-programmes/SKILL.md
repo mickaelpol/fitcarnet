@@ -60,7 +60,7 @@ fermeture gagnait. C'était une fonctionnalité morte qui affirmait le contraire
 Il a été retiré des **quatre** endroits le même jour :
 `api/src/Entity/Modele.php:27-53` (le commentaire qui raconte la décision),
 `db/manuel/33-retirer-le-partage-de-modele.sql`,
-`db/01-schema.sql:283` (« PAS DE COLONNE `partage` ») et
+`db/01-schema.sql:276` (« PAS DE COLONNE `partage` ») et
 `front/src/api/types.ts:179-185`. **Un modèle n'appartient qu'à son compte.**
 Ne rien filmer, ne rien promettre, ne pas réintroduire le champ sans rouvrir la
 décision.
@@ -81,7 +81,7 @@ après son atterrissage** :
   valeurs internes `charge`, `iso`, `chrono`.
 - **Les deux écrans partagent ce composant** : l'éditeur de modèle
   (`front/app/modele/[id].tsx:10,152`) et la séance
-  (`front/src/composants/exerciceSeance.tsx:10,166`). L'ancienne table `MODES`
+  (`front/src/composants/exerciceSeance.tsx:10,162`). L'ancienne table `MODES`
   locale de `exerciceSeance.tsx` a disparu ; le raccourci « ↓ 12×25 » de la
   séance passe désormais par la propriété `suite`, pour rester dans la même
   rangée.
@@ -130,17 +130,18 @@ séances du même type que le modèle (`db/manuel/jeu-demo.sql`).
 5. **« + Ajouter un exercice »** (`:232-234`) ouvre une modale titrée
    « **Ajouter un exercice** » (`:280`) : rangée de vignettes de muscles puis
    champ « **Rechercher…** » (`front/src/composants/choixAliment.tsx:81-99`).
-   **La liste est déjà réduite au type du modèle** (`:59-72`) — un exercice sans
-   groupe (`e.groupes.length === 0`) reste proposé partout, sinon il deviendrait
-   introuvable.
+   **La liste est déjà réduite au type du modèle** (`modele/[id].tsx:59-72`) —
+   un exercice sans groupe (`e.groupes.length === 0`) reste proposé partout,
+   sinon il deviendrait introuvable.
 6. La carte de l'exercice affiche « **n série(s)** » et le format prescrit
-   (`:138-141`), puis le sélecteur **Charge / Tenue / Chrono** (`:152`), puis
-   une ligne par série (`:160-175`, rendue par
+   (`modele/[id].tsx:138-141`), puis le sélecteur **Charge / Tenue / Chrono**
+   (`:152`), puis une ligne par série (`:160-175`, rendue par
    `front/src/composants/serieModele.tsx`) — **et ces champs dépendent du
    mode** : « **rép** » et « **kg** » en Charge et en Chrono (`:47-61`), un seul
    champ « **s** » en Tenue (`:65-72`). Un **×** retire la série (`:77-83`,
    libellé « Supprimer la série n » pour un lecteur d'écran), et les boutons
-   « **+ Série** » (`:188`) et « **Retirer** » (`:190-192`) ferment la carte.
+   « **+ Série** » (`modele/[id].tsx:188`) et « **Retirer** » (`:190-192`)
+   ferment la carte.
 7. Dès **deux** exercices, l'aide apparaît (`:220-226`) :
    « Touche ⠿ pour saisir un exercice, puis l'endroit où le déposer. Les flèches
    ▲▼ le déplacent d'un cran. L'ordre du modèle pourra ensuite être appliqué à
@@ -181,7 +182,8 @@ au moins un modèle (`front/app/seance/[id].tsx:209`).
    (`front/src/composants/serieModele.tsx:42-46`,
    `front/src/composants/champNombre.tsx`).
 4. **Mode de travail, choisi dans le modèle** — les trois pavés **Charge /
-   Tenue / Chrono** apparaissent sur chaque carte d'exercice (`:152`). À
+   Tenue / Chrono** apparaissent sur chaque carte d'exercice
+   (`modele/[id].tsx:152`). À
    l'ajout, le pavé actif est celui du mode par défaut de l'exercice (`:87,129`).
    En choisir un autre doit :
    - le marquer comme sélectionné, **et lui seul** ;
@@ -238,7 +240,7 @@ au moins un modèle (`front/app/seance/[id].tsx:209`).
     recopié (`front/src/api/hooks/seances.ts:138`).
 13. **Suppression** — supprimer le modèle ne touche **aucune** séance passée :
     recompter `seance` et `serie` avant/après. La cascade ne descend que sur
-    `modele_exercice` et `modele_serie` (`db/01-schema.sql:292-306`).
+    `modele_exercice` et `modele_serie` (`db/01-schema.sql:285-299`).
 14. **Refus et vide ≠ zéro** — un champ de série laissé vide s'enregistre
     `null` (« je ne sais pas »), jamais `0`. Un type non choisi reste `null` et
     l'application ne doit pas en inventer un.

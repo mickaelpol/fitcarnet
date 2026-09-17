@@ -79,8 +79,9 @@ Sans consigne particulière, éprouve ce qui a déjà cassé :
   `GET /api/<ressource>/<id>` par le second compte est le test qui compte : un
   filtre posé en collection et oublié en item laisse une liste propre et une fuite
   par identifiant.
-- **Le geste normal de l'administration.** Un `PATCH` sur une donnée commune ne
-  doit pas se l'approprier (constat M-01, survenu deux fois).
+- **Le geste normal de l'administration.** Un `PATCH` sur une entrée du
+  catalogue commun d'exercices ne doit pas se l'approprier : c'est le garde qui
+  regarde l'état au lieu de l'intention (motif 2 de `revue-de-code`).
 - **L'inventaire différé.** Déposer, laisser le travailleur traiter
   (`bin/console app:inventaire:traiter`, sans `--boucle`), vérifier le statut, le
   jeton et le stock.

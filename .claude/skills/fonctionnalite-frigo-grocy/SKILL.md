@@ -47,16 +47,16 @@ l'aller-retour entre deux outils quand on ajoute du poulet.
 | **Un produit sans valeurs est écarté silencieusement**, et journalisé (nombre + 5 exemples) | API | `FrigoGrocy.php:160-165`, `:206-211` |
 | **Signalement des produits incomplets** — `manquants` (bloquants) et `souhaites` (les fibres) | `GET /api/mon-frigo/incomplets` | `FrigoGrocy.php:219-249`, `api/src/Controller/FrigoController.php:93-101` |
 | **Deux bandeaux distincts**, parce que les deux manques ont des conséquences opposées | onglet Mon frigo | `front/src/composants/alertesFrigo.tsx:134-142`, `:144-154` |
-| **Produits sans poids connu signalés** — les macros sont pour 100 g | idem | `alertesFrigo.tsx:109-120`, `front/app/(onglets)/frigo.tsx:129` |
-| **Compteur d'en-tête suivi de « · depuis Grocy »** | idem | `frigo.tsx:207-212` |
-| **Créer un produit depuis l'application** — création **et** valeurs dans le même appel | `POST /api/mon-frigo/aliment` | `FrigoController.php:182-198`, `:227-239` |
+| **Produits sans poids connu signalés** — les macros sont pour 100 g | idem | `alertesFrigo.tsx:109-120`, `front/app/(onglets)/frigo.tsx:125` |
+| **Compteur d'en-tête suivi de « · depuis Grocy »** | idem | `frigo.tsx:176-181` |
+| **Créer un produit depuis l'application** — création **et** valeurs dans le même appel | `POST /api/mon-frigo/aliment` | `FrigoController.php:185-201`, `:230-242` |
 | **Détection de doublon par nom « repéré »** — minuscules, sans accents, non-alphanumériques réduits | API | `FrigoGrocy.php:286-293`, `:340-348` |
 | **Création des champs personnalisés manquants avant d'écrire** | API | `FrigoGrocy.php:373-393`, appelée en `:428` |
 | **Refus propre plutôt qu'un choix au hasard** — sans unité « gramme », sans emplacement | API | `FrigoGrocy.php:295-308`, `:310-320` |
 | **Marquage `source_valeurs = 'moi'`** — protège la saisie des réimports | API | `FrigoGrocy.php:448` |
-| **La quantité passe par l'inventaire Grocy**, et s'envoie même à zéro | `POST /api/mon-frigo/quantite` | `FrigoController.php:272-305`, `front/src/composants/editeurAlimentConnecte.tsx:126-138` |
+| **La quantité passe par l'inventaire Grocy**, et s'envoie même à zéro | `POST /api/mon-frigo/quantite` | `FrigoController.php:275-308`, `front/src/composants/editeurAlimentConnecte.tsx:135-147` |
 | **Suppression refusée côté application** — « un produit Grocy se supprime dans Grocy » | onglet Mon frigo | `front/src/composants/ligneFrigo.tsx:96-102` |
-| **Nom non modifiable en correction** | éditeur d'aliment | `editeurAlimentConnecte.tsx:87-89`, `front/src/composants/editeurAliment.tsx:241`, `:250-255` |
+| **Nom non modifiable en correction** | éditeur d'aliment | `editeurAlimentConnecte.tsx:96-98`, `front/src/composants/editeurAliment.tsx:251`, `:260-265` |
 | **Survie à une panne de Grocy** — liste vide et message, jamais un 500 | API | `FrigoController.php:72-82` |
 | **Le texte réel de Grocy en cas d'échec**, tronqué à 200 caractères | API | `FrigoGrocy.php:533-547`, `:520` |
 | **« Déjà à jour » n'est pas un échec** | API | `FrigoGrocy.php:55`, `:505-515` |
@@ -93,9 +93,9 @@ une unité « gramme » et un emplacement.
 
 1. Onglet **Mon frigo** (`front/app/(onglets)/_layout.tsx:56-62`). L'écran est le
    **même que pour un compte tenu en base** — seule l'API appelée diffère
-   (`frigo.tsx:70-80`). Voir `fonctionnalite-frigo` pour tout ce qui est commun.
+   (`frigo.tsx:66-76`). Voir `fonctionnalite-frigo` pour tout ce qui est commun.
 2. L'en-tête affiche **`12 en stock sur 40`** suivi de **` · depuis Grocy`**
-   (`frigo.tsx:207-212`) : c'est le seul endroit où la source se lit.
+   (`frigo.tsx:176-181`) : c'est le seul endroit où la source se lit.
 3. **Les bandeaux**, dans l'ordre où ils peuvent apparaître
    (`front/src/composants/alertesFrigo.tsx`) :
    - **produits sans poids connu** (`:109-120`) — *« `2` produit(s) sans poids
@@ -123,27 +123,27 @@ une unité « gramme » et un emplacement.
    bouton **`Supprimer` n'existe pas** — il est conditionné à `modifiable`, faux
    sur Grocy (`ligneFrigo.tsx:96-102`).
 6. **`Corriger les valeurs`** ouvre l'éditeur avec le **nom en lecture seule**
-   (`editeurAlimentConnecte.tsx:87-89`) :
+   (`editeurAlimentConnecte.tsx:96-98`) :
 
    > **Le nom vient de Grocy. Renomme le produit là-bas si besoin : le modifier
-   > ici ne changerait rien.** (`editeurAliment.tsx:253-254`)
+   > ici ne changerait rien.** (`editeurAliment.tsx:263-264`)
 
    L'enregistrement appelle `POST /api/mon-frigo/aliment` avec la **référence du
-   produit** (`editeurAlimentConnecte.tsx:114-118`).
-7. **`Ajouter un aliment`** (`frigo.tsx:291-293`) est ouvert **aux deux sources**
-   (`:76-80`). La liste propose **`Créer de zéro`** en tête, puis les aliments de
-   référence dont on ne possède pas déjà le nom (`:142-156`).
+   produit** (`editeurAlimentConnecte.tsx:123-127`).
+7. **`Ajouter un aliment`** (`frigo.tsx:260-269`) est ouvert **aux deux sources**
+   (`:72-76`) et ouvre directement l'éditeur, **vide** : l'écran demande une
+   création (`:265`) sans lui passer d'aliment (`editeurAlimentConnecte.tsx:87-89`).
 8. À la création, le nom **est** saisissable, et un champ
    **`Quantité déjà en stock (facultatif)`** apparaît
-   (`editeurAliment.tsx:263`, `editeurAlimentConnecte.tsx:90-93`).
+   (`editeurAliment.tsx:272`, `editeurAlimentConnecte.tsx:99-102`).
 9. À l'enregistrement, **deux appels dans cet ordre**
-   (`editeurAlimentConnecte.tsx:111-142`) :
+   (`editeurAlimentConnecte.tsx:120-152`) :
    - `POST /api/mon-frigo/aliment` avec `reference` **vide** → l'API crée le
      produit dans Grocy **puis** écrit ses valeurs, **dans le même appel**, et
-     rend `grocy:<id>` (`FrigoController.php:191-198`, `:227-247`) ;
+     rend `grocy:<id>` (`FrigoController.php:194-201`, `:230-250`) ;
    - `POST /api/mon-frigo/quantite` avec cette référence — **même à zéro**, car
      c'est cet appel qui crée la ligne de stock et rattache le produit à un
-     emplacement (`editeurAlimentConnecte.tsx:126-138`).
+     emplacement (`editeurAlimentConnecte.tsx:135-147`).
 10. Si le **second** échoue, le premier est déjà passé, et on le dit précisément
     (`alertesFrigo.tsx:65-73`) : *« L'aliment a bien été créé, mais sa quantité
     n'a pas pu être posée : `<motif>`. Renseigne-la depuis l'inventaire. »*
@@ -164,10 +164,10 @@ une unité « gramme » et un emplacement.
    (`FrigoGrocy.php:160-165`).
 4. **Le même produit est compté dans le bandeau bloquant** : le nombre affiché
    doit correspondre au nombre de produits écartés
-   (`alertesFrigo.tsx:134-142`, `frigo.tsx:85`). Un produit qui disparaît **sans**
+   (`alertesFrigo.tsx:134-142`, `frigo.tsx:81`). Un produit qui disparaît **sans**
    être compté serait le défaut à rapporter.
 5. **Un produit sans `fibres100` apparaît bien dans la liste**, et déclenche le
-   bandeau ⚠ — pas l'autre (`frigo.tsx:86-87`, `alertesFrigo.tsx:144-154`). Les
+   bandeau ⚠ — pas l'autre (`frigo.tsx:82-83`, `alertesFrigo.tsx:144-154`). Les
    deux listes sont disjointes par construction : `manquants.length === 0 &&
    souhaites.length > 0`.
 6. **Le détail n'affiche la ligne `Fibres` que si elles sont connues**
@@ -175,14 +175,14 @@ une unité « gramme » et un emplacement.
 7. **Un compte tenu en base ne déclenche aucun de ces appels** :
    `GET /api/mon-frigo/incomplets` rend `{"produits":[]}` sans toucher à Grocy
    (`FrigoController.php:96-98`), et le hook est désactivé côté front
-   (`front/src/api/hooks/frigo.ts:41`, `frigo.tsx:81`).
+   (`front/src/api/hooks/frigo.ts:41`, `frigo.tsx:77`).
 8. **Création : un seul appel pose le produit ET ses valeurs.** Après
    `POST /api/mon-frigo/aliment` avec `reference` vide, le produit doit exister
    dans Grocy **avec** sa catégorie et ses macros — jamais un produit nu
-   (`FrigoController.php:182-190`). La réponse porte `{"ok":true,"reference":"grocy:<id>"}`.
+   (`FrigoController.php:185-193`). La réponse porte `{"ok":true,"reference":"grocy:<id>"}`.
 9. **Refus : doublon de nom, détecté avant d'arriver dans Grocy.**
    « `« Blanc de poulet »` existe déjà dans Grocy. Ouvre-le pour corriger ses
-   valeurs. » en 422 (`FrigoGrocy.php:286-293`, `FrigoController.php:196-198`).
+   valeurs. » en 422 (`FrigoGrocy.php:286-293`, `FrigoController.php:199-201`).
    Le repérage ignore **la casse, les accents et la ponctuation** : « Blanc de
    Poulet » et « blanc-de-poulet » sont des doublons
    (`FrigoGrocy.php:340-348`). Témoins :
@@ -210,37 +210,37 @@ une unité « gramme » et un emplacement.
     **vides**, pas omises — Grocy conserve la valeur des clés non transmises
     (`FrigoGrocy.php:437-439`, commentaire `:405-409`).
 17. **Refus : les calories sont obligatoires** — « Les calories sont
-    obligatoires. » en 422 (`FrigoController.php:215-220`). Un zéro ferait
+    obligatoires. » en 422 (`FrigoController.php:218-223`). Un zéro ferait
     disparaître l'aliment du solveur sans rien signaler.
-18. **Refus : catégorie inconnue** (`FrigoController.php:210-213`) et **ratio non
-    positif** (`:222-225`).
+18. **Refus : catégorie inconnue** (`FrigoController.php:213-216`) et **ratio non
+    positif** (`:225-228`).
 19. **La quantité s'envoie même à zéro**, et c'est elle qui rattache le produit à
-    un emplacement (`editeurAlimentConnecte.tsx:135-138`). Un produit créé sans
+    un emplacement (`editeurAlimentConnecte.tsx:144-147`). Un produit créé sans
     cet appel resterait sous « Sans emplacement ».
 20. **Si la quantité échoue, le message parle de la création et d'elle seule**
     (`alertesFrigo.tsx:65-73`) : c'est la panne du 14 août 2026, où un inventaire
     raté affichait « L'aliment a bien été créé » à quelqu'un qui n'avait rien
     créé. Les deux mutations sont désormais distinctes
-    (`front/src/api/hooks/frigo.ts:134-153`).
+    (`front/src/api/hooks/frigo.ts:131-150`).
 21. **Suppression refusée côté application** : aucun bouton `Supprimer` sur une
     ligne Grocy (`ligneFrigo.tsx:96-102`), et le message du détail le dit
     (`:87-90`).
 22. **Nom non modifiable en correction**, avec l'explication — et **modifiable à
-    la création** (`editeurAlimentConnecte.tsx:89`,
-    `editeurAliment.tsx:241`, `:250-255`). Côté API, `nom` n'est lu que dans la
-    branche création (`FrigoController.php:195`).
+    la création** (`editeurAlimentConnecte.tsx:98`,
+    `editeurAliment.tsx:251`, `:260-265`). Côté API, `nom` n'est lu que dans la
+    branche création (`FrigoController.php:198`).
 23. **Refus croisé des deux sources**, dans les deux sens :
     - un compte **base** appelant `/mon-frigo/aliment` → 409 « Tes aliments se
-      modifient dans la base, pas ici. » (`FrigoController.php:173-177`) ;
+      modifient dans la base, pas ici. » (`FrigoController.php:176-180`) ;
     - un compte **base** appelant `/mon-frigo/quantite` → 409 « Tes quantités se
-      modifient dans la base, pas ici. » (`:275-279`) ;
+      modifient dans la base, pas ici. » (`:278-282`) ;
     - un compte **grocy** appelant `/mon-frigo/stock` → 409 « Tes quantités se
-      modifient dans Grocy, pas ici. » (`:132-136`).
+      modifient dans Grocy, pas ici. » (`:135-139`).
 24. **Une référence étrangère est refusée** : `/mon-frigo/quantite` exige un
-    préfixe `grocy:` (`FrigoController.php:285-292`), et l'inventaire exige le
-    préfixe de la source du compte (`:331`, `:356-360`).
+    préfixe `grocy:` (`FrigoController.php:288-295`), et l'inventaire exige le
+    préfixe de la source du compte (`:334`, `:359-363`).
 25. **Un échec d'écriture Grocy remonte en 502 avec le texte de Grocy**, pas un
-    500 ni « HTTP 400 returned for … » (`FrigoController.php:240-242`,
+    500 ni « HTTP 400 returned for … » (`FrigoController.php:243-245`,
     `FrigoGrocy.php:517-520`, `:533-547`). Le corps est tronqué à 200 caractères.
 26. **« Déjà à jour » ne compte pas comme un échec** : poser la quantité que
     Grocy a déjà rend `ok`, pas une ligne rouge (`FrigoGrocy.php:505-515`).
@@ -258,7 +258,7 @@ une unité « gramme » et un emplacement.
 ### D'abord : vérifier que Grocy est configuré
 
 La configuration entre par deux variables d'environnement, injectées dans le
-service (`api/config/services.yaml:56-57`) et transmises au conteneur
+service (`api/config/services.yaml:64-65`) et transmises au conteneur
 (`compose.dev.yml:41-42`). `default::` signifie qu'elles sont **facultatives** :
 absentes, elles valent la chaîne vide et `estConfigure()` rend `false`
 (`FrigoGrocy.php:87-90`).
@@ -269,7 +269,7 @@ docker exec fitcarnet-app-dev printenv GROCY_URL
 docker exec fitcarnet-app-dev sh -c 'test -n "$GROCY_API_KEY" && echo "clé présente" || echo "CLÉ ABSENTE"'
 
 # 2. ce que le dépôt fournit (ne jamais afficher la clé en clair)
-grep -c GROCY_API_KEY /home/micka/perso/fitcarnet/.env
+grep -c GROCY_API_KEY "$(git rev-parse --show-toplevel)"/.env
 
 # 3. la réponse de l'application, qui tranche
 curl -s -H "Authorization: Bearer $JETON" http://localhost:8080/api/mon-frigo \
@@ -321,8 +321,8 @@ lance jamais »).
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'
 curl -s http://localhost:8080/api/etat
-/home/micka/perso/fitcarnet/db/manuel/rattraper-dev.sh
-npm --prefix /home/micka/perso/fitcarnet/front run build:web
+"$(git rev-parse --show-toplevel)"/db/manuel/rattraper-dev.sh
+npm --prefix "$(git rev-parse --show-toplevel)"/front run build:web
 ```
 
 Un **compte jetable sur Grocy** se fait en basculant la colonne — et **en
@@ -368,7 +368,7 @@ curl -s -X POST "$BASE/mon-frigo/aliment" -H "Authorization: Bearer $JETON_BASE"
   précisément ce que `FrigoGrocyDelaiTest` protège.
 - **Un produit Grocy sans conversion vers le gramme n'est pas « incomplet »** :
   il a toutes ses valeurs, mais son stock n'est pas convertible. Il apparaît dans
-  la liste et déclenche le bandeau *sans poids connu* (`frigo.tsx:129`), pas le
+  la liste et déclenche le bandeau *sans poids connu* (`frigo.tsx:125`), pas le
   bandeau des bloquants. Deux bandeaux différents, deux causes différentes.
 - **`produitsIncomplets()` relit tout le catalogue Grocy** (`FrigoGrocy.php:226`) :
   c'est un second passage sur `/objects/products`, en plus de la lecture du
@@ -376,7 +376,7 @@ curl -s -X POST "$BASE/mon-frigo/aliment" -H "Authorization: Bearer $JETON_BASE"
 - **Le compteur « n en stock sur m » ne compte que ce que l'application voit** :
   les produits écartés n'y figurent pas. C'est le bandeau qui les nomme.
 - **La suppression d'un aliment de la liste appelle `DELETE /api/aliments/{id}`**
-  avec `reference.split(':')[1]` (`frigo.tsx:350`) — sur une référence `grocy:`,
+  avec `reference.split(':')[1]` (`frigo.tsx:349`) — sur une référence `grocy:`,
   ce nombre est un identifiant **Grocy**, pas un identifiant d'aliment. C'est
   pour cela que le bouton n'existe pas côté Grocy ; ne pas le réactiver « pour
   voir ».
@@ -410,7 +410,7 @@ ils seraient comptés à zéro fibre — et on viserait trop haut sans que rien 
 signale. »
 
 `presentation/captures/frigo-grocy/03-creer-un-produit.webm` — **~45 s**
-: **`Ajouter un aliment`** → **`Créer de zéro`** → saisir un nom repérable, une
+: **`Ajouter un aliment`** → l'éditeur s'ouvre vide → saisir un nom repérable, une
 catégorie, des macros et une quantité, puis enregistrer. Montrer la ligne
 apparue. **Puis rouvrir le produit** et montrer le **nom en lecture seule** avec
 « Le nom vient de Grocy. Renomme le produit là-bas si besoin ».
@@ -474,6 +474,6 @@ pas les vidéos.
   `:197` pour les incomplets, `:252` pour la création, `:318`, `:337`, `:389`,
   `:479`, `:488` — le fichier en compte 614 et les vraies positions sont `:93`,
   `:219`, `:274`, `:340`, `:373`, `:448`, `:533`, `:55`. De même `frigo.tsx:141`
-  et `:702` pour un écran qui fait 445 lignes depuis l'extraction des composants
-  du 15 septembre. Les lignes de cette fiche ont été relues le
-  **16 septembre 2026**.
+  et `:702` pour un écran qui fait 392 lignes (mesuré le 17 septembre 2026).
+  Les lignes de cette fiche ont été relues le
+  **16 septembre 2026**, et leurs renvois recalés le **17 septembre 2026**.

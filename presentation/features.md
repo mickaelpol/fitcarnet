@@ -100,14 +100,14 @@ démontrer devant un client.
 - **Fibres facultatives** — vide veut dire « non renseigné », pas zéro. `editeurAliment.tsx:228`
 - **Détection des kilojoules** — bandeau et bouton « Convertir : 1473 kJ = 352 kcal », déclenché par le facteur 4,184 ou par le plafond de 900 kcal/100 g. `editeurAliment.tsx:258`
 - **Vérificateur de cohérence en direct** — vert, jaune, rouge, gris ; l'enregistrement est **bloqué** sur « incohérent ». `editeurAliment.tsx:133`
-- **Rendement de cuisson** — choix parmi des guides, ou **« Je préfère mesurer »** : poids avant, poids après, et « Utiliser ce résultat (2,3) » ou « Ces deux poids ne sont pas vraisemblables ». `editeurAliment.tsx:302`
+- **Rendement de cuisson** — choix parmi des guides, ou **« Je préfère mesurer »** : poids avant, poids après, et « Utiliser ce résultat (2,3) » ou « Ces deux poids sont inversés : ce produit ne peut pas varier ainsi » quand la mesure contredit la catégorie. `editeurAliment.tsx:302`
 - **Provenance du ratio affichée** — « ✓ mesuré par toi » ou « Valeur courante — mesure-la pour un chiffre propre à ton produit ». `AlimentDisponible.php:103`
 - **Le texte saisi vit à part du nombre** — on peut taper « 0,8 » sans que le séparateur disparaisse. `editeurAliment.tsx:91`
 - **Corriger un aliment, mais seulement le sien** — son propriétaire, et lui seul. `Aliment.php:53`
 - **Supprimer un aliment, mais seulement le sien.** `Aliment.php:60`
-- **Refus de supprimer un aliment encore en stock** — comptage **tous comptes confondus** (le filtre de propriété masquerait justement les lignes qu'il faut voir), 409 nommant le nombre de lignes. Les lignes à zéro sont supprimées silencieusement. `AlimentSuppressionProcessor.php:131`
+- **Refus de supprimer un aliment encore en stock** — comptage en SQL direct, hors du filtre de propriété, 409 nommant le nombre de lignes. Les lignes à zéro sont supprimées silencieusement. `AlimentSuppressionProcessor.php:131`
 - **Doublon de nom rendu lisible** — un nom par compte, casse ignorée : l'unicité vit dans un index fonctionnel que Doctrine ne sait pas pré-vérifier ; l'exception devient un 422 avec le nom en clair. `AlimentProcessor.php:39`
-- **Recherche et filtres sur ses aliments** — nom (partiel), catégorie, code-barres, tri par nom, 200 par page. `Aliment.php:56`
+- **Recherche et filtres sur ses aliments** — nom (partiel), catégorie, code-barres, tri par nom, 200 par page. `Aliment.php:70`
 
 ## Le frigo Grocy
 

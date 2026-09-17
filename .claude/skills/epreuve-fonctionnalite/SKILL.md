@@ -31,14 +31,19 @@ en bas de ce document.
 5. **Chemins absolus uniquement.** Des commandes lancées en parallèle se
    disputent le dossier courant : le 15 septembre, un `cd front && npm run build:web`
    a tourné à la racine et un `rm -rf api/front` est parti d'un autre dossier.
-   Un `rm` n'a jamais de chemin relatif.
+   Un `rm` n'a jamais de chemin relatif. **Et un chemin absolu ne s'écrit pas en
+   dur** : le dépôt n'est pas au même endroit sur tous les postes
+   (`/home/micka/fitcarnet` sur l'un, `~/perso/fitcarnet` ailleurs). On le
+   calcule — `DEPOT="$(git rev-parse --show-toplevel)"`. Écrit en dur, un
+   `sed … jeu-essai.sql | psql` lancé sur l'autre poste ne trouve pas le
+   fichier : `psql` reçoit une entrée vide et sort 0 sans avoir rien chargé.
 
 ## 1. Préparer
 
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'        # fitcarnet-app-dev et fitcarnet-db-dev
 curl -s http://localhost:8080/api/etat               # {"ok":true}
-db/manuel/rattraper-dev.sh                           # la base de dev ne rejoue jamais seule ses migrations
+"$(git rev-parse --show-toplevel)"/db/manuel/rattraper-dev.sh   # la base de dev ne rejoue jamais seule ses migrations
 ```
 
 **Un compte jetable par épreuve**, créé comme le dit `donnees-de-test`. Pour une
@@ -46,16 +51,20 @@ fonctionnalité qui a besoin d'historique (séances, progression, plans, cibles)
 charge le jeu de démonstration **dans ce compte-là** :
 
 ```bash
+DEPOT="$(git rev-parse --show-toplevel)"
 COMPTE=fonction-verif@test.local
-sed "s/demo@fitcarnet.local/$COMPTE/" /home/micka/perso/fitcarnet/db/manuel/jeu-demo.sql \
+set -o pipefail   # sans lui, un fichier introuvable passe inaperçu : psql sort 0
+sed "s/demo@fitcarnet.local/$COMPTE/" "$DEPOT/db/manuel/jeu-demo.sql" \
   | docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -v ON_ERROR_STOP=1
-sed "s/essai@fitcarnet.local/$COMPTE/" /home/micka/perso/fitcarnet/db/manuel/jeu-essai.sql \
+sed "s/essai@fitcarnet.local/$COMPTE/" "$DEPOT/db/manuel/jeu-essai.sql" \
   | docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -v ON_ERROR_STOP=1
 ```
 
 **Relis l'adresse du `sed` avant d'appuyer sur Entrée** : `jeu-demo.sql` EFFACE
 avant de poser. Son garde-fou refuse un compte qui a déjà des séances — s'il se
-déclenche, lis le message au lieu de relancer avec `-v ecraser=oui`.
+déclenche, lis le message au lieu de relancer avec `-v ecraser=oui`. (L'option
+lève bien le garde-fou depuis le 17 septembre 2026 ; `db/manuel/verifier-jeux.sh`
+éprouve la procédure dans un PostgreSQL jetable.)
 
 **Un compte administrateur** n'est nécessaire que pour `fonctionnalite-administration`
 et les écrans d'invitation : `roles` à `'ROLE_ADMIN'`, jetable lui aussi.
@@ -72,10 +81,11 @@ et les écrans d'invitation : `roles` à `'ROLE_ADMIN'`, jetable lui aussi.
 doublon de `front/dist` qui périme en silence :
 
 ```bash
-npm --prefix /home/micka/perso/fitcarnet/front run build:web
-test -d /home/micka/perso/fitcarnet/front/dist/_expo \
-  && rm -rf /home/micka/perso/fitcarnet/api/front \
-  && cp -r /home/micka/perso/fitcarnet/front/dist /home/micka/perso/fitcarnet/api/front
+DEPOT="$(git rev-parse --show-toplevel)"
+test -n "$DEPOT" && npm --prefix "$DEPOT/front" run build:web
+test -n "$DEPOT" && test -d "$DEPOT/front/dist/_expo" \
+  && rm -rf "$DEPOT/api/front" \
+  && cp -r "$DEPOT/front/dist" "$DEPOT/api/front"
 ```
 
 Pour vérifier que le bundle contient bien un changement, cherche un **texte

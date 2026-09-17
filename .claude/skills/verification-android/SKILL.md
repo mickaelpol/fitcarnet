@@ -60,7 +60,7 @@ curl -sL -o /mnt/c/Users/micka/AppData/Local/Temp/fitcarnet-android/expo-go.apk 
 
 ```bash
 $ADB reverse tcp:8081 tcp:8081
-cd /home/micka/perso/fitcarnet/front && npx expo start --go --localhost --port 8081 --clear   # run_in_background
+cd "$(git rev-parse --show-toplevel)"/front && npx expo start --go --localhost --port 8081 --clear   # run_in_background
 $ADB shell am start -a android.intent.action.VIEW -d exp://127.0.0.1:8081
 ```
 
@@ -174,7 +174,7 @@ def taper(n, pause=2.0):
   termine par `, <Onglet>`.
 - **Repartir sans session** : `$ADB shell pm clear host.exp.exponent` — efface
   aussi le cache et le premier lancement.
-- **Une capture** : `$ADB exec-out screencap -p > /home/micka/perso/fitcarnet/presentation/tournage/captures-verification/<nom>.png`,
+- **Une capture** : `$ADB exec-out screencap -p > "$(git rev-parse --show-toplevel)"/presentation/tournage/captures-verification/<nom>.png`,
   puis la lire avec l'outil Read.
 - **Le journal JavaScript** : `$ADB logcat -c` avant, `$ADB logcat -d -s ReactNativeJS:W ReactNativeJS:E AndroidRuntime:E` après.
 
@@ -184,7 +184,7 @@ def taper(n, pause=2.0):
 $ADB shell screenrecord --time-limit 170 --bit-rate 8000000 /sdcard/capture.mp4   # run_in_background
 # … le parcours …
 $ADB shell pkill -INT screenrecord          # arrêt propre : le fichier est finalisé
-$ADB pull /sdcard/capture.mp4 /home/micka/perso/fitcarnet/presentation/captures/<fonctionnalite>/<nn>-<scenario>.mp4
+$ADB pull /sdcard/capture.mp4 "$(git rev-parse --show-toplevel)"/presentation/captures/<fonctionnalite>/<nn>-<scenario>.mp4
 $ADB shell rm /sdcard/capture.mp4
 ```
 
@@ -219,7 +219,7 @@ $ADB reverse --remove-all
 $ADB shell cmd locale set-app-locales host.exp.exponent --locales ""
 $ADB shell settings put system show_touches 0
 $ADB emu kill
-rm -f /home/micka/perso/fitcarnet/front/.env.local
+rm -f "$(git rev-parse --show-toplevel)"/front/.env.local   # la racine du dépôt : son chemin change d'un poste à l'autre
 rm -rf /mnt/c/Users/micka/AppData/Local/Temp/fitcarnet-android
 ```
 

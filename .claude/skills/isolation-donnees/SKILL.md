@@ -25,8 +25,11 @@ enveloppe `ProprietaireProcessor` et traduit un doublon de nom dans le compte
 (`aliment_nom_unique_par_compte`) en 422.
 
 **Une seule exception filtrée à part**, un référentiel partagé que le filtre
-strict rendrait inutilisable (les emplacements et les modes de cuisson, eux, sont
-en lecture seule et dérogent dans `ModeleExposeTest` sans filtre) :
+strict rendrait inutilisable. Deux autres référentiels communs dérogent dans
+`ModeleExposeTest` sans filtre : les emplacements, en lecture seule
+(`GetCollection` et `Get`), et les modes de cuisson, lisibles par tout compte et
+modifiables par l'administrateur seul — `Post`, `Patch` et `Delete` portent
+`is_granted('ROLE_ADMIN')` (`api/src/Entity/ModeCuisson.php:55-57`) :
 
 | Entité | Filtre | Règle | Pourquoi pas le filtre strict |
 |---|---|---|---|
@@ -69,6 +72,15 @@ personnalisé écrit à partir d'un identifiant reçu dans le corps de la requê
   elle-même. Les **trois** appelants sont couverts d'un coup — la route `/stock`,
   l'inventaire différé, le bouton « J'ai cuisiné » de `PlansController` — au lieu
   d'un seul. Le prochain appelant naîtra protégé.
+- **17 septembre 2026, la base ferme la porte à son tour.** La clé étrangère
+  composite `stock_aliment_du_meme_compte_fkey` — (`aliment_id`,
+  `utilisateur_id`) vers `aliment (id, utilisateur_id)`, en `ON DELETE
+  RESTRICT` — refuse toute ligne de stock posée sur l'aliment d'un autre compte,
+  quel que soit le chemin qui l'écrit (`db/01-schema.sql:186-188`, migration
+  `db/manuel/35-stock-et-aliment-du-meme-compte.sql`, qui s'appuie sur la
+  contrainte `aliment_id_utilisateur_unique`). `FrigoBase` vérifie toujours :
+  c'est lui qui répond un 404 lisible, là où la base ne rendrait qu'une
+  violation de contrainte.
 
 **La leçon de conception** : place le contrôle au point de passage obligé de
 l'écriture, pas devant chaque porte. Une règle recopiée devant trois portes finira

@@ -50,15 +50,15 @@ désactivation du compte.
 | **Divergence signalée seulement une fois la confirmation commencée** | idem | `invitation/[jeton].tsx:83`, `:131` |
 | **Pas de connexion automatique après création** | idem | `invitation/[jeton].tsx:66-77` |
 | **JWT d'une heure**, volontairement court car non révocable | API | `api/config/packages/lexik_jwt_authentication.yaml:9` |
-| **Jeton de rafraîchissement révocable**, 90 jours glissants, stocké en SHA-256 | API | `api/src/Service/JetonsRafraichissement.php:44`, `:59-71`, `:176-179` |
+| **Jeton de rafraîchissement révocable**, 90 jours glissants, stocké en SHA-256 | API | `api/src/Service/JetonsRafraichissement.php:44`, `:59-71`, `:219-222` |
 | **Il voyage dans le corps, jamais dans l'URL** | — | `api/src/Controller/SessionController.php:103-115` |
-| **Purge des jetons expirés** au passage d'un rafraîchissement | — | `JetonsRafraichissement.php:169-174`, `SessionController.php:73` |
+| **Purge des jetons expirés** au passage d'un rafraîchissement | — | `JetonsRafraichissement.php:212-217`, `SessionController.php:73` |
 | **Déconnexion côté serveur** — 204 même sur un jeton inconnu | `POST /api/deconnexion` | `SessionController.php:92-101` |
 | **Fin de session propre** — mémoire **et** disque vidés, dans cet ordre | — | `front/src/api/persistance.ts:121-124`, `_layout.tsx:161-165` |
 | **Limitation des tentatives** — 5 par quart d'heure, plus un compteur global par IP | API | `api/config/packages/security.yaml:39-41` |
 | **Un compte désactivé est bloqué à la requête suivante** | API | `api/src/Security/CompteActif.php:56-63`, `security.yaml:96` |
 | **Refus de prolonger la session d'un compte désactivé**, même message qu'un jeton inconnu | — | `SessionController.php:69-71` |
-| **La désactivation supprime aussi les jetons de rafraîchissement** | — | `api/src/Controller/ComptesController.php:148-152` |
+| **La désactivation supprime aussi les jetons de rafraîchissement** | — | `api/src/Controller/ComptesController.php:154-161` |
 | **Voir et couper une session précise** | `GET`/`DELETE /api/mes-sessions` | `api/src/Controller/MesSessionsController.php:67-83`, `:96-108` |
 | **Le serveur ne répond pas → on le dit** (30 s) | tous les écrans | `client.ts:220`, `:363-371` |
 | **« Se déconnecter » reste accessible dans les trois états** | onglet Compte | `front/src/composants/cadreCompte.tsx:64-68` |
@@ -125,22 +125,22 @@ créer l'invitation. **Données de départ** : aucune.
    administrateur (`compte.tsx:83`, `:95-97`). L'en-tête de l'écran est
    **« Inviter quelqu'un »** (`_layout.tsx:214`).
 2. Champ **`Adresse électronique`**, puis bouton **`Créer le lien`** →
-   **`Création…`** (`front/app/admin-utilisateurs.tsx:116`, `:129`).
+   **`Création…`** (`front/app/admin-utilisateurs.tsx:117`, `:130`).
 3. La carte du lien apparaît : **« Lien pour `<adresse>` »**, le lien
    sélectionnable, un bouton **`Envoyer le lien`** (mobile) ou **`Copier le lien`**
    (web) qui passe à **`Envoyé ✓`**, et l'avertissement
-   (`admin-utilisateurs.tsx:155-160`) :
+   (`admin-utilisateurs.tsx:156-161`) :
 
    > **Valable `7` jours. Il ne sera plus affiché après cet écran : le serveur
    > n'en garde qu'une empreinte, comme un mot de passe. Perdu, il suffit de
    > réinviter la même adresse — l'ancien lien meurt aussitôt.**
 
 4. La liste en dessous porte une pastille par invitation : **`Compte créé`**,
-   **`En attente`**, **`Périmée`** (`admin-utilisateurs.tsx:310-320`), et pour
+   **`En attente`**, **`Périmée`** (`admin-utilisateurs.tsx:306-316`), et pour
    une invitation en attente **« Invitée le `11 août`, valable jusqu'au `18 août`. »**
 5. **`Révoquer`** demande confirmation : *« Le lien cesse de fonctionner
    immédiatement, même s'il a déjà été transmis. Aucun compte n'est supprimé :
-   cette invitation n'en a pas encore créé. »* (`admin-utilisateurs.tsx:278`).
+   cette invitation n'en a pas encore créé. »* (`admin-utilisateurs.tsx:276`).
 
 ### C. Créer son compte depuis le lien
 
@@ -186,7 +186,7 @@ créer l'invitation. **Données de départ** : aucune.
 1. **Connexion valide → onglet Séances.** En base, une ligne de plus dans
    `jeton_rafraichissement` pour ce compte, et **jamais le jeton en clair** :
    la colonne porte une empreinte SHA-256 (`JetonsRafraichissement.php:61-66`,
-   `:176-179`).
+   `:219-222`).
 2. **Champ vide → bouton éteint**, aucun appel réseau (`connexion.tsx:60`,
    `:17`).
 3. **Mot de passe faux → refus, et le refus n'apprend rien.** Le message doit
@@ -251,7 +251,7 @@ créer l'invitation. **Données de départ** : aucune.
     inconnu** (`SessionController.php:69-71`). Témoins :
     `CompteActifTest.php:30`, `:43`.
 19. **La désactivation coupe les sessions ouvertes** : plus aucune ligne dans
-    `jeton_rafraichissement` pour ce compte (`ComptesController.php:148-152`).
+    `jeton_rafraichissement` pour ce compte (`ComptesController.php:154-161`).
 20. **Refus : trop de tentatives.** Six essais faux en moins d'un quart d'heure
     sur le même couple adresse+IP doivent être refusés par le serveur, sans
     atteindre la vérification du mot de passe (`security.yaml:39-41`).
@@ -269,7 +269,7 @@ créer l'invitation. **Données de départ** : aucune.
 24. **Couper une session qui n'est pas la sienne est refusé sans le dire** :
     `DELETE /api/mes-sessions/{id}` répond « Cette session n'existe pas. » aussi
     bien pour un identifiant inconnu que pour celui d'un autre compte
-    (`MesSessionsController.php:110-118`, `JetonsRafraichissement.php:147-160`).
+    (`MesSessionsController.php:110-118`, `JetonsRafraichissement.php:190-203`).
     Témoins : `MesSessionsProprieteTest.php:111`, `:132`.
 
 ## Comment l'éprouver
@@ -280,8 +280,8 @@ créer l'invitation. **Données de départ** : aucune.
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'
 curl -s http://localhost:8080/api/etat            # {"ok":true}
-/home/micka/perso/fitcarnet/db/manuel/rattraper-dev.sh
-npm --prefix /home/micka/perso/fitcarnet/front run build:web
+"$(git rev-parse --show-toplevel)"/db/manuel/rattraper-dev.sh
+npm --prefix "$(git rev-parse --show-toplevel)"/front run build:web
 ```
 
 **Deux comptes jetables**, créés comme le dit `donnees-de-test` — un ordinaire et
@@ -398,7 +398,7 @@ pas les vidéos.
 
 - **Aucun écran ne change de mot de passe ni d'adresse.** La règle existe et
   fonctionne côté API — mot de passe actuel exigé, toutes les sessions révoquées
-  (`UtilisateurProcessor.php:93-95`, `:105-113`) — mais **rien dans `front/` ne
+  (`UtilisateurProcessor.php:93-95`, `:105-116`) — mais **rien dans `front/` ne
   l'appelle** : aucune occurrence de `motDePasseActuel` ni de `/utilisateurs/`
   dans `front/src` ni `front/app` au 16 septembre 2026. Cela ne s'éprouve donc
   que par `PATCH /api/utilisateurs/{id}`, et **ne se filme pas**. Voir

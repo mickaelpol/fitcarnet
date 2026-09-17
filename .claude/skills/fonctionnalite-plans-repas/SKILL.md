@@ -39,9 +39,9 @@ cette fiche prend le relais **à partir du bouton « Enregistrer »**.
 
 | Capacité | Où | `fichier:ligne` |
 |---|---|---|
-| **Enregistrer un plan sous un nom libre** — champ « Enregistrer ce plan sous », placeholder « Semaine du 11/08 » | étape 3, pied | `front/src/composants/etapeBatch.tsx:217-222` |
-| Bouton **« Enregistrer »** / **« Enregistrement… »**, éteint tant que le nom est vide | étape 3, pied | `front/src/composants/etapeBatch.tsx:223-237` |
-| **Figer le plan** — courses, fournées, boîtes, et ce qu'il prend au frigo | au clic | `front/src/calcul/planFige.ts:98` (`figerLePlan`), appelé `etapeBatch.tsx:230` |
+| **Enregistrer un plan sous un nom libre** — champ « Enregistrer ce plan sous », placeholder « Semaine du 11/08 » | étape 3, pied | `front/src/composants/etapeBatch.tsx:220-225` |
+| Bouton **« Enregistrer »** / **« Enregistrement… »**, éteint tant que le nom est vide | étape 3, pied | `front/src/composants/etapeBatch.tsx:226-240` |
+| **Figer le plan** — courses, fournées, boîtes, et ce qu'il prend au frigo | au clic | `front/src/calcul/planFige.ts:98` (`figerLePlan`), appelé `etapeBatch.tsx:233` |
 | **Après enregistrement, tout repart de zéro et la liste s'ouvre**, comme preuve | retour étape 1 | `front/app/(onglets)/repas.tsx:341-348` |
 | **Liste « Mes plans enregistrés »**, dépliable, en tête de l'étape 1 | étape 1 | `front/src/composants/etapeReglage.tsx:166-198` |
 | **Résumé replié** — « 3 plans · 2 en attente de cuisson » / « tous cuisinés » / « · 1 sans mise de côté » | étape 1 | `front/src/composants/etapeReglage.tsx:178-194` |
@@ -74,9 +74,9 @@ majeur en *Comment l'éprouver* : les plans de `jeu-demo.sql` ne conviennent pas
 
 1. Composer un plan, puis **« Passer au batch cooking »** (étape 3).
 2. En pied d'écran, champ **« Enregistrer ce plan sous »**, placeholder
-   « Semaine du 11/08 » (`etapeBatch.tsx:217-222`). Le nom est libre.
-3. **« Enregistrer »** (`etapeBatch.tsx:236`). Le bouton est éteint tant que le
-   nom est vide après `trim()` (`:234`).
+   « Semaine du 11/08 » (`etapeBatch.tsx:220-225`). Le nom est libre.
+3. **« Enregistrer »** (`etapeBatch.tsx:239`). Le bouton est éteint tant que le
+   nom est vide après `trim()` (`:237`).
 4. L'écran repart à l'étape 1 **et ouvre la liste des plans**
    (`repas.tsx:341-348`) : « sans ça, le plan semble s'évaporer ».
 
@@ -119,7 +119,7 @@ majeur en *Comment l'éprouver* : les plans de `jeu-demo.sql` ne conviennent pas
 ## Critères d'acceptation
 
 1. **Le nom est libre et obligatoire.** Bouton éteint sur un nom vide ou
-   d'espaces (`etapeBatch.tsx:234`). Côté API, `libelle` est `NotBlank`, 80
+   d'espaces (`etapeBatch.tsx:237`). Côté API, `libelle` est `NotBlank`, 80
    caractères au plus, et `trim()` à l'écriture
    (`api/src/Entity/PlanRepas.php:76-80`, `:141`).
 
@@ -238,8 +238,10 @@ majeur en *Comment l'éprouver* : les plans de `jeu-demo.sql` ne conviennent pas
       (`PlansController.php:87-89`).
     **Et la déduction ne peut pas écrire chez autrui** : elle passe par
     `FrigoBase::definirStock` (`PlansController.php:197`), dont la garde
-    « commun **OU** le mien » est le point de passage obligé fermé après la
-    faille É1 (`api/src/Service/FrigoBase.php:117-133`). Un `consomme` trafiqué
+    « le mien » est le point de passage obligé fermé après la faille É1
+    (`api/src/Service/FrigoBase.php:109-126`) ; la base refuse d'ailleurs
+    elle-même une telle ligne (clé composite
+    `stock_aliment_du_meme_compte_fkey`, migration 35). Un `consomme` trafiqué
     visant l'aliment d'un autre fait **échouer cette ligne**, qui ressort dans
     `ignores` — jamais une écriture.
 
@@ -263,7 +265,7 @@ vérifiées dans le code :
 
 **Pour éprouver ou filmer « J'ai cuisiné », il faut un plan composé et
 enregistré DANS l'application**, qui seul porte un `consomme` renseigné
-(`etapeBatch.tsx:226-230`). Les plans de démonstration servent à montrer la
+(`etapeBatch.tsx:229-233`). Les plans de démonstration servent à montrer la
 **liste**, les **états** et la **relecture** — pas la déduction.
 
 ### Préparer
@@ -271,14 +273,16 @@ enregistré DANS l'application**, qui seul porte un `consomme` renseigné
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'
 curl -s http://localhost:8080/api/etat
-/home/micka/perso/fitcarnet/db/manuel/rattraper-dev.sh
+"$(git rev-parse --show-toplevel)"/db/manuel/rattraper-dev.sh
 ```
 
 ```bash
+DEPOT="$(git rev-parse --show-toplevel)"   # la racine du dépôt : son chemin change d'un poste à l'autre
 COMPTE=plan-verif@test.local
-sed "s/essai@fitcarnet.local/$COMPTE/" /home/micka/perso/fitcarnet/db/manuel/jeu-essai.sql \
+set -o pipefail   # sans lui, un fichier introuvable donne à psql une entrée vide, et psql sort 0
+sed "s/essai@fitcarnet.local/$COMPTE/" "$DEPOT/db/manuel/jeu-essai.sql" \
   | docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -v ON_ERROR_STOP=1
-sed "s/demo@fitcarnet.local/$COMPTE/" /home/micka/perso/fitcarnet/db/manuel/jeu-demo.sql \
+sed "s/demo@fitcarnet.local/$COMPTE/" "$DEPOT/db/manuel/jeu-demo.sql" \
   | docker exec -i fitcarnet-db-dev psql -U fitcarnet -d fitcarnet -v ON_ERROR_STOP=1
 ```
 
@@ -368,7 +372,7 @@ ligne à 0 g et le cumul (`DeductionDuPlanTest.php:20` à `:143`).
 Côté front, `figerLePlan`, `estCuisine` et `dejaPromis` :
 
 ```bash
-npm --prefix /home/micka/perso/fitcarnet/front test
+npm --prefix "$(git rev-parse --show-toplevel)"/front test
 ```
 
 ### Pièges propres à cette fonctionnalité
@@ -392,7 +396,7 @@ npm --prefix /home/micka/perso/fitcarnet/front test
 
 ### Nettoyer
 
-`plan_repas` part en **CASCADE** avec le compte (`db/01-schema.sql:511`). Mais
+`plan_repas` part en **CASCADE** avec le compte (`db/01-schema.sql:502`). Mais
 **`plan_repas.contenu` est du JSON que nulle clé étrangère ne protège** : un
 aliment supprimé qui y figure laisse le plan incohérent **sans la moindre erreur
 SQL** (`donnees-de-test`). Vérifier qu'aucun plan ne cite un aliment avant de le

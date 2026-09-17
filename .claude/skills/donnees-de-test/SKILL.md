@@ -100,8 +100,12 @@ relever d'abord fait donc partie du protocole.
 ## Les pièges de suppression, vérifiés
 
 - **`stock.aliment_id` est en `ON DELETE RESTRICT`** — c'est la seule clé
-  étrangère qui pointe vers `aliment`. Un aliment avec du stock ne se supprime
-  pas ; le message est explicite.
+  étrangère qui pointe vers `aliment`, et elle est composite depuis le
+  17 septembre 2026 : `stock_aliment_du_meme_compte_fkey`, (`aliment_id`,
+  `utilisateur_id`) vers `aliment (id, utilisateur_id)`. Un aliment avec du
+  stock ne se supprime pas, le message est explicite ; et une ligne de stock ne
+  peut viser que les aliments de son propre compte : préparer en SQL direct une
+  ligne « de Bob » sur l'aliment d'Alice est refusé par la base elle-même.
 - **`plan_repas.contenu` est du JSON.** Aucune clé étrangère ne le protège : un
   aliment supprimé qui y figure laisse le plan incohérent **sans la moindre
   erreur SQL**. Vérifier avant de supprimer un aliment qu'aucun plan ne le cite.
@@ -142,4 +146,5 @@ laisse une liste propre et une fuite par identifiant.
 `sauvegarde-nas.sh`. Ils déploient ou détruisent.
 
 `./sauvegarde.sh` en local est sans danger — et une sauvegarde avant de
-commencer coûte trois secondes.
+commencer coûte trois secondes. **Pas `./sauvegarde.sh --restaurer`**, qui
+recharge un `.dump` par-dessus la base.

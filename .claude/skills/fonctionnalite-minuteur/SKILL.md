@@ -52,14 +52,14 @@ souffre, et ne pas le perdre parce qu'on a replié un exercice ou changé de mod
 |---|---|
 | **Compte vers le haut**, deux usages : tenue isométrique et « for time » | `front/src/composants/chronoSerie.tsx:12-23` |
 | **Mode Tenue : un chronomètre par série** | `front/src/composants/serie.tsx:70-79` |
-| **Mode Chrono : un temps total** au-dessus des séries, étiqueté **« Temps total de l'exercice »** | `front/src/composants/exerciceSeance.tsx:196-205` |
+| **Mode Chrono : un temps total** au-dessus des séries, étiqueté **« Temps total de l'exercice »** | `front/src/composants/exerciceSeance.tsx:181-190` |
 | **Boutons « ⏱ Go » / « Stop »**, et **×** pour effacer le temps mesuré | `front/src/composants/chronoSerie.tsx:62-83` |
 | **La mesure survit au démontage** de son champ : changer de mode, replier l'exercice, faire défiler n'interrompt rien | `front/src/composants/etatMesure.ts:1-17` |
 | **Une seule mesure à la fois** — en démarrer une arrête proprement la précédente et met son temps de côté | `front/src/composants/etatMesure.ts:58-68` |
 | **Bandeau « mesure en cours »** en haut de l'écran : le libellé de l'exercice, « série N » ou « temps total de l'exercice », le temps, et **Stop** | `front/src/composants/bandeauMesure.tsx:21-61`, monté `front/app/seance/[id].tsx:140` |
 | **Le bandeau porte le verrou d'écran** — c'est le seul élément resté monté pendant toute la mesure | `front/src/composants/bandeauMesure.tsx:28`, `:17-20` |
 | **Report du temps à la bonne ligne** — appariement sur la position **et** l'exercice ; sans correspondance, **on n'écrit rien** | `front/src/composants/etatMesure.ts:93-115`, `:100-101` |
-| **Le temps hérité des anciennes séances est repris** — le chrono était autrefois stocké sur la première série | `front/src/composants/exerciceSeance.tsx:64-66`, repli `front/src/calcul/performance.ts:76-84` |
+| **Le temps hérité des anciennes séances est repris** — le chrono était autrefois stocké sur la première série | `front/src/composants/exerciceSeance.tsx:60-62`, repli `front/src/calcul/performance.ts:76-84` |
 
 ## Le parcours
 
@@ -97,7 +97,7 @@ exercice. **Plateforme** : Android pour tout ce qui sonne (skill
    ligne dont il vient (`etatMesure.ts:93-115`).
 5. En mode **Chrono**, le chronomètre du haut est étiqueté « Temps total de
    l'exercice » et la mesure porte `serieOrdre: null`
-   (`exerciceSeance.tsx:196-205`, bandeau `bandeauMesure.tsx:48-50`).
+   (`exerciceSeance.tsx:181-190`, bandeau `bandeauMesure.tsx:48-50`).
 
 ## Critères d'acceptation
 
@@ -149,7 +149,7 @@ exercice. **Plateforme** : Android pour tout ce qui sonne (skill
     (`alarmeRepos.ts:103`, garde `chrono.tsx:101`).
 16. **La mesure d'effort survit au démontage.** Lancer une tenue, basculer le
     mode sur Charge : le bandeau continue de compter (`etatMesure.ts:1-17`).
-    C'était autrefois interdit ; ça ne l'est plus (`exerciceSeance.tsx:171-173`).
+    C'était autrefois interdit ; ça ne l'est plus (`choixMode.tsx:55-57`).
 17. **Une seule mesure à la fois.** Lancer une tenue sur la série 1, puis « ⏱ Go »
     sur la série 2 : la première **s'arrête et son temps est écrit**, il n'est pas
     perdu (`etatMesure.ts:58-68`).
@@ -161,7 +161,7 @@ exercice. **Plateforme** : Android pour tout ce qui sonne (skill
     total de l’exercice » pour un « for time » (`bandeauMesure.tsx:48-51`).
 20. **En mode Chrono, le temps total est un champ à part** et non la somme des
     séries ; mais un exercice ancien, dont le temps était stocké sur les séries,
-    doit continuer d'afficher son temps (`exerciceSeance.tsx:64-66`, `:201`,
+    doit continuer d'afficher son temps (`exerciceSeance.tsx:60-62`, `:185`,
     `performance.ts:76-84`).
 21. **REFUS côté API — pas de temps négatif.** `secondes` et `secondesTotal` sont
     `PositiveOrZero` (`api/src/Entity/Serie.php:46-49`,
@@ -217,7 +217,7 @@ adb.exe shell input keyevent KEYCODE_POWER
   main.
 
 ```bash
-npm --prefix /home/micka/perso/fitcarnet/front test
+npm --prefix "$(git rev-parse --show-toplevel)"/front test
 ```
 
 ## La capture pour la démonstration

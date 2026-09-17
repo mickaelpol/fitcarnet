@@ -140,7 +140,9 @@ Une énumération manuelle marche jusqu'au jour où quelqu'un ajoute un élémen
   n'aurait été jouée **nulle part** — ni à l'installation, ni au démarrage de la
   production, ni par le script de vérification, qui aurait donc annoncé que tout
   allait bien. Il s'arrête aujourd'hui à `3[0-9]` : **le piège remordra à 40**,
-  dans trois fichiers.
+  dans cinq fichiers — `installer.sh`, `docker/entrypoint-prod.sh`,
+  `db/manuel/verifier-migrations.sh`, `db/manuel/verifier-schema.sh` et
+  `db/manuel/rattraper-dev.sh` (compté le 17 septembre 2026).
 - `tsconfig.tests.json` énumérait ses tests à la main : `performance.ts` est resté
   sans test pendant des mois, alors que trois constats y vivaient.
 

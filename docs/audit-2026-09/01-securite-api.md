@@ -199,7 +199,7 @@ détournement par cadre (clickjacking) et au *MIME sniffing*.
 ## F-04 — Le catalogue d'exercices n'isole rien, et `Exercice::$creePar` n'est jamais renseigné
 
 - **Gravité : FAIBLE**
-- **Statut : CONFIRMÉ** — la piste signalée dans la commande est réelle mais son impact est plus petit qu'attendu
+- **Statut : CONFIRMÉ à l'audit, réglé par É8 le 14 septembre 2026** (voir [README.md](README.md), lot 8) — la piste signalée dans la commande était réelle mais son impact plus petit qu'attendu
 - **Emplacement :** `api/src/Entity/Exercice.php:50` (`new GetCollection()` sans `security:`), `:59` (`Post` ouvert à `ROLE_USER`), `:204-206` (`creePar`), `:189-191` (`source` par défaut `'perso'`)
 
 **Ce qui se passe.** Confirmation point par point :
@@ -207,8 +207,9 @@ détournement par cadre (clickjacking) et au *MIME sniffing*.
   ne le vise, `FiltreProprietaire` compris. Vérifié par recherche
   exhaustive de `creePar` / `cree_par` dans `src/` : **`Exercice::setCreePar()`
   n'est appelé nulle part**. La colonne est donc toujours `NULL`, y compris pour
-  les exercices créés par l'API — contrairement à `Aliment`, dont
-  `AlimentProcessor` renseigne le propriétaire.
+  les exercices créés par l'API — contrairement à `Aliment`, dont le
+  propriétaire est posé à la création par `ProprietaireProcessor`, le processeur
+  commun des entités rattachées à un compte.
 - Conséquence : **il n'y a pas de fuite au sens strict** — il n'y a rien à
   filtrer, aucune donnée n'est marquée comme appartenant à quelqu'un. Le
   catalogue est commun, ce que la doc de classe assume explicitement
@@ -228,8 +229,9 @@ détournement par cadre (clickjacking) et au *MIME sniffing*.
 1. **Le catalogue reste commun** (statu quo assumé) : supprimer `Exercice::$creePar`
    et sa colonne, corriger le commentaire de tri ligne 66-67 qui affirme le
    contraire. **Effort : 20 min.**
-2. **Les exercices « perso » redeviennent privés** : renseigner `creePar` par un
-   processeur calqué sur `AlimentProcessor`, ajouter un `FiltreExercice`
+2. **Les exercices « perso » redeviennent privés** : renseigner `creePar` à la
+   création par un processeur propre à `Exercice` — sur le modèle de
+   `ProprietaireProcessor`, qui pose le propriétaire depuis le jeton —, ajouter un `FiltreExercice`
    (`creePar IS NULL OR creePar = :courant`), et autoriser
    l'auteur à modifier/supprimer les siens. **Effort : 2 à 3 h**, migration de
    données comprise (les exercices existants restent `NULL` = communs, ce qui est
