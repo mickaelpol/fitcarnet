@@ -5,7 +5,7 @@
 --  CONSTAT 11 DU RAPPORT « DONNÉES ET INFRASTRUCTURE », 7 septembre 2026.
 --
 --  PostgreSQL n'indexe pas les clés étrangères tout seul, contrairement à
---  MySQL. Dix colonnes en manquaient. On n'en crée que CINQ, et le choix est
+--  MySQL. Dix colonnes en manquaient. On n'en crée que QUATRE, et le choix est
 --  délibéré : `28-muscle-cible-filtrable.sql` rappelle qu'« un index que
 --  personne n'interroge n'est pas neutre » — il coûte à chaque écriture, et
 --  encombre les décisions du planificateur. Ceux-ci sont interrogés à chaque
@@ -25,11 +25,10 @@
 --  PostgreSQL balaie TOUT `stock` à chaque suppression d'aliment, pour
 --  vérifier qu'aucune ligne ne s'y oppose.
 --
---  aliment.cree_par et exercice.cree_par — les deux moitiés « le mien » de
---  `FiltreAliment` et `FiltreExercice`, évaluées à chaque lecture des
---  catalogues. Celui d'`exercice` a pris de l'importance le 14 septembre 2026 :
---  avant `FiltreExercice` (constat É8), la colonne n'était jamais lue ; elle
---  l'est désormais sur les 1 338 lignes du catalogue, à chaque appel.
+--  exercice.cree_par — la moitié « le mien » de `FiltreExercice`, évaluée à
+--  chaque lecture du catalogue. Avant `FiltreExercice` (constat É8), la
+--  colonne n'était jamais lue ; elle l'est désormais sur les 1 338 lignes du
+--  catalogue, à chaque appel.
 --
 --  CE QU'ON N'INDEXE PAS, ET C'EST ASSUMÉ : `stock.emplacement_id`,
 --  `seance.modele_id`, `cuisson_habituelle.mode_cuisson_id`,
@@ -47,12 +46,9 @@ CREATE INDEX IF NOT EXISTS modele_exercice_par_exercice
 CREATE INDEX IF NOT EXISTS stock_par_aliment
     ON stock (aliment_id);
 
--- Index PARTIELS : la très grande majorité des lignes ont `cree_par IS NULL`
--- — 50 aliments communs sur 50, 1 338 exercices publics sur 1 338. Indexer les
--- NULL n'apporterait rien et gonflerait l'index ; ce qu'on cherche à retrouver
--- vite, ce sont les rares lignes qui appartiennent à quelqu'un.
-CREATE INDEX IF NOT EXISTS aliment_par_auteur
-    ON aliment (cree_par) WHERE cree_par IS NOT NULL;
-
+-- Index PARTIEL : la très grande majorité des exercices ont `cree_par IS NULL`
+-- — 1 338 exercices publics sur 1 338. Indexer les NULL n'apporterait rien et
+-- gonflerait l'index ; ce qu'on cherche à retrouver vite, ce sont les rares
+-- lignes qui appartiennent à quelqu'un.
 CREATE INDEX IF NOT EXISTS exercice_par_auteur
     ON exercice (cree_par) WHERE cree_par IS NOT NULL;

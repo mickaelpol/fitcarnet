@@ -7,21 +7,10 @@
 --  db/ est monté dans docker-entrypoint-initdb.d, où PostgreSQL exécute
 --  tout .sql à la création de la base. Or ce jeu suppose un compte existant.
 --
---  REMIS EN SERVICE LE 9 SEPTEMBRE 2026. Il inserait encore la colonne
---  `etat_reference`, que la migration 18 « un seul etat » avait supprimee :
---  depuis, il echouait sur « column "etat_reference" does not exist » et ne
---  posait plus rien. Personne ne s'en etait apercu — un jeu d'essai qu'on ne
---  joue pas ne previent pas qu'il est casse. Les macros sont desormais
---  toujours celles du produit CRU, il n'y a plus d'etat a porter.
---
 --  À quoi il sert. Le frigo, l'inventaire et la gestion des aliments sont
 --  écrits pour deux sources — Grocy pour l'administrateur, la table
---  « aliment » pour les autres. Ce fichier crée de quoi exercer l'autre.
---
---  Il crée des aliments PRIVÉS, copiés depuis les 50 de référence. Une
---  version antérieure posait du stock sur les communs eux-mêmes : depuis
---  que le frigo ne montre que les aliments de l'utilisateur, ces lignes
---  étaient devenues invisibles et le frigo paraissait vide.
+--  « aliment » pour les autres. Ce fichier crée de quoi exercer l'autre :
+--  des aliments appartenant au compte d'essai, et du stock.
 --
 --  Avant de le jouer, crée le compte SANS --admin ni --grocy :
 --    docker compose -f compose.dev.yml exec app php bin/console \
@@ -65,40 +54,26 @@ BEGIN
     v_congel  := coalesce(v_congel,  v_frigo);
 
     -- ----------------------------------------------------------------
-    --  Ménage : le stock pose sur des aliments COMMUNS n'est plus visible
-    --  nulle part depuis que le frigo se limite aux aliments de chacun.
-    --  On l'efface plutot que de laisser des lignes fantomes en base.
+    --  Deux aliments par categorie ou presque, pour que le regroupement par
+    --  emplacement soit exerce. Valeurs de Table_Ciqual_2025.xlsx, colonne
+    --  « Energie, Reglement UE n° 1169/2011 », pour le produit TEL QU'ON LE
+    --  PESE (regle 3). Le ratio est celui des deux entrees CIQUAL cru/cuit :
+    --  riz 350/155, pates 364/167, poulet 110/141.
     -- ----------------------------------------------------------------
-    DELETE FROM stock s
-    USING  aliment a
-    WHERE  s.aliment_id = a.id
-      AND  s.utilisateur_id = v_utilisateur
-      AND  a.cree_par IS NULL;
-
-    -- ----------------------------------------------------------------
-    --  Deux aliments par categorie, copies depuis les communs et devenus
-    --  PRIVES. Deux par categorie et non les douze premiers par ordre
-    --  alphabetique : sans cela tout tombe dans « fec » et « fruit », donc
-    --  dans un seul emplacement, et le regroupement n'est pas exerce.
-    -- ----------------------------------------------------------------
-    INSERT INTO aliment (nom, categorie, kcal_100, prot_100, gluc_100, lip_100,
-                         fibres_100, ratio, source, public, cree_par)
-    SELECT t.nom, t.categorie, t.kcal_100, t.prot_100, t.gluc_100, t.lip_100,
-           t.fibres_100, t.ratio, 'manuel', FALSE, v_utilisateur
-    FROM  (SELECT a.*,
-                  row_number() OVER (PARTITION BY a.categorie ORDER BY a.nom) AS rang
-           FROM   aliment a
-           WHERE  a.cree_par IS NULL) t
-    WHERE t.rang <= 2
-    ON CONFLICT (lower(nom), cree_par) WHERE cree_par IS NOT NULL DO NOTHING;
-
-    -- Un aliment que le catalogue de reference ne contient pas : il verifie
-    -- le parcours « creer de zero » et le cloisonnement entre comptes.
-    INSERT INTO aliment (nom, categorie, kcal_100, prot_100, gluc_100, lip_100,
-                         fibres_100, ratio, source, public, cree_par)
-    VALUES ('Skyr d''essai (compte ordinaire)', 'lait', 63, 10.5, 4.0, 0.2,
-            0, 1, 'manuel', FALSE, v_utilisateur)
-    ON CONFLICT (lower(nom), cree_par) WHERE cree_par IS NOT NULL DO NOTHING;
+    INSERT INTO aliment (utilisateur_id, nom, categorie, kcal_100, prot_100,
+                         gluc_100, lip_100, fibres_100, ratio, source)
+    VALUES
+        (v_utilisateur, 'Poulet, filet sans peau cru',  'prot', 110,  23.4,  0,    1.5,   0,     0.78, 'manuel'),
+        (v_utilisateur, 'Riz blanc, cru',               'fec',  350,  7.02,  77.5, 0.79,  1.53,  2.26, 'manuel'),
+        (v_utilisateur, 'Pâtes sèches, standard, crues','fec',  364,  12,    72.7, 1.6,   2.91,  2.18, 'manuel'),
+        (v_utilisateur, 'Brocoli, cru',                 'leg',  31.9, 2.9,   2.15, 0.36,  2.6,   1,    'manuel'),
+        (v_utilisateur, 'Haricot vert, cru',            'leg',  31.9, 1.83,  4.14, 0.22,  2.7,   1,    'manuel'),
+        (v_utilisateur, 'Amande, avec peau',            'ole',  615,  18.8,  9.51, 51.3,  12.5,  1,    'manuel'),
+        (v_utilisateur, 'Huile d''olive vierge extra',  'huile',899,  0.25,  0,    99.9,  0,     1,    'manuel'),
+        -- Un aliment qu'on reconnait au premier coup d'oeil comme un jeu
+        -- d'essai : il verifie le cloisonnement entre comptes.
+        (v_utilisateur, 'Skyr d''essai (compte ordinaire)', 'lait', 63, 10.5, 4.0, 0.2, 0, 1, 'manuel')
+    ON CONFLICT (utilisateur_id, lower(nom)) DO NOTHING;
 
     -- ----------------------------------------------------------------
     --  Stock reparti sur trois emplacements, avec des valeurs decimales :
@@ -114,7 +89,7 @@ BEGIN
                    ELSE v_placard
                END
         FROM   aliment a
-        WHERE  a.cree_par = v_utilisateur
+        WHERE  a.utilisateur_id = v_utilisateur
         ORDER  BY a.nom
     LOOP
         INSERT INTO stock (utilisateur_id, aliment_id, emplacement_id, quantite, maj_le)
@@ -129,16 +104,15 @@ BEGIN
     UPDATE stock SET quantite = 0
     WHERE  utilisateur_id = v_utilisateur
       AND  aliment_id IN (SELECT id FROM aliment
-                          WHERE cree_par = v_utilisateur ORDER BY nom DESC LIMIT 2);
+                          WHERE utilisateur_id = v_utilisateur ORDER BY nom DESC LIMIT 2);
 
     RAISE NOTICE 'Jeu d''essai posé pour %.', v_email;
 END $$;
 
 -- Contrôle : ce que le compte doit voir.
 SELECT u.email,
-       (SELECT count(*) FROM aliment WHERE cree_par = u.id)          AS aliments_a_moi,
+       (SELECT count(*) FROM aliment WHERE utilisateur_id = u.id)    AS aliments_a_moi,
        (SELECT count(*) FROM stock
-         WHERE utilisateur_id = u.id AND quantite > 0)               AS en_stock,
-       (SELECT count(*) FROM aliment WHERE cree_par IS NULL)         AS catalogue_de_reference
+         WHERE utilisateur_id = u.id AND quantite > 0)               AS en_stock
 FROM   utilisateur u
 WHERE  u.source_frigo = 'base';

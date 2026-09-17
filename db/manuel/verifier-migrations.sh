@@ -106,8 +106,9 @@ psql_ <<'SQL'
 INSERT INTO utilisateur (email, mot_de_passe, nom)
 VALUES ('essai@verif.local', 'x', 'Essai');
 
-INSERT INTO aliment (nom, categorie, kcal_100, prot_100, gluc_100, lip_100)
-VALUES ('Aliment a signe faux', 'fec', -350, -20, 12, -3);
+INSERT INTO aliment (utilisateur_id, nom, categorie, kcal_100, prot_100, gluc_100, lip_100)
+SELECT id, 'Aliment a signe faux', 'fec', -350, -20, 12, -3
+FROM   utilisateur WHERE email = 'essai@verif.local';
 
 INSERT INTO cible (utilisateur_id, repas, kcal, prot, gluc, lip)
 SELECT id, 'R1', -600, 40, 60, 20 FROM utilisateur WHERE email = 'essai@verif.local';

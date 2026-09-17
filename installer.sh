@@ -121,10 +121,9 @@ ok "$nb_tables tables"
 nb_aliments=$(sql "SELECT count(*) FROM aliment;")
 nb_perso=$(sql "SELECT count(*) FROM exercice WHERE source='perso';")
 nb_chrono=$(sql "SELECT count(*) FROM exercice WHERE mode_defaut='chrono' AND source='perso';")
-# Zéro aliment sur une installation neuve est le comportement ATTENDU depuis
-# le 14 septembre 2026 : il n'y a plus de catalogue de départ, chacun saisit
-# les valeurs de ce qu'il a acheté. Ce n'est donc pas un contrôle, juste un
-# état des lieux — d'où le `ok` et non un `echec` sur un seuil.
+# Zéro aliment sur une installation neuve est le comportement ATTENDU : chaque
+# compte saisit les valeurs de ce qu'il a acheté. Ce n'est donc pas un
+# contrôle, juste un état des lieux — d'où le `ok` et non un `echec`.
 ok "$nb_aliments aliment(s), $nb_perso exercices personnels dont $nb_chrono en chrono"
 
 # ------------------------------------------------- migrations manuelles
@@ -144,13 +143,11 @@ titre "Migrations"
 # l'installation :
 #
 #   - « aliment-fibres.sql » passait APRÈS « 23-… » alors qu'il crée la
-#     colonne `fibres_100` dont les migrations 16, 17 et 19 ont besoin.
+#     colonne `fibres_100` dont des migrations suivantes avaient besoin.
 #     Vérifié : sur une base vierge, trois migrations sur quatorze
 #     échouaient, et l'installateur s'arrêtait là.
 #   - « jeu-essai.sql » — un jeu de DÉMONSTRATION rattaché à un compte
 #     d'essai — était joué comme une migration, sur toute installation.
-#   - « audit-catalogue.sql » n'est pas une migration : c'est un rapport de
-#     lecture, qu'on lance quand on le décide.
 #
 # Un tri alphabétique qui fait office d'ordre de dépendances marche jusqu'au
 # jour où un nom commence par une lettre. On liste donc à la main.

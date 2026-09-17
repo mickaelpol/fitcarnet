@@ -102,11 +102,11 @@ fi
 # le lancer à la main.
 #
 # L'ORDRE EST ÉCRIT, PAS TRIÉ. `aliment-fibres.sql` crée une colonne dont
-# 16, 17 et 19 ont besoin : par ordre alphabétique il passait après « 23 »,
-# et trois migrations échouaient. Même liste que dans `installer.sh`.
+# des migrations suivantes ont eu besoin : par ordre alphabétique il passait
+# après « 23 », et trois migrations échouaient. Même liste que dans
+# `installer.sh`.
 #
-# `jeu-essai.sql` (démonstration) et `audit-catalogue.sql` (rapport de
-# lecture) n'en sont pas et n'ont rien à faire ici.
+# `jeu-essai.sql` (démonstration) n'en est pas une et n'a rien à faire ici.
 #
 # ON COUPE LA QUERY STRING DE `DATABASE_URL` AVANT DE LA DONNER A psql.
 #

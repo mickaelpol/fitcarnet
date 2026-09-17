@@ -4,7 +4,7 @@
 --  CE FICHIER N'EST PAS JOUÉ AU DÉMARRAGE. Ni `installer.sh` ni
 --  `entrypoint-prod.sh` ne le nomment, et leur liste est ÉCRITE, pas triée :
 --  ce qui n'y figure pas n'est jamais rejoué. C'est la même règle que pour
---  `jeu-essai.sql` et `audit-catalogue.sql`.
+--  `jeu-essai.sql`.
 --
 --  CE QU'IL AJOUTE À `jeu-essai.sql`, ET POURQUOI.
 --

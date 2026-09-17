@@ -1,8 +1,8 @@
 -- =====================================================================
 --  fitcarnet — schéma PostgreSQL
---  Principe : un référentiel COMMUN (aliments, exercices, emplacements)
---             et des données PRIVÉES par utilisateur (stock, cibles,
---             séances, modèles).
+--  Principe : un référentiel COMMUN (exercices, emplacements, modes de
+--             cuisson) et des données PRIVÉES par utilisateur (aliments,
+--             stock, cibles, séances, modèles).
 --
 --  CE FICHIER DÉCRIT LA BASE TELLE QU'ELLE EST AUJOURD'HUI, pas telle
 --  qu'elle était au départ.
@@ -22,9 +22,6 @@
 --  ne fait rien, ce qui est exactement ce qu'on veut d'un installateur qui
 --  doit marcher dans les deux cas sans savoir lequel il a devant lui.
 --
---  Les migrations de DONNÉES (14, 15, 16, 17, 18, 19) ne sont pas repliées
---  ici, et ne peuvent pas l'être : elles corrigent des valeurs saisies, pas
---  une structure. Sur une base vierge elles ne trouvent rien à corriger.
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -33,21 +30,6 @@ CREATE EXTENSION IF NOT EXISTS unaccent;
 -- ---------------------------------------------------------------------
 --  Utilisateurs
 -- ---------------------------------------------------------------------
-
--- ---------------------------------------------------------------------
---  Normalisation des noms
---
---  Posee ici parce que les migrations de `db/manuel/` s'en servent, et que
---  `INSTALLATION.md` invite a en rejouer une seule sur une base neuve. Elle
---  vivait uniquement dans la migration 16 : rejouer la 19 seule echouait
---  alors sur « function fitcarnet_normaliser(text) does not exist ».
---
---  Elle abaisse la casse et retire les accents. RIEN D'AUTRE — ni les
---  apostrophes, ni les espaces.
--- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fitcarnet_normaliser(t text) RETURNS text AS $$
-    SELECT lower(translate(t, 'àâäéèêëïîôöùûüçÀÂÄÉÈÊËÏÎÔÖÙÛÜÇ', 'aaaeeeeiioouuucAAAEEEEIIOOUUUC'));
-$$ LANGUAGE sql IMMUTABLE;
 
 CREATE TABLE utilisateur (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -70,13 +52,16 @@ COMMENT ON COLUMN utilisateur.source_frigo IS
   'base = stock stocké ici ; grocy = les ingrédients viennent de l''instance Grocy (admin uniquement)';
 
 -- ---------------------------------------------------------------------
---  Référentiel commun : aliments
+--  Aliments — chacun les siens
+--
+--  Un aliment appartient toujours à un compte : ses valeurs sont celles du
+--  produit que cette personne a acheté, et personne d'autre ne les lit.
 -- ---------------------------------------------------------------------
 CREATE TABLE aliment (
     id              BIGSERIAL PRIMARY KEY,
-    -- Pas d'UNIQUE en ligne : l'unicité dépend du propriétaire, et deux index
-    -- partiels plus bas s'en chargent. Un UNIQUE global interdirait à deux
-    -- comptes d'avoir chacun son « Riz basmati ».
+    -- Pas d'UNIQUE en ligne : l'unicité dépend du propriétaire, et l'index
+    -- `aliment_nom_unique_par_compte` plus bas s'en charge. Un UNIQUE global
+    -- interdirait à deux comptes d'avoir chacun son « Riz basmati ».
     nom             TEXT        NOT NULL,
     categorie       TEXT        NOT NULL
                     CHECK (categorie IN ('prot','fec','leg','ole','huile','lait','fruit','autre')),
@@ -84,9 +69,8 @@ CREATE TABLE aliment (
     -- UNE SEULE CONVENTION, ET C'EST TOUT LE PROJET QUI EN DÉPEND : ces
     -- valeurs décrivent le produit TEL QU'ON LE PÈSE, avant cuisson. Riz sec,
     -- viande crue. Il n'y a pas de colonne disant « ces valeurs sont-elles
-    -- celles du cru ou du cuit » — il y en a eu une, `etat_reference`, et
-    -- écrire le même fait à deux endroits a fini par faire peser trois fois
-    -- trop de riz. Voir `db/manuel/18-un-seul-etat.sql`.
+    -- celles du cru ou du cuit » : écrire le même fait à deux endroits finirait
+    -- par faire peser trois fois trop de riz.
     kcal_100        NUMERIC(7,2) NOT NULL,
     prot_100        NUMERIC(6,2) NOT NULL,
     gluc_100        NUMERIC(6,2) NOT NULL,
@@ -108,9 +92,8 @@ CREATE TABLE aliment (
 
     code_barres     TEXT,
     source          TEXT        NOT NULL DEFAULT 'manuel'
-                    CHECK (source IN ('manuel','openfoodfacts','reference')),
-    public          BOOLEAN     NOT NULL DEFAULT TRUE,
-    cree_par        UUID        REFERENCES utilisateur(id) ON DELETE SET NULL,
+                    CHECK (source IN ('manuel','openfoodfacts')),
+    utilisateur_id  UUID        NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
     cree_le         TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     -- Une valeur nutritionnelle négative n'existe pas. La base le refuse
@@ -131,14 +114,12 @@ CREATE TABLE aliment (
         (pesee_apres IS NULL OR pesee_apres > 0)
     )
 );
--- Un aliment COMMUN — sans propriétaire — porte un nom unique pour tout le
--- monde. Un aliment PRIVÉ est unique chez son propriétaire, et seulement chez
--- lui : deux comptes peuvent avoir chacun leur « Riz basmati », avec leurs
--- propres valeurs.
-CREATE UNIQUE INDEX aliment_nom_commun_unique
-    ON aliment (lower(nom)) WHERE cree_par IS NULL;
-CREATE UNIQUE INDEX aliment_nom_prive_unique
-    ON aliment (lower(nom), cree_par) WHERE cree_par IS NOT NULL;
+-- Un nom est unique chez son propriétaire, et seulement chez lui : deux
+-- comptes peuvent avoir chacun leur « Riz basmati », avec leurs propres
+-- valeurs. L'index commence par `utilisateur_id` : il sert aussi la clé
+-- étrangère et le filtre par propriétaire.
+CREATE UNIQUE INDEX aliment_nom_unique_par_compte
+    ON aliment (utilisateur_id, lower(nom));
 
 -- Ce qui ne peut PAS être vrai physiquement, refusé par la base plutôt que
 -- rattrapé par du code. Ces deux contraintes viennent de vraies erreurs :
@@ -373,11 +354,9 @@ CREATE INDEX ON serie (seance_exercice_id);
 CREATE INDEX modele_serie_par_exercice ON modele_serie (modele_exercice_id);
 CREATE INDEX modele_exercice_par_exercice ON modele_exercice (exercice_id);
 
--- Index PARTIELS sur les deux moities « le mien » de FiltreAliment et
--- FiltreExercice. La quasi-totalite des lignes ont `cree_par IS NULL` : les
--- indexer ne servirait a rien, ce qu'on cherche vite ce sont les rares lignes
--- qui appartiennent a quelqu'un.
-CREATE INDEX aliment_par_auteur  ON aliment  (cree_par) WHERE cree_par IS NOT NULL;
+-- Index PARTIEL sur la moitie « le mien » de FiltreExercice. La quasi-totalite
+-- des exercices ont `cree_par IS NULL` : les indexer ne servirait a rien, ce
+-- qu'on cherche vite ce sont les rares lignes qui appartiennent a quelqu'un.
 CREATE INDEX exercice_par_auteur ON exercice (cree_par) WHERE cree_par IS NOT NULL;
 
 -- ---------------------------------------------------------------------
@@ -669,7 +648,5 @@ COMMENT ON COLUMN jeton_rafraichissement.vu_le IS
     'Derniere utilisation. NULL = session ouverte avant la migration 32, jamais revue depuis.';
 COMMENT ON COLUMN plan_repas.cuisine_le IS
     'NULL = prevu, le plan reserve son stock ; renseigne = cuisine, le stock a deja ete decremente';
-COMMENT ON INDEX aliment_nom_commun_unique IS
-    'Unicite des aliments de reference entre eux.';
-COMMENT ON INDEX aliment_nom_prive_unique IS
-    'Unicite du nom chez un utilisateur. Deux comptes peuvent nommer pareil.';
+COMMENT ON INDEX aliment_nom_unique_par_compte IS
+    'Un nom par compte. Deux comptes peuvent nommer pareil.';

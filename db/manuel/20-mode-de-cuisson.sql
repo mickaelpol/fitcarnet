@@ -13,8 +13,8 @@
 --      `aliment`, le compte administrateur lit Grocy. Un champ sur la fiche
 --      aurait donc existe en double — une colonne SQL et un champ
 --      personnalise Grocy — avec deux vocabulaires libres de diverger. C'est
---      exactement la structure qui a produit le desastre de `etat_reference`
---      (voir 18-un-seul-etat.sql). Une table centrale n'a pas ce defaut :
+--      exactement la structure qui a produit le desastre de `etat_reference`,
+--      une colonne supprimee depuis. Une table centrale n'a pas ce defaut :
 --      elle est la meme quelle que soit la provenance de l'aliment.
 --
 --   2. Le mode de cuisson n'est pas une propriete de l'aliment, c'est une

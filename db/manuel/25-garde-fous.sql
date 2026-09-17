@@ -21,7 +21,7 @@
 --  Le controle `aliment_matiere_plausible` (somme <= 100,5) est SATISFAIT par
 --  des valeurs negatives : une faute de signe passait les deux garde-fous a
 --  la fois. Un import CSV avec un tiret parasite pose `gluc_100 = -75` sur un
---  riz commun, le solveur resout un systeme avec un coefficient negatif, et
+--  riz, le solveur resout un systeme avec un coefficient negatif, et
 --  propose une quantite aberrante sans un mot.
 --
 --  ON NETTOIE AVANT DE CONTRAINDRE. Une contrainte posee sur des donnees qui
