@@ -32,6 +32,24 @@ export interface Controle {
   message: string;
 }
 
+/**
+ * LES CALORIES QUE DÉCRIVENT DES GRAMMES — la seule écriture de la somme
+ * d'Atwater dans le front (règle 5), convention européenne : fibres à
+ * `KCAL_FIBRES`, comptées à part des glucides.
+ *
+ * `fibres` absent ou `null` compte pour zéro gramme. Ce n'est PAS une réponse à
+ * « combien de fibres ? » : c'est à l'appelant de savoir s'il les connaît, et
+ * de le dire à l'écran s'il ne les connaît pas — `controler` élargit alors sa
+ * tolérance. Voir `formuleUnique.test.ts`, qui refuse toute autre écriture.
+ */
+export const kcalDesGrammes = (
+  m: { prot: number; gluc: number; lip: number; fibres?: number | null },
+): number =>
+  KCAL_PROTEINES * m.prot +
+  KCAL_GLUCIDES * m.gluc +
+  KCAL_FIBRES * (m.fibres ?? 0) +
+  KCAL_LIPIDES * m.lip;
+
 /** Au-delà, l'écart ne s'explique plus par des arrondis. */
 const TOLERANCE = 0.08;
 const TOLERANCE_SANS_FIBRES = 0.2;
@@ -46,11 +64,7 @@ export function controler(m: Macros): Controle {
   const fibresConnues = m.fibres !== null && m.fibres !== undefined;
   const fibres = fibresConnues ? (m.fibres as number) : 0;
 
-  const calculees =
-    KCAL_PROTEINES * m.prot +
-    KCAL_GLUCIDES * m.gluc +
-    KCAL_FIBRES * fibres +
-    KCAL_LIPIDES * m.lip;
+  const calculees = kcalDesGrammes({ prot: m.prot, gluc: m.gluc, lip: m.lip, fibres });
 
   if (m.kcal <= 0) {
     return {

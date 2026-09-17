@@ -19,9 +19,7 @@
 
 /* Chemin RELATIF, jamais `@/calcul/nutrition` : ce sont des VALEURS, et
    `tsc -p tsconfig.tests.json` ne réécrit pas l'alias. */
-import {
-  KCAL_FIBRES, KCAL_GLUCIDES, KCAL_LIPIDES, KCAL_PROTEINES,
-} from './nutrition';
+import { kcalDesGrammes } from './nutrition';
 
 export interface PlanAmericain {
   /** kcal telles qu'imprimées sur le plan */
@@ -109,9 +107,7 @@ export function convertir(plan: PlanAmericain): CibleEuropeenne {
     gluc,
     lip,
     fibres,
-    kcal: Math.round(
-      KCAL_PROTEINES * prot + KCAL_GLUCIDES * gluc
-      + KCAL_FIBRES * fibres + KCAL_LIPIDES * lip),
+    kcal: Math.round(kcalDesGrammes({ prot, gluc, lip, fibres })),
     kcalAnnoncees: Math.round(plan.kcal),
   };
 }

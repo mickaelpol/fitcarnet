@@ -19,7 +19,7 @@ import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
    quel de repas.tsx vers ce fichier au moment de l'extraction. La valeur etait
    juste ; c'est la copie qui pouvait diverger, et la convention europeenne des
    fibres est precisement le genre de chiffre qu'on ne veut pas voir diverger. */
-import { KCAL_FIBRES } from '@/calcul/nutrition';
+import { kcalDesGrammes } from '@/calcul/nutrition';
 
 /**
  * LA CARTE D'UN REPAS — ce qu'on pèse, ce qu'on sert, ce qu'on corrige.
@@ -273,7 +273,7 @@ export function CarteRepas({
               dont {nb(fibres / portions)} g de fibres
               {cible.glucidesTotaux === true
                 ? ', comprises dans la cible en glucides'
-                : `, soit ${nb((fibres * KCAL_FIBRES) / portions)} kcal hors cible`}
+                : `, soit ${nb(kcalDesGrammes({ prot: 0, gluc: 0, lip: 0, fibres }) / portions)} kcal hors cible`}
             </Discret>
           )}
 

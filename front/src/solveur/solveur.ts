@@ -2,9 +2,7 @@ import { arrondir, resoudre } from './algebre';
 /* Chemin RELATIF, jamais `@/calcul/nutrition` : ce sont des VALEURS, et
    `tsc -p tsconfig.tests.json` ne réécrit pas l'alias — le `require('@/…')`
    partirait tel quel dans `dist-tests/` et casserait au `node --test`. */
-import {
-  KCAL_FIBRES, KCAL_GLUCIDES, KCAL_LIPIDES, KCAL_PROTEINES,
-} from '../calcul/nutrition';
+import { kcalDesGrammes } from '../calcul/nutrition';
 import type {
   Aliment, Cibles, Diagnostic, Fixe, Macros, Options, Quantite, Resultat, Variables,
 } from './types';
@@ -30,11 +28,7 @@ export const SEUIL_COHERENCE = 15;
  */
 export const kcalDesMacros = (
   m: { prot: number; gluc: number; lip: number; fibres?: number },
-): number =>
-  KCAL_PROTEINES * m.prot
-  + KCAL_GLUCIDES * m.gluc
-  + KCAL_LIPIDES * m.lip
-  + KCAL_FIBRES * (m.fibres ?? 0);
+): number => kcalDesGrammes(m);
 
 /**
  * DE COMBIEN LES CALORIES ANNONCÉES RATENT CE QUE LES GRAMMES PEUVENT DONNER.

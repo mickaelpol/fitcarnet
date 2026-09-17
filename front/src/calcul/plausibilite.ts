@@ -1,5 +1,5 @@
 import type { Aliment, Gravite } from '@/solveur/types';
-import { KCAL_FIBRES, KCAL_GLUCIDES, KCAL_LIPIDES, KCAL_PROTEINES } from './nutrition';
+import { kcalDesGrammes } from './nutrition';
 
 /**
  * LES DONNÉES NE PEUVENT PAS MENTIR SANS QU'ON LE VOIE.
@@ -59,14 +59,15 @@ export interface Anomalie {
  * valeurs est fausse » alors qu'aucune ne l'était — sur toute la famille des
  * oléagineux, celle-là même que `nutrition.ts` cite en exemple.
  *
- * Les coefficients viennent de `nutrition.ts` et ne sont pas recopiés ici :
- * deux tables qui divergent, c'est le défaut qu'on répare.
+ * La somme elle-même vient de `nutrition.ts` (`kcalDesGrammes`) depuis le
+ * 17 septembre 2026 : les coefficients y étaient déjà pris, mais la formule
+ * était réécrite ici. Des fibres inconnues comptent zéro gramme : l'écart
+ * qu'elles laissent entre dans la marge générale de 20 % de
+ * `verifierAliment`, qui ne les distingue pas.
  */
-export const kcalAtwater = (a: Aliment): number =>
-  KCAL_PROTEINES * a.prot100
-  + KCAL_GLUCIDES * a.gluc100
-  + KCAL_FIBRES * (a.fibres100 ?? 0)
-  + KCAL_LIPIDES * a.lip100;
+export const kcalAtwater = (a: Aliment): number => kcalDesGrammes({
+  prot: a.prot100, gluc: a.gluc100, lip: a.lip100, fibres: a.fibres100,
+});
 
 /** Bande dans laquelle tombe toute céréale ou légumineuse sèche. */
 const SEC_MINI = 300;
