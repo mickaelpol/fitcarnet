@@ -94,7 +94,12 @@ if (( REPARTIR )); then
     printf '   %sTOUTES les données vont être effacées.%s\n' "$ROUGE" "$RAZ"
     read -r -p "   Taper « oui » pour confirmer : " reponse
     [[ "$reponse" == "oui" ]] || echec "Annulé."
-    dc down -v >/dev/null 2>&1 || true
+    # L'ECHEC N'EST PLUS AVALE (constat 02#19, 17 septembre 2026). Un
+    # `|| true` suivi de « Volumes supprimés » annonçait une remise à zéro qui
+    # n'avait peut-être pas eu lieu, puis l'installation repartait sur
+    # l'ancienne base en croyant partir d'une base neuve.
+    dc down -v >/dev/null 2>&1 \
+        || echec "La remise à zéro a échoué. Relance « docker compose -f compose.dev.yml down -v » pour voir l'erreur."
     ok "Volumes supprimés"
 fi
 
