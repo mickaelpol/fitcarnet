@@ -188,34 +188,11 @@ final class FrigoController extends AbstractController
         $donnees = (array) \json_decode($requete->getContent(), true);
         $reference = (string) ($donnees['reference'] ?? '');
 
-        /* Sans reference, c'est une CREATION : le produit n'existe pas encore
-           dans Grocy et on l'y pose avant d'ecrire ses valeurs.
-
-           Les deux gestes tiennent dans le meme appel a dessein. Les separer
-           laisserait, au moindre echec entre les deux, un produit nu dans
-           Grocy — sans categorie ni calories, donc invisible au calculateur
-           et impossible a distinguer d'un oubli. Ici l'echec de l'ecriture
-           remonte tel quel : le produit reste, mais l'utilisateur voit le
-           message et le rouvre pour le completer. */
-        $creation = '' === $reference;
-
-        if ($creation) {
-            try {
-                $idProduit = $this->grocy->creerProduit((string) ($donnees['nom'] ?? ''));
-            } catch (\RuntimeException $e) {
-                return $this->json(['erreur' => $e->getMessage()], 422);
-            }
-        } else {
-            if (!\str_starts_with($reference, 'grocy:')) {
-                return $this->json(['erreur' => 'Référence inattendue : ' . $reference], 422);
-            }
-
-            $idProduit = (int) \substr($reference, \strlen('grocy:'));
-            if ($idProduit <= 0) {
-                return $this->json(['erreur' => 'Produit non précisé.'], 422);
-            }
-        }
-
+        /* LES CONTRÔLES D'ABORD, LA CRÉATION ENSUITE. Jusqu'au 17 septembre
+           2026, une création posait le produit dans Grocy AVANT de vérifier
+           catégorie, calories, ratio et macros : un corps incomplet recevait
+           bien son 422, mais laissait un produit nu dans Grocy. Voir
+           `ValeursGrocyObligatoiresTest`. */
         $categorie = (string) ($donnees['categorie'] ?? '');
         if (!\in_array($categorie, Aliment::CATEGORIES, true)) {
             return $this->json(['erreur' => 'Catégorie inconnue : ' . $categorie], 422);
@@ -246,6 +223,34 @@ final class FrigoController extends AbstractController
                 ], 422);
             }
             $macros[$cle] = (float) $valeur;
+        }
+
+        /* Sans reference, c'est une CREATION : le produit n'existe pas encore
+           dans Grocy et on l'y pose avant d'ecrire ses valeurs.
+
+           Les deux gestes tiennent dans le meme appel a dessein. Les separer
+           laisserait, au moindre echec entre les deux, un produit nu dans
+           Grocy — sans categorie ni calories, donc invisible au calculateur
+           et impossible a distinguer d'un oubli. Ici l'echec de l'ecriture
+           remonte tel quel : le produit reste, mais l'utilisateur voit le
+           message et le rouvre pour le completer. */
+        $creation = '' === $reference;
+
+        if ($creation) {
+            try {
+                $idProduit = $this->grocy->creerProduit((string) ($donnees['nom'] ?? ''));
+            } catch (\RuntimeException $e) {
+                return $this->json(['erreur' => $e->getMessage()], 422);
+            }
+        } else {
+            if (!\str_starts_with($reference, 'grocy:')) {
+                return $this->json(['erreur' => 'Référence inattendue : ' . $reference], 422);
+            }
+
+            $idProduit = (int) \substr($reference, \strlen('grocy:'));
+            if ($idProduit <= 0) {
+                return $this->json(['erreur' => 'Produit non précisé.'], 422);
+            }
         }
 
         try {

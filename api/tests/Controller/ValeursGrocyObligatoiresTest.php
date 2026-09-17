@@ -56,6 +56,27 @@ final class ValeursGrocyObligatoiresTest extends TestCase
         self::assertSame([], $appels, 'rien ne doit partir vers Grocy');
     }
 
+    /**
+     * UNE CRÉATION INCOMPLÈTE NE LAISSE PAS DE PRODUIT NU DANS GROCY.
+     *
+     * Sans référence, la route crée d'abord le produit, puis écrit ses
+     * valeurs. Les contrôles venaient APRÈS la création : un corps sans
+     * lipides recevait bien son 422, mais le produit restait dans Grocy, sans
+     * catégorie ni calories. Relevé par l'agent de documentation le
+     * 17 septembre 2026 ; ce test ne visait jusque-là que la correction.
+     */
+    public function testUneCreationIncompleteNeCreeRienDansGrocy(): void
+    {
+        $appels = [];
+        $corps = ['reference' => '', 'nom' => 'Saumon'] + self::corpsComplet();
+        unset($corps['lip100']);
+
+        $reponse = self::controleur($appels)->enregistrerAliment(self::envoi($corps));
+
+        self::assertSame(422, $reponse->getStatusCode());
+        self::assertSame([], $appels, 'aucun produit ne doit etre cree dans Grocy');
+    }
+
     public function testUneMacroIllisibleNePartPasDansGrocy(): void
     {
         $appels = [];
