@@ -267,8 +267,21 @@ jetonsCharges = true;
 Si `definirJeton(nouveau)` s'exécute pendant que ce `Promise.all` est en vol, l'affectation **écrase le jeton neuf par la valeur ancienne lue du disque** ; `terminerSession()` peut de même se voir annulée. Les trois appelants de `chargerJeton` sont au montage (`_layout.tsx:43`, `index.tsx:12`, `session.ts:21`) et la connexion arrive bien après, donc la fenêtre est étroite — mais aucune garde n'existe.
 **Correction (petit)** : ne réaffecter au retour du `await` que si `!jetonsCharges`.
 
-## M11. `useMoi` : `retry: false` s'applique aussi aux pannes réseau
-**MOYENNE · CONFIRMÉ · `front/src/api/hooks.ts:111-116`**
+## M11. ~~`useMoi` : `retry: false` s'applique aussi aux pannes réseau~~ — CLOS
+**MOYENNE · CORRIGÉ LE 18 SEPTEMBRE 2026 · `front/src/api/hooks/auth.ts`**
+
+La règle vit dans `src/api/reessai.ts`, module pur, avec quatre tests : deux
+réessais sur une panne réseau (statut 0), aucun sur un refus (400 à 500), aucun
+sur ce qui n'est pas une `ErreurApi`. Le seuil est comparé avec `<` et non `<=`,
+parce que `retryer.js` décide **avant** d'incrémenter un compteur qui part de
+zéro — `retry: 2` y vaut exactement `(n) => n < 2`.
+
+`ErreurApi` a été sortie de `client.ts` vers `src/api/erreurApi.ts` : une classe
+de six lignes qui ne dépend de rien n'a pas à imposer le remplacement de
+`Module._load` à ses tests, seulement parce que son fichier importait
+`react-native` et `expo-secure-store`. `client.ts` la réexporte.
+
+Ce qui suit est l'état d'avant.
 
 Désactiver les réessais est justifié pour un refus d'identité, mais `retry: false` couvre aussi la panne réseau, que le client ramène à une `ErreurApi` de statut `0` (`client.ts:261-269`). Une coupure d'une seconde condamne l'onglet Compte à `<Erreur>` plein cadre — sans le bouton « Se déconnecter », voir É4 — alors que tous les autres écrans réessaient deux fois (`_layout.tsx:27`). Le message affiché est correct (« Serveur injoignable : … ») ; c'est la stratégie de réessai qui manque de nuance.
 **Correction (petit)** : `retry: (n, e) => e instanceof ErreurApi && e.statut === 0 && n < 2`.

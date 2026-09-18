@@ -5,6 +5,7 @@ import {
   api, definirJeton, definirRafraichissement, lireRafraichissement,
 } from '../client';
 import { purgerLeCache } from '../persistance';
+import { reessayerSiReseau } from '../reessai';
 import { useConnecte } from '../session';
 import type { Utilisateur } from '../types';
 
@@ -137,6 +138,14 @@ export const useMoi = () => {
     queryKey: ['moi'],
     queryFn: () => api<Utilisateur>('/moi'),
     enabled: connecte === true,
-    retry: false,
+    /* PAS `retry: false` — constat M11. Un refus d'identité ne se réessaie
+       pas, mais la panne réseau arrive par le même chemin : le client la rend
+       en `ErreurApi` de statut 0, et une coupure d'une seconde condamnait cet
+       onglet à un écran d'erreur plein cadre, sans même le bouton « Se
+       déconnecter ». La règle est dans `api/reessai.ts`, où elle s'éprouve. */
+    /* Enveloppe plutot que passee telle quelle : la regle accepte `unknown`,
+       et TanStack deduit le type d'erreur de la signature qu'on lui donne —
+       `compte.tsx` lit `error.message`, qui disparaitrait sur `unknown`. */
+    retry: (tentatives, erreur) => reessayerSiReseau(tentatives, erreur),
   });
 };

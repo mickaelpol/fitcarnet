@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { adresseDeLApi, type Emplacement } from './adresse';
+import { ErreurApi } from './erreurApi';
 import { renouvelerJeton, type DepotJetons } from './renouvellement';
 import { uneSeuleFois } from './uneSeuleFois';
 
@@ -92,12 +93,12 @@ export const coffre = {
   },
 };
 
-export class ErreurApi extends Error {
-  constructor(public readonly statut: number, message: string) {
-    super(message);
-    this.name = 'ErreurApi';
-  }
-}
+/* `ErreurApi` vit dans son propre fichier depuis le 18 septembre 2026 : ce
+   fichier-ci importe `react-native` et `expo-secure-store`, que Node seul ne
+   charge pas, et une classe de six lignes qui ne depend de rien n'a pas a
+   imposer ce detour a ses tests. Reexportee ici, rien ne change pour les
+   appelants. */
+export { ErreurApi } from './erreurApi';
 
 let jeton: string | null = null;
 let rafraichissement: string | null = null;
