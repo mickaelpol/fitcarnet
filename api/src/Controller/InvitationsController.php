@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Utilisateur;
+use App\Repository\Invitations;
 use App\Service\Invitation;
-use Doctrine\DBAL\Connection;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -53,8 +52,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class InvitationsController extends AbstractController
 {
     public function __construct(
-        private readonly Connection $cnx,
-        private readonly EntityManagerInterface $em,
+        private readonly Invitations $invitations,
         private readonly UserPasswordHasherInterface $hacheur,
         /**
          * L'adresse publique du site. On la prend dans la CONFIGURATION, et
@@ -91,14 +89,7 @@ final class InvitationsController extends AbstractController
     #[IsGranted('ROLE_ADMIN')]
     public function lister(): JsonResponse
     {
-        $lignes = $this->cnx->fetchAllAssociative(
-            "SELECT i.id, i.email, i.cree_le, i.expire_le, i.accepte_le,
-                    u.nom AS nom_invite
-               FROM invitation i
-          LEFT JOIN utilisateur u ON u.id = i.utilisateur_id
-           ORDER BY i.cree_le DESC
-              LIMIT 100",
-        );
+        $lignes = $this->invitations->recentes();
 
         $maintenant = new \DateTimeImmutable();
 
@@ -148,35 +139,22 @@ final class InvitationsController extends AbstractController
 
         // Un compte existe deja : l'inviter ne creerait rien, et le lien
         // echouerait au dernier moment — apres que l'admin l'a transmis.
-        $deja = $this->cnx->fetchOne(
-            'SELECT nom FROM utilisateur WHERE lower(email) = :e',
-            ['e' => $email],
-        );
-        if (false !== $deja) {
-            return $this->refus(\sprintf('« %s » a déjà un compte (%s).', $email, (string) $deja));
+        $deja = $this->invitations->nomDuCompte($email);
+        if (null !== $deja) {
+            return $this->refus(\sprintf('« %s » a déjà un compte (%s).', $email, $deja));
         }
 
         $jeton = Invitation::nouveauJeton();
         $maintenant = new \DateTimeImmutable();
         $expire = Invitation::expiration($maintenant);
 
-        $this->cnx->transactional(function () use ($email, $jeton, $maintenant, $expire): void {
-            $this->cnx->executeStatement(
-                'DELETE FROM invitation WHERE lower(email) = :e AND accepte_le IS NULL',
-                ['e' => $email],
-            );
-            $this->cnx->executeStatement(
-                'INSERT INTO invitation (email, jeton_empreinte, invite_par, cree_le, expire_le)
-                 VALUES (:e, :h, :par, :cree, :expire)',
-                [
-                    'e' => $email,
-                    'h' => Invitation::empreinte($jeton),
-                    'par' => $this->getUser() instanceof Utilisateur ? $this->getUser()->getId() : null,
-                    'cree' => $maintenant->format('Y-m-d H:i:sP'),
-                    'expire' => $expire->format('Y-m-d H:i:sP'),
-                ],
-            );
-        });
+        $this->invitations->remplacer(
+            $email,
+            Invitation::empreinte($jeton),
+            $this->getUser() instanceof Utilisateur ? $this->getUser()->getId() : null,
+            $maintenant,
+            $expire,
+        );
 
         return $this->json([
             'email' => $email,
@@ -202,10 +180,7 @@ final class InvitationsController extends AbstractController
     #[IsGranted('ROLE_ADMIN')]
     public function revoquer(int $id): JsonResponse
     {
-        $supprimees = $this->cnx->executeStatement(
-            'DELETE FROM invitation WHERE id = :id AND accepte_le IS NULL',
-            ['id' => $id],
-        );
+        $supprimees = $this->invitations->revoquer($id);
 
         if (0 === $supprimees) {
             return $this->refus(
@@ -292,7 +267,7 @@ final class InvitationsController extends AbstractController
         // Course possible : deux comptes crees en meme temps sur la meme
         // adresse. L'index unique de `utilisateur` trancherait de toute
         // facon, mais avec une erreur 500 illisible.
-        if (false !== $this->cnx->fetchOne('SELECT 1 FROM utilisateur WHERE lower(email) = :e', ['e' => $email])) {
+        if ($this->invitations->compteExiste($email)) {
             return $this->refus('Un compte existe déjà pour cette adresse. Connecte-toi.', Response::HTTP_CONFLICT);
         }
 
@@ -306,24 +281,10 @@ final class InvitationsController extends AbstractController
         $utilisateur->setSourceFrigo('base');
         $utilisateur->setActif(true);
 
-        $this->em->wrapInTransaction(function () use ($utilisateur, $ligne): void {
-            $this->em->persist($utilisateur);
-            $this->em->flush();
-
-            // `accepte_le IS NULL` dans la clause : si deux envois arrivent
-            // ensemble, le second ne marque rien et sa transaction echoue sur
-            // l'unicite de l'adresse. Le compte n'est cree qu'une fois.
-            $marquees = $this->cnx->executeStatement(
-                'UPDATE invitation
-                    SET accepte_le = now(), utilisateur_id = :u
-                  WHERE id = :id AND accepte_le IS NULL',
-                ['u' => $utilisateur->getId(), 'id' => (int) $ligne['id']],
-            );
-
-            if (0 === $marquees) {
-                throw new \RuntimeException('Invitation consommée entre-temps.');
-            }
-        });
+        // Le compte cree et l'invitation consommee sont UN SEUL FAIT : le
+        // depot les tient dans une transaction, et leve si le lien a ete
+        // consomme entre-temps.
+        $this->invitations->creerLeCompteEtConsommer($utilisateur, (int) $ligne['id']);
 
         return $this->json([
             'cree' => true,
@@ -344,14 +305,9 @@ final class InvitationsController extends AbstractController
      */
     private function invitationVivante(string $jeton): ?array
     {
-        $ligne = $this->cnx->fetchAssociative(
-            'SELECT id, email, expire_le, accepte_le
-               FROM invitation
-              WHERE jeton_empreinte = :h',
-            ['h' => Invitation::empreinte($jeton)],
-        );
+        $ligne = $this->invitations->parEmpreinte(Invitation::empreinte($jeton));
 
-        if (false === $ligne) {
+        if (null === $ligne) {
             return null;
         }
 
