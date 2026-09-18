@@ -72,30 +72,38 @@ pas du code : le régler d'abord.
 
 ## 2. Ce qui reste à faire, dans l'ordre
 
-### 2.1 Tout de suite — contrôler la production, puis retirer la migration 34
+### 2.1 ~~Contrôler la production, retirer la migration 34~~ — fait le 18 septembre
 
-La production a reçu, depuis le 17 septembre, les migrations **34** (chaque
-aliment appartient à un compte : les aliments sans propriétaire supprimés),
-**35** (clé composite : une ligne de stock ne vise que les aliments de son
-compte) et **36** (un seul contrôle de quantité sur le stock).
+**Schéma de production vérifié** (`\d aliment`, `\d stock`) : `utilisateur_id`
+NOT NULL, l'index `aliment_nom_unique_par_compte`, la contrainte
+`aliment_id_utilisateur_unique`, et côté stock la clé composite
+`stock_aliment_du_meme_compte_fkey` — **sans** `stock_aliment_id_fkey` ni
+`stock_quantite_check`, ce dernier remplacé par `stock_quantite_positive`. Les
+migrations 34, 35 et 36 sont donc passées. Déploiement du 18 septembre à 11:43,
+tous les conteneurs sains ; `/api` répond 401 sans jeton, `/api/etat` dit `ok`.
 
-1. **Contrôler** :
-   ```bash
-   ssh nas 'tail -5 /volume1/docker/fitcarnet/deploiement.log'
-   ssh nas 'docker exec fitcarnet-db psql -U fitcarnet -d fitcarnet -c "\d aliment" -c "\d stock"'
-   ```
-   Attendu, côté `aliment` : `utilisateur_id` NOT NULL, l'index
-   `aliment_nom_unique_par_compte`, la contrainte `aliment_id_utilisateur_unique`.
-   Côté `stock` : `stock_aliment_du_meme_compte_fkey`, et **plus** ni
-   `stock_aliment_id_fkey` ni `stock_quantite_check`. Puis se connecter, ouvrir
-   le frigo, créer et supprimer un aliment.
-2. **Retirer `db/manuel/34-aliments-par-compte.sql`**, dans un commit à part, et
-   pousser (donc déployer). La 35 et la 36 restent. **La prochaine migration
-   prend le numéro 37** — jamais le 34 libéré (skill `schema-base`).
-3. **Conséquence acceptée** : une sauvegarde d'avant le 17 septembre ne
-   redémarre plus seule — la 35 s'arrête et demande de rejouer la 34 depuis
-   l'historique (`git show 1068054:db/manuel/34-aliments-par-compte.sql`).
-   `DEPLOIEMENT.md` le dit à l'endroit de la restauration.
+**Épreuve d'écriture, sur un compte jetable** (`epreuve-verif@test.local`, créé
+sans `--grocy`, retiré ensuite — les comptes existants lisent Grocy et
+n'écrivent donc pas dans la table `aliment`) : frigo vide à l'arrivée, aliment
+créé **avec un propriétaire**, ligne de stock acceptée sur son propre aliment,
+suppression **refusée** tant que le stock existe (« Cet aliment est encore dans
+un frigo (1 ligne de stock) »), puis quantité mise à zéro par l'inventaire,
+appliquée en tâche de fond, et suppression acceptée. Compteurs identiques avant
+et après : 4 comptes, 0 aliment, 0 stock.
+
+**`db/manuel/34-aliments-par-compte.sql` est retiré** (commit à part).
+`verifier-schema.sh` : base neuve et base migrée identiques.
+`verifier-migrations.sh` : tous les garde-fous posés. **La prochaine migration
+prend le numéro 37** — jamais le 34 libéré (skill `schema-base`).
+
+**Conséquence acceptée** : une sauvegarde d'avant le 17 septembre ne redémarre
+plus seule — la 35 s'arrête et demande de rejouer la 34 depuis l'historique
+(`git show 1068054:db/manuel/34-aliments-par-compte.sql`). `DEPLOIEMENT.md` le
+dit à l'endroit de la restauration.
+
+**À savoir pour la démonstration** : la production ne contient **aucun aliment**
+(la 34 a supprimé ceux sans propriétaire, et les deux comptes lisent Grocy). Un
+compte de démonstration devra donc recevoir `jeu-essai.sql` puis `jeu-demo.sql`.
 
 ### 2.2 À faire par toi — régénérer la clé d'API Grocy
 
