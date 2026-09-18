@@ -14,11 +14,13 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 74 constats clos, 5 ouverts** — vérifiés un par un
-> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 18
-> sont 12 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
-> 17 ; 03 — 8 sur 33 ; 04 — 4 sur 17. **Trois sont à trancher** (02#13,
-> 02#15, 02#17), les quinze autres n’ont aucune décision consignée. La liste,
+> **Au 18 septembre 2026 : 76 constats clos, 3 ouverts** — vérifiés un par un
+> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 3
+> sont 2 moyens (02#8, M5) et 1 faible (02#17). Par rapport : 01 — 0 ouvert
+> sur 12 ; 02 — 2 sur 17 ; 03 — 1 sur 33 ; 04 — 0 sur 17. **Plus aucun
+> n'attend d'arbitrage** : les quatre en attente ont été tranchés le
+> 18 septembre 2026, et les trois qui restent sont des mises en œuvre —
+> 02#8 hors dépôt (une tâche DSM, côté NAS). La liste,
 > avec la preuve de chacun, est dans « [Ce qui reste ouvert](#ce-qui-reste-ouvert-au-17-septembre-2026) ».
 
 ## Ce que l'audit dit du projet
@@ -328,8 +330,8 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 
 | Constat | Gravité | Ce qui retient |
 |---|---|---|
-| **02#13** — ni limites de ressources ni rotation des journaux | faible | `docker-compose.yml` se déploie en production au prochain push : une limite mal choisie arrêterait l'application réelle |
-| **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
+| ~~**02#13** — ni limites de ressources ni rotation des journaux~~ | faible | **clos le 18 septembre 2026, à moitié et c'est la décision.** La rotation est posée sur les trois services (`json-file`, 10 Mo × 3, `docker-compose.yml`) : un journal qui ne se purge jamais remplit le volume qui porte aussi `pgdata/`. Les limites CPU/mémoire sont **refusées avec argument** : ce fichier part en production sans palier de recette, et un `mem_limit` mal choisi ne ralentit pas l'application, il la tue (OOM). Le jour où `docker stats` aura mesuré plusieurs jours de vraie charge, le chiffre se posera sur cette mesure |
+| ~~**02#15** — `compose.dev.yml` publie `5432:5432`~~ | faible | **clos le 18 septembre 2026 : gardé, et écrit.** Le port sert (`import_carnet.py`, `import_catalogue.py`, PhpStorm → Database), la base est de développement et son mot de passe est en clair deux lignes plus haut. Le raisonnement, et ce qui ferait changer d'avis — une copie de production restaurée là ⇒ `127.0.0.1:5432:5432` —, sont désormais dans `compose.dev.yml` au-dessus du `ports:` |
 | **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée (une nouvelle invitation remplace l'ancienne) ; reste la purge, non décidée |
 
 **Ouverts, sans décision consignée :**

@@ -21,8 +21,33 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    # ---------------------------------------------------------------------
+    #  LE PORT 5432 EST PUBLIÉ, ET C'EST UNE DÉCISION — constat 02#15,
+    #  tranché le 18 septembre 2026 : gardé tel quel, et écrit ici pour qu'on
+    #  ne le redécouvre pas comme un oubli.
+    #
+    #  POURQUOI IL RESTE : il sert. `import_carnet.py` et `import_catalogue.py`
+    #  visent `localhost:5432` depuis WSL, hors conteneur ; PhpStorm → Database
+    #  aussi. Le fermer casserait ces trois usages quotidiens pour ne rien
+    #  protéger de plus.
+    #
+    #  POURQUOI CE N'EST PAS LE MÊME SUJET QU'EN PRODUCTION : là-bas, le bloc
+    #  `ports:` de la base a été RETIRÉ (voir `docker-compose.yml`), parce que
+    #  le NAS est joignable depuis Internet et que publier un port, c'est
+    #  l'ouvrir au monde. Ici, la base contient des données de développement,
+    #  le mot de passe est `fitcarnet` en clair deux lignes plus haut, et
+    #  Docker Desktop sous WSL2 lie ce port à l'interface de la machine
+    #  locale. Le risque réel est un autre poste du réseau domestique — pas
+    #  Internet.
+    #
+    #  CE QUI FERAIT CHANGER D'AVIS : le jour où cette base porterait une copie
+    #  de production (une restauration pour enquêter sur un bug, par exemple),
+    #  ce port devient une vraie exposition. Dans ce cas, le lier explicitement
+    #  à la boucle locale — `127.0.0.1:5432:5432` — et non le laisser sur
+    #  toutes les interfaces.
+    # ---------------------------------------------------------------------
     ports:
-      - "5432:5432"                          # pour PhpStorm → Database
+      - "5432:5432"
 
   app:
     build:

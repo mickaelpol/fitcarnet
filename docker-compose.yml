@@ -25,6 +25,34 @@ services:
     image: postgres:16-alpine
     container_name: fitcarnet-db
     restart: unless-stopped
+
+    # ---------------------------------------------------------------------
+    #  ROTATION DES JOURNAUX — constat 02#13, tranche le 18 septembre 2026.
+    #
+    #  Sans `logging`, Docker ecrit dans un `json-file` QUI NE SE PURGE JAMAIS.
+    #  Un conteneur qui tourne depuis des mois sur un NAS finit par remplir
+    #  `/volume1/@docker/containers/`, et ce disque porte AUSSI `pgdata/`. Une
+    #  base PostgreSQL sur un volume plein n'ecrit plus : la panne commence par
+    #  le journal et finit par les donnees.
+    #
+    #  10 Mo x 3 fichiers, soit 30 Mo par conteneur au plus, 120 Mo pour les
+    #  quatre (db, app, et les DEUX taches). C'est assez pour lire un incident
+    #  de la veille et assez peu pour ne jamais devenir un probleme.
+    #
+    #  CE QUI N'EST PAS FAIT, ET C'EST UNE DECISION : ni `cpus:` ni `mem_limit:`.
+    #  Le constat les proposait ensemble. Une limite memoire mal choisie ne
+    #  ralentit pas l'application, elle la TUE — le noyau tue le processus
+    #  (OOM), le conteneur redemarre, et personne ne sait pourquoi. Ce fichier
+    #  part en production au prochain push, sans palier de recette : on ne
+    #  choisit pas un plafond au juge sur une machine qu'on ne mesure pas. Le
+    #  jour ou une mesure existe — `docker stats` sur plusieurs jours de vraie
+    #  charge —, le chiffre se posera sur cette mesure, pas sur une intuition.
+    # ---------------------------------------------------------------------
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: fitcarnet
       POSTGRES_USER: fitcarnet
@@ -68,6 +96,12 @@ services:
       target: prod                     # passe a "dev" pour le rechargement a chaud
     container_name: fitcarnet-app
     restart: unless-stopped
+    # Rotation : voir le bloc de `fitcarnet-db` ci-dessus.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     # PAS DE `extra_hosts` ICI, ET C'EST UN CONSTAT, PAS UN OUBLI.
     #
     # Grocy tourne sur le meme NAS, dans une autre pile. `GROCY_URL` pointe
@@ -215,6 +249,13 @@ services:
     # un nom fixe ne peut designer qu'un conteneur. Docker les nommera
     # `fitcarnet-taches-1` et `fitcarnet-taches-2`.
     restart: unless-stopped
+    # Rotation : voir le bloc de `fitcarnet-db` ci-dessus. Elle s'applique a
+    # CHAQUE exemplaire, pas a la paire : 30 Mo par travailleur.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       # DEUX, ET LE CHIFFRE SE DEMONTRE — IL N'EST PAS PRUDENTIEL.
       #
