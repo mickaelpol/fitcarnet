@@ -39,7 +39,8 @@ export default function Connexion() {
           etiquette="Adresse e-mail"
           valeur={email}
           onChange={setEmail}
-          placeholder="prenom@exemple.fr"
+          placeholder="email@exemple.com"
+          onValider={valider}
         />
         <Champ
           etiquette="Mot de passe"
@@ -47,6 +48,11 @@ export default function Connexion() {
           onChange={setMotDePasse}
           motDePasse
           style={{ marginTop: E.m }}
+          /* « Entrée » connecte, depuis les DEUX champs. Sur le web, le bouton
+             etait le seul chemin : React Native Web ne pose pas de formulaire
+             HTML, donc rien ne se soumettait. `valider` refuse de lui-meme un
+             champ vide, comme le bouton qui se grise. */
+          onValider={valider}
         />
 
         {connexion.isError && (

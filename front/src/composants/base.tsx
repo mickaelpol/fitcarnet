@@ -87,6 +87,21 @@ interface ChampProps {
    */
   multiligne?: boolean;
   /**
+   * Ce que fait la touche « Entrée ».
+   *
+   * SUR LE WEB, LE BOUTON ÉTAIT LE SEUL CHEMIN — 18 septembre 2026. React
+   * Native Web ne pose pas de vrai formulaire HTML : il n'y a donc rien à
+   * soumettre, et « Entrée » ne faisait rien du tout. On remplissait son
+   * adresse, son mot de passe, on appuyait sur Entrée, et il ne se passait
+   * rien — sans le moindre message pour dire qu'il fallait viser le bouton.
+   * C'est déjà écrit dans `presentation/tournage/capturer.mjs`, qui clique
+   * le bouton pour cette raison précise.
+   *
+   * `onSubmitEditing` marche des deux côtés : la touche Entrée sur un
+   * clavier, le bouton « Go » sur un téléphone.
+   */
+  onValider?: () => void;
+  /**
    * La saisie ne désigne rien d'utilisable : le cadre se borde de rouge. On
    * MONTRE l'erreur plutôt que d'effacer ce qui a été tapé — voir `ChampNombre`.
    */
@@ -95,7 +110,7 @@ interface ChampProps {
 
 export function Champ({
   valeur, onChange, placeholder, unite, numerique, motDePasse, etiquette, style,
-  multiligne, illisible,
+  multiligne, illisible, onValider,
 }: ChampProps) {
   return (
     <View style={[s.champBloc, style]}>
@@ -110,6 +125,10 @@ export function Champ({
           secureTextEntry={motDePasse}
           autoCapitalize={multiligne === true ? 'sentences' : 'none'}
           multiline={multiligne}
+          onSubmitEditing={onValider}
+          /* « Entrée » plutôt que « Suivant » : le clavier annonce ce que la
+             touche va faire. Sans `onValider`, on ne touche à rien. */
+          returnKeyType={onValider === undefined ? undefined : 'go'}
           style={[s.champ, numerique && s.champNombre, multiligne === true && s.champLong]}
         />
         {unite !== undefined && <Text style={s.unite}>{unite}</Text>}
