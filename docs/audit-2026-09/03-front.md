@@ -226,8 +226,16 @@ Quatre écrans testent l'erreur d'**une** requête et pas des autres, puis retom
 Correct sur `/connexion`, faux partout ailleurs. Un 401 sur `/moi`, `/seances` ou `/mon-frigo` veut dire « session expirée », jamais « mot de passe faux ». L'utilisateur qui lit « Identifiants incorrects. » sur son onglet Frigo cherche une faute de frappe dans un mot de passe qu'il n'a pas tapé.
 **Correction (trivial)** : faire dépendre le repli de `options.sansJeton`.
 
-## M8. Permission microphone demandée pour rien, et en double
-**MOYENNE · CONFIRMÉ · `front/app.json`, bloc `android.permissions`**
+## M8. ~~Permission microphone demandée pour rien, et en double~~ — CLOS
+**MOYENNE · CORRIGÉ LE 18 SEPTEMBRE 2026 · `front/app.json`, bloc `android.permissions`**
+
+Réduit à `["android.permission.MODIFY_AUDIO_SETTINGS"]`. **Ne prend effet qu'à la
+prochaine compilation Android** — une mise à jour par `eas update` ne touche pas
+le manifeste. À la première installation de l'APK suivant : vérifier que la fiche
+Android n'annonce plus « Microphone », et que la sonnerie de fin de repos sort
+toujours sur le flux ALARME.
+
+Ce qui suit est l'état d'avant.
 
 ```json
 ["android.permission.RECORD_AUDIO", "android.permission.MODIFY_AUDIO_SETTINGS",
