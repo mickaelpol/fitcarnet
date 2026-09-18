@@ -127,11 +127,21 @@ seule se redessinait entièrement à chaque frappe dans la recherche. Les autres
 gardent le leur en ligne — leurs appelants passent des fonctions recréées à
 chaque rendu, une mémoïsation intérieure n'y changerait rien.
 
-### 2.2 À faire par toi — régénérer la clé d'API Grocy
+### 2.2 À faire par toi, sur le NAS
 
-Elle a été collée dans une conversation le 15 septembre 2026 : elle est à
-considérer comme publiée. Grocy → Paramètres → Clés d'API → révoquer puis
-recréer, et reporter la nouvelle dans le `.env` du NAS.
+**Régénérer la clé d'API Grocy.** Elle a été collée dans une conversation le
+15 septembre 2026 : elle est à considérer comme publiée. Grocy → Paramètres →
+Clés d'API → révoquer puis recréer, et reporter la nouvelle dans le `.env` du
+NAS.
+
+**Sortir les sauvegardes du NAS — constat d'audit 02#8.** Base et sauvegardes
+vivent toutes deux sur `/volume1` : une panne de volume, un rançongiciel ou une
+suppression du dossier `docker/` emporte les deux d'un coup. Aucune ligne de
+code ne peut corriger cela — il faut une tâche DSM (Hyper Backup ou un `rsync`)
+qui copie `/volume1/docker/sauvegardes-fitcarnet` **ailleurs**. Puis, une fois :
+reprendre le dernier `.dump` **depuis la destination** et le relire avec
+`./restaurer-nas.sh --essai`. Le détail est dans `DEPLOIEMENT.md`, section
+« Ce que ces sauvegardes NE protègent pas ».
 
 ### 2.3 Avant de tourner la démonstration
 
@@ -180,11 +190,10 @@ infrastructure, `03` = front, `04` = tests et qualité).
 | **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
 | **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée ; reste à décider si l'on purge |
 
-**Huit n'ont jamais été tranchés :**
+**Sept n'ont jamais été tranchés :**
 
 | Constat | Gravité | En une phrase |
 |---|---|---|
-| **02#8** | moyenne | Les sauvegardes du NAS sont sur le même volume que la base : un disque perdu emporte les deux. La correction est hors dépôt, et rien ne la consigne. |
 | **03 M5** | moyenne | Sur le web, les jetons de session sont en clair dans `localStorage` (`front/src/api/client.ts`). |
 | **03 M6** | moyenne | Chargement infini quand une requête voisine échoue : corrigé sur l'écran de séance seulement ; restent `modele/[id].tsx`, `admin-utilisateurs.tsx` et les cibles de `repas.tsx`. |
 | **03 M10** | moyenne | Course au chargement des jetons au démarrage (`client.ts`). |

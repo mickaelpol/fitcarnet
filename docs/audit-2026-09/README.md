@@ -336,7 +336,7 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 
 | Constat | Gravité | Preuve au 17 septembre 2026 |
 |---|---|---|
-| **02#8** — sauvegardes sur le même volume que la base | moyenne | correction hors dépôt ; rien ne la consigne |
+| **02#8** — sauvegardes sur le même volume que la base | moyenne | **consigné** le 18 septembre dans `DEPLOIEMENT.md` ; l'action reste à faire sur le NAS (tâche DSM), hors dépôt |
 | **03 M5** — jetons en clair dans `localStorage` sur le web | moyenne | `front/src/api/client.ts:64-93` |
 | **03 M6** — chargement infini quand une requête voisine échoue | moyenne | **partiel** : `seance/[id].tsx` corrigé ; `modele/[id].tsx:74-78`, `admin-utilisateurs.tsx` et les cibles de `repas.tsx` non |
 | **03 M10** — course au chargement des jetons | moyenne | `front/src/api/client.ts:106-113` |

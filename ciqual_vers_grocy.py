@@ -314,6 +314,11 @@ def nombre(valeur):
     return float(m.group()) if m else None
 
 
+def ecart_relatif(valeur, reference):
+    """De combien `valeur` s'ecarte de `reference`, en proportion."""
+    return abs(valeur - reference) / reference
+
+
 def api(methode, chemin, corps=None):
     donnees = json.dumps(corps).encode() if corps is not None else None
     requete = urllib.request.Request(
@@ -333,6 +338,16 @@ def api(methode, chemin, corps=None):
 
 # ------------------------------------------------------------ lecture Ciqual
 
+def entetes_de(lignes, chemin: str) -> list:
+    """La premiere ligne du classeur, normalisee, qui nomme les colonnes."""
+    return [normaliser(c) for c in next(lignes)]
+
+
+def argument_de(argv, option: str) -> str:
+    """Le mot qui suit `option` sur la ligne de commande."""
+    return argv[argv.index(option) + 1]
+
+
 def lire_ciqual(chemin):
     print(f"Lecture de {chemin}…")
     try:
@@ -345,7 +360,7 @@ def lire_ciqual(chemin):
     feuille = classeur[classeur.sheetnames[0]]
     lignes = feuille.iter_rows(values_only=True)
 
-    entetes = [normaliser(c) for c in next(lignes)]
+    entetes = entetes_de(lignes, chemin)
 
     index = {}
     for cle, regle in COLONNES.items():
@@ -815,7 +830,7 @@ def main() -> int:
 
     # --chercher « amande » : liste les libellés Ciqual disponibles
     if "--chercher" in sys.argv:
-        terme = sys.argv[sys.argv.index("--chercher") + 1]
+        terme = argument_de(sys.argv, "--chercher")
         print(f"Libellés contenant « {terme} » :\n")
         for a in candidats_pour(aliments, terme, 20):
             print(f"  {a['nom'][:58]:60} {a['kcal'] or 0:6.1f} kcal · "
@@ -911,7 +926,7 @@ def main() -> int:
                 # derivation a contresens vient d'un mauvais appariement de
                 # l'entree cuite, pas d'une cuisson exotique.
                 if rendement_derive_credible(categorie, calcule):
-                    if abs(calcule - ratio) / ratio > 0.1:
+                    if ecart_relatif(calcule, ratio) > 0.1:
                         ratios_corriges.append(
                             (produit["name"], ratio, calcule, cuit["nom"]))
                     ratio = calcule
@@ -941,7 +956,7 @@ def main() -> int:
                 pesees_ecartees.append(
                     (produit["name"], mesure, ratio, pesees, contresens))
             else:
-                if abs(mesure - ratio) / ratio > 0.02:
+                if ecart_relatif(mesure, ratio) > 0.02:
                     ratios_mesures.append((produit["name"], ratio, mesure, pesees))
                 ratio = mesure
 

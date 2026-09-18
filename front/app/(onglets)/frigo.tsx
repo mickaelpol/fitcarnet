@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -12,23 +12,12 @@ import { AlertesFrigo } from '@/composants/alertesFrigo';
 import { Confirmer } from '@/composants/confirmer';
 import { EditeurAlimentConnecte } from '@/composants/editeurAlimentConnecte';
 import { LigneInventaire, LigneStock } from '@/composants/ligneFrigo';
+import {
+  abonnerInventaire, allerAuStock, basculerVu, cloreInventaire, modeFrigo, ouvrirInventaire,
+  reinitialiserInventaire, saisirQuantite, saisiesInventaire, vusInventaire,
+} from '@/composants/etatInventaire';
 import { ecartsInventaire, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
-
-/**
- * Champs d'inventaire préremplis avec le stock connu.
- *
- * La valeur exacte, pas son affichage arrondi : préremplir « 1234,6 » pour un
- * stock de 1234,56 créerait un écart de 0,04 sur une ligne que personne n'a
- * touchée, et l'enverrait.
- *
- * Sa place est dans `src/calcul/frigo.ts`, à côté de `ecartsInventaire` dont
- * il est le pendant — un test posé ici ne serait jamais exécuté, `include` de
- * `tsconfig.tests.json` ne couvrant que `src/`. Le déplacement n'a pas été
- * fait le 15 septembre 2026 : le périmètre du chantier s'arrêtait à l'écran.
- */
-const stocksInitiaux = (aliments: AlimentDisponible[]): Record<string, string> =>
-  Object.fromEntries(aliments.map((a) => [a.reference, String(a.stock)]));
 
 /**
  * Mon frigo : une seule liste, deux modes.
@@ -51,12 +40,20 @@ export default function MonFrigo() {
   const majAliment = useMajAliment();
   const supprimer = useSupprimerAliment();
 
-  const [mode, setMode] = useState<'stock' | 'inventaire'>('stock');
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [recherche, setRecherche] = useState('');
 
-  const [saisies, setSaisies] = useState<Record<string, string>>({});
-  const [vus, setVus] = useState<Record<string, boolean>>({});
+  /* L'INVENTAIRE EN COURS NE VIT PAS ICI — constat M12, 18 septembre 2026.
+     Cet onglet est démonté dès qu'on en regarde un autre : tant que le
+     comptage était un `useState`, aller vérifier une quantité dans l'onglet
+     Stock emportait trente articles saisis. `etatInventaire` survit à la
+     navigation ; l'onglet n'en est plus que la vue, et se redessine quand le
+     module le prévient. Même patron que le chrono et la mesure d'effort. */
+  const [, redessiner] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => abonnerInventaire(redessiner), []);
+  const mode = modeFrigo();
+  const saisies = saisiesInventaire();
+  const vus = vusInventaire();
 
   const [edite, setEdite] = useState<AlimentDisponible | null>(null);
   const [creation, setCreation] = useState(false);
@@ -124,20 +121,16 @@ export default function MonFrigo() {
      que Grocy porte la conversion, le litre et le pack non. */
   const sansPoids = useMemo(() => tous.filter((a) => a.grammesParUnite === null), [tous]);
 
+  /* `ouvrirInventaire` décide seul s'il préremplit : une session déjà ouverte
+     se poursuit, elle ne recommence pas. Le contournement qui regardait
+     `Object.keys(saisies).length === 0` est parti avec le constat M12 — il
+     lisait l'état au lieu de l'intention, et tout effacer à la main suffisait
+     à le tromper. Repartir de zéro reste un geste qu'on décide : c'est le
+     bouton « Réinitialiser », en bas. */
   const entrerInventaire = () => {
     envoyer.reset();
-    /* ON NE REPART DE ZERO QUE S'IL N'Y A RIEN EN COURS.
-       Avant, revenir sur cet onglet rappelait `stocksInitiaux` : un inventaire
-       de trente articles disparaissait parce qu'on etait alle verifier une
-       quantite dans l'onglet Stock. Rien ne prevenait, et rien ne permettait
-       de le recuperer. Repartir de zero reste possible — c'est le bouton
-       « Reinitialiser », en bas, et c'est un geste qu'on decide. */
-    if (Object.keys(saisies).length === 0) {
-      setSaisies(stocksInitiaux(tous));
-      setVus({});
-    }
     setOuvert(null);
-    setMode('inventaire');
+    ouvrirInventaire(tous);
   };
 
   if (frigo.isLoading) return <Chargement texte="Lecture de ton frigo…" />;
@@ -151,7 +144,7 @@ export default function MonFrigo() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: E.s }}>
           <View style={s.segmente}>
             <Pressable
-              onPress={() => setMode('stock')}
+              onPress={allerAuStock}
               style={[s.segment, mode === 'stock' && s.segmentActif]}
               accessibilityRole="button"
               accessibilityState={{ selected: mode === 'stock' }}

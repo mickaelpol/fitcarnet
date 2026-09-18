@@ -278,9 +278,22 @@ taille, `pg_restore --list`, `mv` final. **Effort : 20 min (copier-coller).**
 
 ---
 
-## 8. OUVERT — Les sauvegardes vivent sur le même volume que la base, sans copie hors NAS
+## 8. CONSIGNÉ — Les sauvegardes vivent sur le même volume que la base, sans copie hors NAS
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : la correction est hors dépôt (tâche DSM), et rien dans le dépôt ne la consigne.
+**Gravité : MOYENNE — Statut : CONSIGNÉ LE 18 SEPTEMBRE 2026 ; l'action reste à faire, hors dépôt.**
+
+Le risque est réel et inchangé : base et sauvegardes sur `/volume1`, une seule
+panne de volume emporte les deux. **Mais aucune ligne de code ne peut le
+corriger** — il faut une tâche sur le NAS qui copie les sauvegardes ailleurs.
+
+Ce que ce constat reprochait au dépôt, c'était de n'en garder aucune trace :
+c'est réglé. `DEPLOIEMENT.md`, section « Ce que ces sauvegardes NE protègent
+pas », dit le risque, le minimum à mettre en place, et la vérification qui
+compte — relire le dernier `.dump` **depuis la destination** avec
+`./restaurer-nas.sh --essai`.
+
+Le constat ne sera pleinement clos que le jour où cette copie existe et où elle
+aura été relue une fois.
 
 **Emplacement** `sauvegarde-nas.sh:25` (`/volume1/docker/sauvegardes-fitcarnet`) face à
 `docker-compose.yml:33` (`/volume1/docker/fitcarnet/pgdata`).

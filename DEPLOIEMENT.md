@@ -148,6 +148,32 @@ pas une sauvegarde, c'est un espoir.
 ./sauvegarde-nas.sh --lister
 ```
 
+#### Ce que ces sauvegardes NE protègent pas — constat 02#8
+
+**Elles sont sur le même volume que la base.** `/volume1/docker/sauvegardes-fitcarnet`
+d'un côté, `/volume1/docker/fitcarnet/pgdata` de l'autre : une panne de volume,
+un chiffrement par rançongiciel ou une suppression du dossier `docker/` emporte
+**les deux d'un coup**. Les sortir du clone git protégeait d'un `git clean` —
+la réflexion était juste, elle s'arrêtait un cran trop tôt.
+
+Quatorze jours de rétention, aussi : correct pour un incident qu'on voit le
+jour même, insuffisant pour une corruption découverte des semaines plus tard.
+
+**La correction ne peut pas vivre dans ce dépôt** : elle se règle sur le NAS,
+une fois. Tant qu'elle n'est pas faite, ce paragraphe est là pour qu'on ne
+l'oublie pas.
+
+- **Le minimum** : une tâche DSM (Hyper Backup ou un simple `rsync`) qui copie
+  `/volume1/docker/sauvegardes-fitcarnet` **ailleurs** — un autre volume est
+  déjà mieux que rien, une autre machine ou un espace distant est la vraie
+  réponse. Le NAS ne doit pas être le seul endroit où vit l'application ET sa
+  copie de secours.
+- **La vérification qui compte** : une fois la copie en place, prendre le
+  dernier `.dump` **depuis la destination** et le relire avec
+  `./restaurer-nas.sh --essai`. Une copie qu'on n'a jamais essayé d'ouvrir
+  n'est pas une sauvegarde, c'est un espoir — la même phrase que pour le
+  script lui-même, et pour la même raison.
+
 Pour restaurer, c'est `restaurer-nas.sh`, jamais une suite de commandes à la
 main :
 
