@@ -236,8 +236,14 @@ Correct sur `/connexion`, faux partout ailleurs. Un 401 sur `/moi`, `/seances` o
 Les deux permissions sont déclarées **deux fois**, et `RECORD_AUDIO` est la permission **microphone**. Aucune ligne de `front/src` ni `front/app` n'enregistre de son (`grep -niE "record|micro|AudioRecorder|requestRecordingPermission"` : rien hors de `Record<...>` TypeScript). L'application ne fait que **lire** des `.wav` (`sonnerie.ts:117`), ce qui ne demande aucune permission. La fiche Android annonce donc « Microphone » à qui installe l'APK.
 **Correction (2 min)** : réduire à `["android.permission.MODIFY_AUDIO_SETTINGS"]`, puis vérifier que la sonnerie sort toujours sur le flux ALARME.
 
-## M9. `@react-navigation/native-stack` importé mais absent de `package.json`
-**MOYENNE · CONFIRMÉ · `front/src/composants/enTete.tsx:1`**
+## M9. ~~`@react-navigation/native-stack` importé mais absent de `package.json`~~ — CLOS
+**MOYENNE · CORRIGÉ LE 18 SEPTEMBRE 2026 · `front/src/composants/enTete.tsx:1`**
+
+Le paquet est déclaré (`npx expo install`, version alignée sur le SDK), et
+surtout `verifier-greffons.py` regarde désormais **les deux sens** : les
+greffons d'`app.json`, et les modules importés par le code. Il lit les 124
+fichiers de `front/src` et `front/app` et n'a trouvé que celui-ci — c'est
+`publier-android.sh` qui l'exécute, donc avant chaque publication.
 
 Le paquet n'est pas dans `dependencies` (diff imports/deps vérifié) ; il n'est dans `node_modules` que par transitivité d'expo-router (`package-lock.json:4785`). C'est exactement le mode de panne que `verifier-greffons.py` a été écrit pour attraper — sauf que ce script ne regarde **que** les greffons `expo-*` déclarés dans `app.json`, jamais les imports du code. Atténuation : c'est un `import type`, effacé à la compilation, donc Metro ne le cherchera pas ; mais `tsc --noEmit` (script `verif`, exécuté par `npm test`) échouera dès que le hoisting change.
 **Correction (trivial)** : `npm i @react-navigation/native-stack`, et élargir `verifier-greffons.py` au sens inverse.
