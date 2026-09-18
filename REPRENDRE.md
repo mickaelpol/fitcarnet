@@ -47,7 +47,7 @@ cd front && npm install          # si package.json a bougé, ou si les tests de 
 Puis vérifier qu'on part d'un socle sain :
 
 ```bash
-cd front && npm test                                                  # 644 + 33, 0 échec
+cd front && npm test                                                  # 646 + 33, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 415 tests, 1 026 assertions
 db/manuel/verifier-schema.sh                                          # « identiques »
 db/manuel/verifier-migrations.sh                                      # vert

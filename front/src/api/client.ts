@@ -24,7 +24,13 @@ function emplacement(): Emplacement | null {
 /* Voir `adresse.ts` : sur une page HTTPS, l'API est sur la même origine, et
    c'est décidé ici, à l'exécution — pas figé dans le bundle au moment du
    build web par le `.env` de la machine qui l'a lancé. */
-const BASE = adresseDeLApi(process.env.EXPO_PUBLIC_API_URL, emplacement());
+/* `__DEV__` DIT SI CE BUNDLE VIENT DU SERVEUR DE DÉVELOPPEMENT D'EXPO.
+   `npm run web` produit un bundle de développement et ne sert pas l'API ;
+   `npm run build:web` produit un bundle de production, servi par Caddy, qui
+   sert l'API sur la même origine. C'est la distinction dont `adresseDeLApi` a
+   besoin, et le seul endroit du projet qui la connaisse — `adresse.ts` reste
+   pur, donc éprouvable sans React Native. */
+const BASE = adresseDeLApi(process.env.EXPO_PUBLIC_API_URL, emplacement(), __DEV__);
 const CLE_JETON = 'fitcarnet.jeton';
 const CLE_RAFRAICHISSEMENT = 'fitcarnet.rafraichissement';
 

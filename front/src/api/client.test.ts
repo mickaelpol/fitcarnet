@@ -53,6 +53,19 @@ import { describe, it } from 'node:test';
 const ADRESSE = 'http://api.test/api';
 process.env.EXPO_PUBLIC_API_URL = ADRESSE;
 
+/* `__DEV__` EST UN GLOBAL DE METRO, PAS UN MODULE — on ne peut donc pas le
+   doubler par le chargeur ci-dessous, il faut le poser. Sans lui, le simple
+   chargement de `client.ts` lève `__DEV__ is not defined` sous Node nu, et les
+   28 témoins de ce fichier tombent d'un coup sans rapport avec ce qu'ils
+   éprouvent.
+
+   `false`, c'est-à-dire un bundle CONSTRUIT : c'est ce que voit la production,
+   et c'est donc ce qu'on doit éprouver. La valeur ne change rien ici — sans
+   `globalThis.location`, `adresseDeLApi` retombe de toute façon sur
+   `EXPO_PUBLIC_API_URL` — mais l'écrire évite de croire que ce fichier teste
+   le serveur de développement. */
+(globalThis as { __DEV__?: boolean }).__DEV__ = false;
+
 /** Le coffre du web est `localStorage`. On en pose un, en mémoire et
  *  inspectable.
  *

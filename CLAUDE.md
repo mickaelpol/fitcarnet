@@ -33,7 +33,7 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 644 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 646 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
 # 415 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :

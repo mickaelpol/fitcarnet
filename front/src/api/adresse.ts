@@ -52,8 +52,40 @@ export function adresseDeLApi(
   configuree: string | undefined,
   /** `null` hors du web, ou quand le navigateur ne dit rien d'exploitable */
   emplacement: Emplacement | null,
+  /**
+   * Ce bundle est-il celui du SERVEUR DE DÉVELOPPEMENT d'Expo ?
+   *
+   * C'est la seule question qui sépare vraiment les deux situations du web, et
+   * le schéma n'y répondait qu'à moitié :
+   *
+   *   - `npm run web` sert le bundle sur `:8081` et **ne sert pas l'API**. La
+   *     page et l'API sont alors réellement à deux endroits, et
+   *     `EXPO_PUBLIC_API_URL` est la seule façon de savoir où aller.
+   *   - un bundle **construit** (`npm run build:web`) est servi par Caddy, qui
+   *     sert aussi l'API — en développement comme en production. L'API est
+   *     donc sur l'origine de la page, quel que soit le schéma.
+   *
+   * Hors du web, sans objet : `emplacement` vaut `null` et on n'arrive jamais
+   * jusqu'ici.
+   */
+  serveurDeDeveloppement = false,
 ): string {
-  if (emplacement !== null && emplacement.protocol === 'https:') {
+  /* SUIVRE LA PAGE, ET PAS LA VARIABLE DE CONSTRUCTION — sauf sur le serveur
+     de développement d'Expo, seul cas où la page ne sert pas l'API.
+
+     LA RÈGLE NE PORTAIT QUE SUR LE HTTPS, ET ÇA A COÛTÉ UNE DÉCONNEXION À
+     CHAQUE RECHARGEMENT — 18 septembre 2026. Un bundle construit ouvert sur
+     `http://localhost:8080` appelait l'adresse figée à la construction,
+     `http://192.168.1.118:8080/api`. Tant que la session tenait dans
+     `localStorage`, ça marchait : deux origines, mais le jeton voyageait dans
+     un en-tête. Depuis M5 il est dans un cookie `SameSite=Strict`, et
+     `localhost` et `192.168.1.118` sont DEUX SITES — le navigateur ne l'envoie
+     jamais. La connexion réussissait, aucun cookie n'était posé, et le moindre
+     rechargement déconnectait. Mesuré dans Chromium, pas supposé.
+
+     Le HTTPS reste couvert : une page HTTPS ne peut de toute façon pas appeler
+     une adresse en clair, et un bundle construit est le seul qu'on y serve. */
+  if (emplacement !== null && !serveurDeDeveloppement) {
     /* Une barre finale sur `origin` donnerait `https://x//api`. Certains
        serveurs l'acceptent, Caddy renvoie une redirection, et le préflight
        CORS d'un POST ne survit pas à une redirection. */
