@@ -25,7 +25,7 @@ d'une ligne de code, pas ce qui reste à faire.
   `test_import_carnet.py`.
 - **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
   puis deux passes des trois agents de contrôle et leurs correctifs.
-- **Audit de septembre** : 79 constats, **73 clos, 6 ouverts**, aucun
+- **Audit de septembre** : 79 constats, **74 clos, 5 ouverts**, aucun
   critique ni élevé (section 2.4).
 
 ---
@@ -174,7 +174,7 @@ l'instance filmée. Sur la base de dev **du premier poste**, deux comptes
 jetables servent aux captures (`demo-verif@test.local`,
 `demo-admin-verif@test.local`) : les retirer une fois les captures refaites.
 
-### 2.4 Les 6 constats d'audit ouverts
+### 2.4 Les 5 constats d'audit ouverts
 
 Vérifiés un par un le 17 septembre 2026. Aucun critique, aucun élevé. La
 preuve de chacun (fichier et ligne) est dans
@@ -212,11 +212,11 @@ l'atteindre.
   le chemin par lequel tout le monde entre. À éprouver de bout en bout avant de
   pousser.
 
-**Un seul n'a jamais été tranché :**
+**Celui qui n'avait jamais été tranché est tranché :**
 
 | Constat | Gravité | En une phrase |
 |---|---|---|
-| **03 M13** | moyenne | `noUncheckedIndexedAccess` est désactivé dans `front/tsconfig.json`. |
+| ~~**03 M13**~~ | moyenne | **Clos le 18 septembre 2026** : `noUncheckedIndexedAccess` est à `true`. 47 erreurs révélées, 0 restante, **aucun `!` ni `as` ajouté**. Le cœur du sujet était `algebre.ts` (22 erreurs) : une case absente y est désormais un **refus franc** (`ligneDe`/`caseDe` lèvent), jamais un `?? 0` — un zéro inventé dans une élimination de Gauss ne fait pas échouer le calcul, il le fait réussir sur un autre système, et rend des grammes à peser (règle 7). |
 
 Pour les reprendre : un constat, un test rouge, un correctif, un commit ; puis
 mettre à jour son statut dans le rapport et dans le README de l'audit.

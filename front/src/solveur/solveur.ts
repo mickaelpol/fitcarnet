@@ -174,7 +174,12 @@ export function calculer(
   ];
   const actifs = roles.filter((r) => variables[r.cle] !== undefined);
 
-  const quantitesVar: Record<string, number> = { proteine: 0, glucide: 0, lipide: 0 };
+  /* `Record<keyof Variables, …>` et non `Record<string, …>` : les trois clés
+     sont connues, donc `brut.proteine` est un nombre et non « peut-être un
+     nombre ». Avec `Record<string, number>`, `noUncheckedIndexedAccess`
+     rendait `number | undefined` — et une clé mal orthographiée s'y serait
+     glissée sans un mot (M13, 18 septembre 2026). */
+  const quantitesVar: Record<keyof Variables, number> = { proteine: 0, glucide: 0, lipide: 0 };
 
   if (actifs.length === 0) {
     diagnostics.push({

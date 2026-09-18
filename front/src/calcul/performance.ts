@@ -216,12 +216,24 @@ export const PAS_DISPONIBLES = [1, 2.5, 5] as const;
 export const MIN_CHARGES_TRAVAIL = 5;
 
 /**
+ * Le pas le plus fin qu'on accepte de conseiller, et le repli quand aucun des
+ * autres ne tient.
+ *
+ * Il est NOMMÉ, et la liste ci-dessous est bâtie à partir de lui — pas
+ * l'inverse. `PAS_CONSEILLABLES[PAS_CONSEILLABLES.length - 1]` se lisait
+ * `number | undefined` une fois `noUncheckedIndexedAccess` rallumé (M13,
+ * 18 septembre 2026) : le repli d'une fonction qui rend un pas de pesée n'a
+ * pas à dépendre d'une case qui pourrait manquer.
+ */
+const PAS_LE_PLUS_FIN = 1;
+
+/**
  * Les pas qu'on propose TOUT SEUL, du plus grossier au plus fin.
  *
  * 5 kg n'y figure pas : il reste un choix manuel. Personne n'a besoin qu'on lui
  * suggère de sauter de 10 kg entre deux paliers.
  */
-const PAS_CONSEILLABLES = [2.5, 1] as const;
+const PAS_CONSEILLABLES = [2.5, PAS_LE_PLUS_FIN] as const;
 
 /** Charges distinctes que la zone de travail produit à ce pas. */
 const chargesTravail = (rm: number, pas: number): number =>
@@ -254,14 +266,13 @@ const chargesTravail = (rm: number, pas: number): number =>
  * fait. Corrigé le 15 septembre 2026, avant d'être affiché.
  */
 export function pasConseille(rm: number): number {
-  const plusFin = PAS_CONSEILLABLES[PAS_CONSEILLABLES.length - 1];
-  if (!(rm > 0)) return plusFin;
+  if (!(rm > 0)) return PAS_LE_PLUS_FIN;
 
   for (const pas of PAS_CONSEILLABLES) {
     if (chargesTravail(rm, pas) >= MIN_CHARGES_TRAVAIL) return pas;
   }
 
-  return plusFin;
+  return PAS_LE_PLUS_FIN;
 }
 
 /** Une ligne de la table affichée : un ou plusieurs paliers confondus. */

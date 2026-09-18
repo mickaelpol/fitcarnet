@@ -73,6 +73,26 @@ et `cuisson.ts` ne fait que réexporter `habitudesCuisson`), et la sixième copi
 de `garanties.test.ts` a été remplacée par un import. Vérifié : une seule
 définition dans tout le front.
 
+## `noUncheckedIndexedAccess` est à `true` depuis le 18 septembre 2026
+
+Constat M13 fermé. `tableau[i]` se lit `T | undefined`, partout dans `front/`.
+Les 47 erreurs révélées ce jour-là ont été corrigées **sans un seul `!` ni `as`
+ajouté**, et c'est la règle à tenir : une assertion remet le `undefined`
+exactement où il était, avec un mensonge en plus.
+
+Ce qu'il faut faire à la place, dans l'ordre où ça se pose :
+
+| La case peut manquer… | …et alors |
+|---|---|
+| dans un calcul (`src/solveur/algebre.ts`) | **on lève**. `ligneDe` / `caseDe` relisent l'invariant « la matrice est carrée » à chaque accès. Un `?? 0` dans une élimination de Gauss ne fait pas échouer le calcul, il le fait **réussir sur un autre système** — et rend des grammes à peser |
+| à l'affichage (`disqueRM.tsx`, `etatRequetes.ts`) | on **refuse de nommer** : le tiret cadratin, ou `SANS_MESSAGE`. Jamais un « 0 % » qui désigne une charge jamais calculée |
+| parce que le type est trop lâche (`Record<string, number>`) | on **resserre le type** : `Record<keyof Variables, number>` n'a plus de case manquante, et attrape en prime une clé mal orthographiée |
+| dans un test | on l'**affirme** : `assert.ok(x !== undefined, 'ce qui manque')`, jamais `x!` |
+
+`tsconfig.tests.json` ne porte pas le drapeau et n'a pas à le porter : il ne sert
+qu'à émettre, et `npm test` lance `tsc --noEmit` (donc `tsconfig.json`, qui
+couvre `src/` **et** `app/`) avant lui.
+
 ## Les tests
 
 `node:test`, compilés par `tsconfig.tests.json` vers `dist-tests/`. Son `include`

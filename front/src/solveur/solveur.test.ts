@@ -19,8 +19,13 @@ describe('algèbre', () => {
   it('résout un système simple', () => {
     const x = resoudre([[2, 1], [1, 3]], [5, 10]);
     assert.ok(x);
-    assert.ok(Math.abs(x![0] - 1) < 1e-9);
-    assert.ok(Math.abs(x![1] - 3) < 1e-9);
+    /* Les deux composantes sont AFFIRMÉES présentes, pas supposées : un `!`
+       aurait comparé `undefined - 1` et rendu un test vert sur un vecteur
+       tronqué (M13, 18 septembre 2026). */
+    const [x0, x1] = x;
+    assert.ok(x0 !== undefined && x1 !== undefined, 'solution tronquée');
+    assert.ok(Math.abs(x0 - 1) < 1e-9);
+    assert.ok(Math.abs(x1 - 3) < 1e-9);
   });
 
   it('détecte un système singulier', () => {
@@ -30,7 +35,9 @@ describe('algèbre', () => {
   it('gère le pivot partiel (premier coefficient nul)', () => {
     const x = resoudre([[0, 1], [1, 0]], [2, 3]);
     assert.ok(x);
-    assert.ok(Math.abs(x![0] - 3) < 1e-9 && Math.abs(x![1] - 2) < 1e-9);
+    const [x0, x1] = x;
+    assert.ok(x0 !== undefined && x1 !== undefined, 'solution tronquée');
+    assert.ok(Math.abs(x0 - 3) < 1e-9 && Math.abs(x1 - 2) < 1e-9);
   });
 
   it('arrondit au pas demandé', () => {
@@ -86,8 +93,15 @@ describe('algèbre', () => {
       assert.ok(x, 'riz blanc contre riz complet reste un système légitime');
       /* et la solution est bien celle du système, pas un artefact */
       for (let i = 0; i < 3; i++) {
-        const obtenu = BLANC_ET_COMPLET[i]!.reduce((s, c, j) => s + c * x![j]!, 0);
-        assert.ok(Math.abs(obtenu - CIBLE[i]!) < 1e-6);
+        const ligne = BLANC_ET_COMPLET[i];
+        const cible = CIBLE[i];
+        assert.ok(ligne !== undefined && cible !== undefined, `ligne ${i} absente`);
+        const obtenu = ligne.reduce((s, c, j) => {
+          const xj = x[j];
+          assert.ok(xj !== undefined, `composante ${j} absente de la solution`);
+          return s + c * xj;
+        }, 0);
+        assert.ok(Math.abs(obtenu - cible) < 1e-6);
       }
     });
 

@@ -102,6 +102,13 @@ const libellePourcents = (l: LignePalier): string => {
   const premier = l.pourcents[0];
   const dernier = l.pourcents[l.pourcents.length - 1];
 
+  /* `paliersPour` ne produit jamais de ligne sans pourcentage — elles naissent
+     du regroupement d'au moins un palier. Si une telle ligne arrivait malgré tout,
+     on affiche le même tiret que `libelleReps` : « on ne sait pas ». Inventer
+     « 0 % » désignerait une charge qui n'a jamais été calculée
+     (M13, 18 septembre 2026). */
+  if (premier === undefined || dernier === undefined) return '—';
+
   return premier === dernier ? `${nb(premier)} %` : `${nb(premier)}–${nb(dernier)} %`;
 };
 

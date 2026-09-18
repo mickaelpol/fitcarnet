@@ -62,7 +62,11 @@ export function premiereErreur(...requetes: readonly RequeteObservee[]): PanneRe
   const enPanne = requetes.filter((r) => r.isError);
   if (enPanne.length === 0) return null;
 
-  const message = enPanne[0].error?.message.trim();
+  /* `enPanne` n'est jamais vide ici — la garde au-dessus l'a établi. Le `?.`
+     ne comble donc rien : il dit que si la première panne venait à manquer,
+     on retombe sur `SANS_MESSAGE`, c'est-à-dire sur l'aveu qu'on n'a pas de
+     message — jamais sur un message inventé (M13, 18 septembre 2026). */
+  const message = enPanne[0]?.error?.message.trim();
 
   return {
     message: message === undefined || message === '' ? SANS_MESSAGE : message,

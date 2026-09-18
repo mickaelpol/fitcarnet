@@ -39,6 +39,45 @@
 const EPSILON_RELATIF = 5e-3;
 
 /**
+ * UNE CASE ABSENTE N'EST PAS UNE DONNÉE MANQUANTE (M13, 18 septembre 2026).
+ *
+ * `noUncheckedIndexedAccess` a été rallumé ce jour-là, et ce fichier — qui
+ * indexe une matrice à presque chaque ligne — a fourni 22 des 47 erreurs.
+ * Les deux raccourcis qui les font taire mentent tous les deux :
+ *
+ *   `M[i]![j]!` remet exactement le typage d'avant, avec une affirmation
+ *   fausse en plus ;
+ *   `M[i]?.[j] ?? 0` est pire — un zéro inventé au milieu d'une élimination
+ *   de Gauss ne fait pas ÉCHOUER le calcul, il le fait RÉUSSIR sur un système
+ *   qui n'est pas celui qu'on a posé. `resoudre` rendrait alors des grammes
+ *   plausibles, que l'utilisateur pèserait et mangerait. Règle 7 : un chiffre
+ *   faux est pire qu'un refus de répondre.
+ *
+ * L'invariant est donc dit une fois — « une matrice arrivée ici est carrée,
+ * sinon on refuse » — contrôlé à l'entrée de `resoudre`, et RELU à chaque
+ * accès par les deux fonctions ci-dessous. Elles ne comblent rien : elles
+ * lèvent. Une case absente après ce contrôle veut dire que la matrice a été
+ * abîmée en cours de route, et il n'existe aucune valeur honnête à mettre à
+ * la place.
+ *
+ * Ce n'est pas un chemin vivant : aucun appelant ne peut l'atteindre tant que
+ * le contrôle d'entrée tient. C'est le filet qui rend l'invariant vérifiable
+ * au lieu de simplement énoncé.
+ */
+function ligneDe(M: readonly number[][], i: number): number[] {
+  const ligne = M[i];
+  if (ligne === undefined) throw new Error(`Matrice mal formée : ligne ${i} absente.`);
+  return ligne;
+}
+
+/** La case `j` de `ligne`, ou le même refus franc. Voir `ligneDe`. */
+function caseDe(ligne: readonly number[], j: number): number {
+  const valeur = ligne[j];
+  if (valeur === undefined) throw new Error(`Matrice mal formée : case ${j} absente.`);
+  return valeur;
+}
+
+/**
  * Résout A·x = b pour une matrice carrée.
  * @returns le vecteur solution, ou null si le système est singulier.
  */
@@ -53,17 +92,18 @@ export function resoudre(A: number[][], b: number[]): number[] | null {
      entièrement nulle garde une amplitude nulle, et le test ci-dessous la
      rejette comme avant. */
   const amplitude = Array.from({ length: n }, (_, c) =>
-    Math.max(...A.map((ligne) => Math.abs(ligne[c]))));
+    Math.max(...A.map((ligne) => Math.abs(caseDe(ligne, c)))));
 
   // matrice augmentée, copiée pour ne pas altérer les entrées
-  const M: number[][] = A.map((ligne, i) => [...ligne, b[i]]);
+  const M: number[][] = A.map((ligne, i) => [...ligne, caseDe(b, i)]);
 
   for (let colonne = 0; colonne < n; colonne++) {
     // pivot partiel : on prend la ligne au plus grand coefficient absolu,
     // ce qui limite la propagation des erreurs d'arrondi flottant
     let meilleure = colonne;
     for (let ligne = colonne + 1; ligne < n; ligne++) {
-      if (Math.abs(M[ligne][colonne]) > Math.abs(M[meilleure][colonne])) {
+      if (Math.abs(caseDe(ligneDe(M, ligne), colonne))
+        > Math.abs(caseDe(ligneDe(M, meilleure), colonne))) {
         meilleure = ligne;
       }
     }
@@ -71,30 +111,41 @@ export function resoudre(A: number[][], b: number[]): number[] | null {
        rapporter : un seuil relatif seul la laisserait passer, puis diviser par
        zéro. Elle reste ce qu'elle a toujours été — une variable dont rien ne
        dépend, donc un système singulier. */
-    if (amplitude[colonne] === 0) return null;
+    const echelle = caseDe(amplitude, colonne);
+    if (echelle === 0) return null;
 
     /* Ce qui reste de la colonne, rapporté à ce qu'elle valait au départ.
        Proche de zéro : les autres colonnes l'expliquent déjà — le système est
        singulier en pratique, même si son déterminant n'est pas nul. */
-    if (Math.abs(M[meilleure][colonne]) < EPSILON_RELATIF * amplitude[colonne]!) {
+    if (Math.abs(caseDe(ligneDe(M, meilleure), colonne)) < EPSILON_RELATIF * echelle) {
       return null; // colonne devenue redondante : système singulier
     }
-    [M[colonne], M[meilleure]] = [M[meilleure], M[colonne]];
+    const permutee = ligneDe(M, colonne);
+    M[colonne] = ligneDe(M, meilleure);
+    M[meilleure] = permutee;
+
+    /* Le pivot ne bouge plus de la boucle qui suit : elle ne touche que les
+       lignes DIFFÉRENTES de `colonne`. On le lit donc une fois. */
+    const pivot = ligneDe(M, colonne);
+    const coefficientPivot = caseDe(pivot, colonne);
 
     for (let ligne = 0; ligne < n; ligne++) {
       if (ligne === colonne) continue;
-      const facteur = M[ligne][colonne] / M[colonne][colonne];
+      const courante = ligneDe(M, ligne);
+      const facteur = caseDe(courante, colonne) / coefficientPivot;
       if (facteur === 0) continue;
       for (let k = colonne; k <= n; k++) {
-        M[ligne][k] -= facteur * M[colonne][k];
+        courante[k] = caseDe(courante, k) - facteur * caseDe(pivot, k);
       }
     }
   }
 
   const x = new Array<number>(n);
   for (let i = 0; i < n; i++) {
-    x[i] = M[i][n] / M[i][i];
-    if (!Number.isFinite(x[i])) return null;
+    const ligne = ligneDe(M, i);
+    const valeur = caseDe(ligne, n) / caseDe(ligne, i);
+    if (!Number.isFinite(valeur)) return null;
+    x[i] = valeur;
   }
 
   return x;

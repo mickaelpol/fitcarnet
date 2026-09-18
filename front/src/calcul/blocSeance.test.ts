@@ -265,15 +265,17 @@ test('les cibles du modèle deviennent les objectifs de la séance', () => {
   }]));
 
   assert.equal(blocs.length, 1);
-  assert.equal(blocs[0].exercice, '/api/exercices/7');
+  const bloc = blocs[0];
+  assert.ok(bloc !== undefined, 'le modèle n’a produit aucun bloc');
+  assert.equal(bloc.exercice, '/api/exercices/7');
   assert.deepEqual(
-    blocs[0].series.map((s) => ({ repsCible: s.repsCible, poidsCible: s.poidsCible })),
+    bloc.series.map((s) => ({ repsCible: s.repsCible, poidsCible: s.poidsCible })),
     [{ repsCible: 10, poidsCible: 50 }, { repsCible: 8, poidsCible: 55 }],
   );
 
   /* Rien de réalisé n'est copié : le modèle dit ce qu'on VISE. */
-  assert.ok(blocs[0].series.every((s) => s.reps === null && s.poids === null && !s.faite));
-  assert.equal(blocs[0].notes, null);
+  assert.ok(bloc.series.every((s) => s.reps === null && s.poids === null && !s.faite));
+  assert.equal(bloc.notes, null);
 });
 
 test('l\'exercice d\'un modèle est repris en IRI, qu\'il arrive en objet ou en chaîne', () => {
@@ -304,7 +306,9 @@ test('les blocs et leurs séries sont renumérotés depuis zéro', () => {
   ]));
 
   assert.deepEqual(blocs.map((b) => b.ordre), [0, 1]);
-  assert.deepEqual(blocs[0].series.map((s) => s.ordre), [0]);
+  const premier = blocs[0];
+  assert.ok(premier !== undefined, 'le modèle n’a produit aucun bloc');
+  assert.deepEqual(premier.series.map((s) => s.ordre), [0]);
 });
 
 /* ---- avecIdentifiantSeance ---- */

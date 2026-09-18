@@ -169,9 +169,11 @@ test('deux paliers qui donnent la même charge ne font qu\'une ligne', () => {
   const charges = lignes.map((l) => l.charge);
   assert.deepEqual(charges, [...new Set(charges)]);
 
-  assert.deepEqual(lignes[0].pourcents, [90, 87.5, 85, 82.5]);
-  assert.equal(lignes[0].charge, 17.5);
-  assert.deepEqual(lignes[0].reps, { min: 3, max: 6 });
+  const premiere = lignes[0];
+  assert.ok(premiere !== undefined, '20 kg ne produit aucune ligne');
+  assert.deepEqual(premiere.pourcents, [90, 87.5, 85, 82.5]);
+  assert.equal(premiere.charge, 17.5);
+  assert.deepEqual(premiere.reps, { min: 3, max: 6 });
 });
 
 test('une ligne confondue dit son étendue, pas une seule de ses valeurs', () => {
@@ -201,9 +203,15 @@ test('les charges descendent strictement, et aucune ne vaut zéro', () => {
     const lignes = paliersPour(rm, pasConseille(rm));
     assert.ok(lignes.length > 0, `${rm} kg ne produit aucune ligne`);
     for (let i = 1; i < lignes.length; i += 1) {
+      const courante = lignes[i];
+      const precedente = lignes[i - 1];
+      /* Une case affirmée par le test, pas par un `!` : si l'une manquait, le
+         test le DIRAIT au lieu de comparer un « undefined » silencieux
+         (M13, 18 septembre 2026). */
+      assert.ok(courante !== undefined && precedente !== undefined, `${rm} kg : ligne ${i} absente`);
       assert.ok(
-        lignes[i].charge < lignes[i - 1].charge,
-        `${rm} kg : ${lignes[i].charge} kg ne descend pas sous ${lignes[i - 1].charge} kg`,
+        courante.charge < precedente.charge,
+        `${rm} kg : ${courante.charge} kg ne descend pas sous ${precedente.charge} kg`,
       );
     }
     assert.ok(lignes.every((l) => l.charge > 0));

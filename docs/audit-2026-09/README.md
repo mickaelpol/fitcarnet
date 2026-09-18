@@ -14,7 +14,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 73 constats clos, 6 ouverts** — vérifiés un par un
+> **Au 18 septembre 2026 : 74 constats clos, 5 ouverts** — vérifiés un par un
 > dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 18
 > sont 12 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
 > 17 ; 03 — 8 sur 33 ; 04 — 4 sur 17. **Trois sont à trancher** (02#13,
@@ -338,7 +338,7 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 |---|---|---|
 | **02#8** — sauvegardes sur le même volume que la base | moyenne | **consigné** le 18 septembre dans `DEPLOIEMENT.md` ; l'action reste à faire sur le NAS (tâche DSM), hors dépôt |
 | **03 M5** — jetons en clair dans `localStorage` sur le web | moyenne | `front/src/api/client.ts:64-93` |
-| **03 M13** — `noUncheckedIndexedAccess` désactivé | moyenne | `front/tsconfig.json:5` |
+| ~~**03 M13** — `noUncheckedIndexedAccess` désactivé~~ | moyenne | **clos le 18 septembre 2026.** Le drapeau est à `true` (`front/tsconfig.json:5`). Les 47 erreurs qu'il révélait sont corrigées **sans un seul `!` ni `as` ajouté** : les 22 d'`algebre.ts` par un invariant explicite (`ligneDe` / `caseDe` lèvent au lieu de combler — un `?? 0` au milieu d'une élimination de Gauss rendrait des grammes faux et plausibles), les 16 de tests par une assertion de test, `Record<string, number>` remplacé par `Record<keyof Variables, number>` dans `solveur.ts`, et deux refus d'affichage (`disqueRM.tsx` rend « — », `etatRequetes.ts` retombe sur `SANS_MESSAGE`). `npm test` : 631 + 33, 0 échec |
 
 Une refonte vers l'architecture hexagonale est un objectif assumé, **non commencée**. Voir la
 section « Skills » de `CLAUDE.md` : elle ne doit jamais se mélanger à une correction de bug.
