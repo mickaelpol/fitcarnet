@@ -53,42 +53,14 @@ export default function Compte() {
         </Texte>
       </Carte>
 
-      {/* `=== true` ET NON `?.` SEUL : `motDePasseFaible` est facultatif, et un
-          APK installé il y a des mois parle à l'API d'aujourd'hui sans que le
-          champ existe. `undefined` veut dire « je ne sais pas », donc on
-          n'affiche rien — surtout pas un avertissement rouge inventé.
-
-          LE TON : on informe, on ne gronde pas. Les règles ont durci le
-          18 septembre 2026 ; ce compte a été créé avant, son mot de passe est
-          resté valable, et rien n'est bloqué. Mettre quelqu'un dehors pour une
-          règle qui n'existait pas quand il a choisi son mot de passe serait le
-          punir d'une décision qui n'est pas la sienne. */}
-      {data?.motDePasseFaible === true && (
-        <Carte style={s.alerte}>
-          <Discret style={s.etiquette}>Mot de passe</Discret>
-          <Texte>Ton mot de passe ne suit plus les règles actuelles.</Texte>
-          {/* ON NE RECOPIE PAS LES EXIGENCES ICI. Les nommer une seconde fois
-              ferait un second endroit à corriger le jour où elles rebougent —
-              c'est exactement ce qui a laissé l'écran d'invitation promettre
-              « 10 caractères » après le durcissement. L'écran de changement
-              les affiche, et il les tient de `src/calcul/motDePasse.ts`. */}
-          <Discret style={s.alerteTexte}>
-            Elles ont changé le 18 septembre 2026, et le tien a été choisi
-            avant. Il reste valable —{' '}
-            <Texte style={s.alerteFort}>rien n’est bloqué</Texte>, tu peux
-            continuer à t’en servir. Si tu veux en choisir un autre, l’écran de
-            changement dit ce qu’on demande aujourd’hui.
-          </Discret>
-          <Bouton
-            variante="contour"
-            onPress={() => router.push('/mot-de-passe')}
-            style={{ marginTop: E.s }}
-          >
-            Choisir un nouveau mot de passe
-          </Bouton>
-        </Carte>
-      )}
-
+      {/* PAS DE CARTE D'AVERTISSEMENT ICI, ET C'EST UN RETRAIT ASSUME.
+          Il y en avait une, et elle disait exactement ce que dit le bandeau
+          qui coiffe desormais TOUS les ecrans, celui-ci compris : sur cet
+          onglet, le message apparaissait donc deux fois a dix centimetres
+          d'ecart. Repeter n'insiste pas, ca dilue — et ca faisait deux textes
+          a tenir a jour pour une seule idee.
+          Le bouton ci-dessous reste, lui, en permanence : changer son mot de
+          passe est un geste normal, pas une reparation. */}
       <Bouton variante="contour" onPress={() => router.push('/mot-de-passe')}>
         Changer mon mot de passe
       </Bouton>
@@ -148,7 +120,4 @@ const s = StyleSheet.create({
     color: C.discret, marginBottom: E.xs,
   },
   separateur: { height: 1, backgroundColor: C.ligne, marginVertical: E.m },
-  alerte: { backgroundColor: C.erreurFond, borderColor: C.erreur },
-  alerteTexte: { fontSize: T.petit, lineHeight: 18, marginTop: E.xs },
-  alerteFort: { fontFamily: P.fort, fontSize: T.petit },
 });

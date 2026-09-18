@@ -73,18 +73,43 @@ export function BandeauMotDePasse() {
   );
 }
 
+/**
+ * LE DORE, ET PAS LE ROUGE — corrige le 18 septembre 2026, sur remarque.
+ *
+ * Ce n'est pas qu'une question de gout. Le rouge de ce theme annonce une
+ * ERREUR : un champ refuse, une requete qui a echoue, une suppression qui ne
+ * se defait pas. Or ce bandeau dit le contraire de tout ca — les regles ont
+ * change, ton mot de passe RESTE valable, rien n'est bloque. Le peindre en
+ * rouge, c'etait alarmer de ce qu'on venait d'ecrire comme sans gravite, et
+ * user le rouge pour le jour ou quelque chose ira vraiment mal.
+ *
+ * `vif` est la couleur d'accent de l'application — celle des boutons, des
+ * onglets actifs, des chiffres qui comptent. Elle attire l'oeil sans crier, et
+ * ses voiles existaient deja : `vifVoile` et `vifBord` ont ete rassembles
+ * precisement pour ne plus ecrire « le dore, mais discret » en rgba() a chaque
+ * ecran.
+ *
+ * `vifVoile` (8 %) ET NON `vifFond` (12 %) : ce bandeau coiffe l'application
+ * en permanence jusqu'a ce qu'on agisse. Un aplat qu'on voit tout le temps
+ * doit etre plus leger qu'un encadre qu'on voit une fois.
+ */
 const s = StyleSheet.create({
   bandeau: {
-    backgroundColor: C.erreurFond,
+    backgroundColor: C.vifVoile,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.erreur,
+    borderBottomColor: C.vifBord,
     paddingHorizontal: E.l,
     paddingBottom: E.s,
   },
   texte: {
-    color: C.erreur,
+    color: C.vif,
     fontFamily: P.fort,
     fontSize: T.petit,
+    /* Les etiquettes de ce theme sont en capitales espacees ; ici on garde la
+       casse ordinaire. C'est une phrase qu'on lit, pas un intitule de colonne,
+       et des capitales sur toute la largeur sonneraient comme un panneau
+       d'interdiction. */
+    letterSpacing: 0.2,
     textAlign: 'center',
   },
 });
