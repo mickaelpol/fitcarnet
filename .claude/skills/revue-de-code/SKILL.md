@@ -201,9 +201,15 @@ session principale est authentifié et répond. Un outil absent et un outil qui
 refuse ne se distinguent pas depuis l'intérieur : d'où la consigne de DIRE qu'on
 n'y arrive pas, plutôt que de diagnostiquer.)*
 
-Elle se pose donc **depuis la session principale**, ou depuis un agent
-`general-purpose` — qui reçoit tous les outils. C'est ainsi que les quatre
-trouvailles du tableau ci-dessus ont été faites.
+Elle se pose donc **depuis la session principale**, ou depuis un agent qui ne
+déclare pas de liste `tools:` — `general-purpose`, qui reçoit tous les outils.
+C'est ainsi que les quatre trouvailles du tableau ci-dessus ont été faites.
+
+**L'agent `revue-pile` est écrit pour ça**, et il porte un bandeau disant que son
+accès au MCP n'a pas encore été prouvé : les définitions d'agents se chargent au
+démarrage de la session, et celle qui l'a écrit ne pouvait pas l'invoquer. Sa
+première invocation doit commencer par le dire. **Tant que ce n'est pas
+confirmé, la voie sûre reste la session principale.**
 
 **ET SURTOUT PAS EN LISANT `vendor/`.** Le code installé dit ce que la
 bibliothèque ACCEPTE, pas ce qu'elle RECOMMANDE — et c'est exactement la
