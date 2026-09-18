@@ -222,10 +222,8 @@ export default function MonFrigo() {
                 texte={saisies[item.reference] ?? ''}
                 vu={vus[item.reference] === true}
                 ecart={ecarts.some((l) => l.reference === item.reference)}
-                onTexte={(v) => setSaisies((x) => ({ ...x, [item.reference]: v }))}
-                onCocher={() => setVus((v) => ({
-                  ...v, [item.reference]: !(v[item.reference] === true),
-                }))}
+                onTexte={(v) => saisirQuantite(item.reference, v)}
+                onCocher={() => basculerVu(item.reference)}
               />
             )
             : (
@@ -274,7 +272,7 @@ export default function MonFrigo() {
           <View style={{ flexDirection: 'row', gap: E.s }}>
             <Bouton
               variante="contour"
-              onPress={() => { setSaisies(stocksInitiaux(tous)); setVus({}); }}
+              onPress={() => reinitialiserInventaire(tous)}
               style={{ flex: 1 }}
             >
               Réinitialiser
@@ -286,11 +284,7 @@ export default function MonFrigo() {
                    rouvrir l'inventaire sur des chiffres déjà partis, et c'est
                    ce renvoi-là qui a mis le frigo en désordre le 14 août. Ce
                    qui reste à surveiller s'affiche au-dessus. */
-                onSuccess: () => {
-                  setSaisies({});
-                  setVus({});
-                  setMode('stock');
-                },
+                onSuccess: cloreInventaire,
               })}
               /* Un seul inventaire à la fois. Le serveur le refuse aussi — un
                  index unique en base —, mais un bouton grisé explique mieux
