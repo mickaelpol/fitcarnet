@@ -55,24 +55,36 @@ export const DIT: Record<Exigence, string> = {
  * tout en obtenant un caractère spécial qu'il n'a pas. Deux erreurs qui se
  * compensent presque — la pire espèce.
  *
- * **ET HERMES ? LA QUESTION EST OUVERTE, ET CE COMMENTAIRE A MENTI DESSUS.**
+ * **ET HERMES ? MESURÉ SUR L'APPAREIL LE 19 SEPTEMBRE 2026 : IL SUIT.**
  *
- * Il affirmait « Hermes implémente les classes Unicode […] et le test de rendu
- * couvre le cas accentué ». **Il n'existe aucun test de rendu sur le mot de
- * passe** — relevé en revue le 19 septembre 2026. Les deux cas accentués
- * (`Été3cetÉtéLà!`, `éééééééééééé`) vivent dans `motDePassePartage.test.ts`,
- * qui s'exécute sous **Node**, jamais sous Hermes. La précaution était écrite,
- * pas prise — et `texte.ts` montre à quoi elle ressemble quand elle l'est : son
- * test RETIRE `String.prototype.normalize` pour que la panne tombe sur le poste
- * et non sur un téléphone.
+ * Ce commentaire a menti deux fois avant de dire vrai, et les trois versions
+ * valent d'être connues.
  *
- * CE QUE ÇA COÛTERAIT SI HERMES NE SUIVAIT PAS : `manquements()` rendrait
- * toujours quatre manques, `acceptable()` serait toujours faux, et le bouton
- * « Créer mon compte » de l'écran d'invitation resterait désactivé **pour
- * toujours** — sur le seul écran par lequel on entre dans l'application.
+ * 1. Il affirmait « Hermes implémente les classes Unicode […] **et le test de
+ *    rendu couvre le cas accentué** ». Il n'existe aucun test de rendu sur le
+ *    mot de passe : les deux cas accentués vivent dans
+ *    `motDePassePartage.test.ts`, qui s'exécute sous **Node**. La précaution
+ *    était écrite, pas prise — `texte.ts` montre à quoi elle ressemble quand
+ *    elle l'est : son test RETIRE `String.prototype.normalize` pour que la
+ *    panne tombe sur le poste et non sur un téléphone.
+ * 2. Il a donc dit « la question est ouverte, ça se mesure sur un appareil ».
+ *    Honnête, et insuffisant : personne ne construit un APK sur une question
+ *    ouverte.
+ * 3. **`verification-android` l'a mesurée.** Émulateur Android 16, Expo Go,
+ *    caractère accentué saisi par le menu de Gboard (`adb shell input text` ne
+ *    sait pas les taper — vérifié d'abord dans un champ lisible, U+00E0, un
+ *    seul caractère précomposé). Dans le champ « nouveau mot de passe » :
+ *    `à` coche **une lettre minuscule**, `À` coche **une lettre majuscule**, et
+ *    aucun des deux ne coche « un caractère spécial ». Si Hermes ne suivait
+ *    pas, c'est exactement l'inverse qu'on aurait vu.
  *
- * Ça ne se raisonne pas, ça se mesure sur un appareil. Tant que ce n'est pas
- * fait, cette ligne est la seule chose honnête à écrire ici.
+ * CE QUE ÇA AURAIT COÛTÉ : `manquements()` aurait toujours rendu quatre
+ * manques, `acceptable()` aurait toujours été faux, et le bouton « Créer mon
+ * compte » de l'écran d'invitation serait resté désactivé **pour toujours** —
+ * sur le seul écran par lequel on entre dans l'application.
+ *
+ * Reste vrai : aucun test automatique ne garde ce point. Si quelqu'un change
+ * ces expressions, seule une nouvelle épreuve sur appareil le dira.
  */
 export function manquements(motDePasse: string): Exigence[] {
   const manque: Exigence[] = [];

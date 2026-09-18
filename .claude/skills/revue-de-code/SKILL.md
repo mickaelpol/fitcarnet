@@ -1,6 +1,6 @@
 ---
 name: revue-de-code
-description: Comment relire du code sur fitcarnet — les huit motifs de défaut que l'audit de septembre 2026 a réellement trouvés, par ordre de rendement, avec un cas daté pour chacun. À charger avant toute relecture, revue de modification, ou recherche de régression.
+description: Comment relire du code sur fitcarnet — les huit motifs de défaut que l'audit de septembre 2026 a réellement trouvés, par ordre de rendement, avec un cas daté pour chacun, plus une neuvième question qui confronte le code à la documentation officielle de sa pile par context7 — à poser depuis la session principale, l'agent n'y a pas accès. À charger avant toute relecture, revue de modification, ou recherche de régression.
 ---
 
 # Relire du code sur fitcarnet
@@ -24,6 +24,10 @@ tous ? »**
 ---
 
 ## Les huit questions, par rendement décroissant
+
+*(Plus une neuvième depuis le 18 septembre 2026 : la confrontation à la
+documentation officielle par `context7`. Elle vient APRÈS les huit, et elle ne
+cherche pas la même chose — voir plus bas.)*
 
 ### 1. Le jumeau oublié
 
@@ -163,6 +167,79 @@ Une énumération manuelle marche jusqu'au jour où quelqu'un ajoute un élémen
 « un humain qui doit y penser », c'est un défaut en attente.
 
 ---
+
+## 9. Ce que la documentation officielle dit aujourd'hui — par context7
+
+**Les huit motifs ci-dessus cherchent des défauts INTERNES : le code contre
+lui-même. Celui-ci cherche l'autre écart — le code contre l'état de l'art de sa
+pile.** Il ne remplace pas les huit, il vient après.
+
+**Le MCP `context7` sert à ça, et il a déjà trouvé ce qu'aucune relecture
+interne n'aurait vu.** Le 18 septembre 2026, deux confrontations à la
+documentation ont rendu :
+
+| Trouvé | Ce que ça coûtait |
+|---|---|
+| **Aucun `trusted_proxies`** | `login_throttling` construit ses DEUX compteurs sur `$request->getClientIp()`. Derrière le proxy DSM, tout le monde avait la même IP : le compteur « par IP » était devenu un **verrou de tout le site**. Vingt-cinq essais ratés depuis n'importe où, et plus personne ne se connecte pendant un quart d'heure. Le commentaire de `security.yaml` décrivait un comportement que la configuration ne produisait pas |
+| **`retry: 2` en défaut global** | `reessai.ts` avait été écrit pour dire « on ne réessaie QUE la panne réseau » et n'était branché que sur une porte sur trente. Le dépôt constatait déjà l'effet sans faire le lien : « deux 403, relancés deux fois chacun par la politique de réessai » |
+| **`Stack.Protected` existe** (expo-router 6, installé) | Le portier par `useEffect` + `replace` garde un cycle de rendu fantôme que le patron documenté supprime. **Repoussé avec argument** — le `guard` est booléen là où `useConnecte` rend trois valeurs |
+| **Les cookies de `fetch` React Native sont instables** | La raison écrite pour ne PAS utiliser de cookie sur Android était supposée périmée. La doc d'aujourd'hui la répète mot pour mot : elle tient. **Un « rien à changer » vérifié vaut un correctif** |
+
+### D'OÙ elle se pose, et ce n'est pas d'où on croit
+
+**PAS depuis l'agent `revue-fitcarnet`.** Éprouvé le 19 septembre 2026 : les
+deux outils `context7` ont été ajoutés à sa liste, puis retirés le jour même —
+**un agent de projet qui déclare une liste d'outils explicite ne reçoit pas les
+outils MCP**. Lancé sur un seul fichier avec la consigne « dis franchement si tu
+n'y arrives pas », il a répondu qu'il ne disposait que de `Read`, `Bash` et
+`Skill`. Sans ce test, la configuration serait restée en place : elle avait
+l'air juste et ne faisait rien.
+
+*(Le même agent a conclu que le serveur `context7` refusait l'authentification,
+sur la foi d'un `curl` brut qui rendait 401. C'était faux — le client MCP de la
+session principale est authentifié et répond. Un outil absent et un outil qui
+refuse ne se distinguent pas depuis l'intérieur : d'où la consigne de DIRE qu'on
+n'y arrive pas, plutôt que de diagnostiquer.)*
+
+Elle se pose donc **depuis la session principale**, ou depuis un agent
+`general-purpose` — qui reçoit tous les outils. C'est ainsi que les quatre
+trouvailles du tableau ci-dessus ont été faites.
+
+**ET SURTOUT PAS EN LISANT `vendor/`.** Le code installé dit ce que la
+bibliothèque ACCEPTE, pas ce qu'elle RECOMMANDE — et c'est exactement la
+différence que cette question cherche. Un agent privé de `context7` s'y est
+rabattu et l'a honnêtement signalé ; ses verdicts portaient alors sur l'API et
+les dépréciations, pas sur l'état de l'art.
+
+### Comment s'en servir sans se noyer
+
+`mcp__plugin_context7_context7__resolve-library-id` puis
+`query-docs`. **Au plus trois appels par sujet** : ils sont lents et une requête
+vague rend du bruit. Choisis donc les sujets, ne balaye pas.
+
+Les sujets qui rendent, sur ce projet :
+
+| Pile | Ce qu'on demande |
+|---|---|
+| `/symfony/symfony-docs` | pare-feux et `access_control`, voters, cookies de session, `trusted_proxies`, commandes console, transactions Doctrine |
+| API Platform 4 | processeurs et fournisseurs d'état, expressions `security:`, sérialisation |
+| React Native / Expo | stockage d'un jeton, routes protégées, cycle de vie, saisie et clavier |
+| TanStack Query v5 | clés, invalidation, `retry`, persistance |
+
+### La règle qui compte plus que l'outil
+
+**Lis les commentaires du projet AVANT de conclure qu'une chose est mal faite.**
+Ce dépôt écrit ses raisons, et beaucoup de ses écarts à la doc sont des choix
+tenus — `security: false` sur trois pare-feux, `front/dist/` versionné, la table
+manuelle de `cleDHabitude`. Un relecteur qui les signale fait perdre du temps.
+
+**Et quand une raison écrite est devenue fausse, c'est CE point qu'il faut
+rapporter** — pas « la doc dit autre chose ». C'est la même chose que le motif
+3, appliquée à l'extérieur.
+
+Classe chaque écart en trois, jamais en deux : **non conforme et dangereux**,
+**non conforme mais justifié ici**, **conforme**. Un rapport qui ne dit que le
+premier fait croire que le reste n'a pas été regardé.
 
 ## Deux pièges de plateforme, qui ne se voient pas au typage
 
