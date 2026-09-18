@@ -280,6 +280,43 @@ besoin se présente :
 - Un décalage d'affichage d'environ 13 px dans l'éditeur d'aliment après une
   saisie (Chromium, 1280×900). Origine non recherchée.
 
+### 2.5 Deux refontes proposées par les revues, et repoussées
+
+Le 18 septembre 2026, deux confrontations à la documentation officielle (par le
+MCP context7) ont proposé des changements de structure côté front. **Aucun des
+deux n'est un défaut** : le code marche et ses raisons sont écrites. Ils sont
+notés ici pour ne pas être re-découverts, et pour que la décision de les
+repousser soit lisible.
+
+- **`Stack.Protected` à la place du portier par `useEffect`** (`front/app/_layout.tsx`).
+  C'est le patron que documente aujourd'hui expo-router, et **il est bien
+  présent dans le `node_modules` du projet** (expo-router 6.0.24). Il ferait
+  disparaître le cycle de rendu fantôme que la garde de rendu masque
+  actuellement, et nettoierait l'historique lui-même.
+  *Ce qui retient* : son `guard` est un **booléen**, alors que `useConnecte`
+  rend **trois** valeurs — `null` veut dire « je ne sais pas encore », et c'est
+  la décision la mieux argumentée de `session.ts`. Le patron documenté pour ça
+  est un `SplashScreenController` qui retient l'écran de lancement. Ce n'est
+  donc pas un remplacement d'une ligne, c'est un chantier sur le chemin par
+  lequel tout le monde entre.
+- **Un `SessionProvider` React à la place de l'état de module** (`client.ts`).
+  Même remarque : le résultat actuel est correct, éprouvé et mieux documenté
+  que la plupart des `SessionProvider`. Le seul reproche est structurel — un
+  état de session hors de React est invisible des outils de développement.
+
+**Les deux se refondent ensemble.** Ne pas en faire un sans l'autre.
+
+Deux autres points relevés et **assumés tels quels** :
+
+- `refetchIntervalInBackground: true` (`front/src/api/hooks/frigo.ts`) **n'a
+  aucun effet sur Android** : TanStack demande de câbler `AppState` sur son
+  `focusManager`, ce que le projet ne fait pas. La ligne reste juste sur le
+  web ; c'est son commentaire qui promet plus qu'il ne tient.
+- Sur le web, le **cache** (`fitcarnet-cache-v1`) est dans `localStorage` et
+  survit à la fermeture de l'onglet — nom, adresse, séances, frigo. M5 ne
+  concernait que les **jetons** ; le reste est purgé à la connexion, à la
+  déconnexion et à la fin de session, jamais à la fermeture.
+
 ---
 
 ## 3. Les décisions en vigueur — ne pas les rouvrir sans raison
