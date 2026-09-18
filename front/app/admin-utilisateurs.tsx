@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, ScrollView, Share, StyleSheet, Text, View,
 } from 'react-native';
@@ -54,6 +54,37 @@ export default function AdminUtilisateurs() {
   const [email, setEmail] = useState('');
   const [copie, setCopie] = useState(false);
   const [aRevoquer, setARevoquer] = useState<InvitationVue | null>(null);
+
+  /**
+   * RENVOYER UN LIEN — constat 02#17, 18 septembre 2026.
+   *
+   * « La personne a perdu le lien » est le geste le plus courant de cet
+   * écran, et il fallait le faire à l'aveugle : retrouver l'adresse dans la
+   * liste, la retaper à l'identique en haut, et espérer ne pas se tromper
+   * d'une lettre — auquel cas on créait une SECONDE invitation, pour une
+   * adresse voisine, au lieu de remplacer la première.
+   *
+   * AUCUNE ROUTE NOUVELLE, ET C'EST DÉLIBÉRÉ. `POST /api/invitations`
+   * remplace déjà l'invitation en attente de cette adresse, dans la même
+   * transaction : c'est exactement « renvoyer ». Une route `…/relancer`
+   * aurait été un second chemin d'écriture pour la même intention — et ce
+   * projet sait ce que coûte un jumeau qu'on oublie de corriger.
+   *
+   * ON REMONTE EN HAUT, parce que le lien s'affiche là où les liens
+   * s'affichent. Le fabriquer sans le montrer serait pire que de ne rien
+   * faire : l'admin croirait avoir renvoyé, et l'ancien lien serait mort.
+   */
+  const vue = useRef<ScrollView>(null);
+  const renvoyer = (i: InvitationVue) => {
+    setEmail(i.email);
+    setCopie(false);
+    inviter.mutate(i.email, {
+      onSuccess: () => {
+        setEmail('');
+        vue.current?.scrollTo({ y: 0, animated: true });
+      },
+    });
+  };
 
   /**
    * PARTAGER, ET NON COPIER — parce que copier coûtait un module natif.
@@ -114,7 +145,7 @@ export default function AdminUtilisateurs() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={s.page}>
+      <ScrollView ref={vue} contentContainerStyle={s.page}>
         <Discret style={s.aide}>
           Tu invites une adresse, l’application fabrique un lien, et tu
           l’envoies comme tu veux — message, courriel, de vive voix. La personne
@@ -195,13 +226,30 @@ export default function AdminUtilisateurs() {
             <Discret style={s.aide}>
               {i.statut === 'acceptee' && `Compte créé${i.nomInvite !== null ? ` — ${i.nomInvite}` : ''}, le ${jour(i.accepteLe)}.`}
               {i.statut === 'en_attente' && `Invitée le ${jour(i.creeLe)}, valable jusqu’au ${jour(i.expireLe)}.`}
-              {i.statut === 'perimee' && `Invitée le ${jour(i.creeLe)}, périmée depuis le ${jour(i.expireLe)}. Réinvite pour un lien neuf.`}
+              {i.statut === 'perimee' && `Invitée le ${jour(i.creeLe)}, périmée depuis le ${jour(i.expireLe)}.`}
             </Discret>
 
             {i.statut !== 'acceptee' && (
-              <Bouton variante="contour" onPress={() => setARevoquer(i)}>
-                Révoquer
-              </Bouton>
+              <View style={s.ligne}>
+                <Bouton
+                  variante="contour"
+                  onPress={() => renvoyer(i)}
+                  desactive={inviter.isPending}
+                  style={{ flex: 1 }}
+                >
+                  Renvoyer un lien
+                </Bouton>
+                <Bouton variante="contour" onPress={() => setARevoquer(i)} style={{ flex: 1 }}>
+                  Révoquer
+                </Bouton>
+              </View>
+            )}
+
+            {i.statut === 'en_attente' && (
+              <Discret style={[s.aide, { color: C.attenue }]}>
+                Renvoyer fabrique un lien neuf et tue celui d’avant, même s’il a
+                déjà été transmis.
+              </Discret>
             )}
           </Carte>
         ))}

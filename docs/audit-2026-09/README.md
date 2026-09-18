@@ -14,13 +14,13 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 76 constats clos, 3 ouverts** — vérifiés un par un
-> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 3
-> sont 2 moyens (02#8, M5) et 1 faible (02#17). Par rapport : 01 — 0 ouvert
-> sur 12 ; 02 — 2 sur 17 ; 03 — 1 sur 33 ; 04 — 0 sur 17. **Plus aucun
-> n'attend d'arbitrage** : les quatre en attente ont été tranchés le
-> 18 septembre 2026, et les trois qui restent sont des mises en œuvre —
-> 02#8 hors dépôt (une tâche DSM, côté NAS). La liste,
+> **Au 18 septembre 2026 : 77 constats clos, 2 ouverts** — vérifiés un par un
+> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 2
+> sont des moyens (02#8, M5). Par rapport : 01 — 0 ouvert sur 12 ; 02 — 1 sur
+> 17 ; 03 — 1 sur 33 ; 04 — 0 sur 17. **Plus aucun n'attend d'arbitrage** :
+> les quatre en attente ont été tranchés le 18 septembre 2026, et les deux
+> qui restent sont des mises en œuvre — 02#8 hors dépôt (une tâche DSM, côté
+> NAS). La liste,
 > avec la preuve de chacun, est dans « [Ce qui reste ouvert](#ce-qui-reste-ouvert-au-17-septembre-2026) ».
 
 ## Ce que l'audit dit du projet
@@ -332,7 +332,7 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 |---|---|---|
 | ~~**02#13** — ni limites de ressources ni rotation des journaux~~ | faible | **clos le 18 septembre 2026, à moitié et c'est la décision.** La rotation est posée sur les trois services (`json-file`, 10 Mo × 3, `docker-compose.yml`) : un journal qui ne se purge jamais remplit le volume qui porte aussi `pgdata/`. Les limites CPU/mémoire sont **refusées avec argument** : ce fichier part en production sans palier de recette, et un `mem_limit` mal choisi ne ralentit pas l'application, il la tue (OOM). Le jour où `docker stats` aura mesuré plusieurs jours de vraie charge, le chiffre se posera sur cette mesure |
 | ~~**02#15** — `compose.dev.yml` publie `5432:5432`~~ | faible | **clos le 18 septembre 2026 : gardé, et écrit.** Le port sert (`import_carnet.py`, `import_catalogue.py`, PhpStorm → Database), la base est de développement et son mot de passe est en clair deux lignes plus haut. Le raisonnement, et ce qui ferait changer d'avis — une copie de production restaurée là ⇒ `127.0.0.1:5432:5432` —, sont désormais dans `compose.dev.yml` au-dessus du `ports:` |
-| **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée (une nouvelle invitation remplace l'ancienne) ; reste la purge, non décidée |
+| ~~**02#17** — aucune purge des invitations expirées~~ | faible | **clos le 18 septembre 2026.** `app:invitations:purger` (rétention 30 jours), jouée à chaque démarrage par `entrypoint-prod.sh`. La règle vit dans `Invitation::aPurger()` — **un seul juge**, éprouvé sans base : un `DELETE … WHERE` aurait été un second. Le cas qui a motivé le constat n'était pas les périmées mais les **orphelines** : supprimer un compte met `invitation.utilisateur_id` à NULL, la ligne restait « acceptée » sans nom, pour toujours, et réinviter cette adresse affichait deux lignes pour la même personne. Elles partent sans délai. Et un bouton **« Renvoyer un lien »** met le geste « la personne a perdu le lien » à portée, sans retaper l'adresse |
 
 **Ouverts, sans décision consignée :**
 

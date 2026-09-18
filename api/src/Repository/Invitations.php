@@ -151,6 +151,54 @@ final readonly class Invitations
     }
 
     /**
+     * Toutes les invitations, avec de quoi juger s'il faut les purger.
+     *
+     * ON LES LIT TOUTES, ET ON NE JUGE PAS ICI — constat 02#17. La regle vit
+     * dans `App\Service\Invitation::aPurger()`, ou elle s'eprouve sans base.
+     * Un `DELETE ... WHERE` aurait mis un SECOND juge de la meme question a
+     * cote du premier : c'est exactement le defaut que cet audit a trouve
+     * partout ailleurs. La table porte une poignee de lignes.
+     *
+     * `utilisateur_id IS NOT NULL` plutot que la colonne elle-meme : la
+     * decision n'a besoin que de savoir si le compte vit encore, pas de qui
+     * il s\'agit.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function aExaminerPourPurge(): array
+    {
+        return $this->cnx->fetchAllAssociative(
+            'SELECT id, email, expire_le, accepte_le,
+                    (utilisateur_id IS NOT NULL) AS compte_vivant
+               FROM invitation
+           ORDER BY id',
+        );
+    }
+
+    /**
+     * Supprime ces invitations-la, et rend combien sont parties.
+     *
+     * PAR IDENTIFIANT, jamais par condition : la condition a deja ete jugee,
+     * une fois, au bon endroit. Rendre le compte reel des lignes parties
+     * plutot que celui des identifiants demandes est ce qui permet a la
+     * commande de dire la verite quand une ligne a disparu entre-temps.
+     *
+     * @param list<int> $ids
+     */
+    public function supprimerParIds(array $ids): int
+    {
+        if ([] === $ids) {
+            return 0;
+        }
+
+        return $this->cnx->executeStatement(
+            'DELETE FROM invitation WHERE id IN (:ids)',
+            ['ids' => $ids],
+            ['ids' => \Doctrine\DBAL\ArrayParameterType::INTEGER],
+        );
+    }
+
+    /**
      * Cree le compte ET consomme l'invitation — ou ne fait rien du tout.
      *
      * LES DEUX SONT UN SEUL FAIT. Separes, une coupure au mauvais moment

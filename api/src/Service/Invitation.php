@@ -20,6 +20,19 @@ final class Invitation
     /** Sept jours. Assez pour une personne en vacances, trop peu pour qu'on l'oublie. */
     public const DUREE_JOURS = 7;
 
+    /**
+     * Combien de temps une invitation morte reste visible avant d'etre purgee.
+     *
+     * TRENTE JOURS, ET LE CHIFFRE SE DEFEND. Une invitation acceptee dit
+     * « cette personne a bien cree son compte » — utile le lendemain, inutile
+     * un mois plus tard, ou la liste des comptes le dit mieux. Une perimee dit
+     * « ce lien est mort, reinvite » — meme duree de vie utile.
+     *
+     * PLUS COURT ferait disparaitre la reponse avant que l'administrateur ne
+     * revienne voir. PLUS LONG rend l'ecran illisible pour ne rien apprendre.
+     */
+    public const RETENTION_JOURS = 30;
+
     /** Le minimum du projet, celui de la commande console et de l'entite. */
     public const LONGUEUR_MOT_DE_PASSE = 10;
 
@@ -170,7 +183,7 @@ final class Invitation
      * jeton donne a existe — et surtout, la personne invitee n'a rien a faire
      * de la nuance : dans les trois cas elle doit redemander un lien.
      *
-     * @param string|null             $accepteLe  horodatage d'acceptation, ou null
+     * @param \DateTimeImmutable|null $accepteLe horodatage d'acceptation, ou null
      */
     public static function estValable(
         ?\DateTimeImmutable $expireLe,
@@ -188,6 +201,64 @@ final class Invitation
         // pas une seconde apres. La difference n'a aucune importance pratique
         // et toute l'importance quand on relit le code six mois plus tard.
         return $expireLe > $maintenant;
+    }
+
+    /**
+     * CETTE INVITATION N'A-T-ELLE PLUS RIEN A DIRE ? — constat 02#17.
+     *
+     * Rien ne purgeait la table. Une invitation acceptee, une perimee, une
+     * autre perimee, restaient a l'ecran indefiniment — et surtout, supprimer
+     * un compte laissait derriere lui une ligne « acceptee » SANS NOM, parce
+     * que `invitation.utilisateur_id` est en `ON DELETE SET NULL`. Reinviter
+     * cette adresse affichait alors DEUX lignes pour la meme personne, dont
+     * une qui ne designait plus personne.
+     *
+     * QUATRE CAS, ET UN SEUL ENDROIT OU ILS SONT ECRITS :
+     *
+     *   vivante (ni acceptee ni perimee)  -> JAMAIS. Le lien est dehors ;
+     *                                        le purger, c'est le tuer en
+     *                                        silence.
+     *   acceptee, compte disparu          -> TOUT DE SUITE. Elle etait la
+     *                                        trace d'un compte qui n'existe
+     *                                        plus : il ne reste rien a garder.
+     *   acceptee, compte vivant           -> apres RETENTION_JOURS, comptes
+     *                                        DEPUIS L'ACCEPTATION.
+     *   perimee                           -> apres RETENTION_JOURS, comptes
+     *                                        depuis la peremption.
+     *
+     * POURQUOI CETTE FONCTION ET PAS UN `DELETE ... WHERE`. Parce que la regle
+     * serait alors ecrite en SQL, loin d'ici, et qu'il y aurait deux juges de
+     * la meme question — le motif de defaut le plus frequent de ce projet.
+     * La commande lit les lignes, pose la question ici, et supprime par
+     * identifiant. La table porte une poignee de lignes : il n'y a rien a
+     * optimiser, et tout a gagner a n'avoir qu'un seul endroit ou la regle
+     * vive et s'eprouve — sans base, comme tout ce fichier.
+     *
+     * @param bool $compteVivant `utilisateur_id` est-il encore renseigne ?
+     *                           Il l'est sur toute invitation acceptee dont le
+     *                           compte existe, et il est nul sur toute
+     *                           invitation NON acceptee — d'ou le `null !==
+     *                           $accepteLe` qui garde ce cas, sans quoi chaque
+     *                           invitation serait orpheline a la seconde de sa
+     *                           creation.
+     */
+    public static function aPurger(
+        \DateTimeImmutable $expireLe,
+        ?\DateTimeImmutable $accepteLe,
+        bool $compteVivant,
+        \DateTimeImmutable $maintenant,
+    ): bool {
+        $limite = $maintenant->modify('-' . self::RETENTION_JOURS . ' days');
+
+        if (null !== $accepteLe) {
+            return !$compteVivant || $accepteLe < $limite;
+        }
+
+        // Pas acceptee : elle ne part que si elle est perimee DEPUIS assez
+        // longtemps. Une invitation encore valable n'est jamais purgee, quel
+        // que soit son age — c'est le seul cas ou une ligne represente
+        // quelque chose qui circule dehors.
+        return $expireLe < $limite;
     }
 
     /** La date de peremption d'une invitation creee maintenant. */

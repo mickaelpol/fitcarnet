@@ -161,6 +161,26 @@ php bin/console cache:clear  --no-interaction --quiet
 php bin/console cache:warmup --no-interaction --quiet
 ok "chauffé"
 
+# ------------------------------------------------- 5. ménage des invitations
+
+# LE SEUL RENDEZ-VOUS PÉRIODIQUE QUE CETTE PILE POSSÈDE — constat 02#17.
+#
+# Les invitations acceptées, périmées ou devenues orphelines (compte supprimé,
+# `utilisateur_id` mis à NULL) s'accumulaient sans fin dans l'écran
+# d'administration. Il fallait un balayage régulier ; ajouter un planificateur
+# ou un conteneur pour une table de quelques lignes aurait coûté plus que le
+# problème. Un démarrage est un rendez-vous suffisant pour une rétention de
+# trente jours : si la pile ne redémarre pas de trois mois, la seule
+# conséquence est une ligne de plus à l'écran.
+#
+# APRÈS le cache, parce que la commande a besoin d'un conteneur de services
+# chauffé. ET SANS POUVOIR EMPÊCHER LE DÉMARRAGE : `|| true`. Un ménage qui
+# échoue — base lente, colonne inattendue — est un désagrément ; refuser de
+# démarrer l'application pour cette raison serait une panne. Le journal garde
+# la trace, `docker logs fitcarnet-app` la montre.
+bleu "Invitations"
+php bin/console app:invitations:purger --no-interaction || souci "purge des invitations ignorée (sans conséquence)"
+
 printf '\033[0;32m▸ fitcarnet est prêt\033[0m\n'
 
 # `exec` : FrankenPHP devient le processus 1 et reçoit les signaux d'arrêt de

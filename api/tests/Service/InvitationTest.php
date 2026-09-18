@@ -163,6 +163,106 @@ final class InvitationTest extends TestCase
         ));
     }
 
+    // --------------------------------------------------------------- purge
+
+    /*
+     * LA PURGE — constat 02#17, tranche le 18 septembre 2026.
+     *
+     * UN SEUL JUGE, ET IL EST ICI. La tentation etait d'ecrire la regle
+     * directement dans un `DELETE ... WHERE`. C'aurait fait deux juges de la
+     * meme question — le motif de defaut le plus frequent de ce projet, celui
+     * du jumeau oublie — et le second aurait ete intestable sans base. La
+     * commande lit les lignes, demande a cette fonction, et supprime par
+     * identifiant. La table compte une poignee de lignes : il n'y a rien a
+     * optimiser, et tout a gagner a n'avoir qu'un endroit ou la regle vit.
+     */
+
+    public function testUneInvitationVivanteNeSePurgeJamais(): void
+    {
+        $maintenant = new \DateTimeImmutable('2026-09-18 12:00:00');
+
+        /* Meme tres vieille : tant qu'elle n'est ni acceptee ni perimee, le
+           lien est en circulation. Le purger, c'est le tuer sans le dire. */
+        self::assertFalse(Invitation::aPurger(
+            Invitation::expiration($maintenant), null, false, $maintenant,
+        ));
+    }
+
+    public function testUneInvitationPerimeeAttendLaRetention(): void
+    {
+        $expire = new \DateTimeImmutable('2026-08-01 12:00:00');
+
+        /* La veille du terme, elle reste : l'ecran dit « perimee, reinvite
+           pour un lien neuf », et c'est une information utile. */
+        self::assertFalse(Invitation::aPurger(
+            $expire, null, false, $expire->modify('+' . (Invitation::RETENTION_JOURS - 1) . ' days'),
+        ));
+
+        self::assertTrue(Invitation::aPurger(
+            $expire, null, false, $expire->modify('+' . (Invitation::RETENTION_JOURS + 1) . ' days'),
+        ));
+    }
+
+    public function testUneInvitationAccepteeAttendLaRetentionTantQueLeCompteVit(): void
+    {
+        $accepte = new \DateTimeImmutable('2026-08-01 12:00:00');
+        $expire = new \DateTimeImmutable('2026-08-05 12:00:00');
+
+        self::assertFalse(Invitation::aPurger(
+            $expire, $accepte, true, $accepte->modify('+' . (Invitation::RETENTION_JOURS - 1) . ' days'),
+        ));
+
+        self::assertTrue(Invitation::aPurger(
+            $expire, $accepte, true, $accepte->modify('+' . (Invitation::RETENTION_JOURS + 1) . ' days'),
+        ));
+    }
+
+    public function testLeDelaiDUneAccepteeCourtDepuisLAcceptation(): void
+    {
+        /* Le piege : une invitation acceptee le jour meme de sa creation a
+           quand meme un `expire_le` sept jours plus tard. Compter a partir de
+           `expire_le` la garderait une semaine de trop — et, pire, une
+           acceptee le DERNIER jour de validite serait purgee plus tot qu'une
+           acceptee le premier. Le fait qu'on date, c'est l'acceptation. */
+        $accepte = new \DateTimeImmutable('2026-08-01 12:00:00');
+        $expire = new \DateTimeImmutable('2026-08-08 12:00:00');
+        $juste = $accepte->modify('+' . (Invitation::RETENTION_JOURS + 1) . ' days');
+
+        self::assertTrue(Invitation::aPurger($expire, $accepte, true, $juste),
+            'Le delai doit courir depuis l\'acceptation, pas depuis la peremption.');
+    }
+
+    public function testUneAccepteeOrphelinePartToutDeSuite(): void
+    {
+        /* LE CAS QUI A MOTIVE LE CONSTAT. Supprimer un compte met
+           `invitation.utilisateur_id` a NULL (`ON DELETE SET NULL`) : la ligne
+           reste, marquee « acceptee », sans nom, pour toujours. Elle ne porte
+           plus aucune trace — le compte dont elle etait la trace n'existe
+           plus. Et elle encombre l'ecran juste au moment ou l'administrateur
+           reinvite cette adresse : deux lignes pour la meme personne, dont une
+           qui ne veut plus rien dire.
+
+           Aucune retention ici : il n'y a rien a laisser refroidir. */
+        $accepte = new \DateTimeImmutable('2026-09-18 11:59:00');
+        $expire = new \DateTimeImmutable('2026-09-25 12:00:00');
+
+        self::assertTrue(Invitation::aPurger(
+            $expire, $accepte, false, new \DateTimeImmutable('2026-09-18 12:00:00'),
+        ));
+    }
+
+    public function testUneEnAttenteNEstJamaisOrpheline(): void
+    {
+        /* `utilisateur_id` est nul sur TOUTE invitation non acceptee : c'est
+           son etat normal, pas un orphelinat. Confondre les deux purgerait a
+           l'instant meme chaque invitation qu'on vient de creer. */
+        $maintenant = new \DateTimeImmutable('2026-09-18 12:00:00');
+
+        self::assertFalse(Invitation::aPurger(
+            Invitation::expiration($maintenant), null, false, $maintenant,
+        ));
+    }
+
     public function testUnJetonInconnuNeVautRien(): void
     {
         self::assertFalse(Invitation::estValable(null, null, new \DateTimeImmutable()));

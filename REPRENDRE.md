@@ -25,7 +25,7 @@ d'une ligne de code, pas ce qui reste à faire.
   `test_import_carnet.py`.
 - **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
   puis deux passes des trois agents de contrôle et leurs correctifs.
-- **Audit de septembre** : 79 constats, **76 clos, 3 ouverts**, aucun
+- **Audit de septembre** : 79 constats, **77 clos, 2 ouverts**, aucun
   critique ni élevé (section 2.4).
 
 ---
@@ -174,7 +174,7 @@ l'instance filmée. Sur la base de dev **du premier poste**, deux comptes
 jetables servent aux captures (`demo-verif@test.local`,
 `demo-admin-verif@test.local`) : les retirer une fois les captures refaites.
 
-### 2.4 Les 3 constats d'audit ouverts
+### 2.4 Les 2 constats d'audit ouverts
 
 Vérifiés un par un le 17 septembre 2026. Aucun critique, aucun élevé. La
 preuve de chacun (fichier et ligne) est dans
@@ -189,7 +189,7 @@ infrastructure, `03` = front, `04` = tests et qualité).
 | **03 M5** — jetons de session en clair dans `localStorage` sur le web | moyenne | deux issues, et la seconde est un chantier — voir ci-dessous |
 | ~~**02#13**~~ | faible | **tranché le 18 septembre 2026 : rotation seule.** `json-file`, 10 Mo × 3, sur les trois services. Les limites CPU/mémoire sont refusées tant qu'aucune mesure ne les fonde |
 | ~~**02#15**~~ | faible | **tranché le 18 septembre 2026 : gardé, et écrit** dans `compose.dev.yml` |
-| **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée ; reste à décider si l'on purge |
+| ~~**02#17**~~ | faible | **tranché et fait le 18 septembre 2026** : `app:invitations:purger`, rétention 30 jours, jouée à chaque démarrage ; les **orphelines** (compte supprimé) partent sans délai ; bouton « Renvoyer un lien » sur l'écran d'administration |
 
 **M5 en détail, parce que c'est le seul des quatre qui touche à la sécurité.**
 Sur le web, le coffre retombe sur `localStorage` : le JWT **et** le jeton de
