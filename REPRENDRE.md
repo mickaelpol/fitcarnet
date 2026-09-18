@@ -131,10 +131,9 @@ chaque rendu, une mémoïsation intérieure n'y changerait rien.
 
 ### 2.2 À faire par toi, sur le NAS
 
-**Régénérer la clé d'API Grocy.** Elle a été collée dans une conversation le
-15 septembre 2026 : elle est à considérer comme publiée. Grocy → Paramètres →
-Clés d'API → révoquer puis recréer, et reporter la nouvelle dans le `.env` du
-NAS.
+~~**Régénérer la clé d'API Grocy.**~~ **Fait** — le propriétaire l'a confirmé le
+18 septembre 2026. L'ancienne avait été collée dans une conversation le
+15 septembre et était à considérer comme publiée.
 
 **Sortir les sauvegardes du NAS — constat d'audit 02#8.** Base et sauvegardes
 vivent toutes deux sur `/volume1` : une panne de volume, un rançongiciel ou une
