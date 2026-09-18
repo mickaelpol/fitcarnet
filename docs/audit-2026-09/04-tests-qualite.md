@@ -181,8 +181,31 @@ Un cas limite non couvert que j'ai relevé en lisant : si le jeton d'accès exis
 
 ---
 
-### 7. OUVERT — **Deux juges du rendement, un dans l'API et un dans le front, aux seuils différents**
-**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : la borne de l'**impossible** est alignée des deux côtés depuis le 16 (`rendementPossible`), mais les bandes du **plausible** et le seuil de 100,5 g restent écrits deux fois.
+### 7. CLOS — **Deux juges du rendement, un dans l'API et un dans le front, aux seuils différents**
+**Gravité : MOYENNE — Statut : VERROUILLÉ LE 18 SEPTEMBRE 2026**, par la
+seconde correction que ce constat proposait lui-même — « ajouter dans chaque
+suite un test de table qui compare les bornes à une liste unique et explicite ».
+
+La liste est `api/regles/rendement.json` : quinze cas nommés, les deux bornes,
+et le seuil de matière. Elle n'est lue par aucun code — seulement par
+`api/tests/Service/RendementPartageTest.php` **et**
+`front/src/calcul/rendementPartage.test.ts`. Le jour où l'un des deux juges
+change d'avis sans l'autre, une des deux suites tombe en nommant le cas.
+
+Les bords sont éprouvés en tant que tels, pas seulement par des exemples : une
+borne déplacée de 1,05 à 1,5 laisserait « prot à 1,2 » refusé si l'on avait
+oublié d'écrire ce cas-là. Le seuil de 100,5 g est éprouvé par le comportement
+des deux côtés, puisqu'il n'est lisible ni de l'un ni de l'autre.
+
+**Ce qui reste volontairement asymétrique** : les bandes douces du front —
+« ce rendement est inhabituel », en `info` ou `avertissement` — n'ont pas
+d'équivalent dans l'API, et c'est le partage des rôles. L'API **décide** quel
+rendement est retenu ; le front **affiche** un doute. L'unification complète
+(faire remonter les motifs par `incoherences()` et retirer du front ce qui
+recalcule) reste possible, mais elle n'est plus nécessaire pour éviter la
+dérive silencieuse : c'est elle que ce constat visait.
+
+Ce qui suit est l'état d'avant.
 `api/src/Service/RendementPlausible.php:48-76` vs `front/src/calcul/plausibilite.ts:91-105` et `:280-382`
 
 Les deux répondent à la même question — « ce rendement est-il possible ? » — et ne répondent pas pareil :
