@@ -74,41 +74,56 @@ export function BandeauMotDePasse() {
 }
 
 /**
- * LE DORE, ET PAS LE ROUGE — corrige le 18 septembre 2026, sur remarque.
+ * DORE PLEIN, TEXTE SOMBRE — 9,23:1 DE CONTRASTE, MESURE.
  *
- * Ce n'est pas qu'une question de gout. Le rouge de ce theme annonce une
- * ERREUR : un champ refuse, une requete qui a echoue, une suppression qui ne
- * se defait pas. Or ce bandeau dit le contraire de tout ca — les regles ont
- * change, ton mot de passe RESTE valable, rien n'est bloque. Le peindre en
- * rouge, c'etait alarmer de ce qu'on venait d'ecrire comme sans gravite, et
- * user le rouge pour le jour ou quelque chose ira vraiment mal.
+ * TROIS VERSIONS, ET LES DEUX PREMIERES ETAIENT FAUSSES. Il faut les trois
+ * pour comprendre celle-ci.
  *
- * `vif` est la couleur d'accent de l'application — celle des boutons, des
- * onglets actifs, des chiffres qui comptent. Elle attire l'oeil sans crier, et
- * ses voiles existaient deja : `vifVoile` et `vifBord` ont ete rassembles
- * precisement pour ne plus ecrire « le dore, mais discret » en rgba() a chaque
- * ecran.
+ * 1. ROUGE SUR VOILE ROUGE. Faux sur le fond : le rouge de ce theme annonce
+ *    une ERREUR — un champ refuse, une requete qui echoue, une suppression
+ *    qu'on ne defait pas. Or ce bandeau dit le contraire : les regles ont
+ *    change, le mot de passe RESTE valable, rien n'est bloque. Alarmer de ce
+ *    qu'on vient d'ecrire comme sans gravite, c'est aussi user le rouge pour
+ *    le jour ou quelque chose ira vraiment mal.
  *
- * `vifVoile` (8 %) ET NON `vifFond` (12 %) : ce bandeau coiffe l'application
- * en permanence jusqu'a ce qu'on agisse. Un aplat qu'on voit tout le temps
- * doit etre plus leger qu'un encadre qu'on voit une fois.
+ * 2. DORE SUR VOILE DORE A 8 %. Faux sur la forme, et le calcul disait
+ *    pourtant 8:1 — parce qu'il supposait le voile compose sur `C.fond`. Il ne
+ *    l'etait pas : sur le web, `<html>` et `<body>` n'avaient aucun fond, donc
+ *    le voile se composait sur le BLANC du navigateur. Le fond rendu etait un
+ *    creme presque blanc, et le texte dore dessus tombait a **1,87:1**. Il en
+ *    faut 4,5. Illisible, et signale par l'utilisateur avant que la mesure ne
+ *    le confirme.
+ *
+ *    (Le test `theme/charte.test.ts` a d'ailleurs refuse la premiere version de
+ *    ce commentaire, qui citait la couleur en notation `rgb`. Il cherche les
+ *    couleurs ecrites en dur et ne fait pas la difference avec une prose qui
+ *    en parle — c'est le bon reglage : mieux vaut reformuler une phrase que
+ *    laisser passer une couleur hors charte.)
+ *
+ * LA LECON, QUI VAUT PLUS QUE LA COULEUR : un fond TRANSLUCIDE ne decide pas
+ * de sa propre lisibilite, il la delegue a ce qu'on aura mis derriere. Pour un
+ * element qui coiffe TOUTE l'application, au-dessus de n'importe quel ecran,
+ * c'est un pari qu'on perd un jour. Ce bandeau est donc OPAQUE. La cause
+ * premiere est fermee par ailleurs (`app/_layout.tsx` pose enfin un fond), mais
+ * on ne remet pas la lisibilite d'un avertissement entre les mains d'une autre
+ * ligne, dans un autre fichier.
+ *
+ * 9,23:1 passe le niveau AAA (7:1), et pas seulement le AA (4,5:1) : c'est un
+ * texte petit, affiche en permanence, et qui doit se lire d'un coup d'oeil.
  */
 const s = StyleSheet.create({
   bandeau: {
-    backgroundColor: C.vifVoile,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.vifBord,
+    backgroundColor: C.vif,
     paddingHorizontal: E.l,
     paddingBottom: E.s,
   },
   texte: {
-    color: C.vif,
+    color: C.fond,
     fontFamily: P.fort,
     fontSize: T.petit,
-    /* Les etiquettes de ce theme sont en capitales espacees ; ici on garde la
-       casse ordinaire. C'est une phrase qu'on lit, pas un intitule de colonne,
-       et des capitales sur toute la largeur sonneraient comme un panneau
-       d'interdiction. */
+    /* Casse ordinaire, contrairement aux etiquettes de ce theme : c'est une
+       phrase qu'on lit, pas un intitule de colonne, et des capitales sur toute
+       la largeur sonneraient comme un panneau d'interdiction. */
     letterSpacing: 0.2,
     textAlign: 'center',
   },

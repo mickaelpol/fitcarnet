@@ -248,7 +248,16 @@ export default function Racine() {
   const Enveloppe = Platform.OS === 'web' ? View : GestureHandlerRootView;
 
   return (
-    <Enveloppe style={{ flex: 1 }}>
+    /* LE FOND EST POSE ICI, ET IL MANQUAIT — 18 septembre 2026.
+       Sur le web, `<html>` et `<body>` n'ont AUCUNE couleur de fond : la page
+       retombe donc sur le blanc du navigateur. Les ecrans posent chacun le
+       leur, si bien que rien ne se voyait — jusqu'au jour ou un element
+       TRANSLUCIDE s'est retrouve au-dessus d'eux. Le bandeau de mot de passe
+       avait un voile dore a 8 % : compose sur du blanc au lieu du fond sombre,
+       il donnait un creme sur lequel son propre texte dore tombait a 1,87:1 de
+       contraste. Il en faut 4,5. Signale par l'utilisateur, mesure ensuite.
+       Cette ligne ferme le trou pour de bon, pour tout ce qu'on posera ici. */
+    <Enveloppe style={{ flex: 1, backgroundColor: C.fond }}>
     {/* Le cache est relu depuis le disque avant le premier rendu : au
         démarrage à froid, les écrans s'affichent avec ce qu'on savait hier
         pendant que les requêtes repartent en arrière-plan. */}
