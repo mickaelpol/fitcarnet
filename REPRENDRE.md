@@ -15,9 +15,10 @@ d'une ligne de code, pas ce qui reste à faire.
 ## L'état, au 18 septembre 2026
 
 - **Tout est poussé sur Gitea**, et donc déployé : la tâche planifiée du NAS
-  tire `master` toutes les 5 minutes. **La production n'a pas encore été
-  contrôlée** depuis — c'est la première chose à faire (section 2.1).
-- **Tests** : 606 côté front plus 33 de rendu, 330 côté API (864 assertions),
+  tire `master` toutes les 5 minutes. **La production a été contrôlée le
+  18 septembre** — schéma conforme aux migrations 34-35-36, parcours réel
+  éprouvé sur un compte jetable puis retiré (section 2.1).
+- **Tests** : 606 côté front plus 33 de rendu, 356 côté API (918 assertions),
   tous verts. PHPStan : 7 erreurs connues, pas une de plus.
 - **Contrôles de base**, tous verts : `verifier-schema.sh` (base neuve
   identique à base migrée), `verifier-migrations.sh`, `verifier-jeux.sh`,
@@ -216,6 +217,20 @@ besoin se présente :
 
 ## 3. Les décisions en vigueur — ne pas les rouvrir sans raison
 
+- **Aucun SQL dans `src/Controller/`** (18 septembre 2026). Il vit dans
+  `src/Repository/` — `CuissonsHabituelles`, `Comptes`, `Invitations` — avec les
+  transactions qui l'accompagnent. Un contrôleur lit la requête, appelle,
+  répond. C'est ce que montre la documentation Symfony 7.4 (consultée par
+  context7) : du SQL brut, oui, mais dans un dépôt. Les trois dépôts ont été
+  écrits **test d'abord**, et ces tests tiennent ce que le SQL portait sans le
+  dire : l'ordre de suppression d'un compte, l'upsert des habitudes, et le fait
+  que la liste des invitations ne sélectionne jamais l'empreinte d'un jeton.
+- **La propriété d'un objet se demande au voter** `EstLeProprietaire` (attribut
+  `MIEN`), pas à une comparaison écrite sur place. Il vaut pour toute entité
+  `ProprieteUtilisateur`. **Les `#[IsGranted('ROLE_…')]` restent** : un rôle se
+  vérifie ainsi ; un voter sert quand la décision porte sur un objet. Et il ne
+  change pas la réponse — 404 dans les deux cas, « n'existe pas » et « pas à
+  toi », pour ne pas apprendre à un inconnu quels identifiants existent.
 - **Pousser, c'est déployer.** La tâche planifiée du NAS tire Gitea toutes les
   5 minutes. Avant un push qui touche au schéma : `sauvegarde-nas.sh` à la
   main (la sauvegarde automatique date de 4 h). Voir `DEPLOIEMENT.md`.

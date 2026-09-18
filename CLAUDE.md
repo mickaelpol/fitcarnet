@@ -36,7 +36,7 @@ lui-même se reconstruit : `/graphify .`.
 cd front && npm test          # tsc --noEmit + 606 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 330 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 356 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -160,6 +160,15 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   (extension Doctrine, priorité 100, pose le `WHERE`) + `ChargementComplet` (priorité 50, ajoute les
   jointures anti-N+1 par-dessus). L'entité `Utilisateur` n'a **aucune relation sortante** : c'est un
   type auquel on se réfère, pas un module dont on dépend. Garder cette propriété.
+- **« Cette donnée est-elle à moi ? » se demande au voter** `App\Security\Voter\EstLeProprietaire`
+  (attribut `MIEN`), qui vaut pour **toute** entité `ProprieteUtilisateur`. Il remplace deux
+  comparaisons écrites à la main. Il **décide**, il ne répond pas : les appelants rendent **404**,
+  le même texte pour « n'existe pas » et « pas à toi ». Les `#[IsGranted('ROLE_…')]` des contrôleurs
+  restent : un rôle se vérifie ainsi, un voter sert quand la décision porte sur un objet.
+- **Aucun SQL dans `src/Controller/`** depuis le 18 septembre 2026 : il vit dans `src/Repository/`
+  (`CuissonsHabituelles`, `Comptes`, `Invitations`), avec les transactions. Un contrôleur lit la
+  requête, appelle, répond. C'est ce que montre la documentation Symfony 7.4, et ce qui rend le SQL
+  éprouvable sans lever le noyau.
 - **Session** : JWT court (1 h) + jeton de rafraîchissement révocable. Les pare-feux `session`,
   `invitation` et `etat` sont **volontairement hors** du pare-feu JWT — leur ordre dans
   `security.yaml` est signifiant, le premier motif qui correspond gagne.

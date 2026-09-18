@@ -17,6 +17,7 @@ Ce qui suit a été écrit à partir de failles réelles, chacune datée.
 | `App\Doctrine\FiltreProprietaire` | Extension Doctrine, **priorité 100** : pose le `WHERE utilisateur = :moi`. |
 | `App\Doctrine\ChargementComplet` | Priorité 50 : ajoute les jointures anti-N+1 **par-dessus** le filtre. |
 | `App\State\ProprietaireProcessor` | Pose le propriétaire à la création — le filtre ne sert à rien sans lui. |
+| `App\Security\Voter\EstLeProprietaire` | Attribut `MIEN` : « cet objet-ci est-il à moi ». Vaut pour toute entité marquée. |
 | `api/tests/ModeleExposeTest.php` | Refuse toute entité `#[ApiResource]` non conforme absente de sa liste blanche. |
 
 Les aliments sont des données de compte comme les autres : `Aliment` implémente
