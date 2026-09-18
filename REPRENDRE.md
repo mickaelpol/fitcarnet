@@ -25,7 +25,7 @@ d'une ligne de code, pas ce qui reste à faire.
   `test_import_carnet.py`.
 - **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
   puis deux passes des trois agents de contrôle et leurs correctifs.
-- **Audit de septembre** : 79 constats, **65 clos, 14 ouverts**, aucun
+- **Audit de septembre** : 79 constats, **66 clos, 13 ouverts**, aucun
   critique ni élevé (section 2.4).
 
 ---
@@ -164,7 +164,7 @@ l'instance filmée. Sur la base de dev **du premier poste**, deux comptes
 jetables servent aux captures (`demo-verif@test.local`,
 `demo-admin-verif@test.local`) : les retirer une fois les captures refaites.
 
-### 2.4 Les 14 constats d'audit ouverts
+### 2.4 Les 13 constats d'audit ouverts
 
 Vérifiés un par un le 17 septembre 2026. Aucun critique, aucun élevé. La
 preuve de chacun (fichier et ligne) est dans
@@ -180,7 +180,7 @@ infrastructure, `03` = front, `04` = tests et qualité).
 | **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
 | **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée ; reste à décider si l'on purge |
 
-**Onze n'ont jamais été tranchés :**
+**Dix n'ont jamais été tranchés :**
 
 | Constat | Gravité | En une phrase |
 |---|---|---|
@@ -193,7 +193,6 @@ infrastructure, `03` = front, `04` = tests et qualité).
 | **03 M12** | moyenne | La saisie d'un inventaire en cours est perdue au changement d'onglet. |
 | **03 M13** | moyenne | `noUncheckedIndexedAccess` est désactivé dans `front/tsconfig.json`. |
 | **04#7** | moyenne | Deux juges du rendement, l'API et le front : l'impossible est aligné depuis le 16 septembre, mais les bandes du plausible et le seuil de 100,5 g restent écrits deux fois. |
-| **04#15** | faible | Le bouchon HTTP de `FrigoGrocyCreationTest` répond `[]` à tout chemin qu'il ne connaît pas : un appel Grocy nouveau ou renommé passerait sans que le test bronche. |
 | **04#19** | faible | Divisions et conversions non gardées dans `ciqual_vers_grocy.py`. |
 
 Pour les reprendre : un constat, un test rouge, un correctif, un commit ; puis

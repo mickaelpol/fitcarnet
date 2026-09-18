@@ -310,8 +310,14 @@ Le test `testDeuxLignesSurLeMemeAlimentNeSeCumulentPas` **affirme** `[5 => 800.0
 
 ---
 
-### 15. OUVERT — **Le bouchon HTTP de `FrigoGrocyCreationTest` répond `[]` à tout chemin inconnu**
-**Gravité : FAIBLE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : le bouchon rend toujours `$reponses[$chemin] ?? []` (`FrigoGrocyCreationTest.php:176`).
+### 15. CLOS — **Le bouchon HTTP de `FrigoGrocyCreationTest` répond `[]` à tout chemin inconnu**
+**Gravité : FAIBLE — Statut : CORRIGÉ LE 18 SEPTEMBRE 2026.** Un chemin absent de
+`$reponses` lève désormais une `LogicException` qui nomme la méthode et le chemin.
+Et le garde a été **vu mordre** : `testLeBancRefuseUnCheminNonPrevu` monte le banc
+sans aucune réponse déclarée et exige l'échec — un garde qu'on n'a jamais vu
+tomber n'est pas un garde.
+
+Ce qui suit est l'état d'avant.
 `api/tests/Service/FrigoGrocyCreationTest.php:158-172` à l'audit
 
 `return new MockResponse(json_encode($reponses[$chemin] ?? []));` — si le code appelait demain un endpoint Grocy supplémentaire (ou en renommait un), le bouchon rendrait un tableau vide sans broncher et les tests resteraient verts. C'est le genre de mock assez permissif pour valider un code faux.

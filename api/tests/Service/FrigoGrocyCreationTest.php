@@ -151,6 +151,37 @@ final class FrigoGrocyCreationTest extends TestCase
         $grocy->creerProduit('Lentilles corail');
     }
 
+    /**
+     * LE BANC LUI-MEME DOIT MORDRE — constat 04#15.
+     *
+     * Un garde qu'on n'a jamais vu tomber n'est pas un garde. Sans reponse
+     * declaree, le premier appel Grocy doit faire echouer le test bruyamment,
+     * et non recevoir un tableau vide qui ressemble a une reponse valable.
+     */
+    public function testLeBancRefuseUnCheminNonPrevu(): void
+    {
+        $envoyees = [];
+        $grocy = self::grocy([], $envoyees);
+
+        try {
+            $grocy->lire();
+            self::fail('le banc a laisse passer un chemin non declare');
+        } catch (\Throwable $e) {
+            self::assertStringContainsString('Le banc ne prevoit pas', self::message($e));
+        }
+    }
+
+    /** Le message, quel que soit l'emballage que le client HTTP ajoute. */
+    private static function message(\Throwable $e): string
+    {
+        $messages = [];
+        for ($courant = $e; null !== $courant; $courant = $courant->getPrevious()) {
+            $messages[] = $courant->getMessage();
+        }
+
+        return \implode(' | ', $messages);
+    }
+
     /* ------------------------------------------------------------ le banc */
 
     /** @param array<string, mixed> $reponses */
@@ -173,7 +204,20 @@ final class FrigoGrocyCreationTest extends TestCase
                         \json_encode($reponses['creation'] ?? ['created_object_id' => 61]));
                 }
 
-                return new MockResponse(\json_encode($reponses[$chemin] ?? []));
+                /* UN CHEMIN NON PREVU FAIT TOMBER LE BANC — constat 04#15.
+                   Ici se trouvait `$reponses[$chemin] ?? []` : un appel Grocy
+                   nouveau, ou simplement renomme, recevait un tableau vide et
+                   les tests restaient verts. Un bouchon assez permissif pour
+                   valider un code faux ne protege rien — il rassure. */
+                if (!\array_key_exists($chemin, $reponses)) {
+                    throw new \LogicException(\sprintf(
+                        'Le banc ne prevoit pas « %s %s ». Si le code appelle un nouveau '
+                        . 'chemin Grocy, declare sa reponse dans le banc plutot que de '
+                        . 'laisser un tableau vide passer pour une reponse valable.',
+                        $methode, $chemin));
+                }
+
+                return new MockResponse(\json_encode($reponses[$chemin]));
             });
 
         return new FrigoGrocy($client, new NullLogger(), 'https://grocy.test', 'cle');
