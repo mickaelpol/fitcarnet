@@ -182,20 +182,40 @@ preuve de chacun (fichier et ligne) est dans
 reste ouvert » ; le constat complet, dans le rapport indiqué (`02` = données et
 infrastructure, `03` = front, `04` = tests et qualité).
 
-**Trois attendent ta décision :**
+**Quatre attendent ta décision :**
 
 | Constat | Gravité | Ce qui retient |
 |---|---|---|
+| **03 M5** — jetons de session en clair dans `localStorage` sur le web | moyenne | deux issues, et la seconde est un chantier — voir ci-dessous |
 | **02#13** — ni limites de ressources ni rotation des journaux dans `docker-compose.yml` | faible | toute modification de ce fichier se déploie en production au prochain push : une limite mal choisie arrêterait l'application réelle |
 | **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
 | **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée ; reste à décider si l'on purge |
 
-**Trois n'ont jamais été tranchés :**
+**M5 en détail, parce que c'est le seul des quatre qui touche à la sécurité.**
+Sur le web, le coffre retombe sur `localStorage` : le JWT **et** le jeton de
+rafraîchissement y sont en clair, lisibles par tout script de la page et
+persistants. Le rafraîchissement est le plus exposé — il rouvre la session
+indéfiniment, là où le JWT expire en une heure. C'est la seule chose du front
+qui, volée, donne un accès durable.
+
+Ce qui limite le risque aujourd'hui : aucun contenu tiers dans la page, aucune
+publicité, aucune bibliothèque chargée d'un CDN, et une poignée d'utilisateurs
+connus. Il faudrait donc une faille XSS **dans notre propre code** pour
+l'atteindre.
+
+- **L'assumer par écrit** (30 min) : ce paragraphe devient la décision, et le
+  constat se ferme en disant pourquoi.
+- **Le corriger** (une demi-journée) : JWT en mémoire seule, et rafraîchissement
+  dans un cookie `HttpOnly; Secure; SameSite=Strict` posé par Symfony. Front et
+  API sont sur la même origine en HTTPS, donc c'est faisable sans bricolage —
+  mais ça touche la connexion, le renouvellement et la déconnexion, c'est-à-dire
+  le chemin par lequel tout le monde entre. À éprouver de bout en bout avant de
+  pousser.
+
+**Un seul n'a jamais été tranché :**
 
 | Constat | Gravité | En une phrase |
 |---|---|---|
-| **03 M5** | moyenne | Sur le web, les jetons de session sont en clair dans `localStorage` (`front/src/api/client.ts`). |
-| **03 M12** | moyenne | La saisie d'un inventaire en cours est perdue au changement d'onglet. |
 | **03 M13** | moyenne | `noUncheckedIndexedAccess` est désactivé dans `front/tsconfig.json`. |
 
 Pour les reprendre : un constat, un test rouge, un correctif, un commit ; puis
