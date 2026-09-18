@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\PlanRepas;
 use App\Entity\Utilisateur;
+use App\Security\Voter\EstLeProprietaire;
 use App\Service\DeductionDuPlan;
 use App\Service\DeductionGrocy;
 use App\Service\Frigo;
@@ -84,7 +85,10 @@ final class PlansController extends AbstractController
         $utilisateur = $this->utilisateur();
         $plan = $this->em->getRepository(PlanRepas::class)->find($id);
 
-        if (null === $plan || $plan->getUtilisateur() !== $utilisateur) {
+        /* LA MEME REPONSE POUR « N'EXISTE PAS » ET « PAS A TOI ». Distinguer
+           apprendrait a un inconnu quels identifiants existent. Le voter decide,
+           ce controleur choisit quoi dire — et il dit la meme chose deux fois. */
+        if (null === $plan || !$this->isGranted(EstLeProprietaire::MIEN, $plan)) {
             return $this->json(['erreur' => 'Plan introuvable.'], 404);
         }
         if (null !== $plan->getCuisineLe()) {

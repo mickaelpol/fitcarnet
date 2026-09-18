@@ -9,6 +9,7 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Dto\OrdreModele;
 use App\Entity\Modele;
 use App\Entity\Seance;
+use App\Security\Voter\EstLeProprietaire;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -40,7 +41,10 @@ final readonly class OrdreModeleProcessor implements ProcessorInterface
         }
 
         $utilisateur = $this->securite->getUser();
-        if ($modele->getUtilisateur() !== $utilisateur) {
+
+        /* Meme reponse que pour un modele inexistant, et meme regle de propriete
+           que partout ailleurs : elle vit dans le voter, pas ici. */
+        if (!$this->securite->isGranted(EstLeProprietaire::MIEN, $modele)) {
             throw new NotFoundHttpException('Modèle introuvable.');
         }
 
