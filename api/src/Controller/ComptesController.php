@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Utilisateur;
-use App\Service\JetonsRafraichissement;
+use App\Repository\Comptes;
 use App\Service\ProtectionDuCompte;
-use Doctrine\DBAL\ArrayParameterType;
-use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -47,10 +45,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_ADMIN')]
 final class ComptesController extends AbstractController
 {
-    public function __construct(
-        private readonly Connection $cnx,
-        private readonly JetonsRafraichissement $jetons,
-    ) {
+    public function __construct(private readonly Comptes $comptes)
+    {
     }
 
     /**
@@ -69,23 +65,7 @@ final class ComptesController extends AbstractController
     #[Route('/comptes', methods: ['GET'])]
     public function lister(): JsonResponse
     {
-        $lignes = $this->cnx->fetchAllAssociative(
-            "SELECT u.id, u.email, u.nom, u.roles, u.actif, u.source_frigo, u.cree_le,
-                    (SELECT count(*) FROM seance     s WHERE s.utilisateur_id = u.id) AS seances,
-                    (SELECT count(*) FROM modele     m WHERE m.utilisateur_id = u.id) AS modeles,
-                    (SELECT count(*) FROM plan_repas p WHERE p.utilisateur_id = u.id) AS plans,
-                    (SELECT count(*) FROM aliment    a WHERE a.utilisateur_id = u.id) AS aliments,
-                    (SELECT count(*) FROM stock      k WHERE k.utilisateur_id = u.id) AS stock,
-                    (SELECT count(*) FROM cible      c WHERE c.utilisateur_id = u.id) AS cibles,
-                    (SELECT count(*) FROM complement o WHERE o.utilisateur_id = u.id) AS complements,
-                    (SELECT count(*) FROM exercice   e WHERE e.cree_par = u.id AND NOT e.public) AS exercices,
-                    (SELECT count(*) FROM serie sr
-                       JOIN seance_exercice se ON se.id = sr.seance_exercice_id
-                       JOIN seance s2 ON s2.id = se.seance_id
-                      WHERE s2.utilisateur_id = u.id) AS series
-               FROM utilisateur u
-           ORDER BY u.cree_le",
-        );
+        $lignes = $this->comptes->tousAvecContenu();
 
         $moi = $this->moi()->getId()->toRfc4122();
 
@@ -134,7 +114,7 @@ final class ComptesController extends AbstractController
     #[Route('/comptes/{id}/actif', methods: ['POST'])]
     public function activer(string $id, Request $requete): JsonResponse
     {
-        $cible = $this->compte($id);
+        $cible = $this->comptes->parId($id);
         if (null === $cible) {
             return $this->refus('Ce compte n’existe pas.', Response::HTTP_NOT_FOUND);
         }
@@ -149,7 +129,7 @@ final class ComptesController extends AbstractController
                 estMoi: $this->estMoi($id),
                 cibleEstAdmin: $this->estAdmin($cible),
                 cibleEstActive: (bool) $cible['actif'],
-                adminsActifs: $this->administrateursActifs(),
+                adminsActifs: $this->comptes->administrateursActifs(),
             );
         }
 
@@ -157,21 +137,10 @@ final class ComptesController extends AbstractController
             return $this->refus($raison);
         }
 
-        $this->cnx->transactional(function () use ($id, $actif): void {
-            $this->cnx->executeStatement(
-                'UPDATE utilisateur SET actif = :a WHERE id = :id',
-                ['a' => $actif ? 'true' : 'false', 'id' => $id],
-            );
-
-            if (!$actif) {
-                /* LA REGLE N'EST PAS RECOPIEE ICI, ELLE EST APPELEE.
-                   Ce `DELETE` etait ecrit a la main, et son jumeau l'etait
-                   aussi dans `UtilisateurProcessor` : deux copies d'une meme
-                   decision, qui divergeaient deja. Depuis le 17 septembre 2026
-                   les deux appellent le service qui connait les jetons. */
-                $this->jetons->revoquerTout($id);
-            }
-        });
+        /* La mise a jour et la coupure des sessions tiennent dans une seule
+           transaction, et c'est le depot qui la porte : un controleur n'a pas a
+           connaitre les transactions plus qu'il n'a a connaitre le SQL. */
+        $this->comptes->definirActif($id, $actif);
 
         return $this->json(['actif' => $actif]);
     }
@@ -202,7 +171,7 @@ final class ComptesController extends AbstractController
     #[Route('/comptes/{id}', methods: ['DELETE'])]
     public function supprimer(string $id): JsonResponse
     {
-        $cible = $this->compte($id);
+        $cible = $this->comptes->parId($id);
         if (null === $cible) {
             return $this->refus('Ce compte n’existe pas.', Response::HTTP_NOT_FOUND);
         }
@@ -211,71 +180,19 @@ final class ComptesController extends AbstractController
             estMoi: $this->estMoi($id),
             cibleEstAdmin: $this->estAdmin($cible),
             cibleEstActive: (bool) $cible['actif'],
-            adminsActifs: $this->administrateursActifs(),
+            adminsActifs: $this->comptes->administrateursActifs(),
         );
 
         if (null !== $raison) {
             return $this->refus($raison);
         }
 
-        $this->cnx->transactional(function () use ($id): void {
-            /* Le stock qui vise ses aliments, puis ses aliments. Depuis la
-               migration 35, seul son propre stock peut les viser ; la
-               suppression explicite reste pour l'ordre, que deux cascades
-               parties du meme compte ne garantissent pas. */
-            $this->cnx->executeStatement(
-                'DELETE FROM stock WHERE aliment_id IN (SELECT id FROM aliment WHERE utilisateur_id = :u)',
-                ['u' => $id],
-            );
-            $this->cnx->executeStatement('DELETE FROM aliment WHERE utilisateur_id = :u', ['u' => $id]);
-
-            /* SES EXERCICES PERSONNELS, RELEVES AVANT. `exercice.cree_par` est
-               en `SET NULL` : sans ce releve, le compte parti, on ne saurait
-               plus lesquels etaient a lui, et ils resteraient sans auteur ni
-               publication — visibles de personne. */
-            $exercices = $this->cnx->fetchFirstColumn(
-                'SELECT id FROM exercice WHERE cree_par = :u AND NOT public', ['u' => $id]);
-
-            $this->cnx->executeStatement('DELETE FROM utilisateur WHERE id = :id', ['id' => $id]);
-
-            /* APRES le compte, dont les seances et les modeles les citaient
-               encore (RESTRICT). Un exercice qu'un AUTRE compte cite toujours
-               — possible pour une seance d'avant le 14 septembre 2026, quand
-               les exercices personnels se voyaient de tous — reste en place :
-               le supprimer ferait echouer toute la suppression. */
-            if ([] !== $exercices) {
-                $this->cnx->executeStatement(
-                    'DELETE FROM exercice e
-                      WHERE e.id IN (:ids) AND NOT e.public
-                        AND NOT EXISTS (SELECT 1 FROM seance_exercice se WHERE se.exercice_id = e.id)
-                        AND NOT EXISTS (SELECT 1 FROM modele_exercice me WHERE me.exercice_id = e.id)',
-                    ['ids' => $exercices],
-                    ['ids' => ArrayParameterType::INTEGER],
-                );
-            }
-        });
+        $this->comptes->supprimer($id);
 
         return $this->json(['supprime' => true, 'email' => (string) $cible['email']]);
     }
 
     // ------------------------------------------------------------- outils
-
-    private function compte(string $id): ?array
-    {
-        /* L'identifiant vient de l'URL : PostgreSQL refuse un UUID mal forme
-           avec une erreur 500 illisible plutot qu'un resultat vide. On borne
-           donc la forme avant d'interroger. */
-        if (1 !== \preg_match('/^[0-9a-f-]{36}$/i', $id)) {
-            return null;
-        }
-
-        $ligne = $this->cnx->fetchAssociative(
-            'SELECT id, email, nom, roles, actif FROM utilisateur WHERE id = :id',
-            ['id' => $id],
-        );
-
-        return false === $ligne ? null : $ligne;
-    }
 
     private function estAdmin(array $compte): bool
     {
@@ -285,20 +202,6 @@ final class ComptesController extends AbstractController
     private function estMoi(string $id): bool
     {
         return $this->moi()->getId()->toRfc4122() === \mb_strtolower($id);
-    }
-
-    /**
-     * Combien d'administrateurs peuvent encore ouvrir cet ecran.
-     *
-     * On compte les ACTIFS : un administrateur desactive ne peut plus rien
-     * gerer, donc il ne compte pas comme filet de securite.
-     */
-    private function administrateursActifs(): int
-    {
-        return (int) $this->cnx->fetchOne(
-            "SELECT count(*) FROM utilisateur
-              WHERE actif = true AND roles LIKE '%ROLE_ADMIN%'",
-        );
     }
 
     private function moi(): Utilisateur

@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Controller\ComptesController;
 use App\Entity\Utilisateur;
+use App\Repository\Comptes;
 use App\Service\JetonsRafraichissement;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -131,10 +132,13 @@ final class ComptesContenuTest extends TestCase
 
     private static function controleur(Connection $cnx, Utilisateur $moi): ComptesController
     {
-        $controleur = new ComptesController(
+        /* Le SQL vit dans le depot depuis le 18 septembre 2026 : le test monte
+           donc le depot autour de la meme Connection doublee, et continue de
+           lire exactement les memes requetes. */
+        $controleur = new ComptesController(new Comptes(
             $cnx,
             new JetonsRafraichissement(self::createStub(EntityManagerInterface::class)),
-        );
+        ));
 
         $stockage = new TokenStorage();
         $stockage->setToken(new UsernamePasswordToken($moi, 'principal', ['ROLE_ADMIN']));

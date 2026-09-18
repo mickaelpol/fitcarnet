@@ -9,6 +9,7 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Controller\ComptesController;
 use App\Entity\JetonRafraichissement;
 use App\Entity\Utilisateur;
+use App\Repository\Comptes;
 use App\Service\JetonsRafraichissement;
 use App\State\UtilisateurProcessor;
 use Doctrine\DBAL\Connection;
@@ -314,7 +315,12 @@ final class RevocationDeSessionTest extends TestCase
 
         $administrateur = (new Utilisateur())->setRoles(['ROLE_ADMIN']);
 
-        $controleur = new ComptesController($cnx, new JetonsRafraichissement(self::em($enBase, $retires)));
+        /* Le SQL et la transaction vivent dans le depot depuis le 18 septembre
+           2026. Le test monte donc le depot autour de la meme Connection
+           doublee : ce qu'il surveille — la revocation part, ou ne part pas —
+           ne change pas de place. */
+        $controleur = new ComptesController(new Comptes(
+            $cnx, new JetonsRafraichissement(self::em($enBase, $retires))));
         $controleur->setContainer(self::conteneur($administrateur));
 
         return $controleur;
