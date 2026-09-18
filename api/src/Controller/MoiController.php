@@ -91,6 +91,10 @@ final class MoiController extends AbstractController
             'roles' => $utilisateur->getRoles(),
             'sourceFrigo' => $utilisateur->getSourceFrigo(),
             'actif' => $utilisateur->isActif(),
+            /* Pose a la DERNIERE CONNEXION, seul moment ou le mot de passe est
+               en clair. L'ecran Compte s'en sert pour proposer un changement
+               quand les regles ont bouge depuis. Il n'interdit rien. */
+            'motDePasseFaible' => $utilisateur->isMotDePasseFaible(),
         ]);
     }
 }

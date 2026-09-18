@@ -153,3 +153,30 @@ export function useSupprimerCompte() {
     },
   });
 }
+
+/**
+ * CHANGER SON PROPRE MOT DE PASSE.
+ *
+ * `PATCH /api/utilisateurs/{id}` avec les DEUX champs : le serveur exige le
+ * mot de passe actuel avant d'accepter le nouveau (`UtilisateurProcessor`).
+ * Sans lui, un onglet laissé ouvert dans une bibliothèque suffirait à
+ * s'approprier un compte.
+ *
+ * LA SESSION TOMBE APRÈS, ET C'EST VOULU. Le serveur révoque TOUTES les
+ * sessions du compte, y compris celle qui fait le changement — sinon un jeton
+ * de rafraîchissement volé continuerait de produire des jetons d'accès neufs
+ * alors qu'on vient justement de changer le mot de passe à cause de lui.
+ * L'écran doit donc annoncer la reconnexion, pas la subir.
+ *
+ * ON N'INVALIDE RIEN ICI : le cache n'a plus de sens une fois la session
+ * close, et c'est `useDeconnexion` qui le purge dans le bon ordre.
+ */
+export function useChangerMotDePasse() {
+  return useMutation({
+    mutationFn: (v: { id: string; actuel: string; nouveau: string }) =>
+      api<{ id: string }>(`/utilisateurs/${v.id}`, {
+        methode: 'PATCH',
+        corps: { motDePasseActuel: v.actuel, motDePasseClair: v.nouveau },
+      }),
+  });
+}

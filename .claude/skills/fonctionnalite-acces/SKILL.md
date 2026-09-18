@@ -46,7 +46,10 @@ désactivation du compte.
 | **Refus d'inviter une adresse qui a déjà un compte** | — | `InvitationsController.php:151-157` |
 | **Refus des domaines impossibles** (sans point, RFC 2606/6761) | — | `Invitation.php:109-125` |
 | **L'adresse est affichée, jamais saisie** — elle vient de l'invitation | écran Invitation | `front/app/invitation/[jeton].tsx:96`, `InvitationsController.php:290` |
-| **Mot de passe : 10 caractères minimum**, comptés en caractères | idem | `Invitation.php:24`, `:211-214`, `invitation/[jeton].tsx:10` |
+| **Mot de passe : 12 caractères minimum, une minuscule, une majuscule, un chiffre, un caractère spécial**, comptés en caractères | idem | `api/regles/motdepasse.json`, `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` |
+| **Une jauge dit ce qui manque pendant la frappe**, et ne peut pas encourager ce que l'API refuse | invitation, changement | `front/src/composants/jaugeMotDePasse.tsx`, témoin `motDePassePartage.test.ts` |
+| **Chacun change son propre mot de passe**, mot de passe actuel exigé, nouveau tapé deux fois | écran Changer mon mot de passe | `front/app/mot-de-passe.tsx`, `UtilisateurProcessor.php` |
+| **Un mot de passe qui ne respecte plus les règles est signalé**, sans rien bloquer | onglet Compte | `utilisateur.mot_de_passe_faible` (migration 38), posé à la connexion |
 | **Divergence signalée seulement une fois la confirmation commencée** | idem | `invitation/[jeton].tsx:83`, `:131` |
 | **Pas de connexion automatique après création** | idem | `invitation/[jeton].tsx:66-77` |
 | **JWT d'une heure**, volontairement court car non révocable | API | `api/config/packages/lexik_jwt_authentication.yaml:9` |
@@ -157,10 +160,18 @@ créer l'invitation. **Données de départ** : aucune.
    pour `<adresse>`. Choisis un nom et un mot de passe : personne d'autre ne les
    verra. »* — **l'adresse est affichée, pas saisie** (`:96`).
 5. Trois champs : **`Ton nom`**, **`Mot de passe`**, **`Répète-le`**. Sous le mot
-   de passe : *« 10 caractères au minimum. Ni majuscule ni chiffre imposés : une
-   phrase dont tu te souviens vaut mieux qu'un « Motdepasse1! » noté sur un
-   papier. »* (`:117-121`), qui **passe en couleur vive** dès que la saisie est
-   trop courte (`:79`, `:117`).
+   de passe, une **jauge** et la liste des cinq exigences, cochées au fur et à
+   mesure — 12 caractères, une minuscule, une majuscule, un chiffre, un
+   caractère spécial (`front/src/composants/jaugeMotDePasse.tsx`).
+
+   **CE TEXTE A CHANGÉ LE 18 SEPTEMBRE 2026.** L'écran disait auparavant
+   *« 10 caractères au minimum. Ni majuscule ni chiffre imposés : une phrase
+   dont tu te souviens vaut mieux qu'un Motdepasse1! noté sur un papier. »* —
+   c'était la décision d'alors, et le propriétaire du projet l'a renversée. La
+   longueur minimale est passée de 10 à 12 **en même temps** que les exigences
+   sont arrivées : une composition imposée réduit l'aléatoire, la longueur le
+   rend. L'argument d'origine n'a pas été jeté, il est écrit dans
+   `api/regles/motdepasse.json`.
 6. **« Les deux ne sont pas identiques. »** n'apparaît qu'une fois la
    confirmation commencée (`:83`, `:131`).
 7. **`Créer mon compte`** → **`Création…`** → écran **« Ton compte est prêt »** :
@@ -232,10 +243,13 @@ critère.
    (`InvitationsController.php:379-384`). **Aucun des trois cas ne doit se
    distinguer** — ni par le texte, ni par le code HTTP, ni par le temps de
    réponse. Témoins : `InvitationTest.php:135`, `:151`, `:166`.
-9. **Mot de passe de 9 caractères → refus**, avec « Le mot de passe doit faire au
-   moins 10 caractères. » (`InvitationsController.php:283-288`) ; et 10
-   caractères **accentués** passent — on compte les caractères, pas les octets
-   (`Invitation.php:211-214`, témoin `InvitationTest.php:181`).
+9. **Mot de passe faible → refus qui dit TOUT ce qui manque**, pas seulement le
+   premier défaut : « Il manque une lettre majuscule, un chiffre et un caractère
+   spécial. » Un écran qui dit une chose à la fois fait recommencer quatre fois,
+   et c'est ainsi qu'on obtient « Motdepasse1! ». Et un mot de passe **accentué**
+   se compte en caractères, pas en octets — « Été3cetÉtéLà! » fait 13 caractères
+   et passe. Témoins : `MotDePassePartageTest.php` et son jumeau
+   `motDePassePartage.test.ts`, qui lisent **le même** `api/regles/motdepasse.json`.
 10. **Une invitation ne sert qu'une fois.** Rejouer le même lien après création
     donne le lien mort, et **aucun second compte** n'apparaît en base
     (`InvitationsController.php:316-325`).
@@ -415,13 +429,17 @@ pas les vidéos.
 
 ## Limites connues
 
-- **Aucun écran ne change de mot de passe ni d'adresse.** La règle existe et
-  fonctionne côté API — mot de passe actuel exigé, toutes les sessions révoquées
-  (`UtilisateurProcessor.php:93-95`, `:105-116`) — mais **rien dans `front/` ne
-  l'appelle** : aucune occurrence de `motDePasseActuel` ni de `/utilisateurs/`
-  dans `front/src` ni `front/app` au 16 septembre 2026. Cela ne s'éprouve donc
-  que par `PATCH /api/utilisateurs/{id}`, et **ne se filme pas**. Voir
-  `fonctionnalite-compte`.
+- ~~**Aucun écran ne change de mot de passe ni d'adresse.**~~ **Levée le
+  18 septembre 2026 pour le mot de passe** : `front/app/mot-de-passe.tsx`
+  existe, accessible depuis l'onglet Compte. Mot de passe actuel exigé, nouveau
+  tapé deux fois, jauge pendant la frappe.
+  **CE QU'IL FAUT SAVOIR POUR L'ÉPROUVER** : un changement réussi **révoque
+  toutes les sessions du compte, y compris celle qui le fait**
+  (`UtilisateurProcessor`). C'est délibéré — un jeton de rafraîchissement volé
+  ne doit pas survivre au changement qu'il a motivé. L'écran l'annonce et
+  propose de se reconnecter ; il ne faut donc pas prendre cette déconnexion
+  pour un échec.
+  **L'adresse, elle, ne se change toujours par aucun écran.**
 - **`GET /api/mes-sessions` n'a aucun consommateur côté front** non plus. Les
   routes, les tests et la colonne `vu_le` existent ; l'écran qui listerait les
   sessions n'existe pas. « Voir ses sessions » ne se démontre qu'au `curl`.

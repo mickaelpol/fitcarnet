@@ -1,0 +1,185 @@
+import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
+import type { TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+
+import { useChangerMotDePasse, useDeconnexion, useMoi } from '@/api/hooks';
+import { acceptable } from '@/calcul/motDePasse';
+import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Titre } from '@/composants/base';
+import { JaugeMotDePasse } from '@/composants/jaugeMotDePasse';
+import { C, E, T } from '@/theme';
+
+/**
+ * CHANGER SON MOT DE PASSE.
+ *
+ * TROIS CHAMPS, ET LE PREMIER N'EST PAS DÉCORATIF. Le mot de passe actuel est
+ * exigé par le serveur (`UtilisateurProcessor`) : sans lui, un onglet laissé
+ * ouvert dans une bibliothèque suffirait à s'approprier un compte.
+ *
+ * LA RÉUSSITE DÉCONNECTE, ET L'ÉCRAN DOIT LE DIRE AVANT. Le serveur révoque
+ * TOUTES les sessions du compte — y compris celle qui fait le changement,
+ * parce qu'un jeton de rafraîchissement volé ne doit pas survivre au
+ * changement de mot de passe qu'il a motivé. On affiche donc un panneau qui
+ * l'annonce et on attend un geste, au lieu de renvoyer vers la connexion sans
+ * un mot : être éjecté juste après avoir validé ressemble à un échec, et on
+ * retape alors l'ancien mot de passe en croyant que rien n'a pris.
+ *
+ * AUCUNE RÈGLE DE MOT DE PASSE N'EST ÉCRITE ICI. `acceptable` et la jauge
+ * viennent de `src/calcul/motDePasse.ts`, verrouillé sur
+ * `api/regles/motdepasse.json` par un test partagé. Recopier « douze
+ * caractères » dans un écran, c'est se préparer à le laisser derrière le jour
+ * où le chiffre bouge — ce qui est précisément arrivé à l'écran d'invitation,
+ * resté sur « 10 caractères, ni majuscule ni chiffre imposés » après le
+ * durcissement du 18 septembre 2026.
+ */
+export default function MotDePasse() {
+  const router = useRouter();
+  const moi = useMoi();
+  const changer = useChangerMotDePasse();
+  const deconnecter = useDeconnexion();
+
+  const [actuel, setActuel] = useState('');
+  const [nouveau, setNouveau] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+
+  /* « Entrée » descend d'un champ, puis valide sur le dernier. Sur le web,
+     React Native Web ne pose aucun vrai formulaire HTML : sans ces trois
+     liens, la touche Entrée ne ferait rien du tout, en silence. */
+  const champNouveau = useRef<TextInput>(null);
+  const champConfirmation = useRef<TextInput>(null);
+
+  /* LE PANNEAU DE RÉUSSITE PASSE AVANT LES GARDES DE `useMoi`, et l'ordre
+     compte : les sessions viennent d'être révoquées. Une relecture de `/moi`
+     qui échouerait ensuite remplacerait le « c'est fait » par un écran rouge,
+     et donnerait à un changement réussi l'allure d'une panne. */
+  if (changer.isSuccess) {
+    return (
+      <ScrollView contentContainerStyle={s.page}>
+        <Titre>C’est fait</Titre>
+        <Carte style={{ gap: E.s }}>
+          <Texte>Ton mot de passe a été remplacé.</Texte>
+          <Discret style={s.aide}>
+            Toutes les sessions de ton compte ont été fermées — celle-ci
+            comprise, et celles de tes autres appareils. C’est voulu : si
+            quelqu’un avait mis la main sur l’une d’elles, elle ne sert plus à
+            rien. Reconnecte-toi avec ton nouveau mot de passe.
+          </Discret>
+          <Bouton
+            onPress={() => {
+              void deconnecter().then(() => router.replace('/connexion'));
+            }}
+          >
+            Se reconnecter
+          </Bouton>
+        </Carte>
+      </ScrollView>
+    );
+  }
+
+  /* `isPending` ET NON `isLoading` : `useMoi` est désactivé le temps que la
+     session soit lue, et pendant ce temps `isLoading` vaut faux sans qu'on
+     ait la moindre donnée. L'écran passait alors sa garde avec `data`
+     indéfini — relevé sur l'onglet Compte le 15 septembre 2026. Ici, cela
+     donnerait un formulaire dont le bouton n'a pas d'identifiant à envoyer. */
+  if (moi.isPending) return <Chargement />;
+  if (moi.isError) return <Erreur message={moi.error.message} onReessayer={() => void moi.refetch()} />;
+
+  const id = moi.data?.id;
+
+  /* On ne signale la différence qu'une fois la confirmation commencée :
+     gronder quelqu'un qui n'a pas fini de taper, c'est le gronder de taper. */
+  const differe = confirmation !== '' && confirmation !== nouveau;
+  /* Remettre le même mot de passe n'est pas une faute, c'est un geste inutile.
+     On le dit tout de suite plutôt que d'attendre le refus du serveur. */
+  const identique = nouveau !== '' && nouveau === actuel;
+
+  const pret = actuel !== '' && nouveau !== '' && confirmation !== ''
+    && acceptable(nouveau)
+    && nouveau === confirmation
+    && !identique;
+
+  const valider = () => {
+    if (!pret || changer.isPending || id === undefined) return;
+    changer.mutate({ id, actuel, nouveau });
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={s.page}>
+        <Discret style={s.aide}>
+          Ton mot de passe actuel est demandé d’abord : c’est lui qui prouve que
+          c’est bien toi devant l’écran, et non un onglet resté ouvert.
+        </Discret>
+
+        <Carte style={{ gap: E.s }}>
+          <Champ
+            valeur={actuel}
+            onChange={setActuel}
+            motDePasse
+            autoComplete="current-password"
+            etiquette="Mot de passe actuel"
+            onSuivant={() => champNouveau.current?.focus()}
+          />
+
+          <Champ
+            valeur={nouveau}
+            onChange={setNouveau}
+            motDePasse
+            autoComplete="new-password"
+            etiquette="Nouveau mot de passe"
+            champRef={champNouveau}
+            onSuivant={() => champConfirmation.current?.focus()}
+          />
+          <JaugeMotDePasse valeur={nouveau} />
+
+          {identique && (
+            <Discret style={[s.aide, { color: C.erreur }]}>
+              Ce mot de passe est déjà le tien.
+            </Discret>
+          )}
+
+          <Champ
+            valeur={confirmation}
+            onChange={setConfirmation}
+            motDePasse
+            autoComplete="new-password"
+            etiquette="Confirmer le nouveau mot de passe"
+            champRef={champConfirmation}
+            illisible={differe}
+            onValider={valider}
+          />
+          {differe && (
+            <Discret style={[s.aide, { color: C.erreur }]}>
+              Les deux ne sont pas identiques.
+            </Discret>
+          )}
+
+          <Bouton onPress={valider} desactive={!pret || changer.isPending}>
+            {changer.isPending ? 'Changement…' : 'Changer mon mot de passe'}
+          </Bouton>
+
+          {/* Le message vient du serveur et il est utile : ce qui manque au
+              nouveau mot de passe, ou le refus de l'actuel. On l'affiche tel
+              quel plutôt que de le remplacer par un « une erreur est
+              survenue » qui n'apprend rien. */}
+          {changer.isError && (
+            <Discret style={[s.aide, { color: C.erreur }]}>{changer.error.message}</Discret>
+          )}
+        </Carte>
+
+        <Discret style={s.aide}>
+          En validant, tu seras déconnecté de tous tes appareils, celui-ci
+          compris.
+        </Discret>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { padding: E.m, gap: E.s },
+  aide: { fontSize: T.petit, lineHeight: 18 },
+});

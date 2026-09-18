@@ -45,9 +45,17 @@ CREATE TABLE utilisateur (
     source_frigo    TEXT        NOT NULL DEFAULT 'base'
                     CHECK (source_frigo IN ('base', 'grocy')),  -- 'grocy' réservé à l'admin
     actif           BOOLEAN     NOT NULL DEFAULT TRUE,
+    -- Posé à la CONNEXION, seul moment où le mot de passe est en clair : la
+    -- base n'en garde qu'une empreinte, on ne peut pas relire un hash pour
+    -- savoir s'il contient une majuscule (migration 38). Sert à AVERTIR quand
+    -- la règle a changé sous les pieds de quelqu'un ; ne bloque rien, et le
+    -- défaut est FALSE pour n'accuser personne tant qu'on n'a pas vérifié.
+    mot_de_passe_faible BOOLEAN NOT NULL DEFAULT FALSE,
     cree_le         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX utilisateur_email_unique ON utilisateur (lower(email));
+COMMENT ON COLUMN utilisateur.mot_de_passe_faible IS
+  'Posé à la connexion, seul moment où le mot de passe est en clair : vrai quand il ne respecte plus api/regles/motdepasse.json. Sert à afficher un avertissement, ne bloque rien.';
 COMMENT ON COLUMN utilisateur.source_frigo IS
   'base = stock stocké ici ; grocy = les ingrédients viennent de l''instance Grocy (admin uniquement)';
 

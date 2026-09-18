@@ -3,11 +3,10 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 
 import { useAccepterInvitation, useInvitation } from '@/api/hooks';
+import { acceptable } from '@/calcul/motDePasse';
 import { Bouton, Carte, Champ, Chargement, Discret, Texte, Titre } from '@/composants/base';
+import { JaugeMotDePasse } from '@/composants/jaugeMotDePasse';
 import { C, E, P, T } from '@/theme';
-
-/** Le minimum du serveur. Écrit ici aussi, pour le dire AVANT l'envoi. */
-const LONGUEUR_MINIMALE = 10;
 
 /**
  * CRÉER SON COMPTE, DEPUIS UN LIEN D'INVITATION.
@@ -76,14 +75,11 @@ export default function AccepterInvitation() {
     );
   }
 
-  const trop_court = motDePasse !== '' && motDePasse.length < LONGUEUR_MINIMALE;
   /* On ne signale la différence qu'une fois la confirmation commencée :
      alerter dès la première lettre reviendrait à crier pendant toute la
      saisie. */
   const differe = confirmation !== '' && confirmation !== motDePasse;
-  const pret = nom.trim() !== ''
-    && motDePasse.length >= LONGUEUR_MINIMALE
-    && confirmation === motDePasse;
+  const pret = nom.trim() !== '' && acceptable(motDePasse) && confirmation === motDePasse;
 
   return (
     <KeyboardAvoidingView
@@ -108,26 +104,35 @@ export default function AccepterInvitation() {
             Celui qui s’affichera dans l’application. Le prénom suffit.
           </Discret>
 
+          {/* LA JAUGE REMPLACE LA PHRASE D'AIDE, ET C'EST TOUT L'INTÉRÊT.
+              On lisait ici « 10 caractères au minimum, ni majuscule ni chiffre
+              imposés » : une règle RECOPIÉE, et le serveur a durci le
+              18 septembre 2026 sans que cette phrase bouge. Elle promettait
+              donc, en toutes lettres, ce que l'API refuse — un écran qui donne
+              un conseil faux est pire qu'un écran muet.
+              Plus une seule exigence n'est écrite ici : elles viennent de
+              `src/calcul/motDePasse.ts`, que `motDePassePartage.test.ts`
+              verrouille sur `api/regles/motdepasse.json`. Le jour où le chiffre
+              rebouge, cet écran suit sans qu'on y pense. */}
           <Champ
             valeur={motDePasse}
             onChange={setMotDePasse}
             motDePasse
+            autoComplete="new-password"
             etiquette="Mot de passe"
           />
-          <Discret style={[s.aide, trop_court && { color: C.vif }]}>
-            {LONGUEUR_MINIMALE} caractères au minimum. Ni majuscule ni chiffre
-            imposés : une phrase dont tu te souviens vaut mieux qu’un
-            « Motdepasse1! » noté sur un papier.
-          </Discret>
+          <JaugeMotDePasse valeur={motDePasse} />
 
           <Champ
             valeur={confirmation}
             onChange={setConfirmation}
             motDePasse
+            autoComplete="new-password"
             etiquette="Répète-le"
+            illisible={differe}
           />
           {differe && (
-            <Discret style={[s.aide, { color: C.vif }]}>
+            <Discret style={[s.aide, { color: C.erreur }]}>
               Les deux ne sont pas identiques.
             </Discret>
           )}

@@ -96,6 +96,15 @@ final readonly class UtilisateurProcessor implements ProcessorInterface
 
         if ($changeMotDePasse) {
             $data->setPassword($this->hasher->hashPassword($data, (string) $data->getMotDePasseClair()));
+            /* LE DRAPEAU TOMBE ICI, ET C'EST LE SEUL ENDROIT QUI PEUT LE FAIRE
+               EN DEHORS DE LA CONNEXION.
+               Le mot de passe neuf vient de passer la validation
+               (`MotDePasseSolide` sur l'entite) : il respecte donc les regles,
+               par construction. Ne pas l'ecrire ici laisserait l'avertissement
+               a l'ecran jusqu'a la prochaine connexion — c'est-a-dire juste
+               apres avoir fait ce qu'on demandait, ce qui est la meilleure
+               facon de faire croire que le changement n'a pas pris. */
+            $data->setMotDePasseFaible(false);
         }
         $data->setMotDePasseClair(null);
         $data->setMotDePasseActuel(null);

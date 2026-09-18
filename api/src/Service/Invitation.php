@@ -33,8 +33,17 @@ final class Invitation
      */
     public const RETENTION_JOURS = 30;
 
-    /** Le minimum du projet, celui de la commande console et de l'entite. */
-    public const LONGUEUR_MOT_DE_PASSE = 10;
+    /**
+     * Le minimum du projet — DESORMAIS LU AILLEURS.
+     *
+     * Cette constante valait 10 et etait recopiee de fait dans
+     * `Assert\Length(min: 10)` sur l'entite : deux ecritures de la meme regle,
+     * qui disaient la meme chose par accident. Depuis le 18 septembre 2026 la
+     * regle entiere vit dans `App\Service\MotDePasse`, et celle-ci n'en est
+     * plus qu'un renvoi — gardee parce que le message d'erreur de
+     * `InvitationsController` la nomme.
+     */
+    public const LONGUEUR_MOT_DE_PASSE = MotDePasse::LONGUEUR_MINIMALE;
 
     /**
      * Fabrique un jeton d'invitation.
@@ -274,14 +283,32 @@ final class Invitation
      * et six octets ; `strlen` accepterait donc un mot de passe deux fois plus
      * court que la regle affichee, pour peu qu'il soit accentue.
      *
-     * Et on ne demande NI majuscule, NI chiffre, NI caractere special. Ces
-     * regles produisent « Motdepasse1! » — court, previsible, et note sur un
-     * papier. La longueur est la seule contrainte qui augmente vraiment le
-     * cout d'une attaque.
+     * CE PARAGRAPHE DISAIT LE CONTRAIRE JUSQU'AU 18 SEPTEMBRE 2026 : « on ne
+     * demande NI majuscule, NI chiffre, NI caractere special — ces regles
+     * produisent Motdepasse1!, court, previsible, et note sur un papier ; la
+     * longueur est la seule contrainte qui augmente vraiment le cout d'une
+     * attaque ». Le proprietaire du projet a tranche dans l'autre sens, et
+     * l'argument n'a pas ete jete pour autant : la longueur minimale passe de
+     * 10 a 12 EN MEME TEMPS que les quatre exigences arrivent, parce qu'une
+     * composition imposee reduit l'aleatoire et que la longueur le rend.
+     *
+     * La regle entiere est dans `App\Service\MotDePasse` ; cette methode n'en
+     * est plus qu'une porte.
      */
     public static function motDePasseAcceptable(string $motDePasse): bool
     {
-        return \mb_strlen($motDePasse) >= self::LONGUEUR_MOT_DE_PASSE;
+        return MotDePasse::acceptable($motDePasse);
+    }
+
+    /**
+     * Ce qui manque a ce mot de passe, en une phrase, ou `null` s'il convient.
+     *
+     * Le controleur d'invitation l'affiche tel quel : la personne qui cree son
+     * compte doit savoir ce qu'on attend d'elle, pas seulement qu'on refuse.
+     */
+    public static function pourquoiMotDePasseRefuse(string $motDePasse): ?string
+    {
+        return MotDePasse::pourquoiRefuse($motDePasse);
     }
 
     /** Le nom affiche, borne et debarrasse de ses espaces inutiles. */

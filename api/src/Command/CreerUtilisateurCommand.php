@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Entity\Utilisateur;
+use App\Service\MotDePasse;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -45,10 +46,17 @@ final class CreerUtilisateurCommand extends Command
 
         $email = (string) $input->getArgument('email');
         $motDePasse = $input->getOption('mot-de-passe')
-            ?: $io->askHidden('Mot de passe (10 caracteres minimum)');
+            ?: $io->askHidden(\sprintf(
+                'Mot de passe (%d caracteres minimum, une minuscule, une majuscule, un chiffre, un caractere special)',
+                MotDePasse::LONGUEUR_MINIMALE,
+            ));
 
-        if (null === $motDePasse || mb_strlen($motDePasse) < 10) {
-            $io->error('Mot de passe trop court : 10 caracteres minimum.');
+        /* LA MEME REGLE QUE LES DEUX AUTRES PORTES, ET LUE AU MEME ENDROIT.
+           C'etait `mb_strlen($motDePasse) < 10` ecrit ici a la main : la
+           troisieme copie d'une regle qui en avait deja deux. Le 18 septembre
+           2026 elles sont toutes passees par `App\Service\MotDePasse`. */
+        if (null === $motDePasse || !MotDePasse::acceptable($motDePasse)) {
+            $io->error(MotDePasse::pourquoiRefuse((string) $motDePasse) ?? 'Mot de passe refuse.');
 
             return Command::FAILURE;
         }

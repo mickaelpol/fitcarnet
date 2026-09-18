@@ -213,6 +213,20 @@ export interface Utilisateur {
   nom: string;
   roles: string[];
   sourceFrigo: 'base' | 'grocy';
+  /**
+   * Le mot de passe de ce compte ne respecte plus les règles du projet.
+   *
+   * POSÉ À LA DERNIÈRE CONNEXION, seul moment où le serveur l'a en clair : il
+   * n'en garde qu'une empreinte, et on ne relit pas une empreinte pour savoir
+   * si elle contenait une majuscule. Les règles ont durci le 18 septembre
+   * 2026 ; ce drapeau permet de le DIRE sans mettre personne dehors.
+   *
+   * FACULTATIF PARCE QU'UN SERVEUR PLUS ANCIEN NE LE RENVOIE PAS — le web est
+   * servi par le même déploiement que l'API, mais un APK installé depuis des
+   * mois parle au NAS d'aujourd'hui. `undefined` doit se lire « je ne sais
+   * pas », donc « on n'affiche rien », jamais « c'est faible ».
+   */
+  motDePasseFaible?: boolean;
 }
 
 /**

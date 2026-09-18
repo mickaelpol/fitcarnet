@@ -7,6 +7,8 @@ namespace App\EventListener;
 use App\Entity\Utilisateur;
 use App\Service\CookieDeSession;
 use App\Service\JetonsRafraichissement;
+use App\Service\MotDePasse;
+use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -40,6 +42,7 @@ final class AjouterJetonRafraichissement
         private readonly JetonsRafraichissement $jetons,
         private readonly RequestStack $requetes,
         private readonly CookieDeSession $cookie,
+        private readonly EntityManagerInterface $em,
     ) {
     }
 
@@ -49,6 +52,8 @@ final class AjouterJetonRafraichissement
         if (!$utilisateur instanceof Utilisateur) {
             return;
         }
+
+        $this->releverLaForceDuMotDePasse($utilisateur);
 
         $jeton = $this->jetons->creer($utilisateur);
 
@@ -61,6 +66,55 @@ final class AjouterJetonRafraichissement
         $donnees = $evenement->getData();
         $donnees['jetonRafraichissement'] = $jeton;
         $evenement->setData($donnees);
+    }
+
+    /**
+     * LA CONNEXION EST LE SEUL ENDROIT OU L'ON PEUT JUGER CE MOT DE PASSE.
+     *
+     * La base n'en garde qu'une empreinte — c'est tout l'objet d'une empreinte.
+     * On ne peut donc pas relire un compte pour savoir si son mot de passe
+     * contient une majuscule : il faut le tenir en clair, et ca n'arrive qu'ici.
+     *
+     * POURQUOI ON LE FAIT. Les regles ont change le 18 septembre 2026, et les
+     * comptes existants ne doivent pas se retrouver dehors un matin. Ce drapeau
+     * permet de le DIRE a l'ecran et de proposer un changement, sans rien
+     * bloquer.
+     *
+     * ON N'ECRIT QUE SI LA REPONSE A CHANGE. Une connexion par heure sur trois
+     * comptes ne justifie pas un `UPDATE` a chaque fois, et surtout : ecrire
+     * sans raison ferait de cette colonne un journal de connexions, ce qu'elle
+     * n'est pas.
+     *
+     * ET CA NE PEUT PAS FAIRE ECHOUER LA CONNEXION. On est dans un ecouteur, a
+     * un moment ou le mot de passe est deja verifie : une base momentanement
+     * indisponible doit couter un avertissement manquant, jamais l'acces au
+     * compte.
+     */
+    private function releverLaForceDuMotDePasse(Utilisateur $utilisateur): void
+    {
+        $requete = $this->requetes->getCurrentRequest();
+        if (null === $requete) {
+            return;
+        }
+
+        try {
+            /** @var array<string, mixed> $corps */
+            $corps = $requete->toArray();
+            $clair = $corps['motDePasse'] ?? null;
+            if (!\is_string($clair) || '' === $clair) {
+                return;
+            }
+
+            $faible = !MotDePasse::acceptable($clair);
+            if ($faible === $utilisateur->isMotDePasseFaible()) {
+                return;
+            }
+
+            $utilisateur->setMotDePasseFaible($faible);
+            $this->em->flush();
+        } catch (\Throwable) {
+            // Un avertissement manquant ne vaut pas une connexion refusee.
+        }
     }
 
     /**

@@ -18,7 +18,7 @@ d'une ligne de code, pas ce qui reste à faire.
   tire `master` toutes les 5 minutes. **La production a été contrôlée le
   18 septembre** — schéma conforme aux migrations 34-35-36, parcours réel
   éprouvé sur un compte jetable puis retiré (section 2.1).
-- **Tests** : 639 côté front plus 33 de rendu, 398 côté API (985 assertions),
+- **Tests** : 639 côté front plus 33 de rendu, 415 côté API (985 assertions),
   tous verts. PHPStan : **5 erreurs connues**, pas une de plus — c'était 7
   jusqu'au 18 septembre 2026, deux ont disparu avec le code qui les portait.
 - **Contrôles de base**, tous verts : `verifier-schema.sh` (base neuve
@@ -47,8 +47,8 @@ cd front && npm install          # si package.json a bougé, ou si les tests de 
 Puis vérifier qu'on part d'un socle sain :
 
 ```bash
-cd front && npm test                                                  # 639 + 33, 0 échec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 398 tests, 985 assertions
+cd front && npm test                                                  # 644 + 33, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 415 tests, 1 026 assertions
 db/manuel/verifier-schema.sh                                          # « identiques »
 db/manuel/verifier-migrations.sh                                      # vert
 db/manuel/verifier-jeux.sh                                            # vert
@@ -280,7 +280,49 @@ besoin se présente :
 - Un décalage d'affichage d'environ 13 px dans l'éditeur d'aliment après une
   saisie (Chromium, 1280×900). Origine non recherchée.
 
-### 2.5 Deux refontes proposées par les revues, et repoussées
+### 2.5 Mots de passe : durcis, et changeables par leur propriétaire (18 septembre 2026)
+
+**Ce qui a changé.** La règle passe de « dix caractères » à **douze caractères,
+une minuscule, une majuscule, un chiffre et un caractère spécial**. Le code
+argumentait contre les règles de composition ; le propriétaire du projet a
+tranché dans l'autre sens, et l'argument n'a pas été jeté : la longueur minimale
+monte **en même temps** que les exigences arrivent, parce qu'une composition
+imposée réduit l'aléatoire et que la longueur le rend.
+
+**Un seul endroit décide**, `api/regles/motdepasse.json`, lu par les deux suites
+de tests. Les trois portes de l'API (invitation, `PATCH` d'un compte, commande
+console) passent par `App\Service\MotDePasse` ; le front a son jumeau assumé
+(`front/src/calcul/motDePasse.ts`) parce que la jauge doit répondre pendant la
+frappe.
+
+**Chacun change son mot de passe** : `front/app/mot-de-passe.tsx`, depuis
+l'onglet Compte. Mot de passe actuel exigé, nouveau tapé deux fois, jauge qui
+nomme ce qui manque.
+
+**Les comptes existants ne sont pas touchés**, et c'est la décision : personne ne
+se retrouve dehors un matin. Ceux dont le mot de passe ne passerait plus sont
+**signalés** par un bandeau sur l'onglet Compte — le drapeau
+`utilisateur.mot_de_passe_faible` (migration 38) est posé **à la connexion**,
+seul instant où le serveur tient le mot de passe en clair : une empreinte ne se
+relit pas pour savoir si elle contenait une majuscule.
+
+**À savoir avant d'éprouver** : un changement réussi **révoque toutes les
+sessions du compte, y compris celle qui le fait**. C'est délibéré — un jeton de
+rafraîchissement volé ne doit pas survivre au changement qu'il a motivé —, et
+l'écran l'annonce au lieu de l'infliger.
+
+**Ce qui n'est couvert par aucun test automatique** : l'enchaînement des trois
+champs, la désactivation du bouton et le panneau de déconnexion vivent dans
+`front/app/`, que `tsconfig.tests.json` ne compile pas. Les règles, elles, sont
+couvertes. Rendre l'écran testable demanderait d'extraire sa décision vers
+`src/` (un `peutChanger({ actuel, nouveau, confirmation })` et son `.test.ts`) —
+c'est le levier du lot 6, non ouvert. En attendant, le parcours a été **éprouvé
+dans Chromium de bout en bout** : bandeau, jauge nommant les quatre manques,
+non-concordance, changement, déconnexion, reconnexion, bandeau disparu.
+
+---
+
+### 2.6 Deux refontes proposées par les revues, et repoussées
 
 Le 18 septembre 2026, deux confrontations à la documentation officielle (par le
 MCP context7) ont proposé des changements de structure côté front. **Aucun des

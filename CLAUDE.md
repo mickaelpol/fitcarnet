@@ -33,10 +33,10 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 639 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 644 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 398 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 415 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -114,6 +114,15 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Composition de repas | `front/src/solveur/` |
 | Suppression des accents | `front/src/calcul/texte.ts` |
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `front/src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
+| Force d'un mot de passe | `api/src/Service/MotDePasse.php` **et** `front/src/calcul/motDePasse.ts`, verrouillés l'un sur l'autre par `api/regles/motdepasse.json` |
+
+**Le mot de passe est le seul cas où DEUX juges sont assumés**, et c'est écrit : la
+jauge doit répondre pendant la frappe, sans aller-retour réseau. Le dispositif qui
+les empêche de diverger est celui de `rendement.json` — un fichier de règles que
+**les deux suites de tests** lisent (`MotDePassePartageTest.php`,
+`motDePassePartage.test.ts`). Ne jamais recopier « douze caractères » dans un
+écran : c'est exactement ce qui a laissé l'écran d'invitation conseiller « ni
+majuscule ni chiffre imposés » le jour où le serveur a commencé à les exiger.
 
 Un hook qui recalcule un 1RM importe `performance.ts`. Trois copies d'Epley aux bornes divergentes
 ont produit un « record » de 79,96 kg que la formule elle-même déclare invalide.

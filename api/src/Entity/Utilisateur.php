@@ -16,6 +16,7 @@ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
+use App\Validator as AppAssert;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -64,7 +65,7 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     private string $motDePasse = '';
 
     /** Mot de passe en clair : jamais persiste, uniquement a la creation ou au changement. */
-    #[Assert\Length(min: 10, minMessage: 'Au moins {{ limit }} caracteres.')]
+    #[AppAssert\MotDePasseSolide]
     #[Groups(['utilisateur:ecrire'])]
     private ?string $motDePasseClair = null;
 
@@ -90,6 +91,26 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: Types::SIMPLE_ARRAY)]
     #[Groups(['utilisateur:lire'])]
     private array $roles = ['ROLE_USER'];
+
+    /**
+     * Le mot de passe de ce compte respecte-t-il encore les regles du projet ?
+     *
+     * POSE A LA CONNEXION, ET NULLE PART AILLEURS. La base ne garde qu'une
+     * empreinte : on ne peut pas relire un hash pour savoir s'il contient une
+     * majuscule. Le seul instant ou l'application tient le mot de passe en
+     * clair est la connexion — d'ou le drapeau, et d'ou cette colonne.
+     *
+     * IL N'INTERDIT RIEN. Les regles ont change le 18 septembre 2026 ; les
+     * comptes existants ne doivent pas se retrouver dehors un matin pour
+     * autant. Ce drapeau sert a AFFICHER un avertissement et un lien vers
+     * l'ecran de changement, rien de plus.
+     *
+     * EN LECTURE SEULE POUR L'API : il n'est pas dans `utilisateur:ecrire`.
+     * Personne ne se declare solide — c'est la connexion qui constate.
+     */
+    #[ORM\Column(name: 'mot_de_passe_faible', type: Types::BOOLEAN, options: ['default' => false])]
+    #[Groups(['utilisateur:lire'])]
+    private bool $motDePasseFaible = false;
 
     #[ORM\Column(name: 'source_frigo', type: Types::TEXT, options: ['default' => 'base'])]
     #[Assert\Choice(choices: ['base', 'grocy'])]
@@ -138,6 +159,9 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getMotDePasseClair(): ?string { return $this->motDePasseClair; }
     public function setMotDePasseClair(?string $c): self { $this->motDePasseClair = $c; return $this; }
+
+    public function isMotDePasseFaible(): bool { return $this->motDePasseFaible; }
+    public function setMotDePasseFaible(bool $f): self { $this->motDePasseFaible = $f; return $this; }
 
     public function getMotDePasseActuel(): ?string { return $this->motDePasseActuel; }
     public function setMotDePasseActuel(?string $c): self { $this->motDePasseActuel = $c; return $this; }

@@ -255,11 +255,13 @@ final class InvitationsController extends AbstractController
         if (!Invitation::nomAcceptable($nom)) {
             return $this->refus('Indique un nom, de 80 caractères au plus.');
         }
-        if (!Invitation::motDePasseAcceptable($motDePasse)) {
-            return $this->refus(\sprintf(
-                'Le mot de passe doit faire au moins %d caractères.',
-                Invitation::LONGUEUR_MOT_DE_PASSE,
-            ));
+        /* ON DIT TOUT CE QUI MANQUE, PAS SEULEMENT « trop court ». La personne
+           est en train de creer son compte : lui repondre « au moins 12
+           caracteres » alors qu'il manque aussi un chiffre la fait recommencer
+           deux fois. Le texte vient de `MotDePasse`, comme partout ailleurs. */
+        $pourquoi = Invitation::pourquoiMotDePasseRefuse($motDePasse);
+        if (null !== $pourquoi) {
+            return $this->refus($pourquoi);
         }
 
         $email = (string) $ligne['email'];

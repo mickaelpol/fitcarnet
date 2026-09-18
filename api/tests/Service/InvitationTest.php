@@ -296,21 +296,60 @@ final class InvitationTest extends TestCase
 
     // ----------------------------------------------------- mot de passe et nom
 
-    public function testUnMotDePasseTropCourtEstRefuse(): void
+    /*
+     * CES DEUX TESTS ONT CHANGE LE 18 SEPTEMBRE 2026, ET IL FAUT DIRE POURQUOI.
+     *
+     * Ils figeaient l'ancienne regle — dix caracteres, aucune exigence de
+     * composition — et ils sont tombes en rouge des que la nouvelle est
+     * arrivee. C'est exactement ce qu'on attend d'eux : ils ont fait leur
+     * travail.
+     *
+     * Ce n'est donc PAS « ajuster un test pour qu'il passe », le defaut que la
+     * methode du projet interdit. C'est la DEMANDE qui a change, et le
+     * proprietaire l'a tranchee : douze caracteres, plus une minuscule, une
+     * majuscule, un chiffre et un caractere special. Un test qui fige une
+     * decision doit suivre la decision — en le disant, pour qu'on ne confonde
+     * pas les deux gestes six mois plus tard.
+     *
+     * La regle elle-meme ne s'eprouve plus ici : elle est dans
+     * `MotDePassePartageTest`, contre la liste que le front lit aussi. Ce qui
+     * reste ci-dessous, c'est que cette PORTE-LA y mene bien.
+     */
+
+    public function testUnMotDePasseFaibleEstRefuseALAcceptationDUneInvitation(): void
     {
         self::assertFalse(Invitation::motDePasseAcceptable(''));
         self::assertFalse(Invitation::motDePasseAcceptable('court'));
-        self::assertFalse(Invitation::motDePasseAcceptable('123456789'));
-        self::assertTrue(Invitation::motDePasseAcceptable('1234567890'));
+        // Douze caracteres, mais rien d'autre : la longueur ne suffit plus.
+        self::assertFalse(Invitation::motDePasseAcceptable('123456789012'));
+        // Les quatre familles, mais onze caracteres : la composition non plus.
+        self::assertFalse(Invitation::motDePasseAcceptable('Kx7#mLp2vQ9'));
+
+        self::assertTrue(Invitation::motDePasseAcceptable('Poireau3Tiede!'));
     }
 
     public function testOnCompteLesCaracteresEtPasLesOctets(): void
     {
-        /* « Étéétéétée » fait 10 caracteres et 15 octets. `strlen` accepterait
-           donc, ici, un mot de passe de 7 caracteres accentues — deux fois
-           plus court que la regle affichee a l'ecran. */
-        self::assertTrue(Invitation::motDePasseAcceptable('Étéétéétée'));
-        self::assertFalse(Invitation::motDePasseAcceptable('Étéétéé'));
+        /* « Été3cetÉtéLà! » fait 13 caracteres et davantage d'octets. `strlen`
+           l'accepterait, et accepterait surtout, ailleurs, un mot de passe
+           accentue bien plus court que la regle affichee a l'ecran. */
+        self::assertTrue(Invitation::motDePasseAcceptable('Été3cetÉtéLà!'));
+        self::assertFalse(Invitation::motDePasseAcceptable('Été3cÉté!'));
+    }
+
+    public function testLaPorteDeLInvitationDitCeQuiManque(): void
+    {
+        /* « Refuse » ne suffit pas : quelqu'un qui cree son compte doit savoir
+           ce qu'on attend de lui. Et TOUT ce qui manque d'un coup — un ecran
+           qui dit une chose a la fois fait recommencer quatre fois, et c'est
+           ainsi qu'on obtient « Motdepasse1! ». */
+        self::assertNull(Invitation::pourquoiMotDePasseRefuse('Poireau3Tiede!'));
+
+        $dit = Invitation::pourquoiMotDePasseRefuse('motdepasse');
+        self::assertNotNull($dit);
+        foreach (['12 caractères', 'majuscule', 'chiffre', 'spécial'] as $attendu) {
+            self::assertStringContainsString($attendu, $dit);
+        }
     }
 
     public function testUnNomVideOuDemesureEstRefuse(): void
