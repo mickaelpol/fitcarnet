@@ -358,9 +358,28 @@ migration numérotée. **Effort : 20 min.**
 
 ---
 
-## 12. OUVERT — Aucun contrôle de dérive entités ↔ schéma, et quelques divergences installées
+## 12. CLOS — Aucun contrôle de dérive entités ↔ schéma, et quelques divergences installées
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : `Utilisateur::$email` porte encore `length: 180, unique: true`, `secondes_total_cible` n'a toujours ni migration ni propriété, et aucun `doctrine:schema:validate` n'est lancé. Seule la dérive des dates est désormais gardée (`DatesAvecFuseauTest`).
+**Gravité : MOYENNE — Statut : CLOS le 18 septembre 2026.** Les deux divergences
+nommées sont réglées, chacune dans le sens de la réalité :
+
+- **`secondes_total_cible` est supprimée** (`db/manuel/37-modele-exercice-sans-secondes-total-cible.sql`
+  et `db/01-schema.sql`). Aucune entité, aucune requête, aucune ligne de front ne
+  la nommait ; `doctrine:schema:update --dump-sql` proposait lui-même de la retirer.
+  On ne lui a pas écrit de propriété : une colonne qu'aucun code ne lit ne se
+  maintient pas, elle se traîne.
+- **`Utilisateur::$email` est déclaré `TEXT`**, sans `unique: true`. La base porte
+  un `TEXT` et un index **fonctionnel** sur `lower(email)` — c'est lui qui empêche
+  « Marie@… » et « marie@… » de coexister, ce qu'un `unique: true` sur la colonne
+  n'aurait pas fait. La cartographie décrivait une table qui n'existait pas, et une
+  protection plus faible que la vraie.
+
+**Le contrôle de dérive existe désormais**, et il est plus adapté que
+`doctrine:schema:validate` : `db/manuel/verifier-schema.sh` construit une base
+neuve et une base migrée puis exige un diff vide, et `verifier-migrations.sh` les
+rejoue sur des données réelles. `doctrine:schema:validate` ne peut pas servir ici
+— il dira toujours « not in sync », puisque `invitation` et `inventaire_lot`
+n'ont aucune entité (voir la skill `schema-base`).
 
 **Emplacement** `api/config/packages/doctrine.yaml` ; `api/src/Entity/` ; `api/tests/`.
 

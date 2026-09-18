@@ -25,7 +25,7 @@ d'une ligne de code, pas ce qui reste à faire.
   `test_import_carnet.py`.
 - **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
   puis deux passes des trois agents de contrôle et leurs correctifs.
-- **Audit de septembre** : 79 constats, **61 clos, 18 ouverts**, aucun
+- **Audit de septembre** : 79 constats, **62 clos, 17 ouverts**, aucun
   critique ni élevé (section 2.4).
 
 ---
@@ -143,7 +143,7 @@ l'instance filmée. Sur la base de dev **du premier poste**, deux comptes
 jetables servent aux captures (`demo-verif@test.local`,
 `demo-admin-verif@test.local`) : les retirer une fois les captures refaites.
 
-### 2.4 Les 18 constats d'audit ouverts
+### 2.4 Les 17 constats d'audit ouverts
 
 Vérifiés un par un le 17 septembre 2026. Aucun critique, aucun élevé. La
 preuve de chacun (fichier et ligne) est dans
@@ -159,13 +159,12 @@ infrastructure, `03` = front, `04` = tests et qualité).
 | **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
 | **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée ; reste à décider si l'on purge |
 
-**Quinze n'ont jamais été tranchés :**
+**Quatorze n'ont jamais été tranchés :**
 
 | Constat | Gravité | En une phrase |
 |---|---|---|
 | **02#8** | moyenne | Les sauvegardes du NAS sont sur le même volume que la base : un disque perdu emporte les deux. La correction est hors dépôt, et rien ne la consigne. |
 | **02#9** | moyenne | `deployer-nas.sh` redémarre l'application et les travailleurs d'inventaire d'un seul `restart` (`:195-197`). |
-| **02#12** | moyenne | Les entités divergent du schéma : `Utilisateur.email` déclaré `length: 180, unique: true`, et une colonne `secondes_total_cible` sans migration ni propriété. |
 | **03 M5** | moyenne | Sur le web, les jetons de session sont en clair dans `localStorage` (`front/src/api/client.ts`). |
 | **03 M6** | moyenne | Chargement infini quand une requête voisine échoue : corrigé sur l'écran de séance seulement ; restent `modele/[id].tsx`, `admin-utilisateurs.tsx` et les cibles de `repas.tsx`. |
 | **03 M8** | moyenne | La permission Android `RECORD_AUDIO` est inutile et déclarée deux fois (`front/app.json`). La retirer demande une **nouvelle compilation Android**, pas une simple mise à jour. |

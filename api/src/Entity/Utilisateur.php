@@ -44,7 +44,17 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['utilisateur:lire'])]
     private Uuid $id;
 
-    #[ORM\Column(type: Types::STRING, length: 180, unique: true)]
+    /*
+     * TEXT, ET PAS `length: 180, unique: true`.
+     *
+     * Constat 02#12 de l'audit : la cartographie annoncait une colonne de
+     * 180 caracteres et un index unique ordinaire. La base porte un `TEXT`, et
+     * son unicite est un index FONCTIONNEL sur `lower(email)` — c'est lui qui
+     * empeche « Marie@… » et « marie@… » de coexister, ce qu'un `unique: true`
+     * sur la colonne n'aurait pas fait. La cartographie decrivait donc une
+     * table qui n'existe pas, et une protection plus faible que la vraie.
+     */
+    #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank]
     #[Assert\Email]
     #[Groups(['utilisateur:lire', 'utilisateur:ecrire'])]

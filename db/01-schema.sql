@@ -291,7 +291,6 @@ CREATE TABLE modele_exercice (
     ordre       SMALLINT NOT NULL DEFAULT 0,
     mode        TEXT CHECK (mode IN ('charge','iso','chrono')),
     notes       TEXT,
-    secondes_total_cible INTEGER,
     -- meme raison que sur seance_exercice
     UNIQUE (modele_id, ordre) DEFERRABLE INITIALLY DEFERRED
 );

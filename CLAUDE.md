@@ -196,6 +196,11 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   17 septembre 2026. `datetimetz_immutable` est remplacé dans `doctrine.yaml` par
   `App\Doctrine\DateAvecFuseauType`, qui relit aussi les valeurs posées par `now()` ;
   `DatesAvecFuseauTest` refuse toute colonne datée sans fuseau hors `jeton_rafraichissement`.
+- **`doctrine:schema:update --force` détruirait des données.** `doctrine:schema:validate`
+  répond « not in sync », et **c'est normal** : le schéma s'écrit à la main, `invitation` et
+  `inventaire_lot` n'ont aucune entité — Doctrine propose donc de les SUPPRIMER, avec les index
+  et les CHECK faits à la main. Le schéma évolue par `db/01-schema.sql` **et** une migration
+  numérotée, jamais par l'ORM. Détail dans la skill `schema-base`.
 - `tsconfig.tests.json` n'inclut plus une liste écrite à la main mais **un motif**,
   `src/**/*.test.ts` — la liste manuelle avait laissé `performance.ts` sans test
   pendant des mois. Le piège qui reste : le motif ne couvre que `src/`, donc un
