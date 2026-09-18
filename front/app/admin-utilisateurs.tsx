@@ -8,6 +8,7 @@ import {
   useRevoquerInvitation, useSupprimerCompte, type Compte, type InvitationVue,
 } from '@/api/hooks';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
+import { premiereErreur } from '@/composants/etatRequetes';
 import { Confirmer } from '@/composants/confirmer';
 import { C, E, P, R, T } from '@/theme';
 import { contenuEnMots, enumeration } from '@/calcul/contenuCompte';
@@ -80,17 +81,29 @@ export default function AdminUtilisateurs() {
   };
 
   if (moi.isLoading || invitations.isLoading || comptes.isLoading) return <Chargement />;
+
+  /* /moi EN PANNE N'EST PAS UN REFUS DE DROITS — 18 septembre 2026, meme
+     famille que M6. Ce garde etait APRES celui du role : une coupure reseau
+     faisait donc repondre « reservé à l'administrateur » a un administrateur.
+     Un ecran qui ment sur la cause envoie chercher au mauvais endroit. */
+  const panneDuCompte = premiereErreur(moi);
+  if (panneDuCompte) {
+    return <Erreur message={panneDuCompte.message} onReessayer={panneDuCompte.reessayer} />;
+  }
+
   if (moi.data?.roles?.includes('ROLE_ADMIN') !== true) {
     return <Vide message="Cet écran est réservé à l'administrateur." />;
   }
-  if (invitations.isError) {
-    return (
-      <Erreur
-        message={invitations.error.message}
-        onReessayer={() => void invitations.refetch()}
-      />
-    );
-  }
+  /* LA LISTE DES COMPTES EN PANNE PASSAIT INAPERÇUE — constat M6, corrigé le
+     18 septembre 2026. `comptes.isError` n'était lu nulle part : /comptes en
+     échec, `comptes.data ?? []` rendait une liste vide et l'écran affichait
+     un panneau « Comptes » désert, comme si personne n'était inscrit. Sur un
+     écran qui sert à désactiver ou supprimer des comptes, c'est le genre de
+     vide qui fait recommencer une invitation déjà faite.
+     UN SEUL GARDE POUR LES DEUX, après le garde de chargement et jamais
+     avant : « en attente » n'est pas « en panne ». */
+  const panne = premiereErreur(invitations, comptes);
+  if (panne) return <Erreur message={panne.message} onReessayer={panne.reessayer} />;
 
   const liste = invitations.data ?? [];
   const enAttente = liste.filter((i) => i.statut === 'en_attente');

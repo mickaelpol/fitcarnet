@@ -25,7 +25,7 @@ d'une ligne de code, pas ce qui reste à faire.
   `test_import_carnet.py`.
 - **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
   puis deux passes des trois agents de contrôle et leurs correctifs.
-- **Audit de septembre** : 79 constats, **70 clos, 9 ouverts**, aucun
+- **Audit de septembre** : 79 constats, **71 clos, 8 ouverts**, aucun
   critique ni élevé (section 2.4).
 
 ---
@@ -174,7 +174,7 @@ l'instance filmée. Sur la base de dev **du premier poste**, deux comptes
 jetables servent aux captures (`demo-verif@test.local`,
 `demo-admin-verif@test.local`) : les retirer une fois les captures refaites.
 
-### 2.4 Les 9 constats d'audit ouverts
+### 2.4 Les 8 constats d'audit ouverts
 
 Vérifiés un par un le 17 septembre 2026. Aucun critique, aucun élevé. La
 preuve de chacun (fichier et ligne) est dans
@@ -190,12 +190,11 @@ infrastructure, `03` = front, `04` = tests et qualité).
 | **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
 | **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée ; reste à décider si l'on purge |
 
-**Six n'ont jamais été tranchés :**
+**Cinq n'ont jamais été tranchés :**
 
 | Constat | Gravité | En une phrase |
 |---|---|---|
 | **03 M5** | moyenne | Sur le web, les jetons de session sont en clair dans `localStorage` (`front/src/api/client.ts`). |
-| **03 M6** | moyenne | Chargement infini quand une requête voisine échoue : corrigé sur l'écran de séance seulement ; restent `modele/[id].tsx`, `admin-utilisateurs.tsx` et les cibles de `repas.tsx`. |
 | **03 M10** | moyenne | Course au chargement des jetons au démarrage (`client.ts`). |
 | **03 M12** | moyenne | La saisie d'un inventaire en cours est perdue au changement d'onglet. |
 | **03 M13** | moyenne | `noUncheckedIndexedAccess` est désactivé dans `front/tsconfig.json`. |

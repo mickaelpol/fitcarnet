@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useExercices, useMoi } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
 import { Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
+import { premiereErreur } from '@/composants/etatRequetes';
 import { ModaleEditeurExercice } from '@/composants/modaleEditeurExercice';
 import { ModaleExercice } from '@/composants/modaleExercice';
 import {
@@ -111,6 +112,17 @@ export default function AdminExercices() {
   ), []);
 
   if (moi.isLoading || exercices.isLoading) return <Chargement />;
+
+  /* /moi EN PANNE N'EST PAS UN REFUS DE DROITS — 18 septembre 2026, meme
+     famille que M6, et meme correction que sur admin-utilisateurs.tsx : une
+     coupure reseau faisait repondre « reservé à l'administrateur » a un
+     administrateur. Corrige sur LES DEUX ecrans le meme jour ; en laisser un
+     est exactement le jumeau oublie que ce projet connait. */
+  const panneDuCompte = premiereErreur(moi);
+  if (panneDuCompte) {
+    return <Erreur message={panneDuCompte.message} onReessayer={panneDuCompte.reessayer} />;
+  }
+
   if (!moi.data?.roles?.includes('ROLE_ADMIN')) {
     return <Vide message="Cet écran est réservé à l'administrateur." />;
   }

@@ -206,8 +206,35 @@ Le rattrapage limite les dégâts — la boucle des négatifs zéroe le −41 10
 Risque réel faible ici : pas de contenu tiers dans la page, quelques utilisateurs connus. Mais c'est la seule chose du front qui, volée, donne un accès durable.
 **Correction (moyen)** : sur le web, JWT en mémoire seule et rafraîchissement dans un cookie `HttpOnly; Secure; SameSite=Strict` posé par Symfony — front et API sont sur la même origine en HTTPS (`adresse.ts:56-60`), donc directement faisable. À défaut : l'assumer par écrit.
 
-## M6. Écrans bloqués sur un chargement infini quand une requête voisine échoue
-**MOYENNE · CONFIRMÉ**
+## M6. ~~Écrans bloqués sur un chargement infini quand une requête voisine échoue~~ — CLOS
+**MOYENNE · CORRIGÉ LE 18 SEPTEMBRE 2026**
+
+Le helper est `front/src/composants/etatRequetes.ts` — `premiereErreur(...requetes)`,
+sept tests écrits avant lui. **Pas dans `base.tsx`** comme proposé ci-dessous :
+un test de `src/` qui importe une *valeur* d'un `.tsx` tire React Native
+derrière lui et meurt en erreur de syntaxe Flow à l'exécution, pas au typage.
+Un `.ts` nu s'éprouve.
+
+Il ne regarde **jamais** `isLoading` : « en attente » n'est ni « en panne » ni
+« pas de données », et l'écran garde son garde de chargement avant l'appel. Il
+rend la **première** panne dans l'ordre des arguments — un message qui clignote
+selon la requête qui tombe la première ne s'explique pas — mais `reessayer`
+relance **toutes** les requêtes tombées : sinon « Réessayer » remplace un
+message d'erreur par un autre, et on croit que rien ne marche.
+
+**UNE DES QUATRE PUCES CI-DESSOUS ÉTAIT PÉRIMÉE.** `seance/[id].tsx` portait
+déjà sa garde `exercices.isError`, posée le 15 septembre 2026 (commit `ce845d3`)
+et verrouillée par `src/muscles/gardeCatalogue.test.ts`. Le fichier n'a pas été
+touché.
+
+**Et un jumeau, trouvé en chemin et fermé le même jour** : `moi.isError` n'était
+lu ni dans `admin-utilisateurs.tsx` ni dans `admin-exercices.tsx`. Le garde de
+rôle passant avant, une coupure réseau faisait répondre « Cet écran est réservé
+à l'administrateur » **à un administrateur**. Corrigé sur les deux écrans — en
+laisser un aurait été le motif de défaut dominant du projet, à l'endroit même
+où on le corrige.
+
+Ce qui suit est l'état d'avant.
 
 Quatre écrans testent l'erreur d'**une** requête et pas des autres, puis retombent sur un `return <Chargement />` inconditionnel :
 - `front/app/modele/[id].tsx:73-77` — `modeles.isError` jamais lu. Si `/modeles` échoue, l'effet des l. 37-45 ne trouve rien, `modele` reste `null` → **roue qui tourne indéfiniment**, sans message ni bouton Réessayer. Même chose si l'`id` de l'URL ne correspond à aucun modèle (supprimé, lien partagé).

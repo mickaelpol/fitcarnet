@@ -5,7 +5,8 @@ import {
   useAppliquerOrdre, useEnregistrerModele, useExercices, useModeles, useSupprimerModele,
 } from '@/api/hooks';
 import type { Exercice, Modele, ModeleExercice } from '@/api/types';
-import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
+import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
+import { premiereErreur } from '@/composants/etatRequetes';
 import { SerieModele } from '@/composants/serieModele';
 import { ChoixMode, type ModeTravail } from '@/composants/choixMode';
 import { ChoixDansListe } from '@/composants/choixAliment';
@@ -36,15 +37,25 @@ export default function DetailModele() {
   const [propager, setPropager] = useState(false);
   const [confirmerSuppression, setConfirmerSuppression] = useState(false);
 
+  /* LE MODÈLE QUE DÉSIGNE L'URL — cherché UNE fois, et pas deux.
+     Cette recherche était écrite dans l'effet ci-dessous ; la garde
+     « ce modèle n'existe pas » du 18 septembre 2026 en avait besoin aussi, et
+     deux recherches séparées, c'est deux chances de diverger (motif n° 1 de la
+     revue, « le jumeau oublié »). `undefined` veut dire « pas trouvé », ce qui
+     ne se distingue de « pas encore chargé » qu'en regardant `modeles.data`. */
+  const modeleDuLien = useMemo(
+    () => (nouveau ? undefined : (modeles.data ?? []).find((x) => x.id === Number(id))),
+    [nouveau, modeles.data, id],
+  );
+
   useEffect(() => {
     if (modele !== null) return;
     if (nouveau) {
       setModele({ nom: null, type: null, exercices: [] });
-    } else {
-      const m = (modeles.data ?? []).find((x) => x.id === Number(id));
-      if (m) setModele(m);
+    } else if (modeleDuLien) {
+      setModele(modeleDuLien);
     }
-  }, [nouveau, modeles.data, id, modele]);
+  }, [nouveau, modeleDuLien, modele]);
 
   const parId = useMemo(() => {
     const m = new Map<number, Exercice>();
@@ -75,6 +86,32 @@ export default function DetailModele() {
   if (exercices.isError) {
     return <Erreur message={exercices.error.message} onReessayer={() => void exercices.refetch()} />;
   }
+
+  /* LA LISTE DES MODÈLES EN PANNE FAISAIT TOURNER LA ROUE POUR TOUJOURS —
+     constat M6, corrigé le 18 septembre 2026. `modeles.isError` n'était lu
+     nulle part : /modeles en échec, l'effet ci-dessus ne trouvait rien,
+     `modele` restait `null` et on tombait sur le `<Chargement />` du dessous,
+     sans message ni bouton Réessayer.
+     La garde du catalogue reste écrite à part juste au-dessus : c'est elle que
+     `src/muscles/gardeCatalogue.test.ts` cherche mot pour mot dans chaque
+     écran qui traduit un identifiant d'exercice en nom affiché. */
+  const panne = premiereErreur(modeles);
+  if (panne) return <Erreur message={panne.message} onReessayer={panne.reessayer} />;
+
+  /* ET SI L'URL NE DÉSIGNE AUCUN MODÈLE — lien partagé, modèle supprimé
+     depuis. Ce cas prenait exactement le même visage que la panne réseau : la
+     roue, pour toujours. Il n'est pas une erreur et n'a rien à réessayer, donc
+     il se dit en toutes lettres.
+     `modeles.data !== undefined` est ce qui empêche de l'annoncer à tort : au
+     premier rendu qui suit l'arrivée des données, l'effet n'a pas encore posé
+     `modele` et un modèle qui EXISTE passerait pour absent. Et `modele ===
+     null` protège la saisie en cours : un modèle qu'on est en train d'éditer
+     puis qui disparaît de la liste ne doit pas arracher l'écran sous les
+     doigts. */
+  if (!nouveau && modele === null && modeles.data !== undefined && modeleDuLien === undefined) {
+    return <Vide message="Ce modèle n’existe pas — il a peut-être été supprimé." />;
+  }
+
   if (!modele) return <Chargement />;
 
   const ajouter = (idExercice: number) => {

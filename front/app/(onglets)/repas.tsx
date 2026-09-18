@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSupprimerPlan } from '@/api/hooks';
 import type { PlanRepas } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Erreur } from '@/composants/base';
+import { premiereErreur } from '@/composants/etatRequetes';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { libelleDuJour } from '@/composants/calendrier';
 import { Etapes } from '@/composants/etapes';
@@ -251,9 +252,20 @@ export default function Calculateur() {
   };
 
   if (frigo.isLoading || cibles.isLoading) return <Chargement />;
-  if (frigo.isError) {
-    return <Erreur message={frigo.error.message} onReessayer={() => void frigo.refetch()} />;
-  }
+
+  /* SANS CIBLES, CET ÉCRAN NE PROPOSAIT RIEN — ET NE DISAIT PAS POURQUOI.
+     Constat M6, corrigé le 18 septembre 2026. Seul `frigo.isError` était
+     gardé. Quand /cibles échouait pendant que le frigo, lui, répondait —
+     un tunnel de métro suffit —, `cibleDe` et `demandes` filtraient sur un
+     `cibles.data ?? []` vide : le solveur ne tournait pas, aucun repas n'était
+     proposé, et l'écran avait l'air de dire qu'il n'y avait rien à manger.
+     C'est l'écran le plus sensible de l'application (règle 7).
+     UN SEUL GARDE POUR LES DEUX : `premiereErreur` rend la première panne et
+     son « Réessayer » relance toutes celles qui sont tombées. Il est APRÈS le
+     garde de chargement, et jamais avant : « en attente » n'est pas « en
+     panne ». */
+  const panne = premiereErreur(frigo, cibles);
+  if (panne) return <Erreur message={panne.message} onReessayer={panne.reessayer} />;
 
   const aucunCoche = joursRetenus.every((r) => REPAS.every((x) => !coche(r, x)));
 
