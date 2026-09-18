@@ -30,10 +30,22 @@
 
   "longueur_minimale": 12,
 
+  "_dit": [
+    "Le champ `dit` de chaque exigence est le LIBELLE AFFICHE, et il est",
+    "desormais VERIFIE des deux cotes — il ne l'etait pas jusqu'au 19 septembre",
+    "2026, ce qui en faisait la forme douce du commentaire qui ment : il avait",
+    "l'air d'etre la source des textes d'ecran et ne l'etait pas. Les deux juges",
+    "avaient deja diverge de lui (« au moins 12 caracteres » ici, « 12",
+    "caracteres au minimum » a l'ecran).",
+    "",
+    "Les deux suites comparent maintenant leurs libelles a ceux-ci : le front",
+    "pour sa liste cochee, l'API pour la phrase « Il manque … »."
+  ],
+
   "exigences": [
     {
       "code": "longueur",
-      "dit": "au moins 12 caracteres",
+      "dit": "12 caractères au minimum",
       "pourquoi": "C'est la seule contrainte qui multiplie vraiment le cout d'une attaque : chaque caractere de plus fait un facteur ~70."
     },
     {
@@ -53,7 +65,7 @@
     },
     {
       "code": "special",
-      "dit": "un caractere special",
+      "dit": "un caractère spécial",
       "pourquoi": "Tout ce qui n'est ni une lettre, ni un chiffre, ni un espace. L'espace est exclu expres : une phrase de passe en contient sans que ce soit un choix, et le compter pour un caractere special ferait passer « mon chat dort » pour plus solide qu'il n'est."
     }
   ],

@@ -369,15 +369,36 @@ pas les vidéos.
 
 ## Limites connues
 
-- **Le changement de mot de passe et d'adresse n'a AUCUN écran.** Vérifié le
-  16 septembre 2026 : ni `motDePasseActuel`, ni `motDePasseClair`, ni
-  `/utilisateurs/` n'apparaissent dans `front/src` ou `front/app`. La capacité
-  est complète et testée côté API (`UtilisateurProcessor.php`), mais **elle ne
-  s'éprouve qu'au `curl` et ne se filme pas**. `presentation/features.md:59-60`
-  la présente sous « onglet Compte » sans dire qu'il n'y a pas d'interface :
-  c'est l'écart le plus trompeur de cette fiche.
-  `presentation/demonstration.md` la marque désormais `✗` — « l'API sait faire,
-  aucun écran ne l'appelle », partie II·B.
+- ~~**Le changement de mot de passe n'a AUCUN écran.**~~ **Levée le 18 septembre
+  2026**, et cette fiche l'a su un jour plus tard que sa jumelle
+  `fonctionnalite-acces` — le genre d'oubli que cette fiche est censée
+  attraper.
+
+  `front/app/mot-de-passe.tsx` existe, accessible depuis l'onglet Compte par le
+  bouton **« Changer mon mot de passe »**, et par le bandeau d'avertissement qui
+  coiffe tous les écrans quand le mot de passe ne suit plus les règles. Trois
+  champs — actuel, nouveau, confirmation —, une jauge qui nomme ce qui manque
+  (`front/src/composants/jaugeMotDePasse.tsx`), et un panneau de fin.
+
+  **CE QU'IL FAUT SAVOIR POUR LE FILMER** : un changement réussi **révoque
+  toutes les sessions du compte, y compris celle qui le fait**. C'est délibéré —
+  un jeton de rafraîchissement volé ne doit pas survivre au changement qu'il a
+  motivé. L'écran l'annonce et propose de se reconnecter ; ne pas prendre cette
+  déconnexion pour un échec de la démonstration.
+
+  **L'ADRESSE, ELLE, NE SE CHANGE TOUJOURS PAR AUCUN ÉCRAN.** La capacité existe
+  côté API (`UtilisateurProcessor`, mot de passe actuel exigé) et ne s'éprouve
+  qu'au `curl`. C'est ce qui reste de cette limite.
+
+- **Le drapeau « mot de passe faible » ne se voit qu'après une connexion.** Il
+  est posé par `AjouterJetonRafraichissement`, seul moment où le serveur tient
+  le mot de passe en clair — une empreinte ne se relit pas pour savoir si elle
+  contenait une majuscule. Conséquence pour qui veut filmer le bandeau : le
+  poser en base puis se connecter le remet à sa vraie valeur. Il faut un compte
+  dont le mot de passe est **réellement** faible.
+  `presentation/demonstration.md` marquait cette fonctionnalité `✗` — « l'API
+  sait faire, aucun écran ne l'appelle » ; c'est corrigé depuis le 19 septembre
+  2026, elle se démontre.
 - **Voir et couper ses sessions n'a pas d'écran non plus.**
   `GET`/`DELETE /api/mes-sessions` existent, sont testées
   (`api/tests/Controller/MesSessionsProprieteTest.php`), et la colonne `vu_le`

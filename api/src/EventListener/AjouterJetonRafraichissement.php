@@ -7,8 +7,8 @@ namespace App\EventListener;
 use App\Entity\Utilisateur;
 use App\Service\CookieDeSession;
 use App\Service\JetonsRafraichissement;
+use App\Repository\Comptes;
 use App\Service\MotDePasse;
-use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -42,7 +42,7 @@ final class AjouterJetonRafraichissement
         private readonly JetonsRafraichissement $jetons,
         private readonly RequestStack $requetes,
         private readonly CookieDeSession $cookie,
-        private readonly EntityManagerInterface $em,
+        private readonly Comptes $comptes,
     ) {
     }
 
@@ -80,15 +80,26 @@ final class AjouterJetonRafraichissement
      * permet de le DIRE a l'ecran et de proposer un changement, sans rien
      * bloquer.
      *
-     * ON N'ECRIT QUE SI LA REPONSE A CHANGE. Une connexion par heure sur trois
-     * comptes ne justifie pas un `UPDATE` a chaque fois, et surtout : ecrire
+     * ON N'ECRIT QUE SI LA REPONSE A CHANGE, et c'est la BASE qui en decide
+     * (`IS DISTINCT FROM` dans `Comptes::noterMotDePasseFaible`). Une connexion
+     * par heure ne justifie pas un `UPDATE` a chaque fois, et surtout : ecrire
      * sans raison ferait de cette colonne un journal de connexions, ce qu'elle
      * n'est pas.
      *
-     * ET CA NE PEUT PAS FAIRE ECHOUER LA CONNEXION. On est dans un ecouteur, a
-     * un moment ou le mot de passe est deja verifie : une base momentanement
-     * indisponible doit couter un avertissement manquant, jamais l'acces au
-     * compte.
+     * ET CA NE PEUT PAS FAIRE ECHOUER LA CONNEXION — ce qui etait FAUX jusqu'au
+     * 19 septembre 2026, releve en revue avant la publication de l'APK.
+     *
+     * Cette methode ecrivait par l'entite, donc par l'EntityManager. Or un
+     * `flush()` qui echoue FERME l'EntityManager, et `JetonsRafraichissement::
+     * creer()` — appele deux lignes plus loin — tient LE MEME. Le `catch`
+     * ci-dessous avalait bien la premiere exception ; la seconde, elle,
+     * remontait jusqu'au bout : **500 sur `POST /api/connexion`**, plus de
+     * connexion du tout, pour un avertissement cosmetique. Il suffisait d'un
+     * verrou ou d'un disque plein sur le NAS.
+     *
+     * La precaution etait donc ECRITE et pas PRISE. Elle l'est maintenant :
+     * l'ecriture passe par `Comptes`, en SQL direct, hors de l'UnitOfWork —
+     * elle ne peut plus rien fermer.
      */
     private function releverLaForceDuMotDePasse(Utilisateur $utilisateur): void
     {
@@ -105,13 +116,10 @@ final class AjouterJetonRafraichissement
                 return;
             }
 
-            $faible = !MotDePasse::acceptable($clair);
-            if ($faible === $utilisateur->isMotDePasseFaible()) {
-                return;
-            }
-
-            $utilisateur->setMotDePasseFaible($faible);
-            $this->em->flush();
+            $this->comptes->noterMotDePasseFaible(
+                $utilisateur->getId()->toRfc4122(),
+                !MotDePasse::acceptable($clair),
+            );
         } catch (\Throwable) {
             // Un avertissement manquant ne vaut pas une connexion refusee.
         }

@@ -20,7 +20,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 > sauvegardes ailleurs que sur le volume de la base est une tâche DSM, côté
 > NAS. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 1 sur 17 ; 03 — 0 sur 33 ;
 > 04 — 0 sur 17. Plus aucun n'attend d'arbitrage. La liste,
-> avec la preuve de chacun, est dans « [Ce qui reste ouvert](#ce-qui-reste-ouvert-au-17-septembre-2026) ».
+> avec la preuve de chacun, est dans « [Ce qui reste ouvert](#ce-qui-reste-ouvert-au-18-septembre-2026) ».
 
 ## Ce que l'audit dit du projet
 
@@ -297,7 +297,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits ; 02#14, 02#18 et 02#19 aussi. **Le 18 septembre 2026 : 04#14, 04#15, 04#19, M8, M13, puis les quatre derniers arbitrages** — 02#13 (rotation des journaux seule, limites refusées avec argument), 02#15 (port gardé et assumé par écrit), 02#17 (purge des invitations, orphelines comprises) et **M5** (cookie `HttpOnly`, corrigé et non assumé). F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
 Tests au 15 septembre, au terme du chantier : **600 front** (577 + 23 de rendu, en deux passes) · **252 API · 661 assertions · 7 erreurs PHPStan**
-(aucune sur les fichiers corrigés). Au **18 septembre 2026** en fin de journée : **679 front** (646 + 33 de
+(aucune sur les fichiers corrigés). Au **18 septembre 2026** en fin de journée : **680 front** (647 + 33 de
 rendu) · **398 API · 985 assertions · 5 erreurs PHPStan** — deux des sept ont disparu avec le code
 qui les portait.
 

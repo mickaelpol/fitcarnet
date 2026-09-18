@@ -31,10 +31,23 @@
  * derrière n'importe quel domaine, et changer de domaine ne demande plus de
  * reconstruire quoi que ce soit.
  *
- * Partout ailleurs — l'application native, le web de développement en
- * `http://localhost:8081` — on garde `EXPO_PUBLIC_API_URL`. Là, l'API est
- * réellement sur une autre origine que la page, et personne ne peut le
- * deviner.
+ * **LA RÈGLE A ÉTÉ ÉLARGIE LE 18 SEPTEMBRE 2026, ET CE QUI PRÉCÈDE NE DIT PLUS
+ * QUE LA MOITIÉ.** Elle ne portait que sur le HTTPS ; un bundle construit
+ * ouvert sur `http://localhost:8080` appelait donc l'adresse figée à la
+ * construction. Tant que la session tenait dans un en-tête, ça marchait — mais
+ * depuis M5 elle est dans un cookie `SameSite=Strict`, et deux hôtes
+ * différents sont DEUX SITES : le cookie ne partait jamais, et le moindre
+ * rechargement déconnectait.
+ *
+ * Le protocole n'était pas la bonne question. La vraie est : **ce bundle a-t-il
+ * été servi par le serveur qui sert l'API ?** Oui pour tout bundle construit
+ * (Caddy sert les deux, en développement comme en production), non pour le
+ * serveur de développement d'Expo. C'est ce que dit le paramètre
+ * `serveurDeDeveloppement` plus bas — et c'est lui qui décide désormais, pas
+ * le schéma.
+ *
+ * Reste vrai : l'application native n'a pas d'emplacement du tout, et garde
+ * `EXPO_PUBLIC_API_URL`.
  */
 
 /** Ce qu'on retient de `window.location`, et rien de plus. */

@@ -55,10 +55,24 @@ export const DIT: Record<Exigence, string> = {
  * tout en obtenant un caractère spécial qu'il n'a pas. Deux erreurs qui se
  * compensent presque — la pire espèce.
  *
- * **Hermes implémente les classes Unicode.** C'est le point qu'il fallait
- * vérifier : `normalize('NFD')` n'y est pas (voir `texte.ts`), mais
- * `\p{…}` avec le drapeau `u` y est depuis longtemps, et le test de rendu
- * couvre le cas accentué.
+ * **ET HERMES ? LA QUESTION EST OUVERTE, ET CE COMMENTAIRE A MENTI DESSUS.**
+ *
+ * Il affirmait « Hermes implémente les classes Unicode […] et le test de rendu
+ * couvre le cas accentué ». **Il n'existe aucun test de rendu sur le mot de
+ * passe** — relevé en revue le 19 septembre 2026. Les deux cas accentués
+ * (`Été3cetÉtéLà!`, `éééééééééééé`) vivent dans `motDePassePartage.test.ts`,
+ * qui s'exécute sous **Node**, jamais sous Hermes. La précaution était écrite,
+ * pas prise — et `texte.ts` montre à quoi elle ressemble quand elle l'est : son
+ * test RETIRE `String.prototype.normalize` pour que la panne tombe sur le poste
+ * et non sur un téléphone.
+ *
+ * CE QUE ÇA COÛTERAIT SI HERMES NE SUIVAIT PAS : `manquements()` rendrait
+ * toujours quatre manques, `acceptable()` serait toujours faux, et le bouton
+ * « Créer mon compte » de l'écran d'invitation resterait désactivé **pour
+ * toujours** — sur le seul écran par lequel on entre dans l'application.
+ *
+ * Ça ne se raisonne pas, ça se mesure sur un appareil. Tant que ce n'est pas
+ * fait, cette ligne est la seule chose honnête à écrire ici.
  */
 export function manquements(motDePasse: string): Exigence[] {
   const manque: Exigence[] = [];

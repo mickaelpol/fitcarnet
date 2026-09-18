@@ -80,12 +80,12 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 646 tests, puis 33 de rendu
+cd front && npm test        # tsc --noEmit + 647 tests, puis 33 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 
 docker compose -f compose.dev.yml up          # environnement de développement
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 415 tests API
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 416 tests API
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
 
 db/manuel/verifier-schema.sh      # base neuve == base migrée ?
@@ -114,7 +114,7 @@ docs/         audit-2026-09/ — 79 constats classés
 
 ## Qualité
 
-**1 094 tests** au 18 septembre 2026 — 679 côté front (646 + 33 de rendu), 415 côté API — et des
+**1 096 tests** au 18 septembre 2026 — 680 côté front (647 + 33 de rendu), 416 côté API — et des
 garde-fous qui tournent sans qu'on y pense :
 
 - **PHPStan** niveau 5 sur l'API ;

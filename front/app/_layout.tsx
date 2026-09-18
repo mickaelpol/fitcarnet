@@ -115,6 +115,28 @@ function PortierAdmin({ children }: { children: ReactNode }) {
 }
 
 /**
+ * L'HORLOGE ET LA BATTERIE DOIVENT SE LIRE SUR CE QU'IL Y A DERRIÈRE ELLES.
+ *
+ * `<StatusBar style="light" />` était posé une fois pour toute l'application,
+ * et c'était juste tant que le haut de l'écran était sombre. Le bandeau de mot
+ * de passe peint cette zone en doré : du blanc dessus donne **1,96:1**, quand
+ * il en faut 4,5. C'est le même défaut, au même pixel, que celui qu'on venait
+ * de corriger pour le TEXTE du bandeau — corrigé pour le texte, oublié pour
+ * l'horloge, la batterie et les icônes de notification qui sont dessus.
+ * Relevé en revue le 19 septembre 2026, avant la construction de l'APK.
+ *
+ * Invisible sur le web — `expo-status-bar` n'y fait rien. C'est exactement ce
+ * qui serait parti sur les téléphones sans que rien ne le montre ici.
+ *
+ * La question « le bandeau est-il affiché ? » n'a qu'une réponse, celle de
+ * `useMotDePasseASignaler`. Trois choses en dépendent maintenant : le bandeau,
+ * la marge haute, et la couleur de la barre d'état.
+ */
+function BarreDEtat() {
+  return <StatusBar style={useMotDePasseASignaler() ? 'dark' : 'light'} />;
+}
+
+/**
  * Rend ce qu'on lui donne, en disant à ses descendants que la barre d'état est
  * déjà couverte.
  *
@@ -263,7 +285,7 @@ export default function Racine() {
         pendant que les requêtes repartent en arrière-plan. */}
     <PersistQueryClientProvider client={client} persistOptions={PERSISTANCE}>
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <BarreDEtat />
         {/* LE BANDEAU EST AU-DESSUS DE TOUT, ET IL PREND LA BARRE D'ÉTAT.
             Il doit se voir sur TOUS les écrans : l'avertissement ne vivait que
             sur l'onglet Compte, où l'on ne va que pour se déconnecter — donc

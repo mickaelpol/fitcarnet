@@ -70,8 +70,17 @@ final class CookieDeSessionTest extends TestCase
          * `Secure` manque VRAIMENT lui etait invisible.
          *
          * Et il manquait vraiment. Le proxy inverse de DSM termine le TLS puis
-         * parle a Caddy en clair ; Symfony n'a aucun `trusted_proxies`, donc
-         * `$request->isSecure()` repond FAUX en production. Le cookie de
+         * parle a Caddy en clair ; Symfony n'avait alors aucun
+         * `trusted_proxies`, donc `$request->isSecure()` repondait FAUX en
+         * production.
+         *
+         * `SYMFONY_TRUSTED_PROXIES` EXISTE DEPUIS LE MEME JOUR — pose pour une
+         * toute autre raison (`login_throttling` comptait toutes les
+         * tentatives sous l'adresse du proxy). `isSecure()` repondrait donc
+         * juste aujourd'hui, ET CE TEST GARDE TOUT SON SENS : il eprouve que le
+         * cookie ne DEPEND PAS de cette reponse. Une variable d'environnement
+         * qu'un deploiement perd ferait cesser `Secure` en silence ;
+         * `DEFAULT_URI` ne depend de personne. Le cookie de
          * quatre-vingt-dix jours serait parti sans `Secure`, et une seule
          * requete en `http://` — il n'y a pas de HSTS — aurait mis le jeton de
          * rafraichissement en clair sur le reseau. La fuite durable que ce

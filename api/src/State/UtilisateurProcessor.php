@@ -74,9 +74,12 @@ final readonly class UtilisateurProcessor implements ProcessorInterface
         $changeAdresse = !$creation && $precedent->getEmail() !== $data->getEmail();
 
         /* UN COMPTE NE NAIT PAS SANS MOT DE PASSE (constat F-06).
-           `motDePasseClair` ne porte que `Assert\Length(min: 10)`, et `Length`
-           rend zero violation sur `null` — mesure le 15 septembre 2026, pas
-           suppose. Un `POST /api/utilisateurs` sans le champ rendait donc 201 :
+           `motDePasseClair` ne portait alors que `Assert\Length(min: 10)`, et
+           `Length` rend zero violation sur `null` — mesure le 15 septembre
+           2026, pas suppose. (Il porte `MotDePasseSolide` depuis le
+           18 septembre, qui laisse `null` passer pour la meme raison : une
+           contrainte ne doit pas doubler `NotBlank`. Le garde ci-dessous reste
+           donc indispensable.) Un `POST /api/utilisateurs` sans le champ rendait donc 201 :
            le compte existait, il etait actif, il apparaissait dans la liste
            d'administration, et sa colonne `mot_de_passe` restait ''. Personne
            ne pouvait s'y connecter, et rien nulle part ne disait pourquoi.

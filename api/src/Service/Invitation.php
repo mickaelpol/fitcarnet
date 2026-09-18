@@ -40,10 +40,16 @@ final class Invitation
      * `Assert\Length(min: 10)` sur l'entite : deux ecritures de la meme regle,
      * qui disaient la meme chose par accident. Depuis le 18 septembre 2026 la
      * regle entiere vit dans `App\Service\MotDePasse`, et celle-ci n'en est
-     * plus qu'un renvoi — gardee parce que le message d'erreur de
-     * `InvitationsController` la nomme.
+     * plus qu'un renvoi.
+     *
+     * ELLE N'A PLUS AUCUN APPELANT — verifie le 19 septembre 2026 sur tout le
+     * depot. Son commentaire disait « gardee parce que le message d'erreur de
+     * `InvitationsController` la nomme » : c'est le commit du meme jour qui a
+     * supprime ce message, remplace par `pourquoiMotDePasseRefuse()`. Une
+     * constante morte qui justifie sa survie par un appelant disparu — elle
+     * part.
      */
-    public const LONGUEUR_MOT_DE_PASSE = MotDePasse::LONGUEUR_MINIMALE;
+    // public const LONGUEUR_MOT_DE_PASSE — retiree le 19 septembre 2026
 
     /**
      * Fabrique un jeton d'invitation.

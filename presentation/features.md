@@ -52,7 +52,8 @@ démontrer devant un client.
 - **Vérification du lien avant le formulaire** — on n'invite pas quelqu'un à choisir un mot de passe pour lui apprendre ensuite que le lien est mort. `invitation/[jeton].tsx:45`
 - **Lien inconnu, déjà utilisé ou périmé : le même message** — aucune fuite d'information. `InvitationsController.php:237`
 - **L'adresse est affichée, jamais saisie** — elle vient de l'invitation, le serveur ignore ce que le formulaire enverrait. `invitation/[jeton].tsx:96`
-- **Mot de passe : 10 caractères minimum**, comptés en caractères et non en octets, sans exigence de majuscule ni de chiffre. `Invitation.php:21`
+- **Mot de passe : 12 caractères minimum, une minuscule, une majuscule, un chiffre et un caractère spécial**, comptés en caractères et non en octets. Durci le 18 septembre 2026 — c'était 10 sans exigence de composition. La règle a **un seul endroit** où elle vit, `api/regles/motdepasse.json`, que les deux suites de tests lisent. `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts`
+- **Une jauge nomme ce qui manque pendant la frappe**, et ne peut pas encourager un mot de passe que le serveur refusera — un test partagé l'interdit. `front/src/composants/jaugeMotDePasse.tsx`
 - **Alerte de divergence différée** — « Les deux ne sont pas identiques » n'apparaît qu'une fois la confirmation commencée. `invitation/[jeton].tsx:80`
 - **Pas de connexion automatique après création** — le mot de passe doit être tapé une première fois. `invitation/[jeton].tsx:63`
 - **Validité de 7 jours**, annoncée en clair dans la liste des invitations. `Invitation.php:217`

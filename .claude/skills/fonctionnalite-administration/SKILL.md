@@ -134,7 +134,27 @@ champ libre, qui finirait avec « four », « Four », « au four » et « four 
   fois** — le serveur n'en garde qu'une empreinte, comme un mot de passe
   (`front/app/admin-utilisateurs.tsx:38-41,156-161` ·
   `api/src/Controller/InvitationsController.php:183-188`).
-- Une nouvelle invitation **remplace** celle qui attendait (`:130-136,163-179`).
+- Une nouvelle invitation **remplace** celle qui attendait, dans la même
+  transaction : l'ancien lien meurt à l'instant où le nouveau naît.
+- **« Renvoyer un lien »**, depuis le 18 septembre 2026, sur chaque invitation
+  **en attente ou périmée**. C'est le geste du « la personne a perdu son lien »,
+  et il se faisait auparavant à l'aveugle : retrouver l'adresse dans la liste, la
+  retaper en haut de l'écran, et se tromper d'une lettre créait une SECONDE
+  invitation pour une adresse voisine au lieu de remplacer la première. **Aucune
+  route nouvelle** — c'est le `POST` ci-dessus, qui remplaçait déjà. L'écran
+  remonte pour montrer le lien neuf, **y compris quand l'appel échoue** : le
+  seul endroit qui affiche l'erreur est en haut. Une invitation **acceptée** n'a
+  pas ce bouton : la personne a son compte, il n'y a rien à renvoyer.
+- **LA LISTE SE PURGE TOUTE SEULE**, et il faut le savoir avant de s'étonner
+  qu'une ligne ait disparu. `bin/console app:invitations:purger` tourne à chaque
+  démarrage de la pile (`docker/entrypoint-prod.sh`). Rétention de **30 jours**
+  pour les acceptées (comptés depuis l'acceptation) et les périmées ; **sans
+  aucun délai** pour les **orphelines** — celles dont le compte a été supprimé,
+  `invitation.utilisateur_id` étant en `ON DELETE SET NULL` : la ligne restait
+  « acceptée » et sans nom, pour toujours, et réinviter cette adresse affichait
+  deux lignes pour la même personne. Une invitation **vivante n'est jamais
+  purgée**, son lien est dehors. **Purger une invitation ne touche pas au
+  compte.** Pour voir sans rien supprimer : `--simuler`.
 - Liste avec le contenu en chiffres, **neuf compteurs** depuis le 17 septembre
   2026 : « *n* séances · *n* séries · *n* modèles · *n* plans · *n* aliments ·
   *n* lignes de stock · *n* objectifs · *n* compléments · *n* exercices

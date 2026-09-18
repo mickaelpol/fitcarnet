@@ -264,7 +264,8 @@ lui, est corrigé depuis le 16 : c'est 70 à 90 %.)
 | | Réglages : cinq sonneries de minuteur, jouées au toucher, réglage **propre à l'appareil** | `/reglages` | 2.4 |
 | + | Savoir quelle version tourne et chercher une mise à jour. **Sur le web, le panneau se tait** | `/(onglets)/compte` | — |
 | + | L'accès à l'administration, **invisible et inatteignable** pour un compte ordinaire depuis le 15 septembre 2026 | `/(onglets)/compte` | 8.1 |
-| ✗ | **Changer son mot de passe ou son adresse** — la règle est complète côté serveur (mot de passe actuel exigé, toutes les sessions révoquées), mais **aucun écran ne l'appelle** : pas une occurrence de `motDePasseActuel` dans `front/`. C'est l'écart le plus trompeur de l'inventaire | — | — |
+| + | **Changer son mot de passe** — écran dédié depuis le 18 septembre 2026 : mot de passe actuel exigé, nouveau tapé deux fois, jauge qui nomme ce qui manque. **Un changement réussi ferme toutes les sessions, celle-ci comprise** — c'est voulu, et l'écran l'annonce | `/mot-de-passe` | — |
+| ✗ | **Changer son adresse** — la règle est complète côté serveur (mot de passe actuel exigé), mais **aucun écran ne l'appelle**. C'est ce qui reste de l'écart le plus trompeur de l'inventaire | — | — |
 
 ## C · Le frigo
 
@@ -788,8 +789,9 @@ encore en stock est refusé, 409).
   configuré côté serveur ». **Ne pas l'évoquer** dans le cas contraire.
 - **Le bandeau de mise à jour** — il n'apparaît qu'après une publication.
 - **La création d'un exercice** (plan 8.2) — sans écran, pour personne.
-- **Changer son mot de passe ou son adresse**, et **voir ses sessions** — l'API
-  sait faire, aucun écran ne l'appelle. Ne se filme pas, ne se promet pas.
+- **Changer son ADRESSE**, et **voir ses sessions** — l'API sait faire, aucun
+  écran ne l'appelle. Ne se filme pas, ne se promet pas. (Le mot de passe, lui,
+  a son écran depuis le 18 septembre 2026 : il se filme.)
 - **Les notifications téléphone fermé** — Expo Go n'a plus les notifications
   distantes depuis le SDK 53 : il faut l'APK.
 
@@ -1010,7 +1012,7 @@ invitation. C'est un choix, pas une limite technique.
 |---|---|
 | **Le partage d'un modèle** | Il n'existe pas — décision du 15 septembre 2026. Ne rien promettre. |
 | **La création d'un exercice** | Réservée aux administrateurs par l'API, et **sans aucun écran**. |
-| **Changer son mot de passe ou son adresse** | L'API sait faire, aucun écran ne l'appelle. |
+| **Changer son adresse** | L'API sait faire, aucun écran ne l'appelle. Le mot de passe, lui, a son écran depuis le 18 septembre 2026. |
 | **L'administration** (exercices, fusion, cuissons, invitations, comptes) | Demande un second compte administrateur. Hors sujet pour des commerciaux : c'est de l'outillage interne. |
 | **La source Grocy** | Ne fonctionne que si `GROCY_URL` est renseigné sur l'instance. À ne pas évoquer sinon. |
 | **Les notifications distantes** | Absentes d'Expo Go depuis le SDK 53 : non démontrables sur émulateur. |

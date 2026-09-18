@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import {
-  EXIGENCES, LONGUEUR_MINIMALE, acceptable, force, manquements, type Exigence,
+  DIT, EXIGENCES, LONGUEUR_MINIMALE, acceptable, force, manquements, type Exigence,
 } from './motDePasse';
 
 /**
@@ -119,4 +119,24 @@ test('la jauge distingue « ça passe » de « c\'est solide »', () => {
   assert.equal(force(''), 'vide');
   assert.equal(force('motdepasse'), 'faible');
   assert.equal(force('Poireau3Tiede'), 'moyen', 'il ne manque qu\'une chose : on est « presque »');
+});
+
+test('les libellés affichés sont ceux de la liste partagée', () => {
+  /* LE CHAMP `dit` AVAIT L'AIR D'ÊTRE LA SOURCE ET NE L'ÉTAIT PAS — relevé en
+     revue le 19 septembre 2026. Aucune des deux suites ne le lisait, et les
+     deux juges en avaient déjà dérivé (« au moins 12 caractères » dans le
+     fichier, « 12 caractères au minimum » à l'écran). C'est la forme douce du
+     commentaire qui ment : une donnée qui se présente comme la référence, que
+     personne ne vérifie.
+
+     Maintenant il l'est. Ce que ça protège concrètement : l'écran d'invitation
+     coche « une lettre majuscule » pendant que le serveur refuse en disant
+     autre chose, et la personne ne comprend pas ce qu'on lui demande. */
+  for (const exigence of regles.exigences) {
+    assert.equal(
+      DIT[exigence.code], exigence.dit,
+      `api/regles/motdepasse.json dit « ${exigence.dit} » pour « ${exigence.code} », `
+      + `le front affiche « ${DIT[exigence.code]} »`,
+    );
+  }
 });

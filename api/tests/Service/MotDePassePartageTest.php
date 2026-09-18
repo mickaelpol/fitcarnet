@@ -112,6 +112,58 @@ final class MotDePassePartageTest extends TestCase
         );
     }
 
+    /**
+     * LES LIBELLES AFFICHES SONT CEUX DE LA LISTE PARTAGEE.
+     *
+     * Le champ `dit` avait l'air d'etre la source des textes d'ecran et ne
+     * l'etait pas : aucune des deux suites ne le lisait, et les deux juges en
+     * avaient deja derive. Releve en revue le 19 septembre 2026 — c'est la
+     * forme douce du commentaire qui ment, une donnee qui se presente comme la
+     * reference et que personne ne verifie.
+     *
+     * Ce que ca protege : l'ecran coche « une lettre majuscule » pendant que
+     * le serveur refuse en disant autre chose, et la personne ne comprend pas
+     * ce qu'on lui demande.
+     */
+    public function testLesLibellesAffichesSontCeuxDeLaListe(): void
+    {
+        foreach ((array) self::regles()['exigences'] as $exigence) {
+            $code = (string) $exigence['code'];
+            $dit = (string) $exigence['dit'];
+
+            /* On n'atteint pas la table de traduction directement — elle est
+               privee, et c'est bien. On passe par la phrase, qui est ce que la
+               personne lit vraiment : un mot de passe a qui il ne manque QUE
+               cette exigence-la doit la nommer mot pour mot. */
+            $presque = self::motDePasseAuquelIlNeManqueQue($code);
+
+            self::assertSame(
+                [$code], MotDePasse::manquements($presque),
+                \sprintf('Le temoin « %s » devait ne manquer que « %s ».', $presque, $code),
+            );
+            self::assertStringContainsString(
+                $dit, (string) MotDePasse::pourquoiRefuse($presque),
+                \sprintf(
+                    'api/regles/motdepasse.json dit « %s » pour « %s » ; la phrase de l\'API ne le reprend pas.',
+                    $dit, $code,
+                ),
+            );
+        }
+    }
+
+    /** Un mot de passe conforme, sauf sur l'exigence demandee. */
+    private static function motDePasseAuquelIlNeManqueQue(string $code): string
+    {
+        return match ($code) {
+            'longueur' => 'Ab1!x',
+            'minuscule' => 'ABCDEF123456!',
+            'majuscule' => 'abcdef123456!',
+            'chiffre' => 'Abcdefghijk!',
+            'special' => 'Abcdef1234567',
+            default => '',
+        };
+    }
+
     /** @return array<string, mixed> */
     private static function regles(): array
     {

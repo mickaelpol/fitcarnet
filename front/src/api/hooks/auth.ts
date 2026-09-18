@@ -138,17 +138,23 @@ export function useDeconnexion() {
  * `presentation/tournage/verifier-ecrans.mjs`, seul temoin capable de le voir :
  * aucun test unitaire ne monte l'application dans un vrai navigateur.
  *
- * SEPT appelants — le portier d'administration de `app/_layout.tsx`,
- * `etatMaj`, l'onglet Compte et les QUATRE ecrans `admin-*` — et deux d'entre
- * eux vivent a la racine, donc sur TOUS les ecrans, connexion comprise. La
+ * NEUF appelants — le portier d'administration de `app/_layout.tsx`,
+ * `etatMaj`, l'onglet Compte, les QUATRE ecrans `admin-*`, et depuis le
+ * 18 septembre 2026 `bandeauMotDePasse.tsx` et `app/mot-de-passe.tsx`. TROIS
+ * d'entre eux vivent a la racine — le portier, le bandeau, et `SansMargeHaute`
+ * a travers `useMotDePasseASignaler` —, donc sur TOUS les ecrans, connexion
+ * comprise. La
  * garde va donc ici, au point de passage obligé, et non devant chaque
  * appelant : une regle recopiee devant sept portes manquera devant la
  * huitieme.
  *
- * (Ce commentaire a d'abord annonce SIX appelants et « trois ecrans admin-* ».
- * Il avait perdu une porte au comptage, dans la phrase meme qui explique
- * qu'on finit toujours par en perdre une. Corrige le 15 septembre 2026, sur
- * signalement de la revue.)
+ * (Ce commentaire a d'abord annonce SIX appelants et « trois ecrans admin-* » ;
+ * corrige a SEPT le 15 septembre 2026. Il s'est trompe une SECONDE fois le
+ * 18 septembre, en restant a sept apres l'arrivee du bandeau — les deux fois
+ * dans la phrase meme qui explique qu'on finit toujours par perdre une porte.
+ * Recompte le 19 septembre, sur signalement de la revue. La lecon n'est pas
+ * « mieux compter » : c'est que la garde est ICI, au point de passage, et pas
+ * devant chaque appelant. Le nombre exact n'a donc aucune consequence.)
  *
  * `connecte === true` STRICTEMENT, car `useConnecte` rend trois valeurs et
  * `null` veut dire « je ne sais pas encore », pas « oui ». Interroger pendant

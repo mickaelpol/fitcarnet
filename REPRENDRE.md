@@ -18,7 +18,7 @@ d'une ligne de code, pas ce qui reste à faire.
   tire `master` toutes les 5 minutes. **La production a été contrôlée le
   18 septembre** — schéma conforme aux migrations 34-35-36, parcours réel
   éprouvé sur un compte jetable puis retiré (section 2.1).
-- **Tests** : 639 côté front plus 33 de rendu, 415 côté API (985 assertions),
+- **Tests** : 647 côté front plus 33 de rendu, 416 côté API (1 037 assertions),
   tous verts. PHPStan : **5 erreurs connues**, pas une de plus — c'était 7
   jusqu'au 18 septembre 2026, deux ont disparu avec le code qui les portait.
 - **Contrôles de base**, tous verts : `verifier-schema.sh` (base neuve
@@ -47,8 +47,8 @@ cd front && npm install          # si package.json a bougé, ou si les tests de 
 Puis vérifier qu'on part d'un socle sain :
 
 ```bash
-cd front && npm test                                                  # 646 + 33, 0 échec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 415 tests, 1 026 assertions
+cd front && npm test                                                  # 647 + 33, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 416 tests, 1 037 assertions
 db/manuel/verifier-schema.sh                                          # « identiques »
 db/manuel/verifier-migrations.sh                                      # vert
 db/manuel/verifier-jeux.sh                                            # vert
@@ -279,7 +279,7 @@ besoin se présente :
 - Un décalage d'affichage d'environ 13 px dans l'éditeur d'aliment après une
   saisie (Chromium, 1280×900). Origine non recherchée.
 
-### 2.5 Mots de passe : durcis, et changeables par leur propriétaire (18 septembre 2026)
+### 2.6 Mots de passe : durcis, et changeables par leur propriétaire (18 septembre 2026)
 
 **Ce qui a changé.** La règle passe de « dix caractères » à **douze caractères,
 une minuscule, une majuscule, un chiffre et un caractère spécial**. Le code
@@ -333,7 +333,7 @@ non-concordance, changement, déconnexion, reconnexion, bandeau disparu.
 
 ---
 
-### 2.6 Deux refontes proposées par les revues, et repoussées
+### 2.7 Deux refontes proposées par les revues, et repoussées
 
 Le 18 septembre 2026, deux confrontations à la documentation officielle (par le
 MCP context7) ont proposé des changements de structure côté front. **Aucun des

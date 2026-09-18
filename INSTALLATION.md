@@ -49,6 +49,13 @@ docker compose -f compose.dev.yml exec app php bin/console \
   fitcarnet:creer-utilisateur ton@adresse.fr "Mickaël" --admin --grocy
 ```
 
+Le mot de passe est demandé **sans écho**, et il doit respecter la règle du
+projet : **12 caractères au minimum, une minuscule, une majuscule, un chiffre et
+un caractère spécial**. Durcie le 18 septembre 2026 — c'était 10 sans exigence
+de composition. Si le tien ne passe pas, la commande dit **tout** ce qui lui
+manque, pas seulement le premier défaut. La règle n'a qu'un endroit où elle
+vit : `api/regles/motdepasse.json`.
+
 ---
 
 ## 3. Tes objectifs par repas

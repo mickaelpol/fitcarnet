@@ -26,8 +26,16 @@ security:
             # Il n'y en avait aucune : un script pouvait poster des mots de
             # passe en boucle depuis Internet, sans blocage, sans delai, sans
             # trace exploitable. A cinquante essais par seconde, un mot de
-            # passe de dix caracteres tire d'un dictionnaire tombe en quelques
-            # heures — et la regle du projet n'exige QUE dix caracteres.
+            # passe court tire d'un dictionnaire tombe en quelques heures.
+            #
+            # LA REGLE DU PROJET A DURCI LE 18 SEPTEMBRE 2026 — douze
+            # caracteres, une minuscule, une majuscule, un chiffre, un
+            # caractere special (`api/regles/motdepasse.json`). Ce paragraphe
+            # disait « la regle n'exige QUE dix caracteres » : ce n'est plus
+            # vrai. Ca ne rend PAS cette limitation superflue, au contraire —
+            # une composition imposee rend les mots de passe plus previsibles
+            # a nombre de caracteres egal, et c'est la limitation des
+            # tentatives qui couvre ce que la regle ne couvre pas.
             #
             # Symfony pose deux compteurs : un par couple adresse+IP, un
             # global par IP (cinq fois plus large) qui attrape le balayage de

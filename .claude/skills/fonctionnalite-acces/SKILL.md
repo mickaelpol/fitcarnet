@@ -174,6 +174,25 @@ créer l'invitation. **Données de départ** : aucune.
    `api/regles/motdepasse.json`.
 6. **« Les deux ne sont pas identiques. »** n'apparaît qu'une fois la
    confirmation commencée (`:83`, `:131`).
+**DEUX GESTES D'ADMINISTRATION QUI TOUCHENT CETTE BOBINE, AJOUTÉS LE
+18 SEPTEMBRE 2026 :**
+
+- **« Renvoyer un lien »** — sur chaque invitation en attente ou périmée de
+  l'écran d'administration (`front/app/admin-utilisateurs.tsx`). C'est le geste
+  du « la personne a perdu son lien », et il se faisait auparavant à l'aveugle :
+  retrouver l'adresse, la retaper en haut de l'écran, et se tromper d'une lettre
+  créait une SECONDE invitation pour une adresse voisine. Aucune route nouvelle :
+  `POST /api/invitations` remplaçait déjà l'invitation en attente. L'ancien lien
+  meurt à l'instant, dans la même transaction.
+- **La purge** — `bin/console app:invitations:purger`, jouée à chaque démarrage
+  par `docker/entrypoint-prod.sh`. Rétention de **30 jours** pour les acceptées
+  et les périmées ; **sans délai** pour les **orphelines**, c'est-à-dire celles
+  dont le compte a été supprimé (`invitation.utilisateur_id` est en
+  `ON DELETE SET NULL`, la ligne restait « acceptée » et sans nom, pour
+  toujours). Une invitation **vivante n'est jamais purgée**, son lien est dehors.
+  Conséquence pour qui éprouve : **une invitation acceptée disparaît de la liste
+  au bout d'un mois**, et c'est normal — le COMPTE, lui, n'est pas touché.
+
 7. **`Créer mon compte`** → **`Création…`** → écran **« Ton compte est prêt »** :
    *« Connecte-toi avec `<adresse>` et le mot de passe que tu viens de
    choisir. »* et un bouton **`Se connecter`**. **Aucune connexion automatique**

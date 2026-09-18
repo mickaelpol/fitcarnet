@@ -150,6 +150,47 @@ final readonly class Comptes
      * et on les retire APRES le compte, dont les seances et les modeles les
      * citaient encore en RESTRICT.
      */
+    /**
+     * Note que le mot de passe de ce compte ne suit plus les regles — ou qu'il
+     * les suit de nouveau.
+     *
+     * EN SQL DIRECT, ET SURTOUT PAS PAR L'ENTITE. Relevé en revue le
+     * 19 septembre 2026, avant la publication de l'APK.
+     *
+     * Ce drapeau se pose a la CONNEXION, dans un ecouteur, juste avant que
+     * `JetonsRafraichissement::creer()` ne persiste le jeton de session — et
+     * les deux tenaient le MEME `EntityManager`. Un `flush()` qui echoue FERME
+     * l'EntityManager de Doctrine : le `catch` de l'ecouteur avalait bien
+     * l'exception, mais l'appel suivant tombait alors sur un EM ferme, sans
+     * personne pour le rattraper. Resultat : **500 sur `POST /api/connexion`**,
+     * c'est-a-dire plus de connexion du tout, pour un avertissement cosmetique.
+     * Il suffisait d'un verrou, d'une base momentanement indisponible ou d'un
+     * disque plein sur le NAS.
+     *
+     * Le commentaire de l'ecouteur affirmait justement que « ca ne peut pas
+     * faire echouer la connexion ». C'etait faux, et de la pire maniere : la
+     * precaution etait ecrite, pas prise.
+     *
+     * `executeStatement` ne passe pas par l'UnitOfWork : il ne peut donc rien
+     * fermer. Si l'UPDATE echoue, l'exception reste attrapable par l'appelant
+     * et la connexion continue.
+     *
+     * @return int le nombre de lignes touchees — zero si la valeur ne changeait pas
+     */
+    public function noterMotDePasseFaible(string $id, bool $faible): int
+    {
+        /* `AND mot_de_passe_faible IS DISTINCT FROM :f` : on n'ecrit QUE si la
+           reponse change. Une connexion par heure ne justifie pas un UPDATE a
+           chaque fois — et surtout, ecrire sans raison ferait de cette colonne
+           un journal de connexions, ce qu'elle n'est pas. C'est la base qui
+           tranche, plutot que l'appelant : elle a la valeur sous les yeux. */
+        return $this->cnx->executeStatement(
+            'UPDATE utilisateur SET mot_de_passe_faible = :f
+              WHERE id = :id AND mot_de_passe_faible IS DISTINCT FROM :f',
+            ['f' => $faible ? 'true' : 'false', 'id' => $id],
+        );
+    }
+
     public function supprimer(string $id): void
     {
         $this->cnx->transactional(function () use ($id): void {
