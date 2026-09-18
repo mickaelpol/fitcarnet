@@ -148,6 +148,7 @@ valeur.
 | [CALCULATEUR.md](CALCULATEUR.md) | le calculateur de repas : parcours et décisions |
 | [CLAUDE.md](CLAUDE.md) | les sept règles non négociables du projet |
 | [docs/audit-2026-09/](docs/audit-2026-09/README.md) | audit complet, 79 constats et leur plan de correction |
+| [docs/journal-2026-09.md](docs/journal-2026-09.md) | l'ancien journal de bord, archivé : l'histoire détaillée du 7 au 17 septembre 2026 |
 
 ---
 

@@ -30,7 +30,7 @@ au clavier d'un vrai téléphone. Toi, si.
    l'ancien code, le bundle d'erreur de 12 Ko, le clavier qui filtre la virgule.
 2. **Charge la skill `donnees-de-test`** : compte `…@test.local`, et l'ordre de
    suppression.
-3. Lis `CLAUDE.md` et la section « L'épreuve sur Android » de `REPRENDRE.md`.
+3. Lis `CLAUDE.md` et la section « L'épreuve sur Android » de `docs/journal-2026-09.md` (journal archivé).
 
 ## Tes règles
 
