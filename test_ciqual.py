@@ -21,6 +21,8 @@ de l'importer.
 """
 
 import ast
+import contextlib
+import io
 import os
 import re
 import sys
@@ -36,7 +38,10 @@ A_EXTRAIRE = {"sens_du_rendement", "rendement_par_energie",
               "valeurs_au_sec", "nombre", "coherent", "SEC_MINI", "SEC_MAXI",
               "ETAT_CUIT", "CORRESPONDANCE", "desaccords", "normaliser",
               "MOTS_DECISIFS", "valeurs_saisies_a_la_main", "SAISIE_MANUELLE",
-              "EXACTS", "CHAMPS_REQUIS"}
+              "EXACTS", "CHAMPS_REQUIS", "ecart_relatif", "ecart_a_signaler",
+              "entetes_de", "argument_de", "aliment_detiquette",
+              "ETIQUETTES", "GRAINS_SECS", "incoherences_des_tables",
+              "convertir_en_pese"}
 
 
 def noms_poses(noeud) -> set:
@@ -74,7 +79,11 @@ def fonctions_pures():
     if manquantes:
         sys.exit(f"Introuvables dans le script : {', '.join(sorted(manquantes))}")
 
-    espace = {"unicodedata": __import__("unicodedata"), "re": __import__("re")}
+    # `sys` est la parce que les refus du script passent tous par sys.exit :
+    # sans lui dans l'espace d'execution, une fonction qui refuse proprement
+    # leverait un NameError et le test croirait avoir trouve un bug.
+    espace = {"unicodedata": __import__("unicodedata"), "re": __import__("re"),
+              "sys": sys}
     exec("\n\n".join(morceaux), espace)  # noqa: S102 — code du depot, pas une entree
     return espace
 
@@ -112,6 +121,23 @@ def verifier(quoi, condition):
 
 def presque(a, b, marge=1e-9):
     return abs(a - b) <= marge
+
+
+def leve(appel, *args):
+    """
+    Ce que l'appel a leve, ou None s'il est alle au bout.
+
+    `BaseException` et non `Exception` : le script refuse par `sys.exit`, qui
+    leve un `SystemExit` — lequel n'herite PAS d'`Exception`. Un `except
+    Exception` laisserait le refus traverser et tuerait la batterie au milieu,
+    en donnant a croire que la fonction n'a rien refuse du tout.
+    """
+    try:
+        appel(*args)
+    except BaseException as ennui:       # noqa: BLE001 — c'est le sujet du test
+        return ennui
+
+    return None
 
 
 # -------------------------------- ce que le rendement ne peut PLUS faire
@@ -460,6 +486,241 @@ for indispensable in ("cat", "kcal100", "prot100", "gluc100", "lip100", "ratio",
 verifier("chaque champ a un libellé et un type",
          all(len(c) == 3 and all(isinstance(x, str) and x for x in c)
              for c in CHAMPS_REQUIS))
+
+
+# ------------------- constat 04#19 : ce qui plantait au milieu d'une ecriture
+#
+# CE QUE CES TESTS EMPECHENT, ET QUI EST ARRIVE. Le 18 septembre 2026, l'audit
+# a releve cinq endroits ou le script divisait ou convertissait sans garde.
+# Aucun n'est un cas tordu : tous se declenchent sur une donnee que l'outil
+# accepte ailleurs sans broncher.
+#
+# Le plus couteux est le deuxieme. `--appliquer` ecrit dans Grocy produit par
+# produit ; la conversion d'un champ illisible levait un `TypeError` non
+# rattrape, DONC en plein milieu de la boucle d'ecriture. Les vingt premiers
+# produits etaient deja convertis, les suivants non, et rien dans Grocy ne
+# disait lesquels. Une panne a mi-parcours est pire qu'un refus au depart :
+# elle laisse la base dans un etat que personne ne connait.
+
+ecart_relatif = BOITE["ecart_relatif"]
+ecart_a_signaler = BOITE["ecart_a_signaler"]
+entetes_de = BOITE["entetes_de"]
+argument_de = BOITE["argument_de"]
+aliment_detiquette = BOITE["aliment_detiquette"]
+
+# --------- 1. diviser par un rendement de zero
+
+verifier("l'ecart relatif ordinaire est inchange",
+         presque(ecart_relatif(2.26, 2), 0.13, 0.005))
+
+# `ratio` sort de CORRESPONDANCE, ecrite a la main. Une frappe a 0 y est aussi
+# facile qu'ailleurs, et elle faisait sauter TOUT l'import — pas seulement le
+# produit fautif.
+ecart_sur_zero = leve(ecart_relatif, 2.26, 0)
+verifier("un rendement de reference nul ne fait plus sauter l'import",
+         ecart_sur_zero is None)
+verifier("... l'ecart se declare inconnu plutot que faux",
+         ecart_sur_zero is None and ecart_relatif(2.26, 0) is None)
+
+# Et « inconnu » ne veut pas dire « rien a signaler » : un rendement de
+# reference a 0 n'est pas une reference, donc la correction se dit (regle 7,
+# un chiffre faux est pire qu'un refus de repondre).
+verifier("une correction reste signalee quand la reference ne vaut rien",
+         leve(ecart_a_signaler, 2.26, 0, 0.1) is None
+         and ecart_a_signaler(2.26, 0, 0.1) is True)
+verifier("un ecart sous la tolerance ne se signale pas",
+         ecart_a_signaler(2.26, 2.25, 0.1) is False)
+verifier("un ecart au-dessus, si",
+         ecart_a_signaler(4.68, 2.26, 0.1) is True)
+
+# --------- 2. la conversion qui plantait apres coup
+
+# `nombre("n/a")` rend None, et `None * ratio` est un TypeError. Les champs de
+# Grocy sont de la saisie libre : « n/a », « ? », « voir paquet » y passent.
+CUIT_ILLISIBLE = {"kcal100": "99", "gluc100": "n/a", "prot100": "2.4"}
+ennui = leve(valeurs_au_sec, CUIT_ILLISIBLE, 3.53)
+
+verifier("une valeur illisible ne casse plus la conversion en plein vol",
+         not isinstance(ennui, TypeError))
+verifier("... elle est refusee, et le refus nomme le champ fautif",
+         isinstance(ennui, ValueError) and "gluc100" in str(ennui))
+verifier("... et la valeur illisible elle-meme, pour qu'on sache quoi corriger",
+         isinstance(ennui, ValueError) and "n/a" in str(ennui))
+
+# Refuser le PRODUIT, pas seulement le champ : convertir les kcal en laissant
+# les glucides tels quels ecrirait un produit dont les valeurs ne se
+# rapportent plus au meme etat. Rien ne sort de la fonction.
+verifier("aucune valeur a demi convertie ne sort de la conversion",
+         isinstance(ennui, ValueError))
+
+# ET SURTOUT : la boucle d'ecriture va jusqu'au bout. C'est tout l'enjeu du
+# constat — le TypeError partait en plein `--appliquer`, donc apres que les
+# produits precedents etaient deja ecrits dans Grocy, et personne ne savait
+# lesquels. Le mauvais produit se paie desormais d'une ligne de rapport, et
+# ceux qui le suivent sont convertis comme si de rien n'etait.
+#
+# `api` est remplace dans l'espace d'execution : les fonctions extraites y
+# cherchent leurs globales a l'appel, donc aucune requete ne part. La
+# batterie n'a jamais besoin d'un Grocy qui tourne.
+convertir_en_pese = BOITE["convertir_en_pese"]
+
+PRODUITS_GROCY = [
+    {"id": 1, "name": "Riz basmati",
+     "userfields": {"cat": "fec", "kcal100": "99", "gluc100": "22",
+                    "ratio": "3.53"}},
+    {"id": 2, "name": "Semoule complete",
+     "userfields": {"cat": "fec", "kcal100": "142", "gluc100": "n/a",
+                    "ratio": "2.46"}},
+    {"id": 3, "name": "Boulgour",
+     "userfields": {"cat": "fec", "kcal100": "140", "gluc100": "25",
+                    "ratio": "2.5"}},
+]
+ECRITURES = []
+
+
+def faux_api(methode, chemin, corps=None):
+    if methode == "GET":
+        return PRODUITS_GROCY
+    ECRITURES.append((chemin, corps))
+
+    return {}
+
+
+BOITE["api"] = faux_api
+RAPPORT = io.StringIO()
+with contextlib.redirect_stdout(RAPPORT):
+    convertir_en_pese(True)
+RAPPORT = RAPPORT.getvalue()
+
+verifier("le produit illisible n'est pas ecrit",
+         not any("/2" in chemin for chemin, _ in ECRITURES))
+verifier("celui d'AVANT l'est, et celui d'APRES aussi : la boucle continue",
+         [chemin for chemin, _ in ECRITURES]
+         == ["/userfields/products/1", "/userfields/products/3"])
+verifier("le rapport nomme le produit refuse",
+         "Semoule complete" in RAPPORT)
+verifier("... et dit quel champ le rend illisible",
+         "gluc100" in RAPPORT and "n/a" in RAPPORT)
+verifier("... et previent qu'il n'a pas ete converti a moitie",
+         "demi converti" in RAPPORT)
+
+# --------- 3. un classeur vide
+
+classeur_vide = leve(entetes_de, iter([]), "Table_Ciqual_2025.xlsx")
+verifier("un classeur vide ne remonte plus un StopIteration nu",
+         not isinstance(classeur_vide, StopIteration))
+verifier("... il est refuse comme les autres erreurs de lecture, par un message",
+         isinstance(classeur_vide, SystemExit))
+verifier("... qui nomme le fichier qu'on vient de lui donner",
+         isinstance(classeur_vide, SystemExit)
+         and "Table_Ciqual_2025.xlsx" in str(classeur_vide))
+verifier("un classeur normal donne bien ses en-tetes normalisees",
+         entetes_de(iter([("Alim NOM fr", "Énergie, Règlement UE")]), "x")
+         == ["alim nom fr", "energie reglement ue"])
+
+# --------- 4. « --chercher » sans terme
+
+sans_terme = leve(argument_de, ["ciqual.py", "Table.xlsx", "--chercher"],
+                  "--chercher")
+verifier("« --chercher » en dernier mot ne remonte plus un IndexError",
+         not isinstance(sans_terme, IndexError))
+verifier("... le script dit quelle option attend quoi",
+         isinstance(sans_terme, SystemExit) and "--chercher" in str(sans_terme))
+
+# « --chercher --appliquer » prenait « --appliquer » pour un terme de
+# recherche et listait les libelles contenant « appliquer » : aucun. Le
+# script repondait « rien trouve » a une question qu'il n'avait pas comprise.
+suivi_dune_option = leve(argument_de, ["ciqual.py", "--chercher", "--appliquer"],
+                         "--chercher")
+verifier("une option qui en suit une autre n'est pas prise pour un terme",
+         isinstance(suivi_dune_option, SystemExit))
+verifier("un terme normal passe sans encombre",
+         argument_de(["ciqual.py", "--chercher", "amande"], "--chercher")
+         == "amande")
+
+# --------- 5. les fibres d'une etiquette : inconnues, pas nulles
+
+# Regle 6 du projet, vide n'est pas zero. Le reste du fichier la tient — a
+# l'ecriture, des fibres absentes de Ciqual s'ecrivent en chaine vide — mais
+# le chemin des etiquettes posait `0` en dur. Un skyr annonce a 0 g de fibres
+# est une affirmation ; l'emballage Milbona, lui, n'en dit rien.
+ETIQUETTES = BOITE["ETIQUETTES"]
+SKYR = aliment_detiquette(ETIQUETTES["skyr"])
+
+verifier("les fibres d'une etiquette qui n'en parle pas restent inconnues",
+         SKYR["fibres"] is None)
+verifier("le reste de l'etiquette est repris tel quel",
+         SKYR["kcal"] == 54 and SKYR["prot"] == 9.4 and SKYR["gluc"] == 4.0)
+verifier("un lipide a 0 sur l'emballage reste un vrai zero, lui",
+         SKYR["lip"] == 0)
+verifier("la source figure dans le nom, c'est ce que le rapport affiche",
+         "Milbona" in SKYR["nom"])
+
+# --------- le code mort releve par le meme constat
+
+# « skyr » figurait DEUX fois : dans ETIQUETTES et dans CORRESPONDANCE. La
+# seconde n'a jamais pu servir — l'etiquette est consultee avant, et gagne
+# toujours. Deux lignes qui se contredisent, dont une inatteignable : le jour
+# ou l'on corrige la mauvaise, rien ne change et on cherche ailleurs.
+for motif in CORRESPONDANCE:
+    ombre = next((e for e in ETIQUETTES if all(m in motif for m in e.split())),
+                 None)
+    verifier(f"« {motif} » n'est pas deja intercepte par une etiquette",
+             ombre is None)
+
+# `chercher(aliments, motifs, tolerer_pieges=True)` n'a jamais ete appele nulle
+# part, et c'est heureux : son seul effet aurait ete de PREFERER les libelles
+# pieges — « Dragée amande » plutot que « Amande » — soit l'inverse de ce que
+# la fonction promet. Un drapeau qu'on ne peut que regretter d'activer.
+signature = next(n.args for n in ARBRE.body
+                 if isinstance(n, ast.FunctionDef) and n.name == "chercher")
+verifier("`chercher` n'expose plus de drapeau que personne ne passe",
+         [a.arg for a in signature.args] == ["aliments", "motifs"])
+
+# GRAINS_SECS, lui, n'etait pas du code mort mais une promesse non tenue : son
+# commentaire annonce « le script refuse de demarrer plutot que de le faire »,
+# et la constante n'etait lue nulle part. Le seul controle existant etait
+# PAR PRODUIT, donc muet tant qu'aucun produit Grocy ne tombait dessus — une
+# table fautive pouvait dormir des mois. Le garde-fou existe depuis le
+# 18 septembre 2026 (constat 04#19) et se declenche au demarrage.
+GRAINS_SECS = BOITE["GRAINS_SECS"]
+incoherences_des_tables = BOITE["incoherences_des_tables"]
+
+verifier("les tables du depot, elles, sont coherentes",
+         incoherences_des_tables(GRAINS_SECS, CORRESPONDANCE) == [])
+
+# Le degat qu'il empeche : epinard 1 -> 1.70, soit 119 g a peser pour en
+# servir 200 g quand il en faut 500 a 700. Facteur cinq, dans le mauvais sens.
+legume_derivé = incoherences_des_tables({"epinard"}, CORRESPONDANCE)
+verifier("un legume glisse dans ETAT_CUIT arrete le script",
+         len(legume_derivé) == 1)
+verifier("... et le refus nomme le coupable et sa categorie",
+         legume_derivé and "epinard" in legume_derivé[0]
+         and "leg" in legume_derivé[0])
+
+verifier("un grain qui n'a aucune correspondance arrete le script aussi",
+         len(incoherences_des_tables({"sarrasin"}, CORRESPONDANCE)) == 1)
+
+# L'autre moitie du constat : un rendement a 0 dans CORRESPONDANCE. Il ne fait
+# plus sauter l'import — `ecart_relatif` s'en garde — mais il serait ECRIT
+# dans Grocy, ou il signifie « 100 g de sec donnent 0 g de cuit ». On refuse
+# de demarrer plutot que d'ecrire ca.
+for rendement in (0, -2, None, "deux"):
+    fautes = incoherences_des_tables(set(), {"riz": ("riz, cru", "fec", rendement)})
+    verifier(f"un rendement « {rendement} » dans la table arrete le script",
+             len(fautes) == 1 and "riz" in fautes[0])
+
+verifier("un rendement de 1 reste parfaitement legitime",
+         incoherences_des_tables(set(), {"lait": ("lait", "lait", 1)}) == [])
+
+# Un garde-fou qu'on n'appelle pas est un commentaire : c'est precisement ce
+# qui est arrive a GRAINS_SECS pendant des mois.
+corps_de_main = next(n for n in ARBRE.body
+                     if isinstance(n, ast.FunctionDef) and n.name == "main")
+verifier("le garde-fou est bien appele au demarrage, pas seulement ecrit",
+         any(isinstance(n, ast.Call) and getattr(n.func, "id", "")
+             == "incoherences_des_tables"
+             for n in ast.walk(corps_de_main)))
 
 
 if __name__ == "__main__":

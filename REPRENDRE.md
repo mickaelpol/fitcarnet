@@ -25,7 +25,7 @@ d'une ligne de code, pas ce qui reste à faire.
   `test_import_carnet.py`.
 - **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
   puis deux passes des trois agents de contrôle et leurs correctifs.
-- **Audit de septembre** : 79 constats, **72 clos, 7 ouverts**, aucun
+- **Audit de septembre** : 79 constats, **73 clos, 6 ouverts**, aucun
   critique ni élevé (section 2.4).
 
 ---
@@ -174,7 +174,7 @@ l'instance filmée. Sur la base de dev **du premier poste**, deux comptes
 jetables servent aux captures (`demo-verif@test.local`,
 `demo-admin-verif@test.local`) : les retirer une fois les captures refaites.
 
-### 2.4 Les 7 constats d'audit ouverts
+### 2.4 Les 6 constats d'audit ouverts
 
 Vérifiés un par un le 17 septembre 2026. Aucun critique, aucun élevé. La
 preuve de chacun (fichier et ligne) est dans
@@ -190,14 +190,13 @@ infrastructure, `03` = front, `04` = tests et qualité).
 | **02#15** — `compose.dev.yml` publie `5432:5432` | faible | le port sert : `import_carnet.py` et `import_catalogue.py` visent `localhost:5432` |
 | **02#17** — aucune purge des invitations expirées | faible | la réinvitation n'est plus bloquée ; reste à décider si l'on purge |
 
-**Quatre n'ont jamais été tranchés :**
+**Trois n'ont jamais été tranchés :**
 
 | Constat | Gravité | En une phrase |
 |---|---|---|
 | **03 M5** | moyenne | Sur le web, les jetons de session sont en clair dans `localStorage` (`front/src/api/client.ts`). |
 | **03 M12** | moyenne | La saisie d'un inventaire en cours est perdue au changement d'onglet. |
 | **03 M13** | moyenne | `noUncheckedIndexedAccess` est désactivé dans `front/tsconfig.json`. |
-| **04#19** | faible | Divisions et conversions non gardées dans `ciqual_vers_grocy.py`. |
 
 Pour les reprendre : un constat, un test rouge, un correctif, un commit ; puis
 mettre à jour son statut dans le rapport et dans le README de l'audit.

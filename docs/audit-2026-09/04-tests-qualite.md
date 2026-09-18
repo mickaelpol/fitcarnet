@@ -376,8 +376,37 @@ Les usages diffèrent (clé d'habitude vs filtre de recherche) et aucun ne fauss
 
 ---
 
-### 19. OUVERT — **Divisions et conversions non gardées dans `ciqual_vers_grocy.py`, au milieu d'une phase d'écriture**
-**Gravité : FAIBLE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : les cinq points sont toujours là, aux lignes d'aujourd'hui `ciqual_vers_grocy.py:914`, `:944`, `:729-731`, `:348` et `:818` — et les fibres écrites à `0` en dur, `:859`.
+### 19. CLOS — **Divisions et conversions non gardées dans `ciqual_vers_grocy.py`, au milieu d'une phase d'écriture**
+**Gravité : FAIBLE — Statut : CORRIGÉ LE 18 SEPTEMBRE 2026**, les cinq points
+et les trois remarques qui suivaient. 181 vérifications au départ, **271** à
+l'arrivée.
+
+Le plus grave était le deuxième : une valeur illisible faisait `None * ratio`,
+donc un `TypeError` non rattrapé **en plein `--appliquer`**, après que des
+écritures étaient déjà parties vers Grocy. Le produit fautif est maintenant
+refusé et nommé — champ et valeur — et la boucle continue. La preuve a été
+faite par mutation : remettre une minute la ligne d'origine reproduit le
+`TypeError` au milieu de la boucle d'écriture.
+
+Les fibres d'une étiquette qui n'en parle pas valent `None` et non `0` : règle 6
+du projet, inconnu n'est pas zéro. Le `0` des lipides du skyr, lui, reste un
+vrai zéro lu sur l'emballage, et une vérification le fige exprès.
+
+`GRAINS_SECS` **sert enfin** à ce que son commentaire promettait :
+`incoherences_des_tables()` refuse au démarrage un rendement nul, négatif ou
+absent — sans quoi un ratio à 0 serait écrit dans Grocy, où il dit que 100 g de
+sec donnent 0 g de cuit. Un test AST exige que ce garde-fou soit réellement
+appelé dans `main()`, pour que l'histoire ne se répète pas. `tolerer_pieges`,
+jamais passé à `True`, est supprimé ; la clé `"skyr"` de `CORRESPONDANCE`,
+inatteignable car interceptée plus tôt par `ETIQUETTES`, aussi — et le test qui
+la remplace est général : **aucune** clé ne doit être déjà interceptée.
+
+**Non éprouvé** : `test_ecriture_grocy.py` ne se lance pas ici (il écrit vers
+Grocy). Vérification statique faite à sa place — aucun produit « skyr » dans son
+faux Grocy, toutes ses valeurs numériques, pas de `--chercher`, classeur non
+vide, et les tables réelles passent le nouveau garde-fou.
+
+Ce qui suit est l'état d'avant.
 `ciqual_vers_grocy.py:992`, `:1022`, `:849`, `:349`, `:895` à l'audit
 
 - `:992` et `:1022` — `abs(calcule - ratio) / ratio`, `ratio` venant directement de la table `CORRESPONDANCE` (`:206-273`), sans garde. Une entrée à `0` fait planter tout l'import ;

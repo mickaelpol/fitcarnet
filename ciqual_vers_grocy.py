@@ -221,7 +221,13 @@ CORRESPONDANCE = {
     "fraise":               ("fraise, crue",                "fruit", 1),
     "oeufs entiers":        ("oeuf, cru",                   "prot", 1),
     "blancs d oeufs":       ("blanc d'oeuf, cru",           "prot", 1),
-    "skyr":                 ("skyr",                        "lait", 1),
+    # (« skyr » vivait ici, et n'a jamais pu servir : ETIQUETTES est consulte
+    #  AVANT cette table et l'intercepte a tous les coups. Retire le
+    #  18 septembre 2026, constat 04#19 — deux lignes qui decrivent le meme
+    #  produit, dont une inatteignable, c'est la garantie de corriger un jour
+    #  celle qui ne sert a rien et de chercher ailleurs pourquoi rien ne
+    #  change. Les valeurs du skyr viennent de l'emballage Milbona, et Ciqual
+    #  n'a de toute facon aucune entree « skyr ».)
     "banane":               ("banane, crue",                "fruit", 1),
     "amandes":              ("amande",                      "ole",  1),
     "patate douce":         ("patate douce, crue",          "fec",  1),
@@ -315,8 +321,34 @@ def nombre(valeur):
 
 
 def ecart_relatif(valeur, reference):
-    """De combien `valeur` s'ecarte de `reference`, en proportion."""
+    """
+    De combien `valeur` s'ecarte de `reference`, en proportion. None si la
+    reference ne vaut rien : on ne compare pas a zero.
+
+    Cette expression etait ecrite deux fois en clair, `abs(calcule - ratio) /
+    ratio`, et `ratio` sort de CORRESPONDANCE, une table tenue a la main. Une
+    frappe a 0 dans cette table faisait sauter TOUT l'import sur une
+    ZeroDivisionError, pas seulement le produit fautif. Releve le
+    18 septembre 2026 (constat 04#19).
+    """
+    if not reference:
+        return None
+
     return abs(valeur - reference) / reference
+
+
+def ecart_a_signaler(valeur, reference, tolerance: float) -> bool:
+    """
+    `valeur` s'ecarte-t-elle de `reference` au point qu'il faille le dire.
+
+    Une reference a zero n'est pas une reference : on ne sait pas de combien
+    on s'en ecarte, donc on le SIGNALE. Se taire reviendrait a laisser passer
+    pour « conforme » un rendement dont on ignore tout — regle 7, un chiffre
+    faux est pire qu'un refus de repondre.
+    """
+    ecart = ecart_relatif(valeur, reference)
+
+    return ecart is None or ecart > tolerance
 
 
 def api(methode, chemin, corps=None):
@@ -336,16 +368,62 @@ def api(methode, chemin, corps=None):
         sys.exit(f"Grocy est injoignable : {e.reason}")
 
 
-# ------------------------------------------------------------ lecture Ciqual
+def aliment_detiquette(entree) -> dict:
+    """
+    Une ligne d'ETIQUETTES, presentee comme un aliment Ciqual.
 
-def entetes_de(lignes, chemin: str) -> list:
-    """La premiere ligne du classeur, normalisee, qui nomme les colonnes."""
-    return [normaliser(c) for c in next(lignes)]
+    LES FIBRES SONT A None, ET CE N'EST PAS UN OUBLI. Ce chemin ecrivait
+    `"fibres": 0` en dur, c'est-a-dire l'affirmation « ce produit n'a aucune
+    fibre » — alors qu'une etiquette qui n'en parle pas ne dit rien du tout.
+    Regle 6 : vide n'est pas zero. L'ecriture plus bas traduit ce None en
+    chaine vide, exactement comme pour une valeur absente de Ciqual.
+    Releve le 18 septembre 2026 (constat 04#19).
+    """
+    _categorie, kcal, prot, gluc, lip, _ratio, source = entree
+
+    return {"nom": f"({source})", "kcal": kcal, "prot": prot,
+            "gluc": gluc, "lip": lip, "fibres": None}
 
 
 def argument_de(argv, option: str) -> str:
-    """Le mot qui suit `option` sur la ligne de commande."""
-    return argv[argv.index(option) + 1]
+    """
+    Le mot qui suit `option` sur la ligne de commande.
+
+    Deux facons de se tromper, toutes deux silencieuses avant le
+    18 septembre 2026 (constat 04#19) : l'option en dernier mot levait un
+    IndexError nu, et une option qui en suivait une autre —
+    « --chercher --appliquer » — passait pour un terme de recherche. Le script
+    repondait alors « aucun libelle » a une question qu'il n'avait pas
+    comprise. Un refus explicite vaut mieux qu'une reponse a cote.
+    """
+    suivant = argv.index(option) + 1
+    if suivant >= len(argv) or argv[suivant].startswith("--"):
+        sys.exit(f"« {option} » attend un mot juste apres lui.\n"
+                 f"  Exemple :  python3 ciqual_vers_grocy.py Table.xlsx "
+                 f"{option} « amande »")
+
+    return argv[suivant]
+
+
+# ------------------------------------------------------------ lecture Ciqual
+
+def entetes_de(lignes, chemin: str) -> list:
+    """
+    La premiere ligne du classeur, normalisee, qui nomme les colonnes.
+
+    Le `next(lignes)` etait nu : un classeur vide — un telechargement de zero
+    octet, une feuille effacee — remontait un StopIteration et sa trace
+    Python, seul accident de lecture du script a ne pas etre messagee.
+    Releve le 18 septembre 2026 (constat 04#19).
+    """
+    premiere = next(lignes, None)
+    if premiere is None:
+        sys.exit(f"Le classeur {chemin} ne contient aucune ligne.\n"
+                 "Attendu : la table Ciqual au format EXCEL, dont la premiere\n"
+                 "ligne nomme les colonnes. Retelecharge-la depuis\n"
+                 "  https://ciqual.anses.fr/#/cms/download/node/20")
+
+    return [normaliser(c) for c in premiere]
 
 
 def lire_ciqual(chemin):
@@ -425,7 +503,7 @@ PIEGES = (
 )
 
 
-def chercher(aliments, motifs: str, tolerer_pieges: bool = False):
+def chercher(aliments, motifs: str):
     """
     Le meilleur libellé Ciqual pour ces mots-clés.
 
@@ -437,6 +515,12 @@ def chercher(aliments, motifs: str, tolerer_pieges: bool = False):
 
     Un aliment sans énergie est écarté : Ciqual laisse des trous, et une
     valeur à zéro fausserait tout un repas.
+
+    (Un drapeau `tolerer_pieges` trainait ici, jamais passe a True par aucun
+     appelant. Retire le 18 septembre 2026, constat 04#19 : son seul effet
+     aurait ete de PREFERER « Dragée amande » a « Amande », soit l'inverse de
+     ce que la fonction promet. Le repli quand aucun candidat ne survit au
+     filtre existe deja plus bas, et ne demande aucun drapeau.)
     """
     mots = normaliser(motifs).split()
     if not mots:
@@ -445,12 +529,11 @@ def chercher(aliments, motifs: str, tolerer_pieges: bool = False):
     candidats = [a for a in aliments if all(m in a["cle"] for m in mots)]
     candidats = [a for a in candidats if a["kcal"] and a["kcal"] > 0]
 
-    if not tolerer_pieges:
-        propres = [a for a in candidats
-                   if not any(p in a["cle"] for p in PIEGES
-                              if p not in normaliser(motifs))]
-        if propres:
-            candidats = propres
+    propres = [a for a in candidats
+               if not any(p in a["cle"] for p in PIEGES
+                          if p not in normaliser(motifs))]
+    if propres:
+        candidats = propres
 
     if not candidats:
         return None
@@ -734,6 +817,20 @@ def valeurs_au_sec(champs, ratio) -> dict:
     zero en passant par ici, sans quoi la conversion INVENTERAIT une fibre a
     0 g sur un produit dont on ignore les fibres.
 
+    UN CHAMP ILLISIBLE, LUI, FAIT REFUSER LE PRODUIT ENTIER. Les champs de
+    Grocy sont de la saisie libre : « n/a », « ? », « voir paquet » y entrent
+    sans broncher. `nombre("n/a")` rend None, et `None * ratio` levait un
+    TypeError que personne ne rattrapait — en plein `--appliquer`, donc APRES
+    que les produits precedents etaient deja convertis dans Grocy. Une panne a
+    mi-parcours laisse la base dans un etat que personne ne connait ; on
+    refuse donc avant d'ecrire quoi que ce soit, et `convertir_en_pese` liste
+    le produit au lieu de s'arreter. Releve le 18 septembre 2026
+    (constat 04#19).
+
+    Le refus porte sur le PRODUIT et pas sur le seul champ : convertir les
+    kcal en laissant les glucides tels quels ecrirait un produit dont les
+    valeurs ne decrivent plus le meme etat.
+
     Sortie de `convertir_en_pese` le 17 septembre 2026. Enfouie dans une
     fonction qui interroge Grocy en HTTP, la seule formule qui relie l'etat
     cuit a l'etat sec n'etait eprouvable nulle part.
@@ -743,7 +840,11 @@ def valeurs_au_sec(champs, ratio) -> dict:
         valeur = champs.get(champ)
         if valeur is None or str(valeur).strip() == "":
             continue          # « inconnu » ne devient pas zero
-        converties[champ] = round(nombre(valeur) * ratio, 2)
+        brute = nombre(valeur)
+        if brute is None:
+            raise ValueError(
+                f"le champ {champ} porte « {valeur} », qui n'est pas un nombre")
+        converties[champ] = round(brute * ratio, 2)
 
     return converties
 
@@ -769,7 +870,7 @@ def convertir_en_pese(appliquer: bool) -> int:
     l'air d'avoir ete verifiee. On les laisse et on les liste.
     """
     produits = api("GET", "/objects/products")
-    convertis, laisses = [], []
+    convertis, laisses, illisibles = [], [], []
 
     for produit in produits:
         champs = produit.get("userfields") or {}
@@ -788,7 +889,14 @@ def convertir_en_pese(appliquer: bool) -> int:
             laisses.append((produit["name"], kcal, ratio, vise))
             continue
 
-        nouveaux = valeurs_au_sec(champs, ratio)
+        # Ce try est tout l'interet du refus : un champ illisible coute UN
+        # produit, nomme et liste, au lieu d'interrompre la boucle d'ecriture
+        # au vingtieme produit sur cinquante.
+        try:
+            nouveaux = valeurs_au_sec(champs, ratio)
+        except ValueError as illisible:
+            illisibles.append((produit["name"], str(illisible)))
+            continue
 
         convertis.append((produit["name"], kcal, nouveaux.get("kcal100"), ratio))
         if appliquer:
@@ -813,13 +921,72 @@ def convertir_en_pese(appliquer: bool) -> int:
         print("  leurs valeurs etaient deja fausses avant. Recopie la ligne du")
         print("  paquet dans « mon frigo », c'est la seule source fiable.")
 
+    if illisibles:
+        print(f"\n{len(illisibles)} produit(s) REFUSE(S), valeur illisible :")
+        for nom, raison in illisibles:
+            print(f"  ! {nom[:30]:32} {raison}")
+        print("  Rien n'a ete converti pour eux, pas meme les champs lisibles :")
+        print("  un produit a demi converti melangerait deux etats. Corrige la")
+        print("  valeur dans Grocy et relance.")
+
     if not appliquer and convertis:
         print("\nRien n'a ete ecrit. Relance avec --appliquer.")
 
     return 0
 
 
+def incoherences_des_tables(grains_secs, correspondance) -> list:
+    """
+    Ce qui, dans les tables ecrites a la main, interdit de demarrer.
+
+    LE GARDE-FOU QUE GRAINS_SECS ANNONCAIT SANS L'ETRE. Son commentaire disait
+    « le script refuse de demarrer plutot que de le faire », et la constante
+    n'etait lue nulle part : le seul controle existant etait PAR PRODUIT, donc
+    muet tant qu'aucun produit Grocy ne tombait dessus. Une table fautive
+    pouvait dormir des mois. Ecrit le 18 septembre 2026 (constat 04#19).
+
+    Deux fautes, toutes deux invisibles a la relecture :
+
+      - un aliment dans ETAT_CUIT qui n'est pas un grain sec. On lui derive
+        alors un rendement par l'energie, ce qui ne vaut que pour un grain :
+        la version d'avant y avait mis les legumes et sortait epinard 1 ->
+        1,70, soit 119 g a peser pour en servir 200 quand il en faut 500 a
+        700 ;
+      - un rendement absent, nul ou negatif dans CORRESPONDANCE. Il ne fait
+        plus sauter l'import — `ecart_relatif` s'en garde — mais il serait
+        ECRIT dans Grocy, ou « 0 » signifie que 100 g de sec donnent 0 g de
+        cuit. Regle 7 : on refuse plutot que d'ecrire un chiffre faux.
+    """
+    fautes = []
+
+    for grain in sorted(grains_secs):
+        entree = correspondance.get(grain)
+        if entree is None:
+            fautes.append(f"« {grain} » derive son rendement de l'energie mais "
+                          "n'a aucune correspondance Ciqual")
+        elif entree[1] != "fec":
+            fautes.append(f"« {grain} » derive son rendement de l'energie alors "
+                          f"qu'il est de categorie « {entree[1]} » : cette "
+                          "derivation ne vaut que pour un grain sec")
+
+    for produit, (_motifs, _categorie, rendement) in sorted(correspondance.items()):
+        if not isinstance(rendement, (int, float)) or isinstance(rendement, bool) \
+                or rendement <= 0:
+            fautes.append(f"« {produit} » porte un rendement « {rendement} » : "
+                          "il faut un nombre strictement positif")
+
+    return fautes
+
+
 def main() -> int:
+    # Les tables du haut de ce fichier s'ecrivent a la main. On les relit avant
+    # de toucher a quoi que ce soit : une faute dedans se paie en valeurs
+    # ecrites dans Grocy, pas en trace Python.
+    fautes = incoherences_des_tables(GRAINS_SECS, CORRESPONDANCE)
+    if fautes:
+        sys.exit("Les tables de correspondance se contredisent :\n"
+                 + "\n".join(f"  - {faute}" for faute in fautes))
+
     # --convertir-en-pese : le passage unique d'apres la refonte. Ne lit pas
     # Ciqual : il ne fait que multiplier les valeurs de Grocy par leur propre
     # rendement.
@@ -868,10 +1035,9 @@ def main() -> int:
         # une valeur relevée sur l'emballage prime sur tout
         etiquette = next((m for m in ETIQUETTES if all(x in cle for x in m.split())), None)
         if etiquette is not None:
-            categorie, kcal, prot, gluc, lip, ratio, source = ETIQUETTES[etiquette]
+            categorie, _kcal, _prot, _gluc, _lip, ratio, source = ETIQUETTES[etiquette]
             depuis_etiquette.append((produit["name"], source))
-            trouves.append((produit, {"nom": f"({source})", "kcal": kcal, "prot": prot,
-                                      "gluc": gluc, "lip": lip, "fibres": 0},
+            trouves.append((produit, aliment_detiquette(ETIQUETTES[etiquette]),
                             categorie, ratio, True))
             continue
 
@@ -901,12 +1067,12 @@ def main() -> int:
 
         # ratio dérivé de Ciqual quand les deux états sont connus — et
         # seulement pour un GRAIN SEC, seul cas où l'énergie se conserve.
-        if categorie != "fec" and motif_produit in ETAT_CUIT:
-            sys.exit(
-                f"« {motif_produit} » figure dans ETAT_CUIT mais n'est pas un\n"
-                "féculent. La dérivation du rendement par l'énergie ne vaut que\n"
-                "pour un grain sec : un légume perd ses sucres dans l'eau de\n"
-                "cuisson, et le calcul rend une portion cinq fois trop petite.")
+        # (Le controle « ETAT_CUIT ne contient que des feculents » vivait ici,
+        #  produit par produit. Il est remonte au demarrage le 18 septembre
+        #  2026, dans `incoherences_des_tables` : ici, il ne se declenchait que
+        #  si un produit Grocy tombait justement sur la ligne fautive, et
+        #  restait muet le reste du temps. Un garde-fou qui depend des donnees
+        #  qu'on lui soumet n'en est pas un.)
 
         if motif_produit in ETAT_CUIT:
             # Une entree cuite prise pour de la matiere seche ecrit deux valeurs
@@ -926,7 +1092,7 @@ def main() -> int:
                 # derivation a contresens vient d'un mauvais appariement de
                 # l'entree cuite, pas d'une cuisson exotique.
                 if rendement_derive_credible(categorie, calcule):
-                    if ecart_relatif(calcule, ratio) > 0.1:
+                    if ecart_a_signaler(calcule, ratio, 0.1):
                         ratios_corriges.append(
                             (produit["name"], ratio, calcule, cuit["nom"]))
                     ratio = calcule
@@ -956,7 +1122,7 @@ def main() -> int:
                 pesees_ecartees.append(
                     (produit["name"], mesure, ratio, pesees, contresens))
             else:
-                if ecart_relatif(mesure, ratio) > 0.02:
+                if ecart_a_signaler(mesure, ratio, 0.02):
                     ratios_mesures.append((produit["name"], ratio, mesure, pesees))
                 ratio = mesure
 

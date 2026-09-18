@@ -14,7 +14,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 72 constats clos, 7 ouverts** — vérifiés un par un
+> **Au 18 septembre 2026 : 73 constats clos, 6 ouverts** — vérifiés un par un
 > dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 18
 > sont 12 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
 > 17 ; 03 — 8 sur 33 ; 04 — 4 sur 17. **Trois sont à trancher** (02#13,
@@ -292,7 +292,7 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **5 — scripts dangereux** | ✅ | É4, `sauvegarde.sh` (É9 fait le 8 sept.) |
 | **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → **1 295** lignes · `composer.ts` **830** → 135 (817 au commit de l'audit, 830 après le correctif É12 du même soir, 827 au premier rang du lot) · `cuisson.ts` **611** → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
 | **7 — tests manquants** | ✅ | `client.ts` : 22 témoins à la clôture, chacun prouvé par une **mutation** qui le tue (29 mutations au banc) ; **28** au 17 septembre 2026 (`it(` dans `client.test.ts`), dont ceux du délai de garde `fetchAvecDelai`. `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
-| **8 — le reste** | ◐ | Les onze du front et les neuf de sécurité sont faits ; 02#14, 02#18 et 02#19 aussi. **Restent ouverts** 02#13, 02#15, 02#17 (à trancher), 04#14, 04#15, 04#19, et la permission `RECORD_AUDIO` en double (M8) que le plan y rangeait. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
+| **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits ; 02#14, 02#18 et 02#19 aussi. **04#14, 04#15, 04#19 et M8 sont clos le 18 septembre 2026** ; restent 02#13, 02#15 et 02#17, qui attendent un arbitrage. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
 Tests au 15 septembre, au terme du chantier : **600 front** (577 + 23 de rendu, en deux passes) · **252 API · 661 assertions · 7 erreurs PHPStan**
 (aucune sur les fichiers corrigés). Au 17 septembre 2026 en fin de journée : **639 front** (606 + 33 de
@@ -339,7 +339,6 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 | **02#8** — sauvegardes sur le même volume que la base | moyenne | **consigné** le 18 septembre dans `DEPLOIEMENT.md` ; l'action reste à faire sur le NAS (tâche DSM), hors dépôt |
 | **03 M5** — jetons en clair dans `localStorage` sur le web | moyenne | `front/src/api/client.ts:64-93` |
 | **03 M13** — `noUncheckedIndexedAccess` désactivé | moyenne | `front/tsconfig.json:5` |
-| **04#19** — divisions et conversions non gardées dans `ciqual_vers_grocy.py` | faible | `:914`, `:944`, `:729-731`, `:348`, `:818` |
 
 Une refonte vers l'architecture hexagonale est un objectif assumé, **non commencée**. Voir la
 section « Skills » de `CLAUDE.md` : elle ne doit jamais se mélanger à une correction de bug.
