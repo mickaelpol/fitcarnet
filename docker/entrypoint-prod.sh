@@ -174,10 +174,18 @@ ok "chauffé"
 # conséquence est une ligne de plus à l'écran.
 #
 # APRÈS le cache, parce que la commande a besoin d'un conteneur de services
-# chauffé. ET SANS POUVOIR EMPÊCHER LE DÉMARRAGE : `|| true`. Un ménage qui
-# échoue — base lente, colonne inattendue — est un désagrément ; refuser de
-# démarrer l'application pour cette raison serait une panne. Le journal garde
-# la trace, `docker logs fitcarnet-app` la montre.
+# chauffé. ET SANS POUVOIR EMPÊCHER LE DÉMARRAGE : un ménage qui échoue — base
+# lente, colonne inattendue — est un désagrément ; refuser de démarrer
+# l'application pour cette raison serait une panne. Le journal garde la trace,
+# `docker logs fitcarnet-app` la montre.
+#
+# `|| souci "…"` ET NON `|| true`, ET LA DIFFÉRENCE COMPTE. Ce script tourne
+# sous `set -e` : sans le `||`, un échec arrêterait tout. Ce qui neutralise
+# `set -e`, c'est le `||` lui-même, et `souci()` rend 0 parce qu'elle n'est
+# qu'un `printf` — d'où un démarrage qui continue ET une ligne dans le
+# journal, là où `|| true` aurait avalé l'échec en silence. Le commentaire
+# annonçait `|| true` alors que le code écrivait autre chose ; corrigé le
+# 18 septembre 2026, sur relevé de la revue.
 bleu "Invitations"
 php bin/console app:invitations:purger --no-interaction || souci "purge des invitations ignorée (sans conséquence)"
 

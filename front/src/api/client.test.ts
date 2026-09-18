@@ -880,3 +880,71 @@ describe('la course entre la lecture du coffre et une écriture', () => {
       'une fin de session ne doit pas être défaite par une lecture en vol');
   });
 });
+
+describe('amorcerSession : une coupure n\'est pas un refus', () => {
+  /* LE DÉFAUT QUE CE BLOC INTERDIT, relevé en revue le 18 septembre 2026.
+   *
+   * `amorcerSession` mémoïse sa tentative pour toute la vie de la page — il
+   * le faut, sinon `useConnecte` et `Racine`, qui amorcent l'un après
+   * l'autre, envoient deux `/jeton/rafraichir` et deux 401 rouges dans la
+   * console de l'écran de connexion.
+   *
+   * Mais elle mémoïsait AUSSI les échecs passagers. Le NAS redémarre à chaque
+   * déploiement ; quelqu'un qui recharge la page pendant ces quelques
+   * secondes se retrouvait sur l'écran de connexion, sa session cookie de
+   * quatre-vingt-dix jours parfaitement vivante, et RIEN ne réessayait —
+   * pour toute la vie de l'onglet. C'était une régression par rapport à avant
+   * M5, où le JWT de `localStorage` survivait à un serveur momentanément
+   * absent.
+   *
+   * La ligne de partage est celle que `renouvellement.ts` écrit déjà : un 401
+   * est une RÉPONSE, une coupure est un accident. Ces deux tests l'éprouvent
+   * des deux côtés, et le second tombe si l'on remet la mémoïsation
+   * inconditionnelle.
+   */
+
+  it('une coupure au chargement ne condamne pas la session : on réessaie', async () => {
+    /* ON REPART D'UNE PAGE BLANCHE. Poser un jeton puis le retirer efface la
+       mémoire d'amorçage et le souvenir d'un refus — c'est exactement ce que
+       fait une connexion suivie d'une déconnexion, et ça évite d'ajouter à
+       `client.ts` une porte dérobée qui n'existerait que pour les tests. */
+    await client.definirJeton('semence');
+    await client.definirJeton(null);
+
+    let injoignable = true;
+    const journal = brancherFetch((appel) => {
+      if (!estRafraichissement(appel)) return json({}, 404);
+      if (injoignable) return panneReseau();
+
+      return json({ token: 'jwt-revenu' });
+    });
+
+    assert.equal(await client.amorcerSession(), null,
+      'serveur injoignable : on ne peut pas conclure « connecté »');
+    assert.equal(journal.filter(estRafraichissement).length, 1);
+
+    /* Le serveur revient. C'est ce que fait l'écran de connexion en arrivant. */
+    injoignable = false;
+
+    assert.equal(await client.amorcerSession(), 'jwt-revenu',
+      'la session était vivante : une coupure de trois secondes ne doit pas la fermer');
+    assert.equal(journal.filter(estRafraichissement).length, 2,
+      'la deuxième tentative doit vraiment partir, pas relire une promesse morte');
+  });
+
+  it('un refus franc du serveur, lui, se retient : on ne le redemande pas', async () => {
+    await client.definirJeton('semence');
+    await client.definirJeton(null);
+
+    const journal = brancherFetch((appel) => (estRafraichissement(appel)
+      ? json({ detail: 'Session expiree, reconnecte-toi.' }, 401)
+      : json({}, 404)));
+
+    assert.equal(await client.amorcerSession(), null);
+    assert.equal(await client.amorcerSession(), null);
+
+    assert.equal(journal.filter(estRafraichissement).length, 1,
+      'un 401 est une réponse : la redemander en boucle mettrait des erreurs '
+      + 'rouges plein la console de l\'écran de connexion');
+  });
+});

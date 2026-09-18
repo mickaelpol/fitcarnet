@@ -133,6 +133,17 @@ let jeton: string | null = null;
 let rafraichissement: string | null = null;
 let jetonsCharges = false;
 
+/** La tentative d'amorçage de cette page, une fois pour toutes — voir `amorcerSession`. */
+let amorcage: Promise<void> | null = null;
+
+/**
+ * La session a-t-elle été close PAR UNE RÉPONSE DU SERVEUR ?
+ *
+ * Pas « avons-nous un jeton » : une panne réseau laisse aussi sans jeton, et
+ * les deux ne veulent pas dire la même chose. Voir `amorcerSession`.
+ */
+let sessionCloseFranchement = false;
+
 async function chargerLesDeux(): Promise<void> {
   if (jetonsCharges) return;
 
@@ -224,6 +235,17 @@ const prevenirJeton = (): void => {
 export async function definirJeton(valeur: string | null): Promise<void> {
   jeton = valeur;
   jetonsCharges = true;
+  /* UNE SESSION QUI S'OUVRE EFFACE LA MÉMOIRE D'UN AMORÇAGE RATÉ.
+     `amorcerSession` retient sa conclusion pour toute la vie de la page, et
+     `sessionCloseFranchement` retient qu'un serveur a refusé. Les deux
+     décrivent un état RÉVOLU dès qu'un jeton neuf arrive : les garder ferait
+     conclure « pas de session » à quelqu'un qui vient de se connecter.
+     `null` ne les touche pas — `terminerSession` pose le second juste avant
+     d'appeler ceci, et l'effacer ici défairait ce qu'elle vient de dire. */
+  if (valeur !== null) {
+    sessionCloseFranchement = false;
+    amorcage = null;
+  }
   /* LE WEB NE L'ÉCRIT NULLE PART — M5. Il ne vit que dans la variable
      ci-dessus, donc dans la page : un rechargement le perd, et
      `amorcerSession()` en redemande un au cookie. Une heure de fenêtre pour
@@ -268,7 +290,9 @@ export function surSessionFinie(quoi: (() => void) | null): void {
   prevenirSessionFinie = quoi;
 }
 
+
 async function terminerSession(): Promise<void> {
+  sessionCloseFranchement = true;
   await Promise.all([definirJeton(null), definirRafraichissement(null)]);
   /* Et l'héritage du web avec, puisqu'il n'y a plus de session à sauver. Sans
      cette ligne, un ancien jeton de `localStorage` survivrait à la fin de
@@ -405,8 +429,6 @@ const renouvelerUneSeuleFois = uneSeuleFois(
  * gardé le jeton, il n'y a personne à interroger, et un appel réseau au
  * lancement retarderait le premier écran pour rien.
  */
-let amorcage: Promise<void> | null = null;
-
 export async function amorcerSession(): Promise<string | null> {
   const dejaLa = await chargerJeton();
   if (!sessionParCookie) return dejaLa;
@@ -427,11 +449,34 @@ export async function amorcerSession(): Promise<string | null> {
      connexion. C'est exactement le défaut qu'on avait corrigé sur `useMoi`
      en septembre, et je venais de le réintroduire à côté.
 
-     On garde donc la promesse elle-même. Un échec n'a pas à être réessayé
-     ici : `renouvelerJeton` a déjà terminé la session sur un 401, et un
-     nouveau départ passera par l'écran de connexion. */
+     MAIS ON NE MÉMORISE QUE CE QUI EST TRANCHÉ — corrigé le 18 septembre 2026
+     après revue, et le commentaire d'avant était faux.
+
+     Il disait « un échec n'a pas à être réessayé ici : `renouvelerJeton` a
+     déjà terminé la session sur un 401 ». Vrai du 401, faux de tout le reste.
+     `renouvellement.ts` écrit la politique inverse noir sur blanc : une
+     coupure réseau, un 503, une réponse malformée sont PASSAGERS, et
+     déconnecter y serait « une punition pour un tunnel de métro ». En
+     gardant la promesse d'un échec passager, cette fonction transformait
+     justement ce passager en définitif, pour toute la vie de l'onglet.
+
+     Le scénario n'est pas théorique : le NAS redémarre à chaque déploiement,
+     et `entrypoint-prod.sh` y fait maintenant plus de travail qu'avant
+     (migrations, cache, purge des invitations). Quelqu'un qui recharge la
+     page pendant ces quelques secondes se retrouvait devant l'écran de
+     connexion, sa session cookie de quatre-vingt-dix jours parfaitement
+     vivante, sans un mot pour dire que c'était le réseau. C'est une
+     régression par rapport à AVANT M5, où le JWT de `localStorage` survivait
+     à un serveur momentanément absent.
+
+     On efface donc la mémoire quand rien n'a été tranché : la tentative
+     suivante repartira. `sessionCloseFranchement` est le seul témoin fiable —
+     il n'est posé que par `terminerSession`, c'est-à-dire par un refus du
+     serveur. */
   amorcage ??= renouvelerUneSeuleFois().then(() => undefined);
   await amorcage;
+
+  if (jeton === null && !sessionCloseFranchement) amorcage = null;
 
   return jeton;
 }

@@ -14,6 +14,45 @@ framework:
         Symfony\Component\Serializer\Exception\ExceptionInterface:
             log_level: warning
 
+    # ---------------------------------------------------------------------
+    #  DERRIERE LE PROXY INVERSE DE DSM — releve le 18 septembre 2026.
+    #
+    #  La chaine est : proxy inverse DSM (qui termine le TLS) -> Caddy, EN
+    #  CLAIR (`docker/Caddyfile` : `auto_https off`, `:80`) -> FrankenPHP.
+    #  Sans ces deux lignes, Symfony ignore `X-Forwarded-*` et voit TOUTES les
+    #  requetes comme venant du proxy, en HTTP.
+    #
+    #  CE QUE CA CASSAIT, ET CE N'EST PAS `isSecure()`. `login_throttling`
+    #  (voir `security.yaml`) pose DEUX compteurs, et Symfony les construit
+    #  tous deux a partir de `$request->getClientIp()`
+    #  (`DefaultLoginRateLimiter:49-50`, verifie dans le vendor). Le compteur
+    #  par couple adresse+IP continuait de fonctionner, l'adresse suffisant a
+    #  distinguer. Mais le compteur GLOBAL PAR IP recevait la meme valeur pour
+    #  tout le monde : il n'attrapait plus « le balayage de plusieurs comptes
+    #  depuis la meme source », il devenait un verrou de TOUT LE SITE. Vingt-
+    #  cinq essais rates depuis n'importe ou, et plus personne ne se connecte
+    #  pendant un quart d'heure — y compris le proprietaire. Le commentaire de
+    #  `security.yaml` decrivait donc un comportement que la configuration ne
+    #  produisait pas.
+    #
+    #  Le journal avait le meme defaut : toutes les tentatives portaient la
+    #  meme adresse, donc aucune enquete possible.
+    #
+    #  `private_ranges` PLUTOT QU'UNE IP FIXE : le conteneur recoit du reseau
+    #  Docker ou de l'adresse LAN du NAS, toutes deux privees, et ces valeurs
+    #  changent au gre des reseaux Docker. Un client d'Internet n'arrive JAMAIS
+    #  directement — il passe par le proxy, dont l'adresse est privee. Symfony
+    #  retient alors la premiere adresse non fiable de la chaine, c'est-a-dire
+    #  la vraie.
+    #
+    #  CE QUE CA NE CHANGE PAS : le `Secure` du cookie de session. Il reste
+    #  deduit de `DEFAULT_URI` (`App\Service\CookieDeSession`), et c'est
+    #  delibere : une declaration de configuration ne depend de personne, la
+    #  ou `isSecure()` depend de ce qu'un proxy a bien voulu transmettre.
+    # ---------------------------------------------------------------------
+    trusted_proxies: '%env(default::SYMFONY_TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
+
     #esi: true
     #fragments: true
 

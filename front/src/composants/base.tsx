@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import {
-  ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Pressable, StyleSheet, Text, TextInput, type TextInputProps, View,
   type StyleProp, type TextProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { C, E, N, P, R, T, TOUCHE } from '@/theme';
@@ -102,6 +102,42 @@ interface ChampProps {
    */
   onValider?: () => void;
   /**
+   * « Entrée » passe au champ suivant au lieu de valider.
+   *
+   * LA MOITIÉ QUI MANQUAIT — relevée le 18 septembre 2026, le jour même où
+   * `onValider` a été posé. Sur l'écran de connexion, les DEUX champs
+   * portaient `onValider`, et `valider()` commence par
+   * `if (!email.trim() || !motDePasse) return`. Depuis le champ adresse, le
+   * mot de passe est vide par construction : « Entrée » ne produisait donc
+   * RIEN, en silence — le défaut exact qu'on venait de corriger, réintroduit
+   * un champ plus haut. Et le clavier annonçait « go », ce qui est un
+   * mensonge.
+   *
+   * On donne au champ intermédiaire de quoi passer la main : le clavier
+   * annonce « next », et la touche déplace le curseur. C'est le patron que
+   * documente React Native (`improvingux`, « the return key changes from
+   * focusing next input to submitting the form »).
+   */
+  onSuivant?: () => void;
+  /**
+   * Pour qu'un champ précédent puisse lui donner le curseur.
+   *
+   * React 19 accepte `ref` comme une prop ordinaire, mais on le nomme
+   * autrement : `ref` sur un composant de fonction reste un terrain piégeux
+   * d'une version à l'autre, et un nom explicite se cherche.
+   */
+  champRef?: React.Ref<TextInput>;
+  /**
+   * Ce que le gestionnaire de mots de passe doit proposer de remplir.
+   *
+   * `autoComplete` ET PAS `textContentType` : le second n'existe que sur iOS,
+   * le premier vaut pour les trois plateformes, et la documentation React
+   * Native déconseille de les poser tous les deux. Sans lui, le navigateur ne
+   * propose rien sur l'écran de connexion et le mot de passe se retape à
+   * chaque visite — sur le seul écran par lequel tout le monde entre.
+   */
+  autoComplete?: TextInputProps['autoComplete'];
+  /**
    * La saisie ne désigne rien d'utilisable : le cadre se borde de rouge. On
    * MONTRE l'erreur plutôt que d'effacer ce qui a été tapé — voir `ChampNombre`.
    */
@@ -110,8 +146,12 @@ interface ChampProps {
 
 export function Champ({
   valeur, onChange, placeholder, unite, numerique, motDePasse, etiquette, style,
-  multiligne, illisible, onValider,
+  multiligne, illisible, onValider, onSuivant, champRef, autoComplete,
 }: ChampProps) {
+  /* UN SEUL DES DEUX AGIT, ET « SUIVANT » PASSE EN PREMIER : un champ qui
+     donne la main n'est pas un champ qui valide. Les poser tous les deux est
+     une erreur d'écriture, pas un cas à arbitrer en silence. */
+  const surEntree = onSuivant ?? onValider;
   return (
     <View style={[s.champBloc, style]}>
       {etiquette !== undefined && <Text style={s.etiquette}>{etiquette}</Text>}
@@ -124,11 +164,22 @@ export function Champ({
           keyboardType={numerique ? 'decimal-pad' : 'default'}
           secureTextEntry={motDePasse}
           autoCapitalize={multiligne === true ? 'sentences' : 'none'}
+          autoComplete={autoComplete}
           multiline={multiligne}
-          onSubmitEditing={onValider}
-          /* « Entrée » plutôt que « Suivant » : le clavier annonce ce que la
-             touche va faire. Sans `onValider`, on ne touche à rien. */
-          returnKeyType={onValider === undefined ? undefined : 'go'}
+          ref={champRef}
+          onSubmitEditing={surEntree}
+          /* Le clavier annonce ce que la touche va FAIRE : « next » quand elle
+             donne la main au champ suivant, « go » quand elle valide. Sans
+             rien des deux, on ne touche à rien. */
+          returnKeyType={surEntree === undefined ? undefined : (onSuivant === undefined ? 'go' : 'next')}
+          /* LE PIÈGE QUI DORT : sur un champ multiligne, React Native fait
+             par défaut insérer un saut de ligne AU LIEU d'appeler
+             `onSubmitEditing`. Combiner `multiligne` et `onValider` donnerait
+             donc un champ dont la touche Entrée ne valide jamais — en
+             silence, c'est-à-dire le défaut du 18 septembre réintroduit.
+             Aucun appelant ne les combine aujourd'hui ; cette ligne fait que
+             le premier qui le fera obtiendra ce qu'il demande. */
+          submitBehavior={multiligne === true && surEntree !== undefined ? 'blurAndSubmit' : undefined}
           style={[s.champ, numerique && s.champNombre, multiligne === true && s.champLong]}
         />
         {unite !== undefined && <Text style={s.unite}>{unite}</Text>}

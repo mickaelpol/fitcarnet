@@ -43,6 +43,17 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Entity]
 #[ORM\Table(name: 'aliment')]
 #[ApiResource(
+    /* LE SEUL `#[ApiResource]` QUI N'AVAIT PAS DE `security:` DE CLASSE —
+       releve le 18 septembre 2026 en confrontant l'API a la documentation
+       d'API Platform 4. `Stock`, `Cible`, `Modele`, `PlanRepas` et `Seance`
+       l'ont tous ; celui-ci l'avait sur son `Post` seulement.
+       RIEN NE FUYAIT : `access_control` ferme `^/api` a
+       `IS_AUTHENTICATED_FULLY`, et `FiltreProprietaire` pose son `WHERE` y
+       compris sur les operations d'item — un `Get` sur l'aliment d'autrui rend
+       404 avant toute evaluation. C'est le motif du jumeau oublie applique a
+       la configuration : une regle vraie partout, absente a un endroit, qui
+       n'attend qu'un deplacement du filtre pour devenir un trou. */
+    security: "is_granted('ROLE_USER')",
     operations: [
         new GetCollection(),
         new Get(),

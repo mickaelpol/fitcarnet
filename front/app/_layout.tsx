@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { amorcerSession, surSessionFinie } from '@/api/client';
 import { useMoi } from '@/api/hooks';
 import { PERSISTANCE, purgerLeCache } from '@/api/persistance';
+import { reessayerSiReseau } from '@/api/reessai';
 import { useConnecte } from '@/api/session';
 import { Chargement } from '@/composants/base';
 import { EnTete } from '@/composants/enTete';
@@ -25,7 +26,20 @@ const client = new QueryClient({
     queries: {
       staleTime: 60 * 1000,
       gcTime: 24 * 60 * 60 * 1000,
-      retry: 2,
+      /* LA RÈGLE DE RÉESSAI VIT DANS `reessai.ts`, ET ELLE S'APPLIQUE ENFIN
+         PARTOUT — relevé le 18 septembre 2026.
+         C'était `retry: 2`, c'est-à-dire « réessaie TOUT, deux fois » : les
+         pannes réseau, mais aussi les 401, 403, 404 et 422, qui sont des
+         RÉPONSES du serveur et ne changeront pas si on les redemande.
+         `reessai.ts` avait été écrit pour dire cela une fois pour toutes, et
+         il n'était branché que sur `useMoi` — une porte sur une trentaine.
+         Le dépôt en constatait déjà l'effet sans faire le lien : le
+         commentaire du portier d'administration, quelques lignes plus bas,
+         parle de « deux 403, relancés deux fois chacun par la politique de
+         réessai ». C'est ce défaut-ci qu'il décrivait.
+         Trois secondes d'attente en moins sur chaque refus, et une règle qui
+         n'a plus qu'un seul endroit où elle est écrite. */
+      retry: reessayerSiReseau,
       refetchOnWindowFocus: false,
     },
   },

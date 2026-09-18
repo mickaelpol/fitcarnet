@@ -18,7 +18,7 @@ d'une ligne de code, pas ce qui reste à faire.
   tire `master` toutes les 5 minutes. **La production a été contrôlée le
   18 septembre** — schéma conforme aux migrations 34-35-36, parcours réel
   éprouvé sur un compte jetable puis retiré (section 2.1).
-- **Tests** : 637 côté front plus 33 de rendu, 397 côté API (982 assertions),
+- **Tests** : 639 côté front plus 33 de rendu, 398 côté API (985 assertions),
   tous verts. PHPStan : **5 erreurs connues**, pas une de plus — c'était 7
   jusqu'au 18 septembre 2026, deux ont disparu avec le code qui les portait.
 - **Contrôles de base**, tous verts : `verifier-schema.sh` (base neuve
@@ -47,8 +47,8 @@ cd front && npm install          # si package.json a bougé, ou si les tests de 
 Puis vérifier qu'on part d'un socle sain :
 
 ```bash
-cd front && npm test                                                  # 637 + 33, 0 échec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 397 tests, 982 assertions
+cd front && npm test                                                  # 639 + 33, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 398 tests, 985 assertions
 db/manuel/verifier-schema.sh                                          # « identiques »
 db/manuel/verifier-migrations.sh                                      # vert
 db/manuel/verifier-jeux.sh                                            # vert

@@ -49,36 +49,53 @@ final readonly class FusionExerciceProcessor implements ProcessorInterface
             throw new UnprocessableEntityHttpException('Les deux exercices sont identiques.');
         }
 
-        $this->cnx->beginTransaction();
+        /* `wrapInTransaction` ET NON `beginTransaction`/`commit`/`rollBack` —
+           aligne le 18 septembre 2026 sur les six autres transactions du
+           depot, apres confrontation a la documentation Doctrine.
+           DEUX RAISONS, ET LA PREMIERE COMPTE VRAIMENT. Ce bloc melange DBAL
+           (les `UPDATE`) et ORM (`flush()` sur `$nouveau`) : apres un
+           `rollBack()` manuel, la base est revenue en arriere mais
+           l'EntityManager garde en memoire les `setFormatPrescrit()` et
+           `setVideoUrl()` poses juste avant. `wrapInTransaction` FERME
+           l'EntityManager en cas d'echec ; le code manuel non. En requete HTTP
+           l'effet pratique est nul — le processus meurt —, mais c'est
+           precisement la raison pour laquelle Doctrine recommande la forme a
+           fermeture, et on ne garde pas une exception a la regle pour un
+           argument qui tient a la duree de vie d'un processus.
+           SECONDE RAISON : si l'exception venait du `commit()` lui-meme, le
+           `rollBack()` du `catch` portait sur une transaction deja inactive et
+           levait une seconde exception qui masquait la premiere. */
         try {
-            $seances = $this->cnx->executeStatement(
-                'UPDATE seance_exercice SET exercice_id = :nouveau WHERE exercice_id = :ancien',
-                ['nouveau' => $nouveau->getId(), 'ancien' => $ancien->getId()],
-            );
-            $modeles = $this->cnx->executeStatement(
-                'UPDATE modele_exercice SET exercice_id = :nouveau WHERE exercice_id = :ancien',
-                ['nouveau' => $nouveau->getId(), 'ancien' => $ancien->getId()],
-            );
+            [$seances, $modeles] = $this->em->wrapInTransaction(function () use ($ancien, $nouveau): array {
+                $seances = $this->cnx->executeStatement(
+                    'UPDATE seance_exercice SET exercice_id = :nouveau WHERE exercice_id = :ancien',
+                    ['nouveau' => $nouveau->getId(), 'ancien' => $ancien->getId()],
+                );
+                $modeles = $this->cnx->executeStatement(
+                    'UPDATE modele_exercice SET exercice_id = :nouveau WHERE exercice_id = :ancien',
+                    ['nouveau' => $nouveau->getId(), 'ancien' => $ancien->getId()],
+                );
 
-            // Ce qui n'existait que chez l'ancien est repris : mieux vaut
-            // conserver un format prescrit ou une vidéo que les perdre.
-            if (null === $nouveau->getFormatPrescrit() && null !== $ancien->getFormatPrescrit()) {
-                $nouveau->setFormatPrescrit($ancien->getFormatPrescrit());
-            }
-            if (null === $nouveau->getVideoUrl() && null !== $ancien->getVideoUrl()) {
-                $nouveau->setVideoUrl($ancien->getVideoUrl());
-            }
-            if (null === $nouveau->getNomFr() && 'perso' === $ancien->getSource()) {
-                $nouveau->setNomFr($ancien->getNom());
-            }
-            $this->em->flush();
+                // Ce qui n'existait que chez l'ancien est repris : mieux vaut
+                // conserver un format prescrit ou une vidéo que les perdre.
+                if (null === $nouveau->getFormatPrescrit() && null !== $ancien->getFormatPrescrit()) {
+                    $nouveau->setFormatPrescrit($ancien->getFormatPrescrit());
+                }
+                if (null === $nouveau->getVideoUrl() && null !== $ancien->getVideoUrl()) {
+                    $nouveau->setVideoUrl($ancien->getVideoUrl());
+                }
+                if (null === $nouveau->getNomFr() && 'perso' === $ancien->getSource()) {
+                    $nouveau->setNomFr($ancien->getNom());
+                }
+                $this->em->flush();
 
-            $this->cnx->executeStatement(
-                'DELETE FROM exercice WHERE id = :id',
-                ['id' => $ancien->getId()],
-            );
+                $this->cnx->executeStatement(
+                    'DELETE FROM exercice WHERE id = :id',
+                    ['id' => $ancien->getId()],
+                );
 
-            $this->cnx->commit();
+                return [$seances, $modeles];
+            });
 
             $data->seancesModifiees = $seances;
             $data->modelesModifies = $modeles;
@@ -89,7 +106,6 @@ final readonly class FusionExerciceProcessor implements ProcessorInterface
 
             return $data;
         } catch (\Throwable $e) {
-            $this->cnx->rollBack();
 
             /* Meme regle qu'ailleurs, meme si cette route est reservee a
                ROLE_ADMIN : un administrateur n'a pas besoin du SQL a l'ecran

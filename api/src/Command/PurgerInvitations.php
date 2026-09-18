@@ -48,6 +48,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *   bin/console app:invitations:purger --simuler    dit ce qu'il ferait
  *   bin/console app:invitations:purger --jours=90   retention plus longue
  *
+ * `--jours` NE TOUCHE PAS AUX ORPHELINES : une invitation dont le compte a ete
+ * supprime ne designe plus personne, quelle que soit la duree demandee.
+ *
  * ELLE TOURNE TOUTE SEULE au demarrage de `fitcarnet-app`
  * (`docker/entrypoint-prod.sh`) : c'est le seul rendez-vous periodique que
  * cette pile possede sans ajouter ni planificateur ni conteneur. Une purge qui
@@ -162,9 +165,20 @@ final class PurgerInvitations extends Command
            qu'on croit sur parole des mois plus tard. */
         $parties = $this->invitations->supprimerParIds($aPurger);
 
+        /* « RETENTION : N JOURS » NE VAUT PAS POUR LES ORPHELINES, et l'annoncer
+           sans le dire etait un chiffre faux — releve en revue le 18 septembre
+           2026. `--jours=365`, lance par quelqu'un qui veut justement ne rien
+           perdre, supprime quand meme une invitation dont le compte vient
+           d'etre supprime : elle ne designe plus personne, il n'y a rien a
+           laisser refroidir. C'est voulu ; ce qui ne l'etait pas, c'est de
+           l'annoncer sous une duree qui ne s'y applique pas. */
         $ecran->success(\sprintf(
-            '%d invitation(s) purgee(s) : %d orpheline(s), %d acceptee(s), %d perimee(s). Retention : %d jours.',
-            $parties, $raisons['orphelines'], $raisons['acceptees'], $raisons['perimees'], $jours,
+            '%d invitation(s) purgee(s) : %d acceptee(s) et %d perimee(s) de plus de %d jours%s.',
+            $parties, $raisons['acceptees'], $raisons['perimees'], $jours,
+            0 === $raisons['orphelines']
+                ? ''
+                : \sprintf(', plus %d orpheline(s) — sans delai, leur compte n\'existe plus',
+                    $raisons['orphelines']),
         ));
 
         return Command::SUCCESS;

@@ -53,9 +53,17 @@ final readonly class CookieDeSession
      * avant la mise en ligne. La chaine reelle : le proxy inverse de DSM
      * termine le TLS, puis parle a Caddy EN CLAIR (`docker/Caddyfile` :
      * `auto_https off`, `:80`, et son propre commentaire le dit). Symfony
-     * n'a AUCUN `trusted_proxies` configure — verifie par recherche sur
-     * `api/config`, `docker/`, `docker-compose.yml` : il ignore donc
-     * `X-Forwarded-Proto` et voit une requete HTTP. `Response::prepare()`
+     * n'avait AUCUN `trusted_proxies` configure : il ignorait donc
+     * `X-Forwarded-Proto` et voyait une requete HTTP.
+     *
+     * DEPUIS, `SYMFONY_TRUSTED_PROXIES` EXISTE (18 septembre 2026, pour une
+     * toute autre raison : `login_throttling` comptait toutes les tentatives
+     * sous l'adresse du proxy). `isSecure()` repondrait donc juste
+     * aujourd'hui — ET ON NE REVIENT PAS DESSUS POUR AUTANT. Une declaration
+     * de configuration ne depend de personne ; `isSecure()` depend de ce
+     * qu'un proxy a bien voulu transmettre, et d'une variable d'environnement
+     * qu'un deploiement peut perdre. Le jour ou elle disparaitrait, le cookie
+     * continuerait d'etre `Secure` au lieu de cesser de l'etre en silence. `Response::prepare()`
      * n'aurait jamais pose `Secure`, et le jeton de rafraichissement de
      * quatre-vingt-dix jours serait parti en clair a la premiere requete
      * `http://` — il n'y a pas de HSTS, le Caddyfile explique pourquoi.

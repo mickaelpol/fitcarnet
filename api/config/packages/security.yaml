@@ -100,6 +100,22 @@ security:
             provider: utilisateurs
 
     access_control:
+        # QUATRE DE CES LIGNES SONT DECORATIVES, ET IL FAUT LE DIRE — releve le
+        # 18 septembre 2026 en confrontant la configuration a la documentation
+        # Symfony 7.4.
+        #
+        # Quand un pare-feu est en `security: false`, AUCUN ecouteur de
+        # securite n'est instancie — donc `access_control` n'est pas evalue non
+        # plus. Les lignes de `jeton/rafraichir`, `deconnexion`,
+        # `invitation/` et `etat` se lisent comme un filet de securite et n'en
+        # sont pas un : ce sont leurs pare-feux qui ouvrent, elles ne font que
+        # le repeter. On les garde parce qu'elles disent l'intention au meme
+        # endroit que les autres, et qu'un jour ou l'un de ces pare-feux
+        # cesserait d'etre `security: false`, elles redeviendraient vivantes et
+        # justes. Mais personne ne doit croire qu'elles protegent aujourd'hui.
+        #
+        # Seule `^/api/connexion` compte vraiment ici : son pare-feu a bien la
+        # securite activee (`json_login` + `login_throttling`).
         - { path: ^/api/connexion, roles: PUBLIC_ACCESS }
         - { path: ^/api/jeton/rafraichir, roles: PUBLIC_ACCESS }
         - { path: ^/api/deconnexion, roles: PUBLIC_ACCESS }

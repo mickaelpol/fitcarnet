@@ -78,11 +78,18 @@ export default function AdminUtilisateurs() {
   const renvoyer = (i: InvitationVue) => {
     setEmail(i.email);
     setCopie(false);
+    /* ON REMONTE DANS LES DEUX CAS — relevé en revue le 18 septembre 2026.
+       Le `scrollTo` n'était que dans `onSuccess`, et le SEUL endroit qui
+       affiche `inviter.isError` est la carte « Inviter quelqu'un », tout en
+       haut. Un refus — l'adresse a entre-temps obtenu un compte, une panne
+       réseau, un 500 — réactivait donc le bouton sans que rien ne bouge à
+       l'écran : l'admin en concluait que le bouton ne marche pas, ou pire,
+       qu'il avait renvoyé. Un échec doit se voir au moins autant qu'une
+       réussite. */
+    const remonter = () => vue.current?.scrollTo({ y: 0, animated: true });
     inviter.mutate(i.email, {
-      onSuccess: () => {
-        setEmail('');
-        vue.current?.scrollTo({ y: 0, animated: true });
-      },
+      onSuccess: () => { setEmail(''); remonter(); },
+      onError: remonter,
     });
   };
 

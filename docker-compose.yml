@@ -189,6 +189,13 @@ services:
       # un secret, et elle doit etre lisible a cote de CORS_ALLOW_ORIGIN qui
       # nomme deja le meme domaine.
       DEFAULT_URI: "https://carnet.mickael-pol.fr"
+      # LES PROXYS DE CONFIANCE — voir le commentaire de `framework.yaml`.
+      #
+      # Sans ca, `login_throttling` transformait son compteur « par IP » en
+      # verrou de tout le site : vingt-cinq essais rates depuis n'importe ou
+      # fermaient la connexion a tout le monde pour un quart d'heure. Symfony
+      # 7.4 lit deja cette variable par defaut ; elle n'a qu'a exister.
+      SYMFONY_TRUSTED_PROXIES: "private_ranges"
       # Open Food Facts demande un User-Agent identifiant l'application
       OFF_USER_AGENT: "fitcarnet/1.0 (contact@mickael-pol.fr)"
       TZ: Europe/Paris

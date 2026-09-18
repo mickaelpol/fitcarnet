@@ -255,12 +255,38 @@ final class InvitationTest extends TestCase
     {
         /* `utilisateur_id` est nul sur TOUTE invitation non acceptee : c'est
            son etat normal, pas un orphelinat. Confondre les deux purgerait a
-           l'instant meme chaque invitation qu'on vient de creer. */
-        $maintenant = new \DateTimeImmutable('2026-09-18 12:00:00');
+           l'instant meme chaque invitation qu'on vient de creer.
+
+           ON PREND UNE PERIMEE RECENTE, et non une invitation fraiche : avec
+           une fraiche, ce test etait le jumeau exact de
+           `testUneInvitationVivanteNeSePurgeJamais` — memes arguments, meme
+           reponse, aucun chemin de plus. Releve en revue le 18 septembre 2026.
+           Ici la regle doit d'abord ne PAS voir une orpheline, puis constater
+           que le delai n'est pas ecoule : deux decisions, pas une. */
+        $expire = new \DateTimeImmutable('2026-09-10 12:00:00');
 
         self::assertFalse(Invitation::aPurger(
-            Invitation::expiration($maintenant), null, false, $maintenant,
+            $expire, null, false, new \DateTimeImmutable('2026-09-18 12:00:00'),
         ));
+    }
+
+    public function testUneOrphelinePartQuelleQueSoitLaDate(): void
+    {
+        /* LE DELAI NE LA CONCERNE PAS, et c'est ce qui la distingue des deux
+           autres. Une invitation dont le compte a ete supprime ne designe plus
+           personne : il n'y a rien a laisser refroidir, et aucune duree de
+           retention ne doit la sauver. Rien ne l'eprouvait — c'est pourtant la
+           seule regle des trois dont la reponse ne depend PAS de `maintenant`,
+           et la commande annoncait « Retention : N jours » pour elle aussi. */
+        $accepte = new \DateTimeImmutable('2026-09-18 11:59:00');
+        $expire = new \DateTimeImmutable('2026-09-25 12:00:00');
+
+        foreach (['2026-09-18 12:00:00', '2027-09-18 12:00:00', '2026-09-18 11:59:01'] as $quand) {
+            self::assertTrue(
+                Invitation::aPurger($expire, $accepte, false, new \DateTimeImmutable($quand)),
+                "Une orpheline part sans delai, y compris vue depuis {$quand}.",
+            );
+        }
     }
 
     public function testUnJetonInconnuNeVautRien(): void
