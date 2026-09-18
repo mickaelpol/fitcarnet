@@ -360,13 +360,13 @@ SLIDES = [
     # ================================================================== ACTE 3
     ("qualite", "Ce qui garantit que ça marche", """
       <div class="chiffres">
-        <div><strong>969</strong><span>tests automatisés</span></div>
+        <div><strong>1 065</strong><span>tests automatisés</span></div>
         <div><strong>6 769</strong><span>lignes de test</span></div>
         <div><strong>26 %</strong><span>du code est du test</span></div>
         <div><strong>120</strong><span>commits en 5 semaines</span></div>
       </div>
-      <p class="chute">639 tests côté front (<code>node:test</code>, dont 33 de rendu), 330 côté API
-         (PHPUnit), comptés le 17 septembre 2026 : quelques secondes pour l'ensemble. Une suite
+      <p class="chute">670 tests côté front (<code>node:test</code>, dont 33 de rendu), 395 côté API
+         (PHPUnit), comptés le 18 septembre 2026 : quelques secondes pour l'ensemble. Une suite
          qu'on n'attend pas est une suite qu'on lance.</p>
     """),
 
@@ -394,7 +394,7 @@ SLIDES = [
       <div class="chiffres">
         <div><strong>3</strong><span>critiques</span></div>
         <div><strong>14</strong><span>élevés</span></div>
-        <div><strong>61 / 79</strong><span>clos · aucun critique ni élevé ouvert</span></div>
+        <div><strong>78 / 79</strong><span>clos · 1 ouvert (02#8, hors dépôt)</span></div>
         <div><strong>0</strong><span>constat effacé sans preuve</span></div>
       </div>
       <p class="chute">Garde-fous automatiques, pannes réelles, chiffres faux montrés à l'utilisateur,

@@ -188,16 +188,16 @@ sans quoi l'API répond 500 sur le frigo, ou dès la connexion.
 
 ## Vérifier que tout est en place
 
-Chaque commande doit donner ce résultat — les chiffres du 17 septembre 2026.
+Chaque commande doit donner ce résultat — les chiffres du 18 septembre 2026.
 Un chantier peut en retirer autant qu'en ajouter : un chiffre différent se
 compare au journal (`REPRENDRE.md`), il ne se juge pas seul.
 
 ```bash
-cd front && npm test                    # 606 tests, puis 33 de rendu, 0 échec
+cd front && npm test                    # 637 tests, puis 33 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
-                                        # 330 tests, 864 assertions
+                                        # 395 tests, 981 assertions, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
-                                        # 7 erreurs connues, aucune régression
+                                        # 5 erreurs connues, aucune régression
 docker pull postgres:16                 # l'image des deux scripts ci-dessous (451 Mo),
                                         # pas l'alpine du dev — voir la skill schema-base
 db/manuel/verifier-migrations.sh        # ✓ garde-fous posés

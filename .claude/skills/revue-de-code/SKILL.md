@@ -187,7 +187,7 @@ Un relecteur qui ne connaît pas ces choix les prendra pour des défauts :
 - **`doctrine:schema:validate` ne passera jamais** : le schéma est écrit à la
   main, la base porte plus que les entités. Son `--dump-sql` propose
   `DROP TABLE invitation`.
-- **7 erreurs PHPStan sont attendues** (c'était 8 : M-02 en a fait disparaître une). Aucune ne doit apparaître sur un fichier
+- **5 erreurs PHPStan sont attendues** (c'était 8 : M-02 en a fait disparaître une). Aucune ne doit apparaître sur un fichier
   qu'on vient de toucher — c'est le seul critère.
 
 ---

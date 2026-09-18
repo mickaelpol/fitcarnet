@@ -14,13 +14,12 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 77 constats clos, 2 ouverts** — vérifiés un par un
-> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 2
-> sont des moyens (02#8, M5). Par rapport : 01 — 0 ouvert sur 12 ; 02 — 1 sur
-> 17 ; 03 — 1 sur 33 ; 04 — 0 sur 17. **Plus aucun n'attend d'arbitrage** :
-> les quatre en attente ont été tranchés le 18 septembre 2026, et les deux
-> qui restent sont des mises en œuvre — 02#8 hors dépôt (une tâche DSM, côté
-> NAS). La liste,
+> **Au 18 septembre 2026 : 78 constats clos, 1 ouvert** — vérifiés un par un
+> dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert**, et il
+> n'en reste qu'un : **02#8**, moyen, et **hors du dépôt** — copier les
+> sauvegardes ailleurs que sur le volume de la base est une tâche DSM, côté
+> NAS. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 1 sur 17 ; 03 — 0 sur 33 ;
+> 04 — 0 sur 17. Plus aucun n'attend d'arbitrage. La liste,
 > avec la preuve de chacun, est dans « [Ce qui reste ouvert](#ce-qui-reste-ouvert-au-17-septembre-2026) ».
 
 ## Ce que l'audit dit du projet
@@ -91,9 +90,10 @@ AUJOURD'HUI ». Une base neuve n'a ni compléments, ni file d'inventaire, ni auc
 positivité : elle accepte `kcal_100 = -350` en silence. La production ne le voit pas parce que
 `entrypoint-prod.sh` rejoue `db/manuel/` à chaque démarrage — le risque est différé, pas absent.
 
-Constat symétrique : `db/01-schema.sql:294` déclare `modele_exercice.secondes_total_cible`, colonne
-créée par aucune migration, présente dans aucune entité, référencée par aucune ligne de code —
-**toujours vrai au 17 septembre 2026**, voir 02#12.
+Constat symétrique : `db/01-schema.sql:294` déclarait `modele_exercice.secondes_total_cible`, colonne
+créée par aucune migration, présente dans aucune entité, référencée par aucune ligne de code.
+**Corrigé le 18 septembre 2026** (02#12) : la colonne a quitté le schéma et
+`db/manuel/37-modele-exercice-sans-secondes-total-cible.sql` la retire des bases déjà créées.
 
 *Correction : replier le DDL de 25/26/27 dans le schéma, régler `secondes_total_cible`, et ajouter
 au dépôt le script qui construit A et B et exige un diff vide. ~2 h.*
@@ -290,15 +290,16 @@ Au 7 septembre 2026, 15 commits sur `master`, tout poussé sur Gitea.
 | **1 — ce qui est cassé** | ✅ 4/4 | C1, É2, É3, É14 — chacun avec un test écrit et vu échouer d'abord |
 | **2 — chiffres faux** | ✅ | É11, É12, É13, É15, M2, M3 · **M1 et M4 faits le 15 septembre** — M1 affichait un écart de 2 kcal/g de fibres en mode glucides totaux (7,5 g suffisaient à accuser une cible atteignable) ; M4 a reçu un seuil **relatif**, choisi sur 134 860 pivots mesurés |
 | **3 — sécurité et isolation** | ✅ | É1, C3, É8, M-02, M-03 · **M-02 complet le 15 septembre** : `GET /api/mes-sessions` et `DELETE /api/mes-sessions/{id}` |
-| **4 — base reproductible** | ◐ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** · **reste ouverte** la dérive entités ↔ schéma que le plan y rangeait (02#12) |
+| **4 — base reproductible** | ✅ | C2, É5, É6 et les index de jointure · `verifier-schema.sh` : **✓ identiques** · la dérive entités ↔ schéma que le plan y rangeait (**02#12**) est close le 18 septembre 2026 — migration 37 |
 | **5 — scripts dangereux** | ✅ | É4, `sauvegarde.sh` (É9 fait le 8 sept.) |
 | **6 — architecture front** | ✅ | **Les douze rangs sont faits.** Trois écrans de 3 935 → **1 295** lignes · `composer.ts` **830** → 135 (817 au commit de l'audit, 830 après le correctif É12 du même soir, 827 au premier rang du lot) · `cuisson.ts` **611** → 22 · `hooks.ts` en 10 modules · **D1-D10 closes** · seul `choixRatio.tsx` reste, et il était mal rangé (il appartient à `editeurAliment.tsx`, section 7) |
 | **7 — tests manquants** | ✅ | `client.ts` : 22 témoins à la clôture, chacun prouvé par une **mutation** qui le tue (29 mutations au banc) ; **28** au 17 septembre 2026 (`it(` dans `client.test.ts`), dont ceux du délai de garde `fetchAvecDelai`. `@testing-library/react` est installé : É14 et F13 ne sont plus bloqués, et `editeurAliment.test-rendu.tsx` ouvre la voie. Reste du câblage non couvert, sans urgence |
-| **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits ; 02#14, 02#18 et 02#19 aussi. **04#14, 04#15, 04#19 et M8 sont clos le 18 septembre 2026** ; restent 02#13, 02#15 et 02#17, qui attendent un arbitrage. F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
+| **8 — le reste** | ✅ | Les onze du front et les neuf de sécurité sont faits ; 02#14, 02#18 et 02#19 aussi. **Le 18 septembre 2026 : 04#14, 04#15, 04#19, M8, M13, puis les quatre derniers arbitrages** — 02#13 (rotation des journaux seule, limites refusées avec argument), 02#15 (port gardé et assumé par écrit), 02#17 (purge des invitations, orphelines comprises) et **M5** (cookie `HttpOnly`, corrigé et non assumé). F-04 ne tenait plus (réglé par É8), F8 a été **refusé avec argument** — mais en cherchant ce qui transitait vraiment dans le cache, on y a trouvé **le mot de passe en clair** |
 
 Tests au 15 septembre, au terme du chantier : **600 front** (577 + 23 de rendu, en deux passes) · **252 API · 661 assertions · 7 erreurs PHPStan**
-(aucune sur les fichiers corrigés). Au 17 septembre 2026 en fin de journée : **639 front** (606 + 33 de
-rendu) · **330 API · 864 assertions · 7 erreurs PHPStan**.
+(aucune sur les fichiers corrigés). Au **18 septembre 2026** en fin de journée : **670 front** (637 + 33 de
+rendu) · **397 API · 982 assertions · 5 erreurs PHPStan** — deux des sept ont disparu avec le code
+qui les portait.
 
 **Et une épreuve que les tests ne remplacent pas** :
 `presentation/tournage/verifier-ecrans.mjs` pilote un vrai navigateur — connexion,
@@ -321,12 +322,17 @@ Un point laissé ouvert volontairement :
   `REPS_MAX_POUR_1RM`, pas écrit à la main. `pasConseille` descend à 1 kg pour les petites
   charges, où onze paliers ne donnaient que cinq charges distinctes.
 
-## Ce qui reste ouvert au 17 septembre 2026
+## Ce qui reste ouvert au 18 septembre 2026
 
-Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique, aucun élevé.
-04#9 (date d'une séance en UTC), qui y figurait, est clos le soir même : `src/calcul/dates.ts`.
+**Un seul constat, et il ne se règle pas dans ce dépôt : 02#8.** Copier les
+sauvegardes ailleurs que sur le volume qui porte la base est une tâche DSM, côté
+NAS ; elle est consignée dans `DEPLOIEMENT.md`. Aucun critique, aucun élevé.
 
-**À trancher — la décision appartient au propriétaire, avec son argument :**
+Les lignes barrées ci-dessous gardent la trace des dernières fermetures et de ce
+qui a été **refusé avec argument** — un refus motivé fait partie de la réponse, et
+c'est ce qu'on relira dans six mois.
+
+**Les quatre derniers arbitrages, rendus le 18 septembre 2026 :**
 
 | Constat | Gravité | Ce qui retient |
 |---|---|---|
@@ -334,13 +340,13 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 | ~~**02#15** — `compose.dev.yml` publie `5432:5432`~~ | faible | **clos le 18 septembre 2026 : gardé, et écrit.** Le port sert (`import_carnet.py`, `import_catalogue.py`, PhpStorm → Database), la base est de développement et son mot de passe est en clair deux lignes plus haut. Le raisonnement, et ce qui ferait changer d'avis — une copie de production restaurée là ⇒ `127.0.0.1:5432:5432` —, sont désormais dans `compose.dev.yml` au-dessus du `ports:` |
 | ~~**02#17** — aucune purge des invitations expirées~~ | faible | **clos le 18 septembre 2026.** `app:invitations:purger` (rétention 30 jours), jouée à chaque démarrage par `entrypoint-prod.sh`. La règle vit dans `Invitation::aPurger()` — **un seul juge**, éprouvé sans base : un `DELETE … WHERE` aurait été un second. Le cas qui a motivé le constat n'était pas les périmées mais les **orphelines** : supprimer un compte met `invitation.utilisateur_id` à NULL, la ligne restait « acceptée » sans nom, pour toujours, et réinviter cette adresse affichait deux lignes pour la même personne. Elles partent sans délai. Et un bouton **« Renvoyer un lien »** met le geste « la personne a perdu le lien » à portée, sans retaper l'adresse |
 
-**Ouverts, sans décision consignée :**
+**Les deux moyens du front et de l'infrastructure :**
 
-| Constat | Gravité | Preuve au 17 septembre 2026 |
+| Constat | Gravité | Preuve au 18 septembre 2026 |
 |---|---|---|
 | **02#8** — sauvegardes sur le même volume que la base | moyenne | **consigné** le 18 septembre dans `DEPLOIEMENT.md` ; l'action reste à faire sur le NAS (tâche DSM), hors dépôt |
-| **03 M5** — jetons en clair dans `localStorage` sur le web | moyenne | `front/src/api/client.ts:64-93` |
-| ~~**03 M13** — `noUncheckedIndexedAccess` désactivé~~ | moyenne | **clos le 18 septembre 2026.** Le drapeau est à `true` (`front/tsconfig.json:5`). Les 47 erreurs qu'il révélait sont corrigées **sans un seul `!` ni `as` ajouté** : les 22 d'`algebre.ts` par un invariant explicite (`ligneDe` / `caseDe` lèvent au lieu de combler — un `?? 0` au milieu d'une élimination de Gauss rendrait des grammes faux et plausibles), les 16 de tests par une assertion de test, `Record<string, number>` remplacé par `Record<keyof Variables, number>` dans `solveur.ts`, et deux refus d'affichage (`disqueRM.tsx` rend « — », `etatRequetes.ts` retombe sur `SANS_MESSAGE`). `npm test` : 631 + 33, 0 échec |
+| ~~**03 M5** — jetons en clair dans `localStorage` sur le web~~ | moyenne | **clos le 18 septembre 2026, corrigé et non assumé.** Sur le web, le jeton de rafraîchissement n'atteint plus le JavaScript : cookie `HttpOnly; SameSite=Strict; Path=/api` posé par Symfony (`api/src/Service/CookieDeSession.php`, 17 tests) ; le JWT ne vit plus que dans la page et `amorcerSession()` en redemande un au cookie à chaque chargement. Le `localStorage` d'une version antérieure est effacé au premier démarrage, sans attendre de reconnexion, et la bascule ne déconnecte personne. **Android inchangé** — `expo-secure-store` reste le coffre, et c'est le client qui *déclare* son mode. Prouvé à `curl` sur cinq chemins et dans Chromium de bout en bout. **La revue a attrapé deux pièges le jour même** : `Secure` ne pouvait pas venir de `$request->isSecure()` — le proxy DSM termine le TLS puis parle à Caddy en clair, sans `trusted_proxies`, le cookie serait donc parti **sans `Secure`** en production — il vient de `DEFAULT_URI` ; et l'amorçage web chassait vers `/connexion` quiconque ouvrait son **lien d'invitation** |
+| ~~**03 M13** — `noUncheckedIndexedAccess` désactivé~~ | moyenne | **clos le 18 septembre 2026.** Le drapeau est à `true` (`front/tsconfig.json:5`). Les 47 erreurs qu'il révélait sont corrigées **sans un seul `!` ni `as` ajouté** : les 22 d'`algebre.ts` par un invariant explicite (`ligneDe` / `caseDe` lèvent au lieu de combler — un `?? 0` au milieu d'une élimination de Gauss rendrait des grammes faux et plausibles), les 16 de tests par une assertion de test, `Record<string, number>` remplacé par `Record<keyof Variables, number>` dans `solveur.ts`, et deux refus d'affichage (`disqueRM.tsx` rend « — », `etatRequetes.ts` retombe sur `SANS_MESSAGE`). `npm test` : 637 + 33, 0 échec |
 
 Une refonte vers l'architecture hexagonale est un objectif assumé, **non commencée**. Voir la
 section « Skills » de `CLAUDE.md` : elle ne doit jamais se mélanger à une correction de bug.

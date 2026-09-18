@@ -8,8 +8,8 @@ description: Comment on teste l'API de fitcarnet — PHPUnit sans base ni noyau,
 `docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'` — **dans le
 conteneur** : le PHP de l'hôte n'a ni `dom`, ni `mbstring`, ni `xmlwriter`, et
 PHPUnit refuse de démarrer sans elles ; `cd api && bin/phpunit` échoue ici
-(vérifié le 17 septembre 2026, `php -m`). **356 tests, 918 assertions**,
-mesurés le 17 septembre 2026, en fin de journée.
+(vérifié le 17 septembre 2026, `php -m`). **395 tests, 981 assertions**,
+mesurés le 18 septembre 2026, en fin de journée.
 
 **La suite tourne sans base de données et sans noyau Symfony, et doit le rester.**
 C'est ce qui la rend exécutable partout, en une demi-seconde, sans effet de bord.
@@ -104,8 +104,10 @@ docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit --display-all-issues
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse --no-progress src/ tests/'
 ```
 
-PHPStan sort **7 erreurs connues** — `SessionController:108`,
-`JetonRafraichissement::\$empreinte`, `Invitation:175`, `ProtectionDuCompte:77`, et trois
-dans `tests/`. Aucune ne doit apparaître sur un fichier que tu viens de toucher.
+PHPStan sort **5 erreurs connues** au 18 septembre 2026 —
+`JetonRafraichissement::\$empreinte`, `ProtectionDuCompte:77`, et trois
+dans `tests/`. `SessionController:108` et `Invitation:175`, longtemps de la
+partie, ont disparu avec le code qui les portait. Aucune ne doit apparaître sur
+un fichier que tu viens de toucher.
 
 **Ne jamais déclarer terminé sans coller la sortie.**

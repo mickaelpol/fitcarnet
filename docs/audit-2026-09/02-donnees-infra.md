@@ -18,11 +18,19 @@ Les 21 migrations passent toutes sans erreur sur B — c'est le bon côté du co
 
 Comptage : **1 CRITIQUE, 5 ÉLEVÉES, 5 MOYENNES, 6 FAIBLES.**
 
-**État au 17 septembre 2026, vérifié constat par constat : onze clos, six
-ouverts.** Clos : 1 à 7, 11, 14, 18 et 19. **Ouverts** : 8, 9 et 12 (moyens,
-sans décision consignée) ; 13, 15 et 17 (faibles, **à trancher**, avec leur
-argument). Chaque constat porte son statut ; les constats clos suivent au
-présent de l'audit, leurs renvois pointent le code d'aujourd'hui.
+**État au 18 septembre 2026, vérifié constat par constat : seize clos, un
+ouvert.** Clos : 1 à 7, 9, 11 à 15, 17, 18 et 19. **Le seul ouvert est le 8**
+— copier les sauvegardes ailleurs que sur le volume qui porte la base. Il l'est
+parce qu'il ne se règle pas dans ce dépôt : c'est une tâche DSM, côté NAS, et
+elle est consignée dans `DEPLOIEMENT.md`.
+
+Les trois derniers — **13, 15 et 17** — ont été tranchés le 18 septembre 2026,
+et deux d'entre eux ne se sont pas refermés comme leur « correction proposée »
+le prévoyait. Lire la fin de chacun : le refus argumenté fait partie de la
+réponse.
+
+Chaque constat porte son statut ; les constats clos suivent au présent de
+l'audit, leurs renvois pointent le code d'aujourd'hui.
 
 ---
 
@@ -447,9 +455,24 @@ un `#[UniqueEntity]`. **Effort : 2 h.**
 
 ---
 
-## 13. OUVERT, À TRANCHER — Aucune limite de ressources ni rotation des journaux Docker
+## 13. CLOS — Aucune limite de ressources ni rotation des journaux Docker
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ, ouvert et à trancher au 17 septembre 2026.** L'argument
+> **CLOS LE 18 SEPTEMBRE 2026, À MOITIÉ, ET LA MOITIÉ REFUSÉE EST LA DÉCISION.**
+> La **rotation est posée** sur les trois services (`docker-compose.yml` :
+> `logging: json-file`, `max-size: 10m`, `max-file: 3` — soit 120 Mo au plus
+> pour les quatre conteneurs, les tâches tournant en deux exemplaires). Un
+> journal qui ne se purge jamais remplit `/volume1/@docker/containers/`, et ce
+> disque porte aussi `pgdata/` : la panne commence par le journal et finit par
+> une base qui n'écrit plus.
+>
+> **Ni `cpus:` ni `mem_limit:`, et c'est écrit dans le fichier.** Ce compose part
+> en production au prochain push, sans palier de recette. Une limite mémoire mal
+> choisie ne ralentit pas l'application, elle la **tue** — OOM, redémarrage, et
+> personne ne sait pourquoi. Le jour où `docker stats` aura tourné plusieurs
+> jours sur de la vraie charge, le chiffre se posera sur cette mesure et pas sur
+> une intuition. Le constat d'origine suit, au présent de l'audit.
+
+**Gravité : FAIBLE — Statut : CONFIRMÉ à l'audit, tranché le 18 septembre 2026.** L'argument
 qui retient : toute modification de `docker-compose.yml` se déploie en production au prochain
 push — une limite mémoire mal choisie arrêterait l'application réelle. `docker-compose.yml` : aucun `mem_limit`, `cpus`,
 `ulimits`, ni `logging.options.max-size` sur les quatre conteneurs (`grep` : seul `deploy:`
@@ -475,9 +498,19 @@ schéma qui laisse croire que les deux disent des choses différentes.
 
 ---
 
-## 15. OUVERT, À TRANCHER — La base de développement écoute sur toutes les interfaces avec un mot de passe trivial
+## 15. CLOS — La base de développement écoute sur toutes les interfaces avec un mot de passe trivial
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ, ouvert et à trancher au 17 septembre 2026.** L'argument
+> **CLOS LE 18 SEPTEMBRE 2026 : LE PORT RESTE, ET IL EST ENFIN ÉCRIT.** Ce qui
+> manquait n'était pas une fermeture, c'était la phrase qui empêche de le
+> redécouvrir comme un oubli. Elle est dans `compose.dev.yml`, au-dessus du
+> `ports:` : le port sert vraiment (`import_carnet.py`, `import_catalogue.py`,
+> PhpStorm), la base est de développement et son mot de passe est en clair deux
+> lignes plus haut, et la différence avec la production — où le bloc `ports:` de
+> la base a été retiré parce que le NAS est sur Internet — y est expliquée.
+> **Ce qui ferait changer d'avis y figure aussi** : une copie de production
+> restaurée là, et le port se lie à `127.0.0.1`. Le constat d'origine suit.
+
+**Gravité : FAIBLE — Statut : CONFIRMÉ à l'audit, tranché le 18 septembre 2026.** L'argument
 qui retient : ce port sert — `import_carnet.py` et `import_catalogue.py` visent
 `localhost:5432` par défaut. Un `127.0.0.1:5432:5432` les laisserait fonctionner depuis la
 machine elle-même, mais la décision n'est pas prise. `compose.dev.yml:24-25` (`ports: - "5432:5432"`) et
@@ -489,9 +522,30 @@ public, la base est joignable. Le raisonnement écrit pour la production
 
 ---
 
-## 17. OUVERT, À TRANCHER — Aucune purge des invitations expirées
+## 17. CLOS — Aucune purge des invitations expirées
 
-**Gravité : FAIBLE — Statut : CONFIRMÉ, ouvert et à trancher au 17 septembre 2026.** La
+> **CLOS LE 18 SEPTEMBRE 2026 — et le vrai encombrement n'était pas celui que ce
+> constat nommait.** Il parlait des périmées. Le poids mort venait des
+> **orphelines** : `invitation.utilisateur_id` est en `ON DELETE SET NULL`, donc
+> supprimer un compte laissait derrière lui une ligne « acceptée » **sans nom**,
+> pour toujours ; réinviter cette adresse affichait alors deux lignes pour la
+> même personne, dont une qui ne désignait plus personne. Elles partent **sans
+> délai** ; les acceptées et les périmées, après trente jours ; une invitation
+> **vivante n'est jamais purgée**, son lien est dehors.
+>
+> `bin/console app:invitations:purger` (`--simuler`, `--jours`), jouée à chaque
+> démarrage par `entrypoint-prod.sh` — le seul rendez-vous périodique que cette
+> pile possède sans ajouter de planificateur. **La règle n'est pas en SQL** mais
+> dans `Invitation::aPurger()`, où elle s'éprouve sans base : un `DELETE … WHERE`
+> aurait été un second juge de la même question, le motif de défaut le plus
+> fréquent de cet audit. La « correction proposée » ci-dessous, qui écrivait ce
+> `DELETE`, est donc **périmée** : elle dit le quoi, pas le où.
+>
+> Et un bouton **« Renvoyer un lien »** met à portée le geste le plus courant de
+> cet écran, sans route nouvelle : `POST /api/invitations` remplaçait déjà
+> l'invitation en attente. Le constat d'origine suit.
+
+**Gravité : FAIBLE — Statut : CONFIRMÉ à l'audit, corrigé le 18 septembre 2026.** La
 réinvitation, elle, n'est plus bloquée : une nouvelle invitation remplace celle qui attendait,
 expirée ou non (`InvitationsController.php:163-179`). Reste la purge, qui n'est pas décidée.
 À l'audit : `db/01-schema.sql:538-547` : la table `invitation`

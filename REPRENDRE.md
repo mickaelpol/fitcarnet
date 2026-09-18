@@ -18,15 +18,16 @@ d'une ligne de code, pas ce qui reste à faire.
   tire `master` toutes les 5 minutes. **La production a été contrôlée le
   18 septembre** — schéma conforme aux migrations 34-35-36, parcours réel
   éprouvé sur un compte jetable puis retiré (section 2.1).
-- **Tests** : 606 côté front plus 33 de rendu, 356 côté API (918 assertions),
-  tous verts. PHPStan : 7 erreurs connues, pas une de plus.
+- **Tests** : 637 côté front plus 33 de rendu, 397 côté API (982 assertions),
+  tous verts. PHPStan : **5 erreurs connues**, pas une de plus — c'était 7
+  jusqu'au 18 septembre 2026, deux ont disparu avec le code qui les portait.
 - **Contrôles de base**, tous verts : `verifier-schema.sh` (base neuve
   identique à base migrée), `verifier-migrations.sh`, `verifier-jeux.sh`,
   `test_import_carnet.py`.
 - **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
   puis deux passes des trois agents de contrôle et leurs correctifs.
-- **Audit de septembre** : 79 constats, **77 clos, 2 ouverts**, aucun
-  critique ni élevé (section 2.4).
+- **Audit de septembre** : 79 constats, **78 clos, 1 ouvert** — le seul restant, **02#8**, est hors dépôt (une tâche DSM, voir §2.2). Aucun
+  critique ni élevé. Les fermetures sont récapitulées en section 2.4.
 
 ---
 
@@ -46,8 +47,8 @@ cd front && npm install          # si package.json a bougé, ou si les tests de 
 Puis vérifier qu'on part d'un socle sain :
 
 ```bash
-cd front && npm test                                                  # 606 + 33, 0 échec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 330 tests, 864 assertions
+cd front && npm test                                                  # 637 + 33, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 397 tests, 982 assertions
 db/manuel/verifier-schema.sh                                          # « identiques »
 db/manuel/verifier-migrations.sh                                      # vert
 db/manuel/verifier-jeux.sh                                            # vert
@@ -66,8 +67,9 @@ pas du code : le régler d'abord.
 > tournage : d'abord les trois arbitrages de la section 2.3, puis les comptes
 > de démonstration sur le NAS, puis bobine par bobine.
 
-> Lis `REPRENDRE.md`. On attaque les constats d'audit ouverts de la
-> section 2.4, en TDD, un commit par constat.
+> Lis `REPRENDRE.md`. Il ne reste qu'un constat d'audit, **02#8**, et il se
+> règle sur le NAS, pas dans le dépôt (section 2.2). Pour la suite, la section 3
+> dit par quoi continuer.
 
 ---
 
@@ -174,7 +176,7 @@ l'instance filmée. Sur la base de dev **du premier poste**, deux comptes
 jetables servent aux captures (`demo-verif@test.local`,
 `demo-admin-verif@test.local`) : les retirer une fois les captures refaites.
 
-### 2.4 Les 2 constats d'audit ouverts
+### 2.4 Les fermetures d'audit, et ce qu'elles ont coûté
 
 Vérifiés un par un le 17 septembre 2026. Aucun critique, aucun élevé. La
 preuve de chacun (fichier et ligne) est dans
@@ -182,35 +184,61 @@ preuve de chacun (fichier et ligne) est dans
 reste ouvert » ; le constat complet, dans le rapport indiqué (`02` = données et
 infrastructure, `03` = front, `04` = tests et qualité).
 
-**Les quatre arbitrages sont rendus** (18 septembre 2026) ; deux sont déjà en place :
+**Les quatre arbitrages sont rendus, et les quatre sont en place** (18 septembre 2026). Les trois premiers tiennent en un tableau ; M5 a demandé une journée et sa propre section, juste après :
 
 | Constat | Gravité | Ce qui retient |
 |---|---|---|
-| **03 M5** — jetons de session en clair dans `localStorage` sur le web | moyenne | deux issues, et la seconde est un chantier — voir ci-dessous |
 | ~~**02#13**~~ | faible | **tranché le 18 septembre 2026 : rotation seule.** `json-file`, 10 Mo × 3, sur les trois services. Les limites CPU/mémoire sont refusées tant qu'aucune mesure ne les fonde |
 | ~~**02#15**~~ | faible | **tranché le 18 septembre 2026 : gardé, et écrit** dans `compose.dev.yml` |
 | ~~**02#17**~~ | faible | **tranché et fait le 18 septembre 2026** : `app:invitations:purger`, rétention 30 jours, jouée à chaque démarrage ; les **orphelines** (compte supprimé) partent sans délai ; bouton « Renvoyer un lien » sur l'écran d'administration |
 
-**M5 en détail, parce que c'est le seul des quatre qui touche à la sécurité.**
-Sur le web, le coffre retombe sur `localStorage` : le JWT **et** le jeton de
-rafraîchissement y sont en clair, lisibles par tout script de la page et
-persistants. Le rafraîchissement est le plus exposé — il rouvre la session
-indéfiniment, là où le JWT expire en une heure. C'est la seule chose du front
-qui, volée, donne un accès durable.
+**M5 est fait — 18 septembre 2026.** Sur le web, le coffre retombait sur
+`localStorage` : le JWT **et** le jeton de rafraîchissement y étaient en clair,
+lisibles par tout script de la page et persistants. Le rafraîchissement était le
+plus exposé — il rouvre la session quatre-vingt-dix jours, là où le JWT expire en
+une heure. C'était la seule chose du front qui, volée, donne un accès durable.
 
-Ce qui limite le risque aujourd'hui : aucun contenu tiers dans la page, aucune
-publicité, aucune bibliothèque chargée d'un CDN, et une poignée d'utilisateurs
-connus. Il faudrait donc une faille XSS **dans notre propre code** pour
-l'atteindre.
+Ce qui limitait le risque : aucun contenu tiers dans la page, aucune publicité,
+aucune bibliothèque chargée d'un CDN. Il aurait fallu une faille XSS **dans notre
+propre code**. L'option « l'assumer par écrit » a été écartée au profit du
+correctif.
 
-- **L'assumer par écrit** (30 min) : ce paragraphe devient la décision, et le
-  constat se ferme en disant pourquoi.
-- **Le corriger** (une demi-journée) : JWT en mémoire seule, et rafraîchissement
-  dans un cookie `HttpOnly; Secure; SameSite=Strict` posé par Symfony. Front et
-  API sont sur la même origine en HTTPS, donc c'est faisable sans bricolage —
-  mais ça touche la connexion, le renouvellement et la déconnexion, c'est-à-dire
-  le chemin par lequel tout le monde entre. À éprouver de bout en bout avant de
-  pousser.
+Désormais, sur le web : le jeton de rafraîchissement n'arrive plus jusqu'au
+JavaScript, il est dans un cookie `HttpOnly; SameSite=Strict; Path=/api` que
+Symfony pose (`api/src/Service/CookieDeSession.php`) ; le JWT ne vit que dans une
+variable de la page, et `amorcerSession()` en redemande un au cookie à chaque
+chargement. **Sur Android rien ne change** : `expo-secure-store` s'adosse au
+trousseau du système, et le client *déclare* son mode au serveur au lieu que
+celui-ci le devine.
+
+Trois choses à savoir :
+
+- **`Secure` n'est pas écrit en dur** : `Response::prepare()` le pose d'après le
+  schéma de la requête. HTTPS en production, pas en développement sur
+  `http://localhost` — où un cookie `Secure` serait simplement jeté.
+- **`nelmio_cors` active `allow_credentials`**, pour le seul développement
+  (`expo start --web` sur `:8081`, l'API sur `:8080`). En production tout est sur
+  la même origine. Conséquence : `CORS_ALLOW_ORIGIN` n'est plus une ligne
+  anodine — l'élargir laisserait désormais un site tiers agir **avec le cookie**.
+- **La bascule ne déconnecte personne** : un navigateur qui porte encore
+  l'ancien jeton dans `localStorage` l'envoie une dernière fois, reçoit un
+  cookie, et le `localStorage` est effacé au premier démarrage qui suit la mise
+  à jour — même si la personne ne se reconnecte jamais.
+
+**Ce que ça coûte, et on l'assume :** sur le web, le démarrage dépend désormais
+d'un aller-retour avec le serveur. API éteinte ou lente, l'écran de chargement
+dure jusqu'à trente secondes (le délai de garde de `client.ts`) avant que l'écran
+de connexion n'apparaisse. On a écarté la parade évidente — rendre la main plus
+tôt et laisser la session s'ouvrir derrière — parce que `connexion.tsx` ne
+redirige pas quand la session s'ouvre toute seule : la personne resterait plantée
+sur l'écran de connexion **en étant connectée**. À reprendre le jour où cet écran
+saura s'effacer.
+
+Preuve : `CookieDeSessionTest` (17 tests), six tests de `renouvellement.test.ts`
+sur le mode cookie, les cinq chemins vérifiés à `curl` (web, natif, bascule,
+déconnexion, cookie révoqué), et un parcours Chromium complet — `localStorage`
+vide après connexion, cookie `HttpOnly` invisible de `document.cookie`, session
+qui survit au rechargement, déconnexion qui emporte le cookie.
 
 **Celui qui n'avait jamais été tranché est tranché :**
 

@@ -12,16 +12,17 @@
 > `repas.tsx` 2 316 → **655**, `frigo.tsx` 827 → **392**, `admin-exercices.tsx`
 > 711 → **195**, `seance/[id].tsx` 430 → **340**.
 >
-> **État des constats, vérifié le 17 septembre 2026 : 25 clos, 8 ouverts.**
-> Clos : É1 à É5, M1 à M4, M7, M14, et les quatorze faibles — F8 refusé avec
-> argument, F12 pour l'essentiel (`pourObtenirCuit` gardé, il a ses tests).
-> **Ouverts** : M5 (jetons en clair dans `localStorage` sur le web), M6
-> (partiel : `seance/[id].tsx` garde son erreur, `modele/[id].tsx`,
-> `admin-utilisateurs.tsx` et les cibles de `repas.tsx` non), M8
-> (`RECORD_AUDIO` toujours déclaré deux fois dans `app.json`), M9, M10, M11
-> (le `retry: false` de `useMoi` ne distingue toujours pas une panne réseau),
-> M12 et M13 (`noUncheckedIndexedAccess` toujours à `false`). Le détail est
-> dans [README.md](README.md), « Ce qui reste ouvert ».
+> **État des constats, vérifié le 18 septembre 2026 : les 33 sont clos.**
+> É1 à É5, M1 à M14, et les quatorze faibles — F8 refusé avec argument, F12
+> pour l'essentiel (`pourObtenirCuit` gardé, il a ses tests).
+>
+> Les six derniers sont tombés les 17 et 18 septembre : M6 (`etatRequetes.ts`),
+> M8 (`RECORD_AUDIO` n'est plus dans `app.json`), M9, M10, M11
+> (`reessai.ts` distingue enfin la panne réseau du refus d'identité), M12
+> (`etatInventaire.ts`), M13 (`noUncheckedIndexedAccess` est à `true`) et
+> **M5**, corrigé et non assumé : le jeton de rafraîchissement du web est dans
+> un cookie `HttpOnly` que Symfony pose, le JWT ne vit plus que dans la page.
+> Le détail est dans [README.md](README.md).
 >
 > Ce document garde toute sa valeur pour **le raisonnement** de chaque constat —
 > pourquoi c'est un défaut, ce qu'il coûte. Il n'en a plus aucune pour
@@ -199,8 +200,31 @@ Tout le reste de `calculer` gère `glucidesTotaux` (l. 44-45, 110, 135, 194, 205
 Le rattrapage limite les dégâts — la boucle des négatifs zéroe le −41 109, re-résout le sous-système 2×2 → riz 89,5 g / huile 19,4 g — mais le message affiché est alors **faux** : « Pas de riz A dans ce repas : le reste apporte déjà tout ce qu'il faut » (`solveur.ts:164`), alors que les protéines finissent à 6,4 g pour 40 visés. L'écart, lui, est correctement reporté ; c'est l'explication qui ment.
 **Correction (~30 min)** : seuil relatif (`EPSILON × max|A|` calculé une fois sur la matrice d'entrée), et un message de `quantite_negative` qui distingue « le reste couvre déjà » d'« aliments trop proches ».
 
-## M5. Jetons en clair dans localStorage sur le web
-**MOYENNE · CONFIRMÉ · `front/src/api/client.ts:36-50`**
+## M5. ~~Jetons en clair dans localStorage sur le web~~ — CLOS
+**MOYENNE · CORRIGÉ LE 18 SEPTEMBRE 2026**
+
+> **CORRIGÉ, ET NON ASSUMÉ.** Sur le web, le jeton de rafraîchissement
+> n'atteint plus le JavaScript : il est dans un cookie `HttpOnly;
+> SameSite=Strict; Path=/api` posé par Symfony
+> (`api/src/Service/CookieDeSession.php`, 17 tests). Le JWT ne vit plus que
+> dans une variable de la page — un rechargement le perd, et `amorcerSession()`
+> en redemande un au cookie. Ce qu'une version antérieure avait laissé dans
+> `localStorage` sert une dernière fois à obtenir le cookie, puis est effacé :
+> **la bascule ne déconnecte personne**. Sur Android rien ne change,
+> `expo-secure-store` reste le coffre, et c'est le client qui *déclare* son
+> mode au serveur plutôt que celui-ci de le deviner.
+>
+> **Deux pièges attrapés par la revue, le jour même, avant la mise en ligne.**
+> `Secure` ne pouvait pas venir de `$request->isSecure()` : le proxy DSM
+> termine le TLS puis parle à Caddy en clair, et Symfony n'a aucun
+> `trusted_proxies` — le cookie serait parti **sans `Secure`** en production,
+> soit la fuite même que ce constat visait. Il est désormais déduit de
+> `DEFAULT_URI`. Et l'amorçage web, qui interroge le serveur au démarrage,
+> chassait vers `/connexion` quiconque ouvrait son **lien d'invitation** : une
+> fin de session ne redirige plus depuis une route ouverte à tous.
+>
+> Prouvé à `curl` sur cinq chemins et dans Chromium de bout en bout, parcours
+> d'invitation compris. Le constat d'origine suit, au présent de l'audit.
 
 `coffre` utilise `SecureStore` en natif (chiffré, correct) mais retombe sur `globalThis.localStorage` sur le web. Le JWT **et le jeton de rafraîchissement** y sont écrits en clair sous `fitcarnet.jeton` / `fitcarnet.rafraichissement`, lisibles par tout script de la page et persistants. Le jeton de rafraîchissement est le plus exposé : il rouvre la session indéfiniment, là où le JWT expire en une heure. Le commentaire de la ligne 30 (« une seule porte, une seule règle ») élude le fait que la règle n'est pas la même des deux côtés.
 Risque réel faible ici : pas de contenu tiers dans la page, quelques utilisateurs connus. Mais c'est la seule chose du front qui, volée, donne un accès durable.
@@ -334,8 +358,17 @@ Désactiver les réessais est justifié pour un refus d'identité, mais `retry: 
 `mode`, `saisies` et `vus` sont des `useState` du composant d'onglet. Le commentaire des l. 175-180 raconte le bug (« un inventaire de trente articles disparaissait parce qu'on était allé vérifier une quantité dans l'onglet Stock ») et le correctif posé (`if (Object.keys(saisies).length === 0)`, l. 181) est un contournement : quitter l'onglet démonte quand même le composant. Le projet a déjà le bon patron, deux fois (`etatChrono.ts`, `etatMesure.ts`).
 **Correction (moyen)** : `src/composants/etatInventaire.ts`.
 
-## M13. `noUncheckedIndexedAccess` désactivé
-**MOYENNE · CONFIRMÉ · `front/tsconfig.json:5`**
+## M13. ~~`noUncheckedIndexedAccess` désactivé~~ — CLOS
+**MOYENNE · CORRIGÉ LE 18 SEPTEMBRE 2026**
+
+> Le drapeau est à `true` (`front/tsconfig.json:5`). Les 47 erreurs qu'il a
+> révélées sont corrigées **sans un seul `!` ni `as` ajouté** — la « correction »
+> ci-dessous disait « rallumer et mesurer d'abord », c'est ce qui a été fait, et
+> la mesure a montré que 22 des 47 étaient dans `algebre.ts`. Une case absente y
+> est désormais un **refus franc** (`ligneDe`, `caseDe` lèvent) : un `?? 0` au
+> milieu d'une élimination de Gauss ne fait pas échouer le calcul, il le fait
+> **réussir sur un autre système** — et l'application rend alors des grammes que
+> quelqu'un pèse et mange. Le constat d'origine suit.
 
 `strict: true` est bien activé, mais ce drapeau à `false` désactive le seul garde-fou qui rende `tableau[i]` typé `T | undefined`. Dans une base qui indexe beaucoup — `joursRetenus[0]`, `e.groupes[0]`, `b.cle.split('|')[1] as Repas` (`cuisson.ts:367`, `composer.ts:643`, `repas.tsx:1484`), `Object.keys(suite)[0]` — c'est le chemin le plus court vers un `undefined` qui traverse un calcul sans bruit. Le code montre que l'auteur en est conscient (`?? null` posés à la main, `SONNERIES[0]` suivi d'un `if (son === undefined)`), mais la protection est manuelle donc oubliable — et les trois `as Repas` contournent le typage précisément là où l'index peut manquer.
 **Correction** : rallumer et mesurer d'abord (`tsc --noEmit`) avant de s'engager.

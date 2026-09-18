@@ -72,18 +72,18 @@ captif — laissait la promesse en suspens pour toujours. Chaque écran restait 
 son rond qui tourne, sans erreur et sans « Réessayer », puisque React Query
 attendait encore la première réponse.
 
-Le délai de garde vaut **30 000 ms** (`client.ts:220`) et le message est, au
-caractère près (`client.ts:368-370`) :
+Le délai de garde vaut **30 000 ms** (`client.ts:289`) et le message est, au
+caractère près (`client.ts:513-516`) :
 
 > **Le serveur ne répond pas (plus de 30 s) : `<adresse>`. Réessaie dans un
 > instant ; si ça dure, vérifie ta connexion et que le serveur est bien allumé.**
 
 Trois précisions qui comptent :
 
-- **le corps est lu dans le même délai** (`client.ts:244-251`) : un `fetch` résout
+- **le corps est lu dans le même délai** (`client.ts:307-313`) : un `fetch` résout
   dès les en-têtes, et annuler le minuteur là laissait `text()` attendre sans
   limite ;
-- **le renouvellement passe par là aussi** (`client.ts:266`) — `uneSeuleFois` fait
+- **le renouvellement passe par là aussi** (`client.ts:350`) — `uneSeuleFois` fait
   attendre toutes les requêtes derrière un seul `/jeton/rafraichir`, qui muet les
   figeait toutes d'un coup ;
 - **le message ne désigne pas de coupable** : sur Android, un serveur éteint ne
@@ -170,16 +170,35 @@ créer l'invitation. **Données de départ** : aucune.
 
 ### D. Tenir et terminer la session
 
-- La connexion rend `token` **et** `jetonRafraichissement`, ajouté par un
-  écouteur greffé sur Lexik (`api/src/EventListener/AjouterJetonRafraichissement.php:36`).
-- Les deux jetons vont au coffre : `expo-secure-store` en natif, `localStorage`
-  sur le web (`client.ts:64-93`). **Le cache est purgé AVANT l'appel de connexion**
-  (`front/src/api/hooks/auth.ts:36`).
-- Un 401 déclenche un renouvellement et **un seul rejeu** (`client.ts:303-314`).
-- **`Se déconnecter`** (`cadreCompte.tsx:66-68`) prévient le serveur, efface les
-  deux jetons, puis purge mémoire **et** disque (`auth.ts:59-80`).
+**LA SESSION N'EST PLUS RANGÉE AU MÊME ENDROIT SELON LA PLATEFORME — constat
+M5, 18 septembre 2026.** Cette fiche disait « les deux jetons vont au coffre :
+`expo-secure-store` en natif, `localStorage` sur le web ». C'est resté vrai du
+téléphone, et c'est devenu faux du web le jour où le constat a été corrigé. Un
+agent qui charge cette fiche pour éprouver la bobine vérifierait le mauvais
+critère.
+
+- **Sur Android**, rien n'a changé : la connexion rend `token` **et**
+  `jetonRafraichissement` (écouteur greffé sur Lexik,
+  `api/src/EventListener/AjouterJetonRafraichissement.php:61`), et les deux vont
+  au coffre `expo-secure-store` (`client.ts:94-125`).
+- **Sur le web**, le jeton de rafraîchissement **n'atteint jamais le
+  JavaScript** : il est dans un cookie `HttpOnly; SameSite=Strict; Path=/api`
+  posé par Symfony (`api/src/Service/CookieDeSession.php`). Le JWT, lui, ne vit
+  que dans une variable de la page — un rechargement le perd, et
+  `amorcerSession()` (`client.ts:378`) en redemande un au cookie. **`localStorage`
+  ne porte plus aucun jeton**, et ce qu'une version antérieure y avait laissé est
+  effacé au premier démarrage (`client.ts:167-176`).
+- Le client **déclare** son mode au serveur (`cookieDeSession: true`), le serveur
+  ne le devine pas.
+- **Le cache est purgé AVANT l'appel de connexion**
+  (`front/src/api/hooks/auth.ts:37`).
+- Un 401 déclenche un renouvellement et **un seul rejeu** (`client.ts:440-448`).
+- **`Se déconnecter`** (`cadreCompte.tsx:66-68`) prévient le serveur — **y compris
+  sur le web, où il n'y a plus de jeton à montrer** : c'est le cookie qui
+  l'authentifie, et la réponse l'efface — puis purge mémoire **et** disque
+  (`auth.ts:70-102`).
 - Une session morte ramène à la connexion et vide les deux caches
-  (`_layout.tsx:159-170`).
+  (`_layout.tsx:164-175`).
 
 ## Critères d'acceptation
 
@@ -194,7 +213,7 @@ créer l'invitation. **Données de départ** : aucune.
    il devient un annuaire de comptes. Le texte vient de Symfony, en français
    (`api/config/packages/translation.yaml:12`) ; le repli côté client est
    « Identifiants incorrects. » et ne s'applique qu'aux appels `sansJeton`
-   (`client.ts:479-483`).
+   (`client.ts:615-618`).
 4. **Aucune inscription libre**, et aucun chemin détourné : `POST /api/utilisateurs`
    exige `ROLE_ADMIN` (`api/src/Entity/Utilisateur.php:31`), et un compte créé
    sans mot de passe est refusé (`api/src/State/UtilisateurProcessor.php:87-91`).
@@ -260,7 +279,7 @@ créer l'invitation. **Données de départ** : aucune.
     (`persistance.ts:79`). Vérifiable : `fitcarnet-cache-v1` ne doit contenir
     aucun `motDePasse`.
 22. **Le serveur ne répond pas → message en 30 s, jamais un écran figé**
-    (`client.ts:363-371`). Témoins : `client.test.ts:699`, `:744`.
+    (`client.ts:510-517`). Témoins : `client.test.ts:699`, `:744`.
 23. **Onglet Compte en erreur OU en attente → « Se déconnecter » présent et
     agissant** (`cadreCompte.tsx:64-68`). Et l'inverse tient aussi : le contenu du
     compte **ne s'affiche pas** tant qu'il n'a pas été reçu — pas de nom en tiret
