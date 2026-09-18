@@ -51,14 +51,14 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         // ne laisse de toute facon charger que les siens : l'expression le
         // redit, pour qu'une regression du filtre ne suffise pas a ouvrir.
         new Patch(
-            security: 'object.getUtilisateur() == user',
+            security: "is_granted('MIEN', object)",
             processor: AlimentProcessor::class,
         ),
         // La suppression est refusee s'il en reste en stock : voir le
         // processeur. Un compte lisant Grocy n'a rien ici — tout s'y passe
         // dans Grocy.
         new Delete(
-            security: 'object.getUtilisateur() == user',
+            security: "is_granted('MIEN', object)",
             processor: AlimentSuppressionProcessor::class,
         ),
     ],

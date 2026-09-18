@@ -29,7 +29,7 @@ use Symfony\Component\Serializer\Attribute\Groups;
 #[ApiResource(
     operations: [
         new GetCollection(),
-        new Get(security: "object.getUtilisateur() == user"),
+        new Get(security: "is_granted('MIEN', object)"),
     ],
     normalizationContext: ['groups' => ['stock:lire']],
     security: "is_granted('ROLE_USER')",

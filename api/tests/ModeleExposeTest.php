@@ -9,6 +9,7 @@ use ApiPlatform\Metadata\Operation;
 use App\Entity\Aliment;
 use App\Entity\Exercice;
 use App\Entity\ProprieteUtilisateur;
+use App\Security\Voter\EstLeProprietaire;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -140,10 +141,21 @@ final class ModeleExposeTest extends TestCase
      * finit recopie la ou il ferait effet — c'est le motif de defaut dominant
      * de ce projet, dans l'autre sens.
      *
-     * LA REGLE FIGEE ICI : sur une entite filtree par le proprietaire, la
-     * seule chose qu'une expression de securite peut demander a l'objet est
-     * `getUtilisateur()`. Tout autre `object.<methode>()` designe une
-     * condition que la requete SQL a deja tranchee.
+     * LA REGLE FIGEE ICI : sur une entite filtree par le proprietaire, la seule
+     * expression permise est `is_granted('MIEN', object)` — le voter
+     * `EstLeProprietaire`. Depuis le 18 septembre 2026, elle ne s'ecrit plus a
+     * la main : `object.getUtilisateur() == user` etait recopiee DIX-SEPT fois
+     * dans sept entites, et la documentation d'API Platform montre justement
+     * `is_granted('…', object)` comme la forme a employer.
+     *
+     * Ce test verifie l'attribut par la CONSTANTE du voter : une faute de frappe
+     * dans l'un des dix-sept endroits — `is_granted('MIENS', object)` — donnerait
+     * un voter qui ne se prononce jamais, donc un refus silencieux sur les
+     * donnees de leur propre proprietaire. Le mot est ecrit une fois en PHP, il
+     * est verifie ici partout ailleurs.
+     *
+     * Tout `object.<methode>()` reste interdit : il designe une condition que la
+     * requete SQL a deja tranchee.
      *
      * Ce test parcourt les entites reelles : il verra celle qu'on ajoutera
      * apres l'avoir oublie.
@@ -174,7 +186,24 @@ final class ModeleExposeTest extends TestCase
             "{$nom} est filtree par le proprietaire mais ne porte AUCUNE expression "
             . 'de securite : la defense en profondeur du projet en demande deux.');
 
+        $attendue = "is_granted('" . EstLeProprietaire::MIEN . "', object)";
+
         foreach (self::expressionsDeSecurite($classe) as $operation => $expression) {
+            /* Les expressions de ROLE restent ce qu'elles sont : `is_granted('ROLE_USER')`
+               au niveau de la ressource, et sur un `Post` ou aucun objet n'existe encore.
+               La regle ne porte que sur celles qui parlent de l'OBJET. */
+            if (!\str_contains($expression, 'object')) {
+                continue;
+            }
+
+            self::assertSame(
+                $attendue, $expression,
+                "{$nom}, operation {$operation} : la propriete se demande au voter "
+                . "EstLeProprietaire, pas a une expression ecrite sur place. Elle etait "
+                . 'recopiee dix-sept fois avant le 18 septembre 2026 ; une seule regle '
+                . 'vaut mieux que dix-sept copies qui divergeront.',
+            );
+
             \preg_match_all('/object\.(\w+)\s*\(/', $expression, $trouves);
 
             foreach ($trouves[1] as $methode) {
@@ -266,8 +295,8 @@ final class ModeleExposeTest extends TestCase
             'Aliment doit implementer ProprieteUtilisateur : sans cela, FiltreProprietaire '
             . 'ne le filtre pas et chaque compte lit les aliments de tous les autres.');
 
-        self::assertStringContainsString(
-            'object.getUtilisateur() == user',
+        self::assertSame(
+            "is_granted('" . EstLeProprietaire::MIEN . "', object)",
             self::expressionsDeSecurite(Aliment::class)['Patch'] ?? '',
             'seul le proprietaire d\'un aliment le corrige');
     }

@@ -51,10 +51,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         // `db/01-schema.sql`, plus le type et l'appel cote front — les quatre
         // ensemble, parce qu'une moitie de suppression est pire que rien.
         // Aucune donnee perdue : la colonne n'a jamais porte que `false`.
-        new Get(security: "object.getUtilisateur() == user"),
+        new Get(security: "is_granted('MIEN', object)"),
         new Post(processor: ProprietaireProcessor::class),
-        new Patch(security: "object.getUtilisateur() == user", processor: ProprietaireProcessor::class),
-        new Delete(security: "object.getUtilisateur() == user"),
+        new Patch(security: "is_granted('MIEN', object)", processor: ProprietaireProcessor::class),
+        new Delete(security: "is_granted('MIEN', object)"),
     ],
     normalizationContext: ['groups' => ['modele:lire'], 'skip_null_values' => false],
     denormalizationContext: ['groups' => ['modele:ecrire']],

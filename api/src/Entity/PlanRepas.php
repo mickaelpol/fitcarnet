@@ -50,9 +50,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     operations: [
         new GetCollection(),
-        new Get(security: 'object.getUtilisateur() == user'),
+        new Get(security: "is_granted('MIEN', object)"),
         new Post(processor: ProprietaireProcessor::class),
-        new Delete(security: 'object.getUtilisateur() == user'),
+        new Delete(security: "is_granted('MIEN', object)"),
     ],
     normalizationContext: ['groups' => ['plan:lire']],
     denormalizationContext: ['groups' => ['plan:ecrire']],

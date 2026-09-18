@@ -32,10 +32,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     operations: [
         new GetCollection(),
-        new Get(security: "object.getUtilisateur() == user"),
+        new Get(security: "is_granted('MIEN', object)"),
         new Post(processor: ProprietaireProcessor::class),
-        new Patch(security: "object.getUtilisateur() == user", processor: ProprietaireProcessor::class),
-        new Delete(security: "object.getUtilisateur() == user"),
+        new Patch(security: "is_granted('MIEN', object)", processor: ProprietaireProcessor::class),
+        new Delete(security: "is_granted('MIEN', object)"),
     ],
     normalizationContext: ['groups' => ['seance:lire'], 'skip_null_values' => false],
     denormalizationContext: ['groups' => ['seance:ecrire']],
