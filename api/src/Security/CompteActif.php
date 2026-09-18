@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Security;
 
 use App\Entity\Utilisateur;
+use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAccountStatusException;
 use Symfony\Component\Security\Core\User\UserCheckerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -62,8 +63,16 @@ final class CompteActif implements UserCheckerInterface
         }
     }
 
-    public function checkPostAuth(UserInterface $user): void
+    /**
+     * Apres l'authentification : rien, tout ce qui compte se decide avant.
+     *
+     * LE SECOND ARGUMENT EST LA POUR LA SUITE. `UserCheckerInterface` l'exigera
+     * dans sa prochaine version majeure, et Symfony 7.4 le signale deja en
+     * depreciation au demarrage (`bin/console debug:container --deprecations`).
+     * On l'ajoute avec une valeur par defaut : la signature reste compatible
+     * avec la version actuelle, et le jour de la montee ne demandera rien.
+     */
+    public function checkPostAuth(UserInterface $user, ?TokenInterface $token = null): void
     {
-        // Rien : tout ce qui compte se decide avant.
     }
 }

@@ -7,6 +7,7 @@ namespace App\Security\Voter;
 use App\Entity\ProprieteUtilisateur;
 use App\Entity\Utilisateur;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
@@ -50,8 +51,17 @@ final class EstLeProprietaire extends Voter
         return self::MIEN === $attribute && $subject instanceof ProprieteUtilisateur;
     }
 
-    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
-    {
+    /**
+     * Le quatrieme argument est la pour la suite : `Voter` l'exigera dans sa
+     * prochaine version majeure, et Symfony 7.4 le signale deja en depreciation.
+     * Avec sa valeur par defaut, la signature reste valable aujourd'hui.
+     */
+    protected function voteOnAttribute(
+        string $attribute,
+        mixed $subject,
+        TokenInterface $token,
+        ?Vote $vote = null,
+    ): bool {
         $moi = $token->getUser();
         \assert($subject instanceof ProprieteUtilisateur);
 
