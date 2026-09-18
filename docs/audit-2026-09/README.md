@@ -14,7 +14,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 67 constats clos, 12 ouverts** — vérifiés un par un
+> **Au 18 septembre 2026 : 68 constats clos, 11 ouverts** — vérifiés un par un
 > dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 18
 > sont 12 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
 > 17 ; 03 — 8 sur 33 ; 04 — 4 sur 17. **Trois sont à trancher** (02#13,
@@ -337,7 +337,6 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 | Constat | Gravité | Preuve au 17 septembre 2026 |
 |---|---|---|
 | **02#8** — sauvegardes sur le même volume que la base | moyenne | correction hors dépôt ; rien ne la consigne |
-| **02#9** — `deployer-nas.sh` redémarre l'application et les travailleurs d'un seul `restart` | moyenne | `deployer-nas.sh:195-197` |
 | **03 M5** — jetons en clair dans `localStorage` sur le web | moyenne | `front/src/api/client.ts:64-93` |
 | **03 M6** — chargement infini quand une requête voisine échoue | moyenne | **partiel** : `seance/[id].tsx` corrigé ; `modele/[id].tsx:74-78`, `admin-utilisateurs.tsx` et les cibles de `repas.tsx` non |
 | **03 M10** — course au chargement des jetons | moyenne | `front/src/api/client.ts:106-113` |

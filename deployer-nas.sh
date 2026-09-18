@@ -191,10 +191,67 @@ $(tail -40 "$JOURNAL")"
 # semaines — il a charge ses classes au demarrage et ne les relira jamais.
 # Sans ce redemarrage, il appliquerait les inventaires avec le code d'il y a
 # trois deploiements, sans que rien ne le signale.
-dire "redemarrage de fitcarnet-app et fitcarnet-taches"
-$COMPOSE --env-file "$DOSSIER/.env" -f "$DOSSIER/docker-compose.yml" \
-    restart fitcarnet-app fitcarnet-taches >>"$JOURNAL" 2>&1 \
+# DANS CET ORDRE, ET PAS D'UN SEUL `restart` — constat 02#9 de l'audit.
+#
+# `docker compose restart fitcarnet-app fitcarnet-taches` redemarre les deux
+# conteneurs SANS REEVALUER `depends_on`. La garantie posee dans
+# docker-compose.yml — « fitcarnet-taches attend que fitcarnet-app soit
+# healthy » — ne valait donc que pour le tout premier `up`, jamais pour le
+# chemin de deploiement reel. Les travailleurs repartaient avec le NOUVEAU code
+# pendant que fitcarnet-app en etait encore a `composer install` (jusqu'a trois
+# minutes) et a ses migrations : ils appliquaient des inventaires contre une
+# base pas encore migree et un vendor/ a moitie ecrit, sur le meme /app monte.
+#
+# On arrete donc les travailleurs, on redemarre l'application, on ATTEND
+# qu'elle soit saine, et on les relance. C'est la main qui refait ce que
+# `depends_on` aurait fait.
+# Une fonction, PAS un tableau : ce script tourne sous /bin/sh, et `x=(...)`
+# est un bashisme que le shell du NAS refuserait — le deploiement mourrait a
+# cette ligne. `$COMPOSE` reste non protege : il vaut « docker compose » ou
+# « docker-compose », et c'est la decoupe en deux mots qu'on veut ici.
+composer_la() {
+    $COMPOSE --env-file "$DOSSIER/.env" -f "$DOSSIER/docker-compose.yml" "$@"
+}
+
+dire "arret des travailleurs d'inventaire"
+composer_la stop fitcarnet-taches >>"$JOURNAL" 2>&1 \
+    || echec "l'arrêt des travailleurs a échoué. Les 40 dernières lignes :
+$(tail -40 "$JOURNAL")"
+
+dire "redemarrage de fitcarnet-app"
+composer_la restart fitcarnet-app >>"$JOURNAL" 2>&1 \
     || echec "le redémarrage a échoué. Les 40 dernières lignes :
+$(tail -40 "$JOURNAL")"
+
+# La sonde de fitcarnet-app tourne toutes les 15 s et tolere 20 echecs : cinq
+# minutes au pire. On attend six, puis on renonce en le disant — demarrer les
+# travailleurs sur une application qui n'a pas fini serait exactement le defaut
+# qu'on corrige ici.
+dire "attente de fitcarnet-app (sain)"
+# Une boucle comptee a la main plutot que `seq` : busybox l'a, mais on ne
+# depend pas d'un binaire de plus pour attendre.
+SANTE=inconnu
+ESSAIS=0
+while [ "$ESSAIS" -lt 72 ]; do
+    SANTE=$(docker inspect -f '{{.State.Health.Status}}' fitcarnet-app 2>/dev/null || echo inconnu)
+    if [ "$SANTE" = "healthy" ]; then
+        break
+    fi
+    ESSAIS=$((ESSAIS + 1))
+    sleep 5
+done
+
+if [ "$SANTE" != "healthy" ]; then
+    dire "$(docker logs --tail 30 fitcarnet-app 2>&1)"
+    echec "fitcarnet-app n'est pas sain après six minutes (état : $SANTE).
+Les travailleurs restent ARRÊTÉS : ils tourneraient contre une base non migrée.
+Relancer à la main une fois la cause corrigée :
+  $COMPOSE --env-file $DOSSIER/.env -f $DOSSIER/docker-compose.yml start fitcarnet-taches"
+fi
+
+dire "fitcarnet-app est sain, demarrage des travailleurs"
+composer_la start fitcarnet-taches >>"$JOURNAL" 2>&1 \
+    || echec "le démarrage des travailleurs a échoué. Les 40 dernières lignes :
 $(tail -40 "$JOURNAL")"
 
 # ------------------------------------------------------------ verdict

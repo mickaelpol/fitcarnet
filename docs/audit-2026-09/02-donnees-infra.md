@@ -298,9 +298,24 @@ découverte tard.
 
 ---
 
-## 9. OUVERT — `deployer-nas.sh` court-circuite l'ordonnancement `depends_on` par un `docker compose restart`
+## 9. CLOS — `deployer-nas.sh` court-circuite l'ordonnancement `depends_on` par un `docker compose restart`
 
-**Gravité : MOYENNE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : `deployer-nas.sh:195-197` redémarre encore `fitcarnet-app` et `fitcarnet-taches` d'un seul `restart`.
+**Gravité : MOYENNE — Statut : CORRIGÉ LE 18 SEPTEMBRE 2026.** Le script refait
+à la main ce que `depends_on` aurait fait : il **arrête** les travailleurs,
+**redémarre** `fitcarnet-app`, **attend** son état `healthy` (sondage toutes les
+5 s, six minutes au plus — la sonde tolère 20 échecs de 15 s, soit cinq), puis
+les **redémarre**. Si l'application n'est pas saine, les travailleurs restent
+arrêtés et le message donne la commande pour les relancer : mieux vaut un
+travailleur à l'arrêt qu'un travailleur qui applique des inventaires contre une
+base non migrée.
+
+**Non éprouvé sur le NAS** : `deployer-nas.sh` ne se lance pas « pour voir ».
+La justesse vient de la lecture, et de deux contrôles — `sh -n` et `dash -n`.
+Au passage, la première version écrite portait un `TABLEAU=(...)`, bashisme que
+le shell de DSM aurait refusé net : l'en-tête du script prévient pourtant en
+toutes lettres qu'il est écrit en `sh` et pas en `bash`.
+
+Ce qui suit est l'état d'avant.
 
 **Emplacement** `deployer-nas.sh:195-197` ; `docker-compose.yml:217-223`
 (`depends_on: fitcarnet-app: condition: service_healthy`).
