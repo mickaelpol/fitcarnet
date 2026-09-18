@@ -292,8 +292,14 @@ L'`include` énumère explicitement chaque `.ts` et chaque `.test.ts` (à l'exce
 
 ---
 
-### 14. OUVERT — **`DeductionDuPlan` : deux lignes sur la même référence, la seconde écrase — et le test l'entérine**
-**Gravité : FAIBLE — Statut : CONFIRMÉ, toujours ouvert au 17 septembre 2026** : `testDeuxLignesSurLeMemeAlimentNeSeCumulentPas` affirme toujours `[5 => 800.0]` (`DeductionDuPlanTest.php:143-160`).
+### 14. CLOS — **`DeductionDuPlan` : deux lignes sur la même référence, la seconde écrase — et le test l'entérine**
+**Gravité : FAIBLE — Statut : CORRIGÉ LE 18 SEPTEMBRE 2026.** Les grammes
+s'additionnent par référence **avant** le calcul du restant ; le test, renommé
+`testDeuxLignesSurLeMemeAlimentSAdditionnent`, exige `[5 => 500.0]` et a été vu
+rouge sur `800.0` avant le correctif. Une seule écriture par produit, donc un
+seul mouvement d'inventaire côté Grocy.
+
+Ce qui suit est l'état d'avant.
 `api/src/Service/DeductionDuPlan.php:88` ; `api/tests/Service/DeductionDuPlanTest.php:159-176` à l'audit
 
 `$quantites[identifiantSource($reference)] = round($restant / $parUnite, 3)` : chaque ligne recalcule depuis le stock **initial**. Deux lignes de 300 g et 200 g sur 1 000 g de riz donnent 800, pas 500 — 300 g de riz qui n'existent plus restent inscrits au frigo.

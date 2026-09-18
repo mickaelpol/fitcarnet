@@ -14,7 +14,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 64 constats clos, 15 ouverts** — vérifiés un par un
+> **Au 18 septembre 2026 : 65 constats clos, 14 ouverts** — vérifiés un par un
 > dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 18
 > sont 12 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
 > 17 ; 03 — 8 sur 33 ; 04 — 4 sur 17. **Trois sont à trancher** (02#13,
@@ -345,7 +345,6 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 | **03 M12** — saisie d'inventaire perdue au changement d'onglet | moyenne | `front/app/(onglets)/frigo.tsx:54-59` |
 | **03 M13** — `noUncheckedIndexedAccess` désactivé | moyenne | `front/tsconfig.json:5` |
 | **04#7** — deux juges du rendement, API et front | moyenne | l'impossible est aligné (16 septembre) ; les bandes du plausible et le seuil de 100,5 g restent écrits deux fois |
-| **04#14** — `DeductionDuPlan` : la seconde ligne écrase la première | faible | `DeductionDuPlanTest.php:143-160` affirme toujours `800` |
 | **04#15** — le bouchon de `FrigoGrocyCreationTest` répond `[]` à tout | faible | `FrigoGrocyCreationTest.php:176` |
 | **04#19** — divisions et conversions non gardées dans `ciqual_vers_grocy.py` | faible | `:914`, `:944`, `:729-731`, `:348`, `:818` |
 

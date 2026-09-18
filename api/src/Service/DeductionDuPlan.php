@@ -58,13 +58,27 @@ final class DeductionDuPlan
             return new self([], []);
         }
 
+        /* ON ADDITIONNE D'ABORD, ON CALCULE ENSUITE — constat 04#14.
+           Chaque ligne recalculait le restant depuis le stock INITIAL : 300 g
+           puis 200 g pris sur 1 000 g laissaient 800 g au frigo au lieu de 500,
+           et 300 g de riz qui n'existaient plus restaient inscrits. La seconde
+           ligne ecrasait simplement la premiere.
+
+           Le front agrege deja par aliment, le defaut ne se voyait donc pas —
+           mais il reposait entierement sur le front, et le test qui aurait du
+           l'attraper ici enterinait le contraire.
+
+           Une seule ecriture par produit, aussi : Grocy enregistrerait deux
+           inventaires successifs comme deux mouvements. */
+        $grammesParReference = [];
+        $noms = [];
+
         foreach ($consomme as $ligne) {
             if (!\is_array($ligne)) {
                 continue;
             }
 
             $reference = (string) ($ligne['reference'] ?? '');
-            $nom = (string) ($ligne['nom'] ?? $reference);
             $grammes = (float) ($ligne['grammes'] ?? 0);
 
             /* Zero gramme n'est pas une deduction : ecrire quand meme
@@ -75,6 +89,16 @@ final class DeductionDuPlan
                 continue;
             }
 
+            /* Le nom de la PREMIERE ligne : c'est celui qui sera lu dans
+               « plus dans ton frigo », et deux lignes du meme aliment portent
+               le meme nom de toute facon. */
+            $noms[$reference] ??= (string) ($ligne['nom'] ?? $reference);
+            $grammesParReference[$reference] = ($grammesParReference[$reference] ?? 0.0) + $grammes;
+        }
+
+        foreach ($grammesParReference as $reference => $grammes) {
+            $reference = (string) $reference;
+            $nom = $noms[$reference];
             $aliment = $frigo[$reference] ?? null;
 
             if (null === $aliment) {

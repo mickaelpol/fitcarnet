@@ -140,13 +140,26 @@ final class DeductionDuPlanTest extends TestCase
         self::assertSame(7, DeductionDuPlan::identifiantSource('7'));
     }
 
-    public function testDeuxLignesSurLeMemeAlimentNeSeCumulentPas(): void
+    /**
+     * DEUX LIGNES SUR LE MEME ALIMENT S'ADDITIONNENT.
+     *
+     * CONSTAT 04#14 DE L'AUDIT. Ce test affirmait le contraire — `[5 => 800.0]`
+     * — et documentait le defaut comme un choix. Chaque ligne recalculait le
+     * restant depuis le stock INITIAL : 300 g puis 200 g pris sur 1 000 g
+     * laissaient 800 g au frigo au lieu de 500. Trois cents grammes de riz qui
+     * n'existent plus restaient inscrits.
+     *
+     * Le front agrege deja par aliment (`cuisson.ts`, `consommationDuPlan`), le
+     * risque etait donc theorique — mais il reposait entierement sur le front,
+     * et le seul test qui aurait pu l'attraper cote serveur enterinait le
+     * contraire. Un test qui fige le mauvais comportement est pire que pas de
+     * test : il empeche de le corriger sans avoir l'air de casser quelque chose.
+     *
+     * Une seule ecriture par produit, toujours : Grocy enregistrerait deux
+     * inventaires successifs comme deux mouvements.
+     */
+    public function testDeuxLignesSurLeMemeAlimentSAdditionnent(): void
     {
-        /* `consommationDuPlan` cote ecran additionne deja par aliment : une
-           reference n'apparait qu'une fois. Si jamais elle apparaissait deux
-           fois, la SECONDE ecrase la premiere — et surtout, on n'ecrit pas
-           deux inventaires successifs sur le meme produit, ce que Grocy
-           enregistrerait comme deux mouvements. */
         $sortie = DeductionDuPlan::calculer(
             [
                 ['reference' => 'base:5', 'nom' => 'Riz', 'grammes' => 300],
@@ -156,7 +169,7 @@ final class DeductionDuPlanTest extends TestCase
         );
 
         self::assertCount(1, $sortie->quantites);
-        self::assertSame([5 => 800.0], $sortie->quantites);
+        self::assertSame([5 => 500.0], $sortie->quantites, 'les grammes s\'additionnent avant le calcul');
     }
 
     private static function aliment(
