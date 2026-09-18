@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useExercices, useMoi } from '@/api/hooks';
 import type { Exercice } from '@/api/types';
@@ -50,6 +50,66 @@ export default function AdminExercices() {
   );
   const avancement = useMemo(() => avancementCatalogue(exercices.data ?? []), [exercices.data]);
 
+  /* renderItem SORT DU JSX ET PASSE PAR useCallback, comme la documentation
+     React Native le demande (« Optimizing FlatList Configuration »). Ecrit en
+     ligne, il est recree a chaque rendu : la liste, qui compare les props pour
+     savoir quoi redessiner, redessine alors toutes ses lignes visibles a chaque
+     frappe dans le champ de recherche. Sur mille trois cent trente-huit
+     exercices, c'est le seul ecran du projet ou cela se voit.
+
+     Les dependances sont vides : les deux seules choses capturees sont des
+     fonctions d'etat de React, stables par construction. */
+  const rendreExercice = useCallback(({ item }: { item: Exercice }) => (
+    <Carte style={{ padding: 0 }}>
+      <View style={s.ligne}>
+        <Pressable
+          onPress={() => setEdite(item)}
+          style={s.zoneNom}
+          accessibilityLabel={`Modifier ${item.nomFr ?? item.nom}`}
+        >
+          <Texte style={{ fontFamily: P.fort }} numberOfLines={1}>
+            {item.nomFr ?? item.nom}
+          </Texte>
+          {/* LE MUSCLE EST AFFICHÉ ICI, PAS SEULEMENT DANS LA FICHE.
+              C'est lui qui décide sous quelle vignette l'exercice se
+              retrouve quand on en cherche un. Un exercice qui n'en a pas
+              ne sort que sous « Autre » — autant le voir dans la liste
+              plutôt qu'en ouvrant les fiches une par une. */}
+          <Discret style={{ fontSize: T.petit }} numberOfLines={1}>
+            {item.source === 'perso' ? '★ ' : ''}
+            {item.nomFr !== null && item.nomFr !== undefined ? `${item.nom} · ` : ''}
+            {item.partieCorps ? libelle(ZONES, item.partieCorps) : 'zone à compléter'}
+            {' · '}
+            {libelleDuMuscle(item.muscleCible) ?? 'muscle à compléter'}
+          </Discret>
+        </Pressable>
+
+        {/* Deux pastilles, pas une colonne de cases : ce qui manque se
+            voit d'un coup d'œil sans lire. */}
+        <View style={s.pastilles}>
+          <Discret style={{
+            fontSize: T.petit, color: aTraduire(item) ? C.discret : C.ok,
+          }}>
+            FR
+          </Discret>
+          <Discret style={{ fontSize: T.petit, color: item.videoUrl ? C.ok : C.discret }}>
+            ▶
+          </Discret>
+        </View>
+
+        {item.videoUrl !== null && item.videoUrl !== undefined && (
+          <Pressable
+            onPress={() => setApercu(item)}
+            style={s.oeil}
+            accessibilityLabel="Voir la fiche"
+          >
+            <Discret style={{ fontSize: T.moyen }}>i</Discret>
+          </Pressable>
+        )}
+      </View>
+    </Carte>
+  ), []);
+
   if (moi.isLoading || exercices.isLoading) return <Chargement />;
   if (!moi.data?.roles?.includes('ROLE_ADMIN')) {
     return <Vide message="Cet écran est réservé à l'administrateur." />;
@@ -99,56 +159,7 @@ export default function AdminExercices() {
         contentContainerStyle={s.page}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={<Vide message="Aucun exercice dans cette sélection." />}
-        renderItem={({ item }) => (
-          <Carte style={{ padding: 0 }}>
-            <View style={s.ligne}>
-              <Pressable
-                onPress={() => setEdite(item)}
-                style={s.zoneNom}
-                accessibilityLabel={`Modifier ${item.nomFr ?? item.nom}`}
-              >
-                <Texte style={{ fontFamily: P.fort }} numberOfLines={1}>
-                  {item.nomFr ?? item.nom}
-                </Texte>
-                {/* LE MUSCLE EST AFFICHÉ ICI, PAS SEULEMENT DANS LA FICHE.
-                    C'est lui qui décide sous quelle vignette l'exercice se
-                    retrouve quand on en cherche un. Un exercice qui n'en a pas
-                    ne sort que sous « Autre » — autant le voir dans la liste
-                    plutôt qu'en ouvrant les fiches une par une. */}
-                <Discret style={{ fontSize: T.petit }} numberOfLines={1}>
-                  {item.source === 'perso' ? '★ ' : ''}
-                  {item.nomFr !== null && item.nomFr !== undefined ? `${item.nom} · ` : ''}
-                  {item.partieCorps ? libelle(ZONES, item.partieCorps) : 'zone à compléter'}
-                  {' · '}
-                  {libelleDuMuscle(item.muscleCible) ?? 'muscle à compléter'}
-                </Discret>
-              </Pressable>
-
-              {/* Deux pastilles, pas une colonne de cases : ce qui manque se
-                  voit d'un coup d'œil sans lire. */}
-              <View style={s.pastilles}>
-                <Discret style={{
-                  fontSize: T.petit, color: aTraduire(item) ? C.discret : C.ok,
-                }}>
-                  FR
-                </Discret>
-                <Discret style={{ fontSize: T.petit, color: item.videoUrl ? C.ok : C.discret }}>
-                  ▶
-                </Discret>
-              </View>
-
-              {item.videoUrl !== null && item.videoUrl !== undefined && (
-                <Pressable
-                  onPress={() => setApercu(item)}
-                  style={s.oeil}
-                  accessibilityLabel="Voir la fiche"
-                >
-                  <Discret style={{ fontSize: T.moyen }}>i</Discret>
-                </Pressable>
-              )}
-            </View>
-          </Carte>
-        )}
+        renderItem={rendreExercice}
       />
 
       {edite !== undefined && (

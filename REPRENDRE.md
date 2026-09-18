@@ -106,6 +106,27 @@ dit à l'endroit de la restauration.
 (la 34 a supprimé ceux sans propriétaire, et les deux comptes lisent Grocy). Un
 compte de démonstration devra donc recevoir `jeu-essai.sql` puis `jeu-demo.sql`.
 
+### 2.1 bis — une limite du front, mesurée et laissée telle quelle
+
+**Le calculateur rend ses résultats dans un `ScrollView`**, qui dessine TOUT
+d'un coup (`app/(onglets)/repas.tsx`, et de même dans `planRelu`,
+`etapeReglage`, `etapeBatch`). La documentation React Native déconseille le
+`ScrollView` pour une longue liste — mais **virtualiser n'apporterait presque
+rien ici** : la liste extérieure, ce sont les JOURS, et un plan réaliste en
+compte trois à sept. Le poids est à l'intérieur de chaque jour (quatre repas ×
+leurs aliments, avec leurs champs de saisie), et virtualiser à ce niveau-là
+demande des listes imbriquées, que React Native gère mal.
+
+**Ce qui n'est pas borné** : rien n'empêche de cocher un mois entier au
+calendrier. Le jour où l'écran devient lent, c'est cette limite qu'il faut
+regarder — pas la liste des jours.
+
+Les cinq `FlatList` du projet ont toutes leur `keyExtractor`. Seule celle des
+**1 338 exercices** a vu son `renderItem` sortir du JSX (18 septembre) : elle
+seule se redessinait entièrement à chaque frappe dans la recherche. Les autres
+gardent le leur en ligne — leurs appelants passent des fonctions recréées à
+chaque rendu, une mémoïsation intérieure n'y changerait rien.
+
 ### 2.2 À faire par toi — régénérer la clé d'API Grocy
 
 Elle a été collée dans une conversation le 15 septembre 2026 : elle est à
