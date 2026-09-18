@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { abonnerJeton, chargerJeton } from './client';
+import { abonnerJeton, amorcerSession } from './client';
 
 /**
  * SOMMES-NOUS CONNECTÉS ?
@@ -18,7 +18,12 @@ export function useConnecte(): boolean | null {
 
   useEffect(() => {
     let vivant = true;
-    void chargerJeton().then(
+    /* `amorcerSession` ET PAS `chargerJeton` — constat M5. Sur le web le JWT
+       ne survit pas au rechargement : il n'y a rien en mémoire au démarrage,
+       et pourtant le cookie `HttpOnly` peut porter une session vivante.
+       Lire le coffre seul répondrait « non » à quelqu'un de connecté, à
+       chaque rafraîchissement de page. */
+    void amorcerSession().then(
       (j) => { if (vivant) setConnecte(j !== null && j !== ''); },
       /* LIRE LE COFFRE PEUT LEVER, ET ALORS IL FAUT RÉPONDRE QUAND MÊME (F14).
          Sur le web, le coffre est `localStorage` ; en navigation privée, avec

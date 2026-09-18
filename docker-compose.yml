@@ -147,11 +147,28 @@ services:
       # outil que ce projet n'utilise pas : la ligne a ete recopiee d'ailleurs
       # et personne ne s'en est jamais servi.
       #
-      # L'exposition etait faible et le reste : l'authentification passe par
-      # l'en-tete `Authorization` et non par un cookie, et
-      # `nelmio_cors.yaml` n'active pas `allow_credentials`. CORS n'est donc
-      # pas la frontiere qui protege les donnees. Mais un motif qui autorise
-      # plus que necessaire finit par etre recopie la ou il compte.
+      # CE PARAGRAPHE A CHANGE LE 18 SEPTEMBRE 2026, AVEC LE CONSTAT M5.
+      #
+      # Il disait : « l'exposition est faible et le reste, l'authentification
+      # passe par l'en-tete `Authorization` et non par un cookie, et
+      # `nelmio_cors.yaml` n'active pas `allow_credentials` ». Les deux
+      # moities de cette phrase sont devenues fausses le meme jour : le jeton
+      # de rafraichissement du web vit desormais dans un cookie `HttpOnly`
+      # (`App\Service\CookieDeSession`), et un navigateur envoie un cookie
+      # TOUT SEUL — c'est bien la difference avec un en-tete. `nelmio_cors`
+      # active donc `allow_credentials`.
+      #
+      # EN PRODUCTION, LA CONSEQUENCE RESTE NULLE, et pour une raison qui n'a
+      # rien a voir avec CORS : la page et l'API sont sur LA MEME ORIGINE, et
+      # CORS ne s'applique pas a une requete de meme origine. Le cookie porte
+      # en plus `SameSite=Strict`, qui l'empeche de partir depuis un autre
+      # site quoi qu'en dise l'en-tete.
+      #
+      # MAIS CE MOTIF COMPTE MAINTENANT POUR DE BON. Tant que l'authentification
+      # tenait dans un en-tete, elargir cette expression ne donnait a un autre
+      # site que le droit de LIRE une reponse qu'il n'aurait pas su demander.
+      # Desormais, l'elargir laisserait un site tiers faire des requetes AVEC
+      # LE COOKIE de la personne. Une ligne a ne plus toucher sans y penser.
       #
       # Le developpement garde son propre motif, dans `compose.dev.yml` :
       # `^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$$`. Les deux fichiers

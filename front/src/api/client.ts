@@ -29,6 +29,35 @@ const CLE_JETON = 'fitcarnet.jeton';
 const CLE_RAFRAICHISSEMENT = 'fitcarnet.rafraichissement';
 
 /**
+ * LE WEB NE RANGE PLUS SES JETONS — constat M5, 18 septembre 2026.
+ *
+ * Sur le web, le coffre ci-dessous retombe sur `localStorage`. Le JWT ET le
+ * jeton de rafraîchissement y étaient en clair, lisibles par n'importe quel
+ * script de la page et persistants d'une visite à l'autre. Le second est le
+ * plus exposé des deux : il rouvre la session pendant quatre-vingt-dix jours,
+ * là où le JWT expire en une heure. C'est la seule chose du front qui, volée,
+ * donne un accès durable — et la seule que son propriétaire ne peut pas voir
+ * partir.
+ *
+ * DÉSORMAIS, SUR LE WEB : le jeton de rafraîchissement n'arrive même plus
+ * jusqu'ici, il est dans un cookie `HttpOnly` que le serveur pose et
+ * qu'aucun script ne lit (`App\Service\CookieDeSession`). Le JWT, lui, ne
+ * vit que dans les deux variables ci-dessous — c'est-à-dire dans la page :
+ * fermer l'onglet le perd, et c'est le but. Au démarrage, `amorcerSession()`
+ * en redemande un au cookie.
+ *
+ * SUR LE TÉLÉPHONE, RIEN NE CHANGE. `expo-secure-store` s'adosse au trousseau
+ * du système : c'est déjà mieux qu'un cookie, et les cookies d'un `fetch`
+ * React Native ne se comportent pas pareil d'une version à l'autre. Un
+ * mécanisme qu'on ne peut pas éprouver sur l'appareil n'est pas un progrès.
+ *
+ * Exporté : `hooks/auth.ts` en a besoin pour dire au serveur dans quel mode
+ * il parle, et c'est la MÊME constante — pas un second `Platform.OS === 'web'`
+ * écrit ailleurs, qui finirait par ne plus dire la même chose.
+ */
+export const sessionParCookie = Platform.OS === 'web';
+
+/**
  * SecureStore n'existe pas sur le web : on retombe sur localStorage.
  *
  * Exporté parce que les réglages de l'application s'y rangent aussi. Un
@@ -112,6 +141,22 @@ async function chargerLesDeux(): Promise<void> {
     coffre.lire(CLE_RAFRAICHISSEMENT),
   ]);
 
+  /* CE QU'ON LIT ICI SUR LE WEB EST UN HÉRITAGE, ET ON NE L'EFFACE PAS
+     ENCORE — constat M5, corrigé après revue le 18 septembre 2026.
+
+     La première écriture effaçait les deux clés ICI MÊME, en gardant la valeur
+     en mémoire « le temps de payer la bascule ». C'était une promesse que le
+     code ne tenait pas : si l'API était injoignable au premier démarrage (NAS
+     qui redémarre, réseau coupé), ou si la page était rechargée avant le
+     premier renouvellement, l'ancien jeton avait déjà quitté `localStorage`,
+     aucun cookie n'avait été posé, et la mémoire partait avec la page. La
+     personne devait se reconnecter — exactement ce que le commentaire jurait
+     qu'elle n'aurait pas à faire.
+
+     On efface donc APRÈS, et seulement une fois qu'il y a quelque chose à la
+     place : voir `oublierLHeritage()`, appelée quand le cookie est posé ou
+     quand la session est finie pour de bon. */
+
   /* CE QUI A ÉTÉ ÉCRIT PENDANT LA LECTURE GAGNE — constat M10.
      L'affectation était faite directement sur le résultat de l'`await`, donc
      APRÈS une attente pendant laquelle une connexion ou une déconnexion a pu
@@ -126,6 +171,25 @@ async function chargerLesDeux(): Promise<void> {
   jeton = duDisque;
   rafraichissement = rafraichissementDuDisque;
   jetonsCharges = true;
+}
+
+/**
+ * EFFACER CE QU'UNE VERSION ANTÉRIEURE AVAIT LAISSÉ DANS `localStorage`.
+ *
+ * Appelée à deux moments, et à deux seulement : quand le cookie vient d'être
+ * posé (la bascule a réussi, l'héritage ne sert plus à rien) et quand la
+ * session est finie pour de bon (il n'y a plus rien à sauver). Jamais avant :
+ * effacer un secret dont on a encore besoin, c'est déconnecter quelqu'un pour
+ * lui rendre service.
+ *
+ * Sur le téléphone, elle ne fait rien : c'est `definirJeton` /
+ * `definirRafraichissement` qui tiennent le coffre, et il n'y a pas d'héritage
+ * à oublier.
+ */
+async function oublierLHeritage(): Promise<void> {
+  if (!sessionParCookie) return;
+
+  await Promise.all([coffre.effacer(CLE_JETON), coffre.effacer(CLE_RAFRAICHISSEMENT)]);
 }
 
 export async function chargerJeton(): Promise<string | null> {
@@ -160,16 +224,27 @@ const prevenirJeton = (): void => {
 export async function definirJeton(valeur: string | null): Promise<void> {
   jeton = valeur;
   jetonsCharges = true;
-  if (valeur === null) await coffre.effacer(CLE_JETON);
-  else await coffre.ecrire(CLE_JETON, valeur);
+  /* LE WEB NE L'ÉCRIT NULLE PART — M5. Il ne vit que dans la variable
+     ci-dessus, donc dans la page : un rechargement le perd, et
+     `amorcerSession()` en redemande un au cookie. Une heure de fenêtre pour
+     un script hostile, au lieu de trois mois. */
+  if (!sessionParCookie) {
+    if (valeur === null) await coffre.effacer(CLE_JETON);
+    else await coffre.ecrire(CLE_JETON, valeur);
+  }
   prevenirJeton();
 }
 
 export async function definirRafraichissement(valeur: string | null): Promise<void> {
   rafraichissement = valeur;
   jetonsCharges = true;
-  if (valeur === null) await coffre.effacer(CLE_RAFRAICHISSEMENT);
-  else await coffre.ecrire(CLE_RAFRAICHISSEMENT, valeur);
+  /* Sur le web, celui-ci n'arrive même plus : le serveur le met dans un
+     cookie `HttpOnly`. La variable reste, pour le seul temps de la bascule
+     depuis `localStorage` — voir `renouveler()`, qui la vide ensuite. */
+  if (!sessionParCookie) {
+    if (valeur === null) await coffre.effacer(CLE_RAFRAICHISSEMENT);
+    else await coffre.ecrire(CLE_RAFRAICHISSEMENT, valeur);
+  }
 }
 
 export async function lireRafraichissement(): Promise<string | null> {
@@ -195,6 +270,10 @@ export function surSessionFinie(quoi: (() => void) | null): void {
 
 async function terminerSession(): Promise<void> {
   await Promise.all([definirJeton(null), definirRafraichissement(null)]);
+  /* Et l'héritage du web avec, puisqu'il n'y a plus de session à sauver. Sans
+     cette ligne, un ancien jeton de `localStorage` survivrait à la fin de
+     session qu'il vient lui-même de provoquer. */
+  await oublierLHeritage();
   prevenirSessionFinie?.();
 }
 
@@ -209,6 +288,7 @@ const depotJetons: DepotJetons = {
   definirJeton,
   definirRafraichissement,
   terminerSession,
+  sessionParCookie,
 };
 
 /* --------------------------------------------------------- le délai de garde
@@ -279,7 +359,21 @@ async function fetchAvecDelai(url: string, options: RequestInit = {}): Promise<R
 }
 
 async function renouveler(): Promise<boolean> {
-  return renouvelerJeton(BASE, depotJetons, (url, options) => fetchAvecDelai(String(url), options));
+  const renouvele = await renouvelerJeton(
+    BASE, depotJetons, (url, options) => fetchAvecDelai(String(url), options));
+
+  /* LA BASCULE N'A LIEU QU'UNE FOIS, ET C'EST ICI QU'ELLE EST ACQUISE.
+     Le serveur vient de poser le cookie : l'ancien jeton venu de
+     `localStorage` ne sert plus à rien, ni en mémoire (il repartirait dans le
+     corps de chaque renouvellement, alors que le corps est justement ce qu'on
+     cherchait à vider) ni sur le disque. C'est le seul instant où l'effacer
+     ne coûte rien à personne. */
+  if (renouvele && sessionParCookie) {
+    rafraichissement = null;
+    await oublierLHeritage();
+  }
+
+  return renouvele;
 }
 
 /* Une panne de réseau lève une exception : on la ramène à « pas renouvelé »
@@ -287,6 +381,60 @@ async function renouveler(): Promise<boolean> {
    session, et c'est `renouveler` qui s'en charge. */
 const renouvelerUneSeuleFois = uneSeuleFois(
   async (): Promise<boolean> => renouveler().catch(() => false));
+
+/**
+ * LE JETON DE DÉPART, AU LANCEMENT DE L'APPLICATION — constat M5.
+ *
+ * `chargerJeton()` ne suffit plus sur le web. Le JWT n'y survit pas au
+ * rechargement (il n'est plus écrit nulle part, c'est le but) : au démarrage
+ * il n'y a RIEN en mémoire, et pourtant la session peut être parfaitement
+ * vivante — le cookie `HttpOnly`, lui, a survécu. Sans cette fonction, le
+ * portier de `app/_layout.tsx` conclurait « pas connecté » à chaque
+ * rafraîchissement de page et renverrait vers l'écran de connexion quelqu'un
+ * qui n'a rien demandé.
+ *
+ * ON DEMANDE DONC AU SERVEUR, qui est le seul à voir le cookie. Sa réponse
+ * tranche : un JWT, ou un 401 qui termine la session pour de bon.
+ *
+ * `uneSeuleFois` ENVELOPPE DÉJÀ L'APPEL, et c'est ce qui rend cette fonction
+ * sûre à appeler depuis plusieurs endroits : `useConnecte` et `Racine` la
+ * demandent tous les deux au montage, et il ne part qu'un seul
+ * `/jeton/rafraichir`.
+ *
+ * SUR LE TÉLÉPHONE, C'EST `chargerJeton()` ET RIEN D'AUTRE : le coffre a
+ * gardé le jeton, il n'y a personne à interroger, et un appel réseau au
+ * lancement retarderait le premier écran pour rien.
+ */
+let amorcage: Promise<void> | null = null;
+
+export async function amorcerSession(): Promise<string | null> {
+  const dejaLa = await chargerJeton();
+  if (!sessionParCookie) return dejaLa;
+
+  /* UN JWT HÉRITÉ NE DISPENSE PAS DE BASCULER — relevé par la revue.
+     On rendait la main dès qu'un jeton d'accès était là, fût-il celui qu'une
+     version antérieure avait laissé dans `localStorage`. La bascule
+     n'arrivait donc qu'au premier 401, c'est-à-dire jusqu'à une heure plus
+     tard ; entre-temps, un rechargement de page perdait tout. Tant qu'il reste
+     un jeton de rafraîchissement hérité, on va chercher le cookie. */
+  if (dejaLa !== null && dejaLa !== '' && rafraichissement === null) return dejaLa;
+
+  /* UNE SEULE TENTATIVE POUR TOUTE LA VIE DE LA PAGE, et `uneSeuleFois` ne
+     suffisait pas à l'obtenir : il ne réunit que les appels SIMULTANÉS.
+     `useConnecte` et `Racine` amorcent tous les deux au montage, mais l'un
+     après l'autre — deux `/jeton/rafraichir` partaient donc, et sur un
+     navigateur sans cookie, DEUX 401 rouges dans la console de l'écran de
+     connexion. C'est exactement le défaut qu'on avait corrigé sur `useMoi`
+     en septembre, et je venais de le réintroduire à côté.
+
+     On garde donc la promesse elle-même. Un échec n'a pas à être réessayé
+     ici : `renouvelerJeton` a déjà terminé la session sur un 401, et un
+     nouveau départ passera par l'écran de connexion. */
+  amorcage ??= renouvelerUneSeuleFois().then(() => undefined);
+  await amorcage;
+
+  return jeton;
+}
 
 interface Options {
   /* PUT sert aux écritures qui REMPLACENT par clé naturelle — les cuissons
@@ -296,6 +444,31 @@ interface Options {
   corps?: unknown;
   /** certains appels (connexion, renouvellement) n'ont pas encore de jeton */
   sansJeton?: boolean;
+  /**
+   * CET APPEL A BESOIN DU COOKIE DE SESSION — connexion et déconnexion.
+   *
+   * CE DRAPEAU NE FAIT PAS CE QU'IL SEMBLE FAIRE, et la revue du 18 septembre
+   * 2026 a corrigé le commentaire qui le prétendait. Il disait « l'ouvrir
+   * partout enverrait un jeton de session sur des appels qui n'en font rien » :
+   * c'est faux en production. Le cookie a pour chemin `/api`, la page et l'API
+   * y partagent l'origine, et `credentials: 'same-origin'` — la valeur de tous
+   * les autres appels — **envoie le cookie quand même**. Il accompagne donc
+   * déjà `GET /api/seances`, `/api/moi`, tout.
+   *
+   * Ce que ce drapeau fait vraiment : il ouvre le cas CROISÉ, celui du
+   * développement (`expo start --web` sur `:8081`, l'API sur `:8080`), où
+   * `same-origin` retiendrait le cookie et où la session web ne s'ouvrirait
+   * pas. Deux origines, un seul site.
+   *
+   * Pourquoi ce n'est pas grave que le cookie voyage partout : il est
+   * `HttpOnly` (aucun script ne le lit), `SameSite=Strict` (aucun autre site
+   * ne le déclenche), et **l'API ne s'authentifie pas avec lui** — elle lit
+   * `Authorization`. Seules `/api/jeton/rafraichir` et `/api/deconnexion` le
+   * regardent. Un chemin plus étroit demanderait de ranger ces deux routes
+   * sous un préfixe commun, ce qui changerait une route publique ; ça n'en
+   * vaut pas le prix aujourd'hui, mais c'est la voie si on y revient.
+   */
+  avecCookieDeSession?: boolean;
 }
 
 /**
@@ -337,7 +510,7 @@ interface Reponse<T> {
 }
 
 async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>> {
-  const { methode = 'GET', corps, sansJeton = false } = options;
+  const { methode = 'GET', corps, sansJeton = false, avecCookieDeSession = false } = options;
 
   const entetes: Record<string, string> = {
     Accept: 'application/ld+json',
@@ -367,6 +540,7 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
     reponse = await fetchAvecDelai(BASE + chemin, {
       method: methode,
       headers: entetes,
+      credentials: avecCookieDeSession && sessionParCookie ? 'include' : 'same-origin',
       body: corps === undefined ? undefined : JSON.stringify(corps),
     });
   } catch (e) {

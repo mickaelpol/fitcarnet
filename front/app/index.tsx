@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { chargerJeton } from '@/api/client';
+import { amorcerSession } from '@/api/client';
 import { Chargement } from '@/composants/base';
 import { C } from '@/theme';
 
@@ -9,7 +9,12 @@ import { C } from '@/theme';
 export default function Depart() {
   const [jeton, setJeton] = useState<string | null | undefined>(undefined);
 
-  useEffect(() => { void chargerJeton().then(setJeton); }, []);
+  /* `amorcerSession` comme `_layout.tsx` et `session.ts` — M5. Il est
+     mémoïsé : appelé par les trois, il ne part qu'une fois. `chargerJeton`
+     marchait ici par accident, parce que `Racine` attend son propre amorçage
+     avant de monter cet écran ; dépendre d'un ordre de montage est ce qui
+     casse au premier déplacement de code. */
+  useEffect(() => { void amorcerSession().then(setJeton, () => setJeton(null)); }, []);
 
   if (jeton === undefined) {
     return <View style={{ flex: 1, backgroundColor: C.fond }}><Chargement /></View>;

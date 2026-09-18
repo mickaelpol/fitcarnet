@@ -1,5 +1,26 @@
+# LES COOKIES DE SESSION TRAVERSENT CORS — constat M5, 18 septembre 2026.
+#
+# `allow_credentials` etait a faux, et le commentaire de `docker-compose.yml`
+# s'appuyait dessus pour dire que CORS n'etait pas la frontiere qui protege les
+# donnees : l'authentification passait par l'en-tete `Authorization`, qu'un
+# navigateur n'envoie pas tout seul. Depuis M5, le jeton de rafraichissement du
+# web voyage dans un cookie, et un cookie, le navigateur l'envoie tout seul.
+#
+# EN PRODUCTION CA NE CHANGE RIEN : la page et l'API sont sur LA MEME ORIGINE
+# (`carnet.mickael-pol.fr` sert les deux, voir `adresse.ts`), et CORS ne
+# s'applique pas a une requete de meme origine. Ce reglage n'existe que pour le
+# developpement, ou `expo start --web` sert la page sur `localhost:8081` et
+# l'API repond sur `localhost:8080` — deux origines, un seul site.
+#
+# CE QUI LE REND SUR : `allow_origin` est une LISTE EXACTE, jamais `*`. La
+# specification interdit d'ailleurs de combiner `*` et `allow_credentials`, et
+# le navigateur refuserait. En production le motif ne nomme qu'un domaine, en
+# HTTPS (`CORS_ALLOW_ORIGIN` dans `docker-compose.yml`) ; en developpement,
+# `localhost` et `127.0.0.1`. Le jour ou quelqu'un elargit ce motif, ce n'est
+# plus seulement la lecture qui s'ouvre : ce sont les cookies qui partent avec.
 nelmio_cors:
     defaults:
+        allow_credentials: true
         origin_regex: true
         allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']
         allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']

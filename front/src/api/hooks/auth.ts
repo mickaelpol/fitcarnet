@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  api, definirJeton, definirRafraichissement, lireRafraichissement,
+  api, definirJeton, definirRafraichissement, lireRafraichissement, sessionParCookie,
 } from '../client';
 import { purgerLeCache } from '../persistance';
 import { reessayerSiReseau } from '../reessai';
@@ -36,13 +36,31 @@ export function useConnexion() {
        * l'écran de connexion. */
       await purgerLeCache(qc);
 
+      /* ON DIT AU SERVEUR DANS QUELLE LANGUE RÉPONDRE — constat M5.
+         Sur le web, `cookieDeSession: true` : le jeton de rafraîchissement
+         repart dans un cookie `HttpOnly` et NE FIGURE PAS dans la réponse.
+         Sur le téléphone, rien, et la réponse garde sa forme d'avant.
+         Le serveur ne devine pas d'un `User-Agent` : une déduction se trompe
+         un jour, une déclaration non. */
       const r = await api<{ token: string; jetonRafraichissement?: string }>('/connexion', {
-        methode: 'POST', corps: identifiants, sansJeton: true,
+        methode: 'POST',
+        corps: sessionParCookie ? { ...identifiants, cookieDeSession: true } : identifiants,
+        sansJeton: true,
+        avecCookieDeSession: true,
       });
       await definirJeton(r.token);
       /* Le serveur joint un jeton de rafraîchissement : c'est LUI qui tient
-         la session ouverte. Le jeton d'accès, lui, ne dure qu'une heure. */
-      if (r.jetonRafraichissement) await definirRafraichissement(r.jetonRafraichissement);
+         la session ouverte. Le jeton d'accès, lui, ne dure qu'une heure.
+
+         `&& !sessionParCookie` : LE JUMEAU DE `renouvellement.ts`, qui avait
+         reçu cette garde et pas lui — relevé par la revue. Sur le web le
+         serveur n'en renvoie plus ; mais un serveur d'une version antérieure,
+         ou une bascule à moitié déployée, en renverrait un, et le ranger le
+         remettrait exactement là d'où M5 vient de le sortir. La même décision
+         doit être écrite aux deux endroits, ou elle n'est écrite nulle part. */
+      if (r.jetonRafraichissement && !sessionParCookie) {
+        await definirRafraichissement(r.jetonRafraichissement);
+      }
 
       return r;
     },
@@ -62,10 +80,22 @@ export function useDeconnexion() {
 
   return async () => {
     const cle = await lireRafraichissement();
-    if (cle !== null) {
+
+    /* SUR LE WEB, ON APPELLE MÊME SANS JETON À MONTRER — constat M5, et
+       c'était le piège de ce hook. La condition était `cle !== null` ; sur le
+       web `cle` est TOUJOURS `null` désormais, puisque le jeton est dans un
+       cookie qu'aucun script ne lit. « Se déconnecter » n'aurait donc plus
+       rien prévenu au serveur : la ligne serait restée en base quatre-vingt-dix
+       jours, et le cookie dans le navigateur — c'est-à-dire que se déconnecter
+       n'aurait pas déconnecté. Le serveur, lui, voit le cookie : c'est lui qui
+       sait quoi révoquer, et c'est lui qui efface le cookie en répondant. */
+    if (cle !== null || sessionParCookie) {
       try {
         await api<void>('/deconnexion', {
-          methode: 'POST', corps: { jetonRafraichissement: cle }, sansJeton: true,
+          methode: 'POST',
+          corps: cle !== null ? { jetonRafraichissement: cle } : {},
+          sansJeton: true,
+          avecCookieDeSession: true,
         });
       } catch {
         // hors ligne : le jeton reste en base jusqu'à son échéance, tant pis

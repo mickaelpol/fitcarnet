@@ -54,8 +54,19 @@ const ADRESSE = 'http://api.test/api';
 process.env.EXPO_PUBLIC_API_URL = ADRESSE;
 
 /** Le coffre du web est `localStorage`. On en pose un, en mémoire et
- *  inspectable : c'est lui qui prouvera que la fin de session efface bien les
- *  DEUX jetons, et pas seulement celui qu'on a en tête. */
+ *  inspectable.
+ *
+ *  CE QU'IL PROUVE A CHANGÉ AVEC M5, et pendant quelques heures il n'a plus
+ *  rien prouvé du tout — relevé par la revue le 18 septembre 2026. Ce fichier
+ *  double `react-native` par `{ Platform: { OS: 'web' } }`, donc toute la
+ *  suite tourne en mode cookie ; depuis M5, `definirJeton` et
+ *  `definirRafraichissement` n'écrivent plus rien ici. Les assertions
+ *  « le coffre est vide après la fin de session » passaient donc même si
+ *  `terminerSession` ne faisait plus rien : un test qui ne peut pas échouer.
+ *
+ *  Il prouve maintenant l'autre moitié, celle qui compte encore sur le web :
+ *  que la fin de session emporte L'HÉRITAGE, ces deux clés qu'une version
+ *  antérieure à M5 avait laissées en clair. Le test les pose lui-même. */
 const coffreDuNavigateur = new Map<string, string>();
 (globalThis as { localStorage?: unknown }).localStorage = {
   getItem: (cle: string): string | null => coffreDuNavigateur.get(cle) ?? null,
@@ -365,6 +376,12 @@ describe('panne réseau et refus serveur ne sont pas la même chose', () => {
     const vus: boolean[] = [];
     const desabonner = client.abonnerJeton((connecte) => { vus.push(connecte); });
 
+    /* L'HÉRITAGE D'UNE VERSION ANTÉRIEURE À M5, posé ici pour que l'assertion
+       du bas ait quelque chose à constater. Sans ces deux lignes, le coffre
+       est vide dès le départ sur le web et le test passe sans rien vérifier. */
+    coffreDuNavigateur.set(CLE_JETON, 'vieux-jwt-en-clair');
+    coffreDuNavigateur.set(CLE_RAFRAICHISSEMENT, 'vieux-jeton-en-clair');
+
     brancherFetch((appel) => (estRafraichissement(appel)
       ? json({ message: 'jeton révoqué' }, 401)
       : json({ detail: 'Expired JWT Token' }, 401)));
@@ -378,7 +395,8 @@ describe('panne réseau et refus serveur ne sont pas la même chose', () => {
       assert.equal(coffreDuNavigateur.get(CLE_JETON), undefined,
         'un JWT mort laissé dans le coffre fait croire à l\'application qu\'elle est connectée');
       assert.equal(coffreDuNavigateur.get(CLE_RAFRAICHISSEMENT), undefined,
-        'les DEUX jetons partent, pas seulement celui auquel on pense');
+        'les DEUX jetons partent, pas seulement celui auquel on pense : une session '
+        + 'finie ne doit rien laisser en clair, héritage compris');
     } finally {
       desabonner();
       client.surSessionFinie(null);

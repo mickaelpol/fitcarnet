@@ -8,7 +8,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { chargerJeton, surSessionFinie } from '@/api/client';
+import { amorcerSession, surSessionFinie } from '@/api/client';
 import { useMoi } from '@/api/hooks';
 import { PERSISTANCE, purgerLeCache } from '@/api/persistance';
 import { useConnecte } from '@/api/session';
@@ -118,7 +118,11 @@ export default function Racine() {
      ne dit pas pourquoi. Sans jeton lisible, on n'est pas connecté : le portier
      enverra vers la connexion, ce qui est au moins un écran. */
   useEffect(() => {
-    void chargerJeton().then(() => setPret(true), () => setPret(true));
+    /* `amorcerSession` ET PAS `chargerJeton` (M5) : sur le web, le premier
+       jeton ne vient plus du coffre mais du cookie, par un aller-retour avec
+       le serveur. Être « prêt » avant qu'il ait répondu afficherait l'écran de
+       connexion à quelqu'un de connecté, le temps de la requête. */
+    void amorcerSession().then(() => setPret(true), () => setPret(true));
   }, []);
 
   /* --------------------------------------------------------- le portier
@@ -155,7 +159,27 @@ export default function Racine() {
      `push` : revenir en arrière sur une session morte n'a pas de sens.
 
      Le cache est vidé au passage, sans quoi les données du compte précédent
-     réapparaîtraient une fraction de seconde à la connexion suivante. */
+     réapparaîtraient une fraction de seconde à la connexion suivante.
+
+     MAIS PAS DEPUIS UNE ROUTE OUVERTE À TOUS — et c'est M5 qui a créé le
+     besoin, relevé par la revue puis reproduit dans un navigateur le
+     18 septembre 2026.
+
+     Avant M5, le démarrage ne faisait AUCUN appel réseau : « la session est
+     finie » ne pouvait arriver qu'à quelqu'un qui en avait une. Depuis, le web
+     amorce en demandant un jeton au cookie — et quelqu'un qui ouvre son lien
+     d'invitation n'a ni cookie ni compte. Le serveur répondait 401, ce rappel
+     partait, et **la personne invitée atterrissait sur l'écran de connexion**,
+     où elle n'a pas encore de mot de passe. Le lien devenait inutilisable sur
+     le web, c'est-à-dire sur le seul chemin par lequel on entre dans cette
+     application.
+
+     Le portier juste au-dessus connaissait déjà ces routes ; c'est ce rappel-ci
+     qui redirigeait sans les regarder. On lit donc la MÊME variable : deux
+     règles pour « où a-t-on le droit d'être sans compte » finiraient par
+     diverger.
+
+     Le cache est purgé dans tous les cas : il n'appartient à personne ici. */
   useEffect(() => {
     surSessionFinie(() => {
       /* LA MÉMOIRE ET LE DISQUE, dans cet ordre : `purgerLeCache` porte les
@@ -163,11 +187,11 @@ export default function Racine() {
          la main ici comme aux deux autres endroits qui purgent — trois copies
          d'un ordre dont dépend la confidentialité du cache (F9). */
       void purgerLeCache(client);
-      routeur.replace('/connexion');
+      if (!ouverteATous) routeur.replace('/connexion');
     });
 
     return () => { surSessionFinie(null); };
-  }, [routeur]);
+  }, [routeur, ouverteATous]);
 
   /* ON N'AFFICHE RIEN PLUTÔT QU'UN ÉCRAN QU'ON VA QUITTER.
    *
