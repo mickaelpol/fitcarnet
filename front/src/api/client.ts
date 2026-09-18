@@ -106,10 +106,25 @@ let jetonsCharges = false;
 
 async function chargerLesDeux(): Promise<void> {
   if (jetonsCharges) return;
-  [jeton, rafraichissement] = await Promise.all([
+
+  const [duDisque, rafraichissementDuDisque] = await Promise.all([
     coffre.lire(CLE_JETON),
     coffre.lire(CLE_RAFRAICHISSEMENT),
   ]);
+
+  /* CE QUI A ÉTÉ ÉCRIT PENDANT LA LECTURE GAGNE — constat M10.
+     L'affectation était faite directement sur le résultat de l'`await`, donc
+     APRÈS une attente pendant laquelle une connexion ou une déconnexion a pu
+     passer. Le disque écrasait alors le jeton neuf par l'ancien, ou défaisait
+     une fin de session. `definirJeton` et `definirRafraichissement` posent
+     `jetonsCharges` à `true` sans attendre : il suffit de le relire ici.
+     La fenêtre était étroite — les trois appelants sont au montage — mais
+     rien ne la fermait, et une session qui se rouvre toute seule ne se
+     diagnostique pas. */
+  if (jetonsCharges) return;
+
+  jeton = duDisque;
+  rafraichissement = rafraichissementDuDisque;
   jetonsCharges = true;
 }
 

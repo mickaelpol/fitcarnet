@@ -283,8 +283,23 @@ fichiers de `front/src` et `front/app` et n'a trouvé que celui-ci — c'est
 Le paquet n'est pas dans `dependencies` (diff imports/deps vérifié) ; il n'est dans `node_modules` que par transitivité d'expo-router (`package-lock.json:4785`). C'est exactement le mode de panne que `verifier-greffons.py` a été écrit pour attraper — sauf que ce script ne regarde **que** les greffons `expo-*` déclarés dans `app.json`, jamais les imports du code. Atténuation : c'est un `import type`, effacé à la compilation, donc Metro ne le cherchera pas ; mais `tsc --noEmit` (script `verif`, exécuté par `npm test`) échouera dès que le hoisting change.
 **Correction (trivial)** : `npm i @react-navigation/native-stack`, et élargir `verifier-greffons.py` au sens inverse.
 
-## M10. Course sur le chargement des jetons
-**MOYENNE · CONFIRMÉ (code) · probabilité faible · `front/src/api/client.ts:63-70`**
+## M10. ~~Course sur le chargement des jetons~~ — CLOS
+**MOYENNE · CORRIGÉ LE 18 SEPTEMBRE 2026 · `front/src/api/client.ts`**
+
+Ce qui a été écrit pendant la lecture gagne : `chargerLesDeux()` relit
+`jetonsCharges` **après** son `await` et abandonne les valeurs du disque si une
+connexion ou une déconnexion est passée entre-temps. `definirJeton` et
+`definirRafraichissement` posent ce drapeau sans attendre, il suffisait de le
+relire.
+
+**La course a été reproduite avant d'être fermée**, ce qui demandait un détour :
+`jetonsCharges` est privé au module et vaut déjà `true` après les autres tests
+du fichier. Les deux épreuves montent donc une instance NEUVE du client
+(`delete require.cache`) — sans cela, `chargerLesDeux()` sortait immédiatement
+et le test passait sans rien éprouver. Les deux ont été vues rouges : le jeton
+neuf écrasé par l'ancien, et la fin de session défaite par une lecture en vol.
+
+Ce qui suit est l'état d'avant.
 
 ```ts
 if (jetonsCharges) return;

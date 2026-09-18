@@ -14,7 +14,7 @@ Les quatre rapports détaillés, avec le raisonnement complet et les scénarios 
 
 **Total : 3 critiques, 14 élevées, ~27 moyennes, ~35 faibles** (après dédoublonnage entre rapports).
 
-> **Au 18 septembre 2026 : 71 constats clos, 8 ouverts** — vérifiés un par un
+> **Au 18 septembre 2026 : 72 constats clos, 7 ouverts** — vérifiés un par un
 > dans le code ce jour-là. **Aucun critique ni élevé n'est ouvert** : les 18
 > sont 12 moyens et 6 faibles. Par rapport : 01 — 0 ouvert sur 12 ; 02 — 6 sur
 > 17 ; 03 — 8 sur 33 ; 04 — 4 sur 17. **Trois sont à trancher** (02#13,
@@ -338,7 +338,6 @@ Dix-huit constats, vérifiés un par un dans le code ce jour-là. Aucun critique
 |---|---|---|
 | **02#8** — sauvegardes sur le même volume que la base | moyenne | **consigné** le 18 septembre dans `DEPLOIEMENT.md` ; l'action reste à faire sur le NAS (tâche DSM), hors dépôt |
 | **03 M5** — jetons en clair dans `localStorage` sur le web | moyenne | `front/src/api/client.ts:64-93` |
-| **03 M10** — course au chargement des jetons | moyenne | `front/src/api/client.ts:106-113` |
 | **03 M13** — `noUncheckedIndexedAccess` désactivé | moyenne | `front/tsconfig.json:5` |
 | **04#19** — divisions et conversions non gardées dans `ciqual_vers_grocy.py` | faible | `:914`, `:944`, `:729-731`, `:348`, `:818` |
 

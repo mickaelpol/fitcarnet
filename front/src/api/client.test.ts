@@ -814,3 +814,51 @@ describe('un serveur muet ne fige pas l\'application', () => {
     }
   });
 });
+
+/**
+ * LA COURSE SUR LE CHARGEMENT DES JETONS — constat M10.
+ *
+ * `chargerLesDeux()` lisait le coffre, puis affectait `jeton` APRÈS l'`await`.
+ * Une écriture arrivée entre les deux — une connexion, une déconnexion —
+ * était donc écrasée par la valeur lue sur le disque, c'est-à-dire par
+ * l'ancienne. La fenêtre est étroite (les trois appelants sont au montage,
+ * la connexion arrive bien après) mais rien ne la fermait.
+ *
+ * ON MONTE UNE INSTANCE NEUVE DU CLIENT. `jetonsCharges` est privé au module
+ * et vaut déjà `true` après les tests ci-dessus : sans cette remise à zéro,
+ * `chargerLesDeux()` sortirait immédiatement et le test passerait sans rien
+ * éprouver — exactement le genre de test qui ne peut pas échouer.
+ */
+describe('la course entre la lecture du coffre et une écriture', () => {
+  const clientNeuf = (): typeof import('./client') => {
+    delete require.cache[require.resolve('./client')];
+
+    return require('./client') as typeof import('./client');
+  };
+
+  it('une connexion pendant la lecture n’est pas écrasée par le disque', async () => {
+    coffreDuNavigateur.set(CLE_JETON, 'ancien-jeton-du-disque');
+    const neuf = clientNeuf();
+
+    /* La lecture part et s'arrête sur son `await`. */
+    const lecture = neuf.chargerJeton();
+    /* La connexion écrit pendant ce temps. */
+    await neuf.definirJeton('jeton-tout-neuf');
+    await lecture;
+
+    assert.equal(await neuf.chargerJeton(), 'jeton-tout-neuf',
+      'le jeton écrit pendant la lecture doit gagner sur celui du disque');
+  });
+
+  it('une déconnexion pendant la lecture n’est pas annulée non plus', async () => {
+    coffreDuNavigateur.set(CLE_JETON, 'ancien-jeton-du-disque');
+    const neuf = clientNeuf();
+
+    const lecture = neuf.chargerJeton();
+    await neuf.definirJeton(null);
+    await lecture;
+
+    assert.equal(await neuf.chargerJeton(), null,
+      'une fin de session ne doit pas être défaite par une lecture en vol');
+  });
+});
