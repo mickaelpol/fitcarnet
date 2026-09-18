@@ -301,13 +301,25 @@ nomme ce qui manque.
 
 **Les comptes existants ne sont pas touchés**, et c'est la décision : personne ne
 se retrouve dehors un matin. Ceux dont le mot de passe ne passerait plus sont
-**signalés** par un bandeau sur l'onglet Compte — le drapeau
+**signalés sur TOUS les écrans** par une ligne fine en haut, cliquable — et non
+plus seulement sur l'onglet Compte, où l'on ne va que pour se déconnecter :
+quelqu'un pouvait ne jamais l'apprendre, et donc ne jamais changer son mot de
+passe. La carte détaillée reste sur l'onglet Compte. Le drapeau
 `utilisateur.mot_de_passe_faible` (migration 38) est posé **à la connexion**,
 seul instant où le serveur tient le mot de passe en clair : une empreinte ne se
 relit pas pour savoir si elle contenait une majuscule.
 
-**À savoir avant d'éprouver** : un changement réussi **révoque toutes les
-sessions du compte, y compris celle qui le fait**. C'est délibéré — un jeton de
+**À SAVOIR AVANT D'ÉPROUVER, ET ÇA A PIÉGÉ DEUX FOIS** : le drapeau est
+**recalculé à chaque connexion**. Le poser à la main en base puis se
+reconnecter le remet donc à `false` aussitôt, et on croit que le bandeau ne
+marche pas. Pour l'éprouver, deux façons — un compte dont le mot de passe est
+*réellement* faible (le vrai chemin), ou poser le drapeau **sans se
+reconnecter**, en sachant que `/api/moi` reste en cache une minute
+(`staleTime`). Dans l'usage réel il n'y a aucun délai : le cache est purgé
+avant la connexion, donc `/moi` est relu neuf juste après.
+
+Un changement réussi **révoque toutes les sessions du compte, y compris celle
+qui le fait**. C'est délibéré — un jeton de
 rafraîchissement volé ne doit pas survivre au changement qu'il a motivé —, et
 l'écran l'annonce au lieu de l'infliger.
 

@@ -4,15 +4,16 @@ import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useContext, useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, SafeAreaProvider } from 'react-native-safe-area-context';
 import { amorcerSession, surSessionFinie } from '@/api/client';
 import { useMoi } from '@/api/hooks';
 import { PERSISTANCE, purgerLeCache } from '@/api/persistance';
 import { reessayerSiReseau } from '@/api/reessai';
 import { useConnecte } from '@/api/session';
+import { BandeauMotDePasse, useMotDePasseASignaler } from '@/composants/bandeauMotDePasse';
 import { Chargement } from '@/composants/base';
 import { EnTete } from '@/composants/enTete';
 import { C } from '@/theme';
@@ -111,6 +112,31 @@ function PortierAdmin({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+/**
+ * Rend ce qu'on lui donne, en disant à ses descendants que la barre d'état est
+ * déjà couverte.
+ *
+ * Le seul moyen propre de le dire : `useSafeAreaInsets` lit un contexte, et on
+ * le redonne avec `top` à zéro. On garde les trois autres bords — c'est `bottom`
+ * qui tient la barre d'onglets au-dessus des boutons d'Android, et l'écraser
+ * ferait passer les onglets dessous.
+ *
+ * Tant qu'aucun bandeau ne s'affiche, le contexte n'est pas modifié : rien ne
+ * change pour personne.
+ */
+function SansMargeHaute({ children }: { children: ReactNode }) {
+  const bandeauVisible = useMotDePasseASignaler();
+  const marges = useContext(SafeAreaInsetsContext);
+
+  if (!bandeauVisible || marges === null) return <>{children}</>;
+
+  return (
+    <SafeAreaInsetsContext.Provider value={{ ...marges, top: 0 }}>
+      {children}
+    </SafeAreaInsetsContext.Provider>
+  );
 }
 
 export default function Racine() {
@@ -229,6 +255,21 @@ export default function Racine() {
     <PersistQueryClientProvider client={client} persistOptions={PERSISTANCE}>
       <SafeAreaProvider>
         <StatusBar style="light" />
+        {/* LE BANDEAU EST AU-DESSUS DE TOUT, ET IL PREND LA BARRE D'ÉTAT.
+            Il doit se voir sur TOUS les écrans : l'avertissement ne vivait que
+            sur l'onglet Compte, où l'on ne va que pour se déconnecter — donc
+            quelqu'un pouvait ne jamais apprendre que son mot de passe ne suit
+            plus les règles, et ne jamais le changer.
+
+            `SansMargeHaute` NEUTRALISE L'ENCOCHE POUR CE QUI SUIT, et sans lui
+            l'écran gagnerait DEUX fois la hauteur de la barre d'état sur
+            Android : une fois pour le bandeau, une fois pour l'en-tête qui le
+            suit — `EnTete` et les en-têtes d'onglets lisent tous les deux
+            `useSafeAreaInsets`, et cette mesure ne dépend pas de l'endroit où
+            l'on est rendu. Le bandeau ayant déjà couvert le haut de l'écran,
+            personne d'autre n'a à le faire. */}
+        <BandeauMotDePasse />
+        <SansMargeHaute>
         <PortierAdmin>
           <Stack
             screenOptions={{
@@ -260,6 +301,7 @@ export default function Racine() {
             />
           </Stack>
         </PortierAdmin>
+        </SansMargeHaute>
       </SafeAreaProvider>
     </PersistQueryClientProvider>
     </Enveloppe>
