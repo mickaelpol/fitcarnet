@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Utilisateur;
+use App\Repository\CuissonsHabituelles;
 use App\Service\LotDHabitudes;
-use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -34,20 +34,17 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * perdues dans une coupure de reseau, et aucun moyen de savoir lesquelles.
  * Un seul appel, une seule transaction — il passe ou il ne passe pas.
  *
- * POURQUOI DU SQL ET NON L'ORM
+ * OU EST PASSE LE SQL
  *
- * `ON CONFLICT DO UPDATE` fait en un aller-retour ce que l'ORM ferait en deux
- * (chercher, puis creer ou modifier) — et surtout, il le fait sans fenetre :
- * entre le « chercher » et le « creer » de l'ORM, un second envoi passerait
- * et le premier finirait sur une violation d'unicite. C'est le seul endroit
- * du projet ou la base sait faire quelque chose que Doctrine ne sait pas
- * dire, et le dire en SQL coute une ligne.
+ * Dans `App\Repository\CuissonsHabituelles`, depuis le 18 septembre 2026 — avec
+ * la raison de l'`ON CONFLICT DO UPDATE`, qui n'a pas change en changeant de
+ * place. Un controleur lit la requete, appelle, repond ; il ne parle pas SQL.
  */
 #[Route('/api')]
 #[IsGranted('ROLE_USER')]
 final class CuissonsController extends AbstractController
 {
-    public function __construct(private readonly Connection $cnx)
+    public function __construct(private readonly CuissonsHabituelles $habitudes)
     {
     }
 
@@ -62,18 +59,8 @@ final class CuissonsController extends AbstractController
     #[Route('/mes-cuissons', methods: ['GET'])]
     public function lire(): JsonResponse
     {
-        $lignes = $this->cnx->fetchAllAssociative(
-            'SELECT aliment, mode_cuisson_id FROM cuisson_habituelle
-              WHERE utilisateur_id = :u
-              ORDER BY aliment',
-            ['u' => $this->utilisateur()->getId()],
-        );
-
         return $this->json([
-            'habitudes' => \array_map(static fn (array $l) => [
-                'aliment' => (string) $l['aliment'],
-                'mode' => null === $l['mode_cuisson_id'] ? null : (int) $l['mode_cuisson_id'],
-            ], $lignes),
+            'habitudes' => $this->habitudes->lire($this->moi()),
         ]);
     }
 
@@ -95,9 +82,7 @@ final class CuissonsController extends AbstractController
 
         /* Les modes existants, lus UNE fois. C'est la seule chose que la
            validation ne puisse pas savoir toute seule. */
-        $connus = \array_map(
-            static fn ($v) => (int) $v,
-            $this->cnx->fetchFirstColumn('SELECT id FROM mode_cuisson'));
+        $connus = $this->habitudes->modesConnus();
 
         /* Toute la validation — bornes, dedoublonnage, distinction entre
            « mode absent » et « mode null » — vit dans `LotDHabitudes`, ou elle
@@ -108,28 +93,13 @@ final class CuissonsController extends AbstractController
         if (!$lot->estValide()) {
             return $this->json(['erreur' => $lot->erreur], 422);
         }
-        if ([] === $lot->aEcrire) {
-            return $this->json(['enregistrees' => 0]);
-        }
 
-        $aEcrire = $lot->aEcrire;
-        $utilisateur = $this->utilisateur()->getId();
-
-        /* Une transaction pour tout le lot : un geste de l'utilisateur passe
-           entierement ou pas du tout. */
-        $this->cnx->transactional(function (Connection $cnx) use ($aEcrire, $utilisateur): void {
-            foreach ($aEcrire as $aliment => $mode) {
-                $cnx->executeStatement(
-                    'INSERT INTO cuisson_habituelle (utilisateur_id, aliment, mode_cuisson_id, maj_le)
-                     VALUES (:u, :a, :m, now())
-                     ON CONFLICT (utilisateur_id, aliment)
-                     DO UPDATE SET mode_cuisson_id = EXCLUDED.mode_cuisson_id, maj_le = now()',
-                    ['u' => $utilisateur, 'a' => (string) $aliment, 'm' => $mode],
-                );
-            }
-        });
-
-        return $this->json(['enregistrees' => \count($aEcrire)]);
+        /* Le lot vide n'a plus son cas ici : le depot n'ouvre pas de
+           transaction pour rien et rend 0. Deux endroits pour une seule regle,
+           c'est le jumeau oublie que ce projet connait bien. */
+        return $this->json([
+            'enregistrees' => $this->habitudes->remplacer($this->moi(), $lot->aEcrire),
+        ]);
     }
 
     /*
@@ -148,11 +118,18 @@ final class CuissonsController extends AbstractController
      * echange de rien.
      */
 
-    private function utilisateur(): Utilisateur
+    /**
+     * L'identifiant du compte connecte, EN CHAINE.
+     *
+     * Le depot recoit une chaine et non un objet `Uuid` : l'ancien code passait
+     * l'objet a DBAL, qui s'en sortait par la conversion `Stringable` de PDO —
+     * une dependance implicite que personne n'avait verifiee.
+     */
+    private function moi(): string
     {
         $u = $this->getUser();
         \assert($u instanceof Utilisateur);
 
-        return $u;
+        return $u->getId()->toRfc4122();
     }
 }
