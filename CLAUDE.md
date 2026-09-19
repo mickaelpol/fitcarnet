@@ -117,15 +117,17 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `front/src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
 | Force d'un mot de passe | `api/src/Service/MotDePasse.php` **et** `front/src/calcul/motDePasse.ts`, verrouillés l'un sur l'autre par `api/regles/motdepasse.json` |
 
-**DEUX juges sont assumés dans DEUX cas — et le troisième a été supprimé, pas
-synchronisé.** Cette page s'est trompée trois fois en les comptant : « le mot de
-passe est le seul cas », puis « deux cas et deux seulement », puis « trois cas ».
-Voici l'état mesuré.
+**NE COMPTE PAS LES DOUBLES JUGES DE TÊTE — CETTE PAGE S'EST TROMPÉE QUATRE
+FOIS.** Successivement : « le mot de passe est le seul cas », « deux cas et deux
+seulement », « trois cas », puis de nouveau « deux ». Chaque correction a été
+écrite par quelqu'un qui croyait vérifier. **La liste ci-dessous est à compléter
+dès qu'on en trouve un autre, et il faut la considérer comme incomplète.**
 
 | Ce qui est jugé deux fois | Les deux écritures | Ce qui les tient alignées |
 |---|---|---|
 | Mot de passe | `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` | `api/regles/motdepasse.json`, lu par `MotDePassePartageTest.php` **et** `motDePassePartage.test.ts` |
 | Rendement cru/cuit | les deux côtés, depuis le constat 04#7 | `api/regles/rendement.json`, lu par `RendementPartageTest.php` **et** `rendementPartage.test.ts` |
+| **Avancement d'une séance** | `api/src/Entity/Seance.php:138 getAvancement()`, `front/src/calcul/blocSeance.ts:52 avancementDe()` | **RIEN.** Relevé le 19 septembre 2026, jamais déclaré nulle part. Les deux tournent : `app/(onglets)/seances.tsx:51` lit le champ du serveur, `app/seance/[id].tsx:113` recalcule. Même règle écrite deux fois (« un exercice chrono ne compte que pour une série »), aucun test croisé |
 
 Ces deux-là ont la même raison d'exister — l'écran doit répondre pendant la
 frappe, sans aller-retour réseau, pendant que le serveur reste seul à décider —
