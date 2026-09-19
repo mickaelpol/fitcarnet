@@ -20,19 +20,46 @@ n'arrive pas.
 | `verification-android` | Le **vrai moteur d'Android** — clavier, marges, cycle de vie | Ce qui ne casse qu'en production |
 | `verification-fonctionnalites` | La fonctionnalité **du point de vue de l'utilisateur**, filmée | Le code |
 
-**Aucun d'eux ne remplace un autre.** Le 18 septembre 2026, quatre lancés en
-parallèle ont rendu quatre constats dont aucun n'était visible depuis un autre
-angle :
+**Aucun d'eux ne remplace un autre.** Dans la nuit du 18 au 19 septembre 2026,
+**quatre** agents lancés en parallèle (`860e435` : *« quatre relectures lancées
+à la demande […] revue de code, épreuve bout en bout sur l'application qui
+tourne, vérité documentaire, et Android »*) ont rendu quatre constats dont aucun
+n'était visible depuis l'angle d'un autre :
 
 - `revue-fitcarnet` : une connexion pouvant rendre **500** — un `flush()` qui
   échoue ferme l'EntityManager, et le service appelé deux lignes plus loin tient
   le même ;
-- `revue-pile` : `login_throttling` devenu un **verrou de tout le site**, faute
-  de `trusted_proxies` ;
+- `verification-bout-en-bout` : l'application **qui tourne**, éprouvée sur les
+  chemins que la lecture ne visite pas ;
 - `verite-documentaire` : une fiche affirmant encore « le changement de mot de
-  passe n'a **aucun écran** », alors que sa jumelle avait été corrigée la veille ;
+  passe n'a **aucun écran** », alors que sa jumelle avait été corrigée la
+  veille ;
 - `verification-android` : la barre d'état **blanche sur le doré**, 1,96:1 — et
   invisible sur le web, parce qu'`expo-status-bar` n'y fait rien.
+
+Le cinquième constat de ces deux jours — `login_throttling` devenu un **verrou
+de tout le site**, faute de `trusted_proxies` — **ne vient d'aucun agent** : il
+vient de la session principale, le 18 septembre à 20 h 40 (`1e3a47d`, *« trois
+relectures avant de publier […] deux confrontations à la documentation
+officielle par le MCP context7 »*), un jour avant que `revue-pile` existe
+(`b4a5cc0`, 19 septembre 1 h 21).
+
+## Ce paragraphe s'est trompé DEUX fois, et c'est la leçon de la fiche
+
+Sa première écriture attribuait `trusted_proxies` à `revue-pile`, qui n'était
+pas né. **Le rectificatif du 19 septembre a corrigé l'attribution et cassé le
+reste** : il comptait « trois agents » en lisant le titre de `1e3a47d` (« trois
+revues »), alors que ce commit décrit trois relectures faites *à la main*, et il
+a fait disparaître `verification-bout-en-bout` de la liste des quatre.
+
+Deux erreurs de suite sur le même paragraphe, la seconde commise en réparant la
+première, par quelqu'un qui croyait vérifier. Ce qui a manqué les deux fois :
+**lire le CORPS du commit, pas son titre.** Un titre résume ; un corps nomme.
+
+Et le motif commun aux deux versions fausses est le même : elles rendaient
+l'outillage plus impressionnant qu'il n'était, en attribuant à un agent une
+trouvaille humaine. **Une fiche écrite pour enseigner la rigueur est exactement
+celle qu'il faut vérifier ligne à ligne.**
 
 ## Comment on la lance
 
@@ -99,6 +126,21 @@ docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse --no-
 db/manuel/verifier-schema.sh
 ```
 
-Et si `front/src` ou `front/app` a bougé : `npm run build:web`, puis
-`rm -rf api/front && cp -r front/dist api/front`. Le `dist` est versionné ; un
-`dist` périmé se commite sans bruit et se déploie tel quel.
+Et si `front/src` ou `front/app` a bougé, il faut régénérer le bundle **et**
+sa copie servie par l'API :
+
+```bash
+DEPOT="$(git rev-parse --show-toplevel)"      # PAS de chemin relatif : voir plus bas
+cd "$DEPOT/front" && npm run build:web
+rm -rf "$DEPOT/api/front" && cp -r "$DEPOT/front/dist" "$DEPOT/api/front"
+```
+
+**Le `DEPOT` n'est pas une coquetterie.** `rm -rf api/front` écrit sans lui
+suppose le dossier courant, et des commandes lancées en parallèle se le
+disputent : le 15 septembre 2026, un `cd front && npm run build:web` a tourné à
+la racine et le `rm -rf` est parti d'ailleurs. Un `rm` n'a jamais de chemin
+relatif, et le chemin absolu ne s'écrit pas en dur — le dépôt n'est pas au même
+endroit sur les deux postes. Même règle que `epreuve-fonctionnalite`, point 5.
+
+Le `dist` est versionné ; un `dist` périmé se commite sans bruit et se déploie
+tel quel.

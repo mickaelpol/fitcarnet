@@ -1,0 +1,20 @@
+import { lancerNavigateur, ADRESSE, surveiller, LARGEUR, HAUTEUR } from './commun.mjs';
+const nav = await lancerNavigateur();
+const ctx = await nav.newContext({ viewport: { width: LARGEUR, height: HAUTEUR } });
+const page = await ctx.newPage();
+const journal = []; surveiller(page, journal);
+const txt = async () => (await page.evaluate(() => document.body.innerText)).replace(/\n+/g, ' | ');
+await page.goto(`${ADRESSE}/invitation/jetonQuiNExistePasDuTout1234567890`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(3000);
+console.log('=== LIEN MORT ===\n', await txt());
+await page.screenshot({ path: '/tmp/claude-1000/-home-micka-perso-fitcarnet/63b81794-0521-411a-932e-699fb6e29bc0/scratchpad/lien-mort.png' });
+await page.getByText('Aller à la connexion', { exact: true }).last().click({ force: true });
+await page.waitForTimeout(2500);
+console.log('APRES LE BOUTON — url =', page.url(), '|', (await txt()).slice(0, 80));
+// un jeton trop court : 404 de routage, ou l'ecran ?
+await page.goto(`${ADRESSE}/invitation/court`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(3000);
+console.log('=== JETON TROP COURT ===\n', (await txt()).slice(0, 300));
+await page.screenshot({ path: '/tmp/claude-1000/-home-micka-perso-fitcarnet/63b81794-0521-411a-932e-699fb6e29bc0/scratchpad/lien-court.png' });
+console.log('JOURNAL', journal.join('\n  ') || '(rien)');
+await nav.close();

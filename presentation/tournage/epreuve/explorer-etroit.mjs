@@ -1,0 +1,33 @@
+import { lancerNavigateur, ADRESSE, surveiller } from './commun.mjs';
+const [email, mdp] = process.argv.slice(2);
+const nav = await lancerNavigateur();
+const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const page = await ctx.newPage();
+const journal = []; surveiller(page, journal);
+const S = '/tmp/claude-1000/-home-micka-perso-fitcarnet/63b81794-0521-411a-932e-699fb6e29bc0/scratchpad';
+const txt = async () => (await page.evaluate(() => document.body.innerText)).replace(/\n+/g, ' | ');
+await page.goto(`${ADRESSE}/connexion`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${S}/etroit-connexion.png` });
+const inp = page.locator('input');
+await inp.nth(0).fill(email); await inp.nth(1).fill(mdp);
+await page.keyboard.press('Enter');
+await page.waitForURL(/seances/, { timeout: 15000 });
+await page.waitForTimeout(2500);
+await page.screenshot({ path: `${S}/etroit-bandeau.png` });
+// le bandeau tient-il sur une ligne (numberOfLines=1) ?
+console.log('BANDEAU', JSON.stringify(await page.evaluate(() => {
+  const e = [...document.querySelectorAll('div')].find(d => d.childElementCount === 0 && /ne suit plus les r/.test(d.textContent));
+  if (!e) return null;
+  const r = e.getBoundingClientRect();
+  return { texte: e.textContent, largeur: Math.round(r.width), tronque: e.scrollWidth > e.clientWidth + 1 };
+})));
+await page.goto(`${ADRESSE}/mot-de-passe`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(2000);
+const c = page.locator('input[type=password]');
+await c.nth(0).fill('faux'); await c.nth(1).fill('motdepasse'); await c.nth(2).fill('autre');
+await page.waitForTimeout(800);
+await page.screenshot({ path: `${S}/etroit-mdp.png`, fullPage: true });
+console.log(await txt());
+console.log('JOURNAL', journal.join('\n  ') || '(rien)');
+await nav.close();

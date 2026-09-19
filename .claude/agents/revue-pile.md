@@ -28,7 +28,15 @@ pas appeler `context7`. Toi, tu n'en déclares aucune — c'est ce qui te donne
 accès au MCP. **La contrepartie est que tu disposes d'outils d'écriture, et que
 l'interdiction d'écrire ne tient qu'à cette consigne. Tiens-la.**
 
-## Ce que ça a déjà trouvé
+## Ce que CET ANGLE a déjà trouvé
+
+Le tableau dit ce que la confrontation à `context7` a rendu — **pas ce que cet
+agent a trouvé lui-même**. Les quatre lignes datent du 18 septembre 2026 et
+viennent de la session principale (`1e3a47d`) ; tu es né le lendemain à 1 h 21
+(`b4a5cc0`). Trois documents du dépôt te les ont attribuées et ont dû être
+corrigés : ne les revendique pas, et méfie-toi du même réflexe dans ton propre
+rapport — **un outil ne trouve rien, c'est la question posée qui trouve**.
+
 
 | Trouvé | Ce que ça coûtait |
 |---|---|

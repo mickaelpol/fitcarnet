@@ -134,32 +134,43 @@ Administration. **Données de départ** : aucune.
 
 ### Changer son mot de passe ou son adresse
 
-**Il n'y a pas d'écran.** La capacité existe et est complète côté serveur, mais
-aucun composant de `front/` ne l'appelle (voir *Limites connues*). Le chemin réel
-est `PATCH /api/utilisateurs/{id}`, autorisé par
+**LE MOT DE PASSE A SON ÉCRAN DEPUIS LE 18 SEPTEMBRE 2026** (`f4a49ec`,
+21 h 06) :
+`front/app/mot-de-passe.tsx`, atteint depuis « Mon compte » et depuis le bandeau
+d'avertissement visible sur tous les onglets. Trois champs enchaînés — actuel,
+nouveau, confirmation — une jauge qui liste les cinq exigences et les coche
+pendant la frappe, puis un panneau « C'est fait ». *(Cette fiche a affirmé « il
+n'y a pas d'écran » un jour de trop — puis, en se corrigeant le 19, a daté
+l'écran du 19 alors qu'il est du 18. Sa propre section « Limites connues » le
+disait déjà : « Levée le 18 septembre 2026, et cette fiche l'a su un jour plus
+tard ». Deux parties du même document, deux dates.)*
+
+**L'ADRESSE, elle, n'a toujours aucun écran** et ne se change qu'au `curl`.
+
+Le chemin réel, commun aux deux, est `PATCH /api/utilisateurs/{id}`, autorisé par
 `security: "is_granted('ROLE_ADMIN') or object == user"`
 (`api/src/Entity/Utilisateur.php:33`), et le processeur fait trois choses dans cet
-ordre (`UtilisateurProcessor.php:61-119`) :
+ordre (`UtilisateurProcessor.php:61-180`) :
 
 1. **exiger le mot de passe actuel** dès qu'on change le mot de passe **ou**
-   l'adresse (`:93-95`). Sans cette règle, un jeton volé pendant une heure
+   l'adresse (`:145-147`). Sans cette règle, un jeton volé pendant une heure
    suffisait à prendre le compte définitivement : un `PATCH` posait une nouvelle
    adresse **et** un nouveau mot de passe, et le propriétaire ne pouvait plus se
    connecter avec les siens ;
-2. **hacher**, puis oublier le clair (`:97-101`) ;
+2. **hacher**, puis oublier le clair (`:149-162`) ;
 3. **révoquer toutes les sessions**, la courante comprise, et **après** la
    persistance seulement, par `JetonsRafraichissement::revoquerTout`
-   (`:105-116`).
+   (`:163-177`).
 
 Deux refus, avec leurs textes exacts :
 
 - **« Indique ton mot de passe actuel pour changer ton mot de passe ou ton
-  adresse. »** — 422 (`:138-142`) ;
-- **« Mot de passe actuel incorrect. »** — accès refusé (`:144-146`).
+  adresse. »** — 422 (`:199-203`) ;
+- **« Mot de passe actuel incorrect. »** — accès refusé (`:205-207`).
 
 La comparaison se fait contre **l'ancien hachage** (`$precedent`), jamais contre
 l'objet déjà désérialisé — sans quoi on validerait le nouveau mot de passe contre
-lui-même (`:124-126`).
+lui-même (`:185-195`).
 
 ## Critères d'acceptation
 
@@ -230,13 +241,13 @@ lui-même (`:124-126`).
     ton mot de passe actuel pour changer ton mot de passe ou ton adresse. »
     (`UtilisateurProcessor.php:138-142`). Idem pour un changement d'adresse seul.
 19. **Refus : mot de passe actuel faux → accès refusé**, « Mot de passe actuel
-    incorrect. » (`:144-146`), et **rien n'est écrit** en base.
+    incorrect. » (`:205-207`), et **rien n'est écrit** en base.
 20. **Un changement de mot de passe révoque toutes les sessions.** Après le
     `PATCH`, `SELECT count(*) FROM jeton_rafraichissement` pour ce compte doit
     valoir **0**, la session qui a fait le changement comprise, et l'ancien jeton
     de rafraîchissement doit être refusé (`UtilisateurProcessor.php:115`).
 21. **Un administrateur est dispensé du mot de passe actuel sur autrui, jamais
-    sur lui-même** (`:132-136`) : le même `PATCH` sur son propre compte doit
+    sur lui-même** (`:193-197`) : le même `PATCH` sur son propre compte doit
     exiger le mot de passe.
 22. **Isolation (règle 2) : un compte ordinaire ne peut lire que lui-même.**
     `GET /api/utilisateurs` répond 403 (`Utilisateur.php:30`) ;
@@ -265,7 +276,15 @@ administrateur, pour éprouver le critère 17 dans les deux sens. Pour le critè
 un troisième compte avec `source_frigo = 'grocy'` — **en lecture seule**, voir
 `fonctionnalite-frigo-grocy` avant d'écrire quoi que ce soit.
 
-**Le changement de mot de passe ne se fait qu'au `curl`** (il n'a pas d'écran) :
+**Le changement d'adresse ne se fait qu'au `curl`.** Le mot de passe a son écran
+depuis le 18 septembre, mais l'éprouver ainsi reste utile : c'est le seul moyen
+de lire les refus tels que le serveur les formule.
+
+**LE MOT DE PASSE D'EXEMPLE CI-DESSOUS OBÉIT À LA RÈGLE DE COMPOSITION**, et ce
+n'était pas le cas jusqu'au 19 septembre : il valait `nouveauMotDePasse2026`,
+sans le moindre caractère spécial, et se fait refuser en 422 depuis que la règle
+a durci. Quiconque aurait recopié ce bloc aurait cru à une panne de l'API. Voir
+`api/regles/motdepasse.json` :
 
 ```bash
 BASE=http://localhost:8080/api
@@ -276,13 +295,13 @@ ID=$(curl -s -H "Authorization: Bearer $JETON" $BASE/moi \
 curl -s -X PATCH "$BASE/utilisateurs/$ID" \
   -H "Authorization: Bearer $JETON" \
   -H 'Content-Type: application/merge-patch+json' \
-  -d '{"motDePasseClair":"nouveauMotDePasse2026"}'
+  -d '{"motDePasseClair":"NouveauMotDePasse2026!"}'
 
 # accepté : avec le mot de passe actuel
 curl -s -X PATCH "$BASE/utilisateurs/$ID" \
   -H "Authorization: Bearer $JETON" \
   -H 'Content-Type: application/merge-patch+json' \
-  -d '{"motDePasseClair":"nouveauMotDePasse2026","motDePasseActuel":"MotDePasseTest123!"}'
+  -d '{"motDePasseClair":"NouveauMotDePasse2026!","motDePasseActuel":"MotDePasseTest123!"}'
 ```
 
 **Ce que la base doit dire** — le critère 20 se prouve ici, pas à l'écran :
@@ -423,6 +442,6 @@ pas les vidéos.
   et la session sont dans `fonctionnalite-acces`.
 - **`presentation/features.md` est daté du 14 septembre 2026** et ses
   `fichier:ligne` de la section A ne correspondent plus au code (`compte.tsx:17`,
-  `:30`, `reglages.tsx:29`, `etatMaj.tsx:109`, `:125`, `EtatController.php:259`
+  `:30`, `reglages.tsx:29`, `etatMaj.tsx:109`, `:125`, `EtatController.php:40-43`
   pour un fichier de 45 lignes). Les lignes de cette fiche ont été relues le
   **16 septembre 2026**.

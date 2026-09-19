@@ -33,10 +33,10 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 647 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # tsc --noEmit + 649 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 416 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 419 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -116,11 +116,34 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `front/src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
 | Force d'un mot de passe | `api/src/Service/MotDePasse.php` **et** `front/src/calcul/motDePasse.ts`, verrouillés l'un sur l'autre par `api/regles/motdepasse.json` |
 
-**Le mot de passe est le seul cas où DEUX juges sont assumés**, et c'est écrit : la
-jauge doit répondre pendant la frappe, sans aller-retour réseau. Le dispositif qui
-les empêche de diverger est celui de `rendement.json` — un fichier de règles que
-**les deux suites de tests** lisent (`MotDePassePartageTest.php`,
-`motDePassePartage.test.ts`). Ne jamais recopier « douze caractères » dans un
+**DEUX juges sont assumés dans TROIS cas**, et cette page s'est trompée deux
+fois de suite en les comptant — d'abord « le mot de passe est le seul cas »,
+puis « deux cas, et deux seulement ». Les voici, mesurés :
+
+| Ce qui est jugé deux fois | Les deux écritures | Ce qui les tient alignées |
+|---|---|---|
+| Mot de passe | `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` | `api/regles/motdepasse.json`, lu par `MotDePassePartageTest.php` **et** `motDePassePartage.test.ts` |
+| Rendement cru/cuit | les deux côtés, depuis le constat 04#7 | `api/regles/rendement.json`, lu par `RendementPartageTest.php` **et** `rendementPartage.test.ts` |
+| **1RM (Epley)** | `front/src/calcul/performance.ts:31`, `api/src/Entity/SeanceExercice.php:126` — `0.0333` et le plafond de 15 répétitions, écrits deux fois | **RIEN.** Pas de fichier de règles, et `api/tests/Entity/RmEstimeTest.php` n'en lit aucun |
+
+Les deux premiers partagent la même raison — l'écran doit répondre pendant la
+frappe, sans aller-retour réseau, pendant que le serveur reste seul à décider —
+et le même dispositif : **un fichier de règles lu par les DEUX suites**. Le jour
+où l'un des juges change d'avis sans l'autre, une des deux suites tombe **en
+nommant le cas**.
+
+**Le troisième n'a ni l'un ni l'autre, et son propre commentaire promet plus
+qu'il ne tient.** `SeanceExercice.php:143` affirme « `RmEstimeTest.php` la tient
+alignée sur les mêmes règles […] le test tombe si on l'oublie » : c'est faux
+dans un sens. Ce test n'éprouve que le PHP. Déplacer le plafond de 15 dans
+`performance.ts` laisse les deux suites vertes, et l'API continue d'exposer un
+autre `rmEstime` dans `seance:lire` — exactement le constat E1, qui avait déjà
+produit un « record » de 79,96 kg. **Relevé le 19 septembre 2026, non corrigé :
+il manque un `api/regles/rm.json` sur le modèle des deux autres.**
+
+Ne jamais recopier « douze caractères » dans un écran : c'est exactement ce qui
+a laissé l'écran d'invitation conseiller « ni majuscule ni chiffre imposés » le
+jour où le serveur a commencé à les exiger. Ne jamais recopier « douze caractères » dans un
 écran : c'est exactement ce qui a laissé l'écran d'invitation conseiller « ni
 majuscule ni chiffre imposés » le jour où le serveur a commencé à les exiger.
 
@@ -235,7 +258,7 @@ déviation par rapport à la cible doit être expliquée à l'écran.
 
 ## Skills : laquelle, quand
 
-**Les 25 skills du dépôt portent ce que personne d'autre ne peut écrire** — dix
+**Les 26 skills du dépôt portent ce que personne d'autre ne peut écrire** — onze
 skills de métier et d'outillage, plus les quinze fiches `fonctionnalite-*`. Elles
 sont dans `.claude/skills/`, toutes actives, et disent le métier et les pièges de
 *ce* projet :
@@ -296,7 +319,7 @@ Pour l'aiguillage :
 | Agent | Quand l'invoquer |
 |---|---|
 | **`revue-fitcarnet`** | Avant de pousser, sur une modification en cours, ou pour éprouver un pan de code. Lecture seule : il rapporte, il ne corrige pas. Il applique les **huit motifs de défaut réellement trouvés** par l'audit — le jumeau oublié, le garde qui regarde l'état au lieu de l'intention, le commentaire qui ment, le test qui ne peut pas échouer… — via la skill `revue-de-code`. Une revue générique ne trouve rien sur ce projet ; celle-ci sait où regarder. Il n'a **pas** `context7` : un agent de projet qui déclare une liste d'outils explicite ne reçoit pas les outils MCP (mesuré le 19 septembre 2026). Il signale donc les sujets à confronter, et c'est `revue-pile` ou la session principale qui pose la question. |
-| **`revue-pile`** | Confronte le code à la documentation **officielle** de sa pile — Symfony 7.4, API Platform 4, React Native, Expo Router, TanStack Query — par le MCP `context7`. Là où `revue-fitcarnet` cherche le code contre lui-même, celui-ci cherche le code contre l'état de l'art de ses bibliothèques. C'est cet angle qui a trouvé que `login_throttling` était devenu un verrou de tout le site, faute de `trusted_proxies`. **Il ne déclare aucune liste `tools:`**, et c'est ce qui lui donne le MCP — la règle, mesurée dans les deux sens le 19 septembre 2026 : *une liste `tools:` explicite prive des outils MCP ; pas de liste ⇒ tous les outils*. Contrepartie : il dispose d'outils d'écriture, et son interdiction de modifier ne tient qu'à sa consigne. |
+| **`revue-pile`** | Confronte le code à la documentation **officielle** de sa pile — Symfony 7.4, API Platform 4, React Native, Expo Router, TanStack Query — par le MCP `context7`. Là où `revue-fitcarnet` cherche le code contre lui-même, celui-ci cherche le code contre l'état de l'art de ses bibliothèques. C'est cet **angle** — la confrontation à `context7` — qui a trouvé que `login_throttling` était devenu un verrou de tout le site, faute de `trusted_proxies` ; la trouvaille date du 18 septembre et vient de la **session principale** (`1e3a47d`), un jour avant que cet agent existe (`b4a5cc0`, 19 septembre 1 h 21). Ne pas la lui attribuer : trois documents l'ont fait, et c'est ce qui fait croire qu'un outil trouve tout seul. **Il ne déclare aucune liste `tools:`**, et c'est ce qui lui donne le MCP — la règle, mesurée dans les deux sens le 19 septembre 2026 : *une liste `tools:` explicite prive des outils MCP ; pas de liste ⇒ tous les outils*. Contrepartie : il dispose d'outils d'écriture, et son interdiction de modifier ne tient qu'à sa consigne. |
 | **`verification-bout-en-bout`** | Après une modification qui touche l'API ou la base, et avant une livraison ou une démonstration. Éprouve l'application **qui tourne** — connexion, appels, état en base — puis retire toute trace de son passage et le prouve. Sa règle absolue : **n'écrire jamais sur une donnée qu'il n'a pas créée** (skill `donnees-de-test`). |
 | **`verite-documentaire`** | Après un chantier, avant une passation. Confronte ce que la documentation **affirme** au dépôt réel : fichiers annoncés, revendications d'unicité, compteurs, `fichier:ligne`. Quatre affirmations fausses ont été trouvées par accident en deux jours ; il les cherche exprès. |
 | **`verification-android`** | Après une modification qui touche une saisie, le réseau ou un écran, et avant une livraison. Fait tourner l'application dans Expo Go sur l'émulateur, fait les gestes de l'utilisateur, relit l'écran et la base. C'est ainsi qu'on a vu 42,5 kg s'enregistrer 425 kg avec 577 tests au vert. Skill `verification-android`. |

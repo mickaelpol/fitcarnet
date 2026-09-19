@@ -82,7 +82,7 @@ démontrer devant un client.
 - **Changer son mot de passe ou son adresse** — le mot de passe actuel est exigé ; l'administrateur en est dispensé sur autrui, jamais sur lui-même. `UtilisateurProcessor.php:229`
 - **Toutes les sessions sont révoquées au changement de mot de passe**, y compris la session courante. `UtilisateurProcessor.php:245`
 - **Choisir sa sonnerie de fin de repos** parmi cinq, chacune jouée au toucher ; réglage propre à l'appareil. `reglages.tsx:29`
-- **Savoir si le serveur répond** — `/api/etat` public, sans version ni nom de serveur ni état de la base. `EtatController.php:259`
+- **Savoir si le serveur répond** — `/api/etat` public, sans version ni nom de serveur ni état de la base. `EtatController.php:40-43`
 
 ---
 

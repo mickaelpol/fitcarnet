@@ -1,0 +1,14 @@
+import { lancerNavigateur, ADRESSE } from './commun.mjs';
+const [email, mdp] = process.argv.slice(2);
+const nav = await lancerNavigateur();
+const ctx = await nav.newContext({ viewport: { width: 360, height: 760 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+const page = await ctx.newPage();
+await page.goto(`${ADRESSE}/connexion`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(1200);
+const inp = page.locator('input');
+await inp.nth(0).fill(email); await inp.nth(1).fill(mdp);
+await page.keyboard.press('Enter');
+await page.waitForURL(/seances/, { timeout: 20000 });
+await page.waitForTimeout(2500);
+await page.screenshot({ path: '/tmp/claude-1000/-home-micka-perso-fitcarnet/63b81794-0521-411a-932e-699fb6e29bc0/scratchpad/bandeau-360.png', clip: { x: 0, y: 0, width: 360, height: 60 } });
+await nav.close();

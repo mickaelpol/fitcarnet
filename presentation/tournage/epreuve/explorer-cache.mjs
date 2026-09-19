@@ -1,0 +1,17 @@
+import { lancerNavigateur, ADRESSE, LARGEUR, HAUTEUR } from './commun.mjs';
+const [email, mdp] = process.argv.slice(2);
+const nav = await lancerNavigateur();
+const ctx = await nav.newContext({ viewport: { width: LARGEUR, height: HAUTEUR } });
+const page = await ctx.newPage();
+await page.goto(`${ADRESSE}/connexion`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(1200);
+const inputs = page.locator('input');
+await inputs.nth(0).fill(email); await inputs.nth(1).fill(mdp);
+await page.keyboard.press('Enter');
+await page.waitForURL(/seances/, { timeout: 15000 });
+await page.waitForTimeout(2000);
+const cache = await page.evaluate(() => localStorage.getItem('fitcarnet-cache-v1'));
+const i = cache.indexOf('motDePasse');
+console.log('TAILLE', cache.length);
+console.log('EXTRAIT AUTOUR DE motDePasse :\n', cache.slice(Math.max(0, i - 400), i + 400));
+await nav.close();

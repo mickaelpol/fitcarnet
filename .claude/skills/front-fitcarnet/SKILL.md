@@ -38,6 +38,7 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 | Composition de repas | `src/solveur/` |
 | Suppression des accents | `src/calcul/texte.ts` |
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
+| Force d'un mot de passe, et ce qui lui manque | `src/calcul/motDePasse.ts` — verrouillé sur `api/src/Service/MotDePasse.php` par `api/regles/motdepasse.json`, que les DEUX suites lisent. Ne jamais réécrire « 12 caractères » dans un écran : c'est ce qui a laissé l'écran d'invitation annoncer une règle que le serveur n'appliquait plus |
 
 **Aucune formule métier recopiée.** Un écran qui recalcule un 1RM importe
 `performance.ts`. Trois copies d'Epley aux bornes divergentes ont produit un
@@ -92,6 +93,35 @@ Ce qu'il faut faire à la place, dans l'ordre où ça se pose :
 `tsconfig.tests.json` ne porte pas le drapeau et n'a pas à le porter : il ne sert
 qu'à émettre, et `npm test` lance `tsc --noEmit` (donc `tsconfig.json`, qui
 couvre `src/` **et** `app/`) avant lui.
+
+## Un hook après un `return`, et l'écran devient blanc
+
+**`tsc` compile, les 680 tests passent, et l'écran ne s'affiche plus.** Mesuré le
+19 septembre 2026 sur `app/invitation/[jeton].tsx` : deux `useRef` ajoutés pour
+faire passer le focus d'un champ au suivant, posés **après** les retours
+anticipés de l'écran (`if (invitation.isLoading) return …`, lien expiré, compte
+créé). React exige que tous les hooks soient appelés à chaque rendu, dans le même
+ordre ; un hook qu'on n'atteint que sur un chemin fait tomber le rendu de ce
+chemin-là.
+
+Ce qui rend ce défaut méchant, c'est **quel** chemin tombe :
+
+| Lien | Ce qui s'affiche |
+|---|---|
+| expiré ou déjà utilisé | l'écran « CE LIEN N'EST PLUS VALABLE », parfaitement |
+| **valable** | **rien** — page blanche, aucun champ |
+
+Autrement dit : tout marche, sauf le cas pour lequel l'écran existe. Les
+captures d'un cas d'erreur rassurent, la suite de tests reste verte — `tsc` ne
+connaît pas la règle des hooks, et aucun test de rendu ne montait cet écran.
+
+**Ce qui l'a attrapé** : un script Playwright qui ouvre l'URL avec un **vrai**
+jeton et attend un `input`. Rien d'autre ne pouvait le voir. Et ce qui a donné
+la réponse en une ligne, c'est d'écouter `pageerror` — sans quoi on ne lit qu'un
+`TimeoutError` sur `waitForSelector`, qui ne dit pas pourquoi.
+
+**La règle : tous les hooks en haut, avant le premier `return`.** Sans
+exception, et y compris quand le hook ne sert qu'au chemin du bas.
 
 ## Les tests
 

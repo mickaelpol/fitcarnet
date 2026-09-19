@@ -12,20 +12,27 @@ d'une ligne de code, pas ce qui reste à faire.
 
 ---
 
-## L'état, au 18 septembre 2026
+## L'état, au 19 septembre 2026
 
 - **Tout est poussé sur Gitea**, et donc déployé : la tâche planifiée du NAS
   tire `master` toutes les 5 minutes. **La production a été contrôlée le
   18 septembre** — schéma conforme aux migrations 34-35-36, parcours réel
-  éprouvé sur un compte jetable puis retiré (section 2.1).
-- **Tests** : 647 côté front plus 33 de rendu, 416 côté API (1 037 assertions),
+  éprouvé sur un compte jetable puis retiré (section 2.1). **Ce contrôle date du
+  déploiement de 11 h 43 ; les migrations 37 et 38 sont parties APRÈS** (13 h 36
+  et 21 h 06) et rien dans le dépôt ne dit qu'elles ont été vérifiées en
+  production. À refaire avant de s'appuyer sur cette ligne.
+- **Tests** : 649 côté front plus 33 de rendu, 419 côté API (1 043 assertions),
   tous verts. PHPStan : **5 erreurs connues**, pas une de plus — c'était 7
   jusqu'au 18 septembre 2026, deux ont disparu avec le code qui les portait.
 - **Contrôles de base**, tous verts : `verifier-schema.sh` (base neuve
   identique à base migrée), `verifier-migrations.sh`, `verifier-jeux.sh`,
   `test_import_carnet.py`.
-- **Dernier chantier** : chaque aliment appartient à un compte (17 septembre),
-  puis deux passes des trois agents de contrôle et leurs correctifs.
+- **Dernier chantier** : les mots de passe (section 2.6) — règle durcie à douze
+  caractères et quatre familles, jauge de force, écran de changement, bandeau
+  d'avertissement sur tous les onglets. Puis **la passe de contrôle à six
+  agents** avant l'APK (skill `passe-de-controle`), et ses correctifs.
+- **L'APK n'est PAS publié.** Tout est prêt et vérifié ; `./publier-android.sh`
+  se lance par le propriétaire du projet, jamais par Claude.
 - **Audit de septembre** : 79 constats, **78 clos, 1 ouvert** — le seul restant, **02#8**, est hors dépôt (une tâche DSM, voir §2.2). Aucun
   critique ni élevé. Les fermetures sont récapitulées en section 2.4.
 
@@ -47,8 +54,8 @@ cd front && npm install          # si package.json a bougé, ou si les tests de 
 Puis vérifier qu'on part d'un socle sain :
 
 ```bash
-cd front && npm test                                                  # 647 + 33, 0 échec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 416 tests, 1 037 assertions
+cd front && npm test                                                  # 649 + 33, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 419 tests, 1 043 assertions
 db/manuel/verifier-schema.sh                                          # « identiques »
 db/manuel/verifier-migrations.sh                                      # vert
 db/manuel/verifier-jeux.sh                                            # vert
@@ -59,9 +66,9 @@ pas du code : le régler d'abord.
 
 **Le premier message à donner à Claude**, selon ce qu'on reprend :
 
-> Lis `REPRENDRE.md`. On contrôle la production et on retire la migration 34
-> (section 2.1). Ne travaille pas sur une autre branche que `master` sans me
-> le demander.
+> Lis `REPRENDRE.md`. On publie l'APK : d'abord la passe de contrôle
+> (skill `passe-de-controle`), et **c'est moi qui lance `publier-android.sh`**.
+> Ne travaille pas sur une autre branche que `master` sans me le demander.
 
 > Lis `REPRENDRE.md` et `presentation/demonstration.md`. On prépare le
 > tournage : d'abord les trois arbitrages de la section 2.3, puis les comptes
@@ -96,8 +103,13 @@ et après : 4 comptes, 0 aliment, 0 stock.
 
 **`db/manuel/34-aliments-par-compte.sql` est retiré** (commit à part).
 `verifier-schema.sh` : base neuve et base migrée identiques.
-`verifier-migrations.sh` : tous les garde-fous posés. **La prochaine migration
-prend le numéro 37** — jamais le 34 libéré (skill `schema-base`).
+`verifier-migrations.sh` : tous les garde-fous posés. **Le 34 libéré ne se
+reprend jamais.** Ce paragraphe a dit « la prochaine prend le 37 » jusqu'au
+19 septembre 2026 : les 37 et 38 étaient déjà posées le 18 (`a52c882` à 13 h 36,
+`f4a49ec` à 21 h 06), et suivre cette ligne aurait produit un numéro déjà pris.
+**Ne pas écrire de numéro en dur ici** — la règle est dans `schema-base` et elle
+se suffit : *le numéro qui suit le plus haut présent*, que `ls db/manuel/` donne
+en une seconde.
 
 **Conséquence acceptée** : une sauvegarde d'avant le 17 septembre ne redémarre
 plus seule — la 35 s'arrête et demande de rejouer la 34 depuis l'historique
@@ -154,7 +166,7 @@ d'abord** — chacun ferait tourner une prise pour rien :
 |---|---|---|
 | **Le bandeau « Fibres inconnues »** | Le plan 4.1 de la bobine 4 et la slide 06 le montrent, mais `jeu-essai.sql` renseigne les fibres de ses huit aliments : il ne peut pas apparaître (`planCalcule.ts` exige un aliment aux fibres inconnues). | Un féculent du jeu aux fibres `NULL`, ou retirer le bandeau du plan et de la slide. |
 | **Les habitudes de cuisson du compte de démonstration** | Aucun fichier ne les pose, et `presentation/tournage/capturer.mjs` clique « se mangent tels quels » : sur un compte neuf, la capture du batch cooking sort sans fournée. | `jeu-demo.sql` pose des habitudes, ou le script de capture les choisit. |
-| **La tuile d'audit de la slide** | `construire.py` affiche désormais « 61 / 79 clos · aucun critique ni élevé ouvert », là où la slide disait « tous clos ». | Garder ce message, ou le reformuler. |
+| **La tuile d'audit de la slide** | ~~« 61 / 79 clos »~~ — **tranché** : `construire.py:397` affiche « **78 / 79** clos · 1 ouvert (02#8, hors dépôt) ». Le seul constat encore ouvert est une tâche DSM qui ne vit pas dans le dépôt. | Réglé ; la tuile dit le vrai chiffre. |
 
 Ensuite, dans l'ordre de `demonstration.md` (partie I) :
 
@@ -260,7 +272,9 @@ mettre à jour son statut dans le rapport et dans le README de l'audit.
 | **Un second `tsconfig` pour les tests de rendu** | rendrait aux tests ordinaires la garde « pas d'import de `.tsx` ». | 1 h |
 | **Les hooks de `.claude/settings.json`** | appellent graphify par un chemin absolu (`/home/micka/.local/bin/graphify`) : vrai sur les deux postes, faux sur un troisième. Non modifié. | 5 min |
 | **Le graphe sémantique** | `graphify update .` est à jour pour le code ; la partie tirée des documents demande `/graphify . --update` (consomme des tokens ; `api/src` en fait partie, voir `CLAUDE.md`). | ~30 min |
-| **`presentation/features.md`** | « ~288 capacités », inventaire du 14 septembre : ses renvois vers les fichiers non touchés depuis restent périmés, comme son en-tête le dit. | 2 h |
+| **`presentation/features.md`** | « ~288 capacités », inventaire du 14 septembre. **Mesuré le 19 septembre : ~80 renvois `fichier:ligne` tombent HORS de leur fichier** — `composer.ts` est passé de 827 à 135 lignes et `cuisson.ts` à 22 (barils de ré-export du 15 septembre), `repas.tsx` en a 667 pour des renvois jusqu'à `:2262`. Ce n'est plus « périmé par endroits », c'est un inventaire qu'on ne peut plus suivre. | 2 h |
+| **Un troisième juge sans garde-fou : le 1RM** | `0.0333` et le plafond de 15 répétitions sont écrits DEUX fois — `front/src/calcul/performance.ts:31` et `api/src/Entity/SeanceExercice.php:126` — sans le dispositif qui protège les deux autres doubles juges. `RmEstimeTest.php` ne lit aucun fichier de règles et n'éprouve que le PHP : déplacer le plafond côté front laisse les deux suites vertes pendant que l'API expose un autre `rmEstime` dans `seance:lire`. C'est le constat E1 qui redevient possible. **Il manque `api/regles/rm.json`**, sur le modèle de `motdepasse.json` et `rendement.json`. Relevé le 19 septembre 2026. | 1 h |
+| **Les renvois `fichier:ligne` de tout le corpus** | un balayage n'attrape que ceux qui pointent au-delà de la dernière ligne. Les **décalages silencieux** — un renvoi qui tombe dans le fichier, mais sur autre chose — ne se voient qu'à la lecture. Dix ont été trouvés dans `fonctionnalite-compte` le 19 septembre, dont un qui désignait un 422 pour un autre. Il en reste ~1 170 non relus. | au fil de l'eau |
 | **Le réseau sortant des conteneurs** | constaté cassé le 9 septembre sur le poste d'alors (NAT Docker sous WSL2 : `composer install` impossible dans le conteneur). Non revérifié depuis. | à vérifier |
 
 **Laissés en l'état, en connaissance de cause** — à reprendre seulement si le
@@ -331,12 +345,27 @@ c'est le levier du lot 6, non ouvert. En attendant, le parcours a été **éprou
 dans Chromium de bout en bout** : bandeau, jauge nommant les quatre manques,
 non-concordance, changement, déconnexion, reconnexion, bandeau disparu.
 
+**ET CE TROU A COÛTÉ UN ÉCRAN BLANC LE 19 SEPTEMBRE, le jour même.** En
+corrigeant l'enchaînement des champs de `front/app/invitation/[jeton].tsx`, deux
+`useRef` ont été posés **après** les retours anticipés de l'écran. React exige
+que tous les hooks soient appelés à chaque rendu : le lien expiré s'affichait
+parfaitement, le lien **valable** ne rendait plus rien — pas un champ, page
+blanche. `tsc` compile, les 680 tests restent verts, et l'écran d'entrée de tout
+nouvel arrivant était mort. Vu par un script Playwright ouvrant l'URL avec un
+vrai jeton ; le diagnostic est venu d'un écouteur `pageerror`, sans quoi on ne
+lit qu'un délai dépassé qui ne dit rien. Le piège est écrit dans la skill
+`front-fitcarnet` : **tous les hooks en haut, avant le premier `return`.**
+
 ---
 
 ### 2.7 Deux refontes proposées par les revues, et repoussées
 
-Le 18 septembre 2026, deux confrontations à la documentation officielle (par le
-MCP context7) ont proposé des changements de structure côté front. **Aucun des
+Le **18** septembre 2026, deux confrontations à la documentation officielle (par
+le MCP context7, **depuis la session principale** — `1e3a47d`, 20 h 40) ont
+proposé des changements de structure côté front. *Ce paragraphe a porté « le
+19 septembre » et « agent `revue-pile` » pendant quelques heures le 19 : c'était
+faux deux fois, l'agent n'étant né qu'à 1 h 21 cette nuit-là (`b4a5cc0`) et sa
+seule trouvaille front étant le `submitBehavior` de `Champ` (`6f5eb7f`).* **Aucun des
 deux n'est un défaut** : le code marche et ses raisons sont écrites. Ils sont
 notés ici pour ne pas être re-découverts, et pour que la décision de les
 repousser soit lisible.

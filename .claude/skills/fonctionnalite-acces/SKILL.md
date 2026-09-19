@@ -41,7 +41,7 @@ désactivation du compte.
 | **À usage unique** — `accepte_le IS NULL` dans la transaction | — | `InvitationsController.php:316-321` |
 | **Révocable**, immédiatement | `DELETE /api/invitations/{id}` | `InvitationsController.php:201-218` |
 | **Le serveur n'en garde qu'une empreinte SHA-256** | — | `Invitation.php:55-58`, `InvitationsController.php:173`, `:347-352` |
-| **Même message pour un lien inconnu, périmé ou déjà utilisé** | — | `Invitation.php:175-191`, `InvitationsController.php:379-384` |
+| **Même message pour un lien inconnu, périmé ou déjà utilisé** | — | `Invitation.php:175-191`, `InvitationsController.php:363-368` |
 | **Une nouvelle invitation remplace celle qui attendait** | — | `InvitationsController.php:163-179` |
 | **Refus d'inviter une adresse qui a déjà un compte** | — | `InvitationsController.php:151-157` |
 | **Refus des domaines impossibles** (sans point, RFC 2606/6761) | — | `Invitation.php:109-125` |
@@ -259,7 +259,7 @@ critère.
    (`InvitationsController.php:290`).
 8. **Refus : lien inconnu, périmé, ou déjà utilisé → 404, même corps, même
    écran.** « Ce lien n'est plus valable. Demande une nouvelle invitation. »
-   (`InvitationsController.php:379-384`). **Aucun des trois cas ne doit se
+   (`InvitationsController.php:363-368`). **Aucun des trois cas ne doit se
    distinguer** — ni par le texte, ni par le code HTTP, ni par le temps de
    réponse. Témoins : `InvitationTest.php:135`, `:151`, `:166`.
 9. **Mot de passe faible → refus qui dit TOUT ce qui manque**, pas seulement le
