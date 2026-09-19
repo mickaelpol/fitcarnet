@@ -1,0 +1,33 @@
+-- ---------------------------------------------------------------------
+--  La vue v_performance recalculait Epley, et personne ne la lisait
+--
+--  Relevé le 19 septembre 2026, en cherchant les duplications du 1RM à la
+--  demande du propriétaire du projet : « je veux qu'un seul endroit qui
+--  calcule le 1RM […] si un jour on touche à l'un sans toucher à l'autre il
+--  va y avoir une divergence sans s'en rendre compte ».
+--
+--  Elle portait :
+--
+--      MAX(sr.poids * (1 + 0.0333 * sr.reps)) AS rm_estime
+--
+--  soit une TROISIÈME écriture d'Epley, après TypeScript et PHP — et la seule
+--  des trois qui était déjà FAUSSE : aucun plafond de répétitions. C'est le
+--  constat E1 dans une vue SQL. Une série de 93 répétitions à 32 kg y vaut
+--  131 kg, davantage qu'une série de 7 à 35 kg qui en vaut 43,2 : au-delà
+--  d'une quinzaine de répétitions on mesure l'endurance, pas la force. Elle
+--  ignorait aussi qu'une série d'UNE répétition est un maximum réel, auquel
+--  Epley ajouterait 3,3 % inventés.
+--
+--  AUCUN CODE NE LA LISAIT : zéro référence à `v_performance` dans `api/`,
+--  `front/` ou les scripts. Une vue morte qui porte un calcul faux est pire
+--  qu'une vue absente — le jour où quelqu'un la découvre, elle a l'air d'être
+--  la source de vérité.
+--
+--  La formule n'a plus qu'un domicile : `front/src/calcul/performance.ts`,
+--  et `front/src/calcul/epleyUnique.test.ts` refuse toute réécriture du
+--  coefficient dans le dépôt, SQL et PHP compris.
+--
+--  IDEMPOTENTE : rejouée à chaque démarrage par entrypoint-prod.sh.
+-- ---------------------------------------------------------------------
+
+DROP VIEW IF EXISTS v_performance;

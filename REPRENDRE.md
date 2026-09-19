@@ -21,7 +21,7 @@ d'une ligne de code, pas ce qui reste à faire.
   déploiement de 11 h 43 ; les migrations 37 et 38 sont parties APRÈS** (13 h 36
   et 21 h 06) et rien dans le dépôt ne dit qu'elles ont été vérifiées en
   production. À refaire avant de s'appuyer sur cette ligne.
-- **Tests** : 649 côté front plus 33 de rendu, 419 côté API (1 043 assertions),
+- **Tests** : 652 côté front plus 33 de rendu, 416 côté API (1 041 assertions),
   tous verts. PHPStan : **5 erreurs connues**, pas une de plus — c'était 7
   jusqu'au 18 septembre 2026, deux ont disparu avec le code qui les portait.
 - **Contrôles de base**, tous verts : `verifier-schema.sh` (base neuve
@@ -54,8 +54,8 @@ cd front && npm install          # si package.json a bougé, ou si les tests de 
 Puis vérifier qu'on part d'un socle sain :
 
 ```bash
-cd front && npm test                                                  # 649 + 33, 0 échec
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 419 tests, 1 043 assertions
+cd front && npm test                                                  # 652 + 33, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'          # 416 tests, 1 041 assertions
 db/manuel/verifier-schema.sh                                          # « identiques »
 db/manuel/verifier-migrations.sh                                      # vert
 db/manuel/verifier-jeux.sh                                            # vert
@@ -274,7 +274,7 @@ mettre à jour son statut dans le rapport et dans le README de l'audit.
 | **Les hooks de `.claude/settings.json`** | appellent graphify par un chemin absolu (`/home/micka/.local/bin/graphify`) : vrai sur les deux postes, faux sur un troisième. Non modifié. | 5 min |
 | **Le graphe sémantique** | `graphify update .` est à jour pour le code ; la partie tirée des documents demande `/graphify . --update` (consomme des tokens ; `api/src` en fait partie, voir `CLAUDE.md`). | ~30 min |
 | **`presentation/features.md`** | « ~288 capacités », inventaire du 14 septembre. **Mesuré le 19 septembre : ~80 renvois `fichier:ligne` tombent HORS de leur fichier** — `composer.ts` est passé de 827 à 135 lignes et `cuisson.ts` à 22 (barils de ré-export du 15 septembre), `repas.tsx` en a 667 pour des renvois jusqu'à `:2262`. Ce n'est plus « périmé par endroits », c'est un inventaire qu'on ne peut plus suivre. | 2 h |
-| **Un troisième juge sans garde-fou : le 1RM** | `0.0333` et le plafond de 15 répétitions sont écrits DEUX fois — `front/src/calcul/performance.ts:31` et `api/src/Entity/SeanceExercice.php:126` — sans le dispositif qui protège les deux autres doubles juges. `RmEstimeTest.php` ne lit aucun fichier de règles et n'éprouve que le PHP : déplacer le plafond côté front laisse les deux suites vertes pendant que l'API expose un autre `rmEstime` dans `seance:lire`. C'est le constat E1 qui redevient possible. **Il manque `api/regles/rm.json`**, sur le modèle de `motdepasse.json` et `rendement.json`. Relevé le 19 septembre 2026. | 1 h |
+| ~~**Un troisième juge sans garde-fou : le 1RM**~~ | **Réglé le 19 septembre 2026**, et autrement que prévu : au lieu d'ajouter `api/regles/rm.json`, les DEUX copies mortes ont été supprimées — celle de `SeanceExercice.php` et la vue SQL `v_performance` (migration 39), que personne ne lisait et dont la seconde était déjà fausse (aucun plafond de répétitions). `epleyUnique.test.ts` refuse désormais toute réécriture du coefficient dans le dépôt, PHP et SQL compris. | fait |
 | **Les renvois `fichier:ligne` de tout le corpus** | un balayage n'attrape que ceux qui pointent au-delà de la dernière ligne. Les **décalages silencieux** — un renvoi qui tombe dans le fichier, mais sur autre chose — ne se voient qu'à la lecture. Dix ont été trouvés dans `fonctionnalite-compte` le 19 septembre, dont un qui désignait un 422 pour un autre. Il en reste ~1 170 non relus. | au fil de l'eau |
 | **Le réseau sortant des conteneurs** | constaté cassé le 9 septembre sur le poste d'alors (NAT Docker sous WSL2 : `composer install` impossible dans le conteneur). Non revérifié depuis. | à vérifier |
 

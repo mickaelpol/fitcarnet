@@ -33,11 +33,11 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 649 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 652 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 419 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 416 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -109,7 +109,7 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 
 | Domaine | Module de référence |
 |---|---|
-| 1RM, volume, paliers | `front/src/calcul/performance.ts` |
+| 1RM, volume, paliers | `front/src/calcul/performance.ts` — **seule écriture d'Epley dans tout le dépôt** depuis le 19 septembre 2026, gardée par `epleyUnique.test.ts` |
 | Macros, Atwater (`kcalDesGrammes`), catégories | `front/src/calcul/nutrition.ts` |
 | Cru/cuit, fournées, habitudes | `front/src/calcul/cuisson.ts` |
 | Composition de repas | `front/src/solveur/` |
@@ -117,36 +117,40 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `front/src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
 | Force d'un mot de passe | `api/src/Service/MotDePasse.php` **et** `front/src/calcul/motDePasse.ts`, verrouillés l'un sur l'autre par `api/regles/motdepasse.json` |
 
-**DEUX juges sont assumés dans TROIS cas**, et cette page s'est trompée deux
-fois de suite en les comptant — d'abord « le mot de passe est le seul cas »,
-puis « deux cas, et deux seulement ». Les voici, mesurés :
+**DEUX juges sont assumés dans DEUX cas — et le troisième a été supprimé, pas
+synchronisé.** Cette page s'est trompée trois fois en les comptant : « le mot de
+passe est le seul cas », puis « deux cas et deux seulement », puis « trois cas ».
+Voici l'état mesuré.
 
 | Ce qui est jugé deux fois | Les deux écritures | Ce qui les tient alignées |
 |---|---|---|
 | Mot de passe | `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` | `api/regles/motdepasse.json`, lu par `MotDePassePartageTest.php` **et** `motDePassePartage.test.ts` |
 | Rendement cru/cuit | les deux côtés, depuis le constat 04#7 | `api/regles/rendement.json`, lu par `RendementPartageTest.php` **et** `rendementPartage.test.ts` |
-| **1RM (Epley)** | `front/src/calcul/performance.ts:31`, `api/src/Entity/SeanceExercice.php:126` — `0.0333` et le plafond de 15 répétitions, écrits deux fois | **RIEN.** Pas de fichier de règles, et `api/tests/Entity/RmEstimeTest.php` n'en lit aucun |
 
-Les deux premiers partagent la même raison — l'écran doit répondre pendant la
+Ces deux-là ont la même raison d'exister — l'écran doit répondre pendant la
 frappe, sans aller-retour réseau, pendant que le serveur reste seul à décider —
 et le même dispositif : **un fichier de règles lu par les DEUX suites**. Le jour
 où l'un des juges change d'avis sans l'autre, une des deux suites tombe **en
 nommant le cas**.
 
-**Le troisième n'a ni l'un ni l'autre, et son propre commentaire promet plus
-qu'il ne tient.** `SeanceExercice.php:143` affirme « `RmEstimeTest.php` la tient
-alignée sur les mêmes règles […] le test tombe si on l'oublie » : c'est faux
-dans un sens. Ce test n'éprouve que le PHP. Déplacer le plafond de 15 dans
-`performance.ts` laisse les deux suites vertes, et l'API continue d'exposer un
-autre `rmEstime` dans `seance:lire` — exactement le constat E1, qui avait déjà
-produit un « record » de 79,96 kg. **Relevé le 19 septembre 2026, non corrigé :
-il manque un `api/regles/rm.json` sur le modèle des deux autres.**
+### Le 1RM : la duplication a été retirée, le 19 septembre 2026
 
-Ne jamais recopier « douze caractères » dans un écran : c'est exactement ce qui
-a laissé l'écran d'invitation conseiller « ni majuscule ni chiffre imposés » le
-jour où le serveur a commencé à les exiger. Ne jamais recopier « douze caractères » dans un
-écran : c'est exactement ce qui a laissé l'écran d'invitation conseiller « ni
-majuscule ni chiffre imposés » le jour où le serveur a commencé à les exiger.
+Epley était écrit **trois** fois, dans trois langages : `performance.ts`,
+`api/src/Entity/SeanceExercice.php` (exposé en `seance:lire`) et la vue SQL
+`v_performance`. **Personne ne lisait les deux dernières**, et la troisième était
+déjà fausse — `MAX(sr.poids * (1 + 0.0333 * sr.reps))`, sans le plafond de
+15 répétitions, donc un « record » sur une série de 93 répétitions. C'est le
+constat E1 endormi dans une vue.
+
+Les deux copies sont supprimées (migration 39 pour la vue). **La formule n'a plus
+qu'un domicile**, et `front/src/calcul/epleyUnique.test.ts` refuse toute
+réécriture du coefficient **dans tout le dépôt** — `.ts`, `.tsx`, `.php`, `.sql`,
+`.py` — pas seulement dans le front. C'est le seul dispositif qui voit une
+divergence entre deux langages : aucun des deux côtés ne peut la voir seul.
+
+**Ne pas réintroduire `rmEstime` dans l'API sans décision explicite.** Si un
+autre lecteur doit un jour obtenir ce chiffre du serveur, il faudra alors un
+`api/regles/rm.json` lu par les deux suites, comme pour les deux cas ci-dessus.
 
 Un hook qui recalcule un 1RM importe `performance.ts`. Trois copies d'Epley aux bornes divergentes
 ont produit un « record » de 79,96 kg que la formule elle-même déclare invalide.

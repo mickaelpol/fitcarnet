@@ -40,7 +40,7 @@
     // `npm test` lance DEUX fois `node --test` : les tests purs nus, les tests
     // de rendu derriere `--import .../environnement.js`. Le motif `*.test.js`
     // ne peut pas attraper `*.test-rendu.js`, et c'est exactement ce qu'on veut :
-    // donner un `window` aux 649 tests purs ferait basculer TanStack Query en
+    // donner un `window` aux 652 tests purs ferait basculer TanStack Query en
     // mode navigateur (gcTime 5 min au lieu d'Infinity) et api/persistance.test.ts
     // ne rendrait plus jamais la main. Mesure du 15 septembre 2026.
     "src/**/*.test-rendu.tsx",

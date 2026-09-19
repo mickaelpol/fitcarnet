@@ -122,53 +122,25 @@ class SeanceExercice
         return $this;
     }
 
-    /** Le coefficient d'Epley, et le plafond au-dela duquel on mesure l'endurance. */
-    private const COEF_EPLEY = 0.0333;
-    private const REPS_MAX_POUR_1RM = 15;
+    /* LE 1RM NE SE CALCULE PLUS ICI — retire le 19 septembre 2026, a la
+       demande du proprietaire du projet : « je veux qu'un seul endroit qui
+       calcule le 1RM […] si un jour on touche a l'un sans toucher a l'autre il
+       va y avoir une divergence sans s'en rendre compte ».
 
-    /**
-     * 1RM estime (Epley) : poids x (1 + 0,0333 x repetitions).
-     *
-     * LES DEUX GARDE-FOUS MANQUAIENT ICI, ET C'EST UN CHIFFRE FAUX QUI PARTAIT
-     * (releve le 16 septembre 2026, en ecrivant les fiches de fonctionnalite) :
-     *
-     *  - AU-DELA DE 15 REPETITIONS, on mesure l'endurance et plus la force. Une
-     *    serie de 93 repetitions a 32 kg donnait 131 kg — soit davantage qu'une
-     *    serie de 7 a 35 kg, qui vaut 43,2. L'API annoncait 131 comme
-     *    « maximum ».
-     *  - UNE SERIE D'UNE REPETITION EST PRISE TELLE QUELLE. Le maximum EST la
-     *    charge soulevee ; Epley y ajouterait 3,3 % inventes.
-     *
-     * LA FORMULE FAIT FOI DANS `front/src/calcul/performance.ts` (regle 5,
-     * module de reference). PHP ne peut pas l'importer : cette ecriture-ci est
-     * une seconde implementation, assumee, et `tests/Entity/RmEstimeTest.php`
-     * la tient alignee sur les memes regles. Toute evolution de l'une se
-     * repercute ici, et le test tombe si on l'oublie.
-     *
-     * Le front ne lit pas ce champ — il recalcule. Mais il est expose dans
-     * `seance:lire` : tout autre lecteur de l'API obtenait un autre chiffre pour
-     * les memes series.
-     */
-    #[Groups(['seance:lire'])]
-    public function getRmEstime(): ?float
-    {
-        $meilleur = null;
-        foreach ($this->series as $serie) {
-            $reps = $serie->getReps();
-            $poids = $serie->getPoids();
-            if (null === $reps || null === $poids || $reps < 1 || $poids <= 0) {
-                continue;
-            }
-            if ($reps > self::REPS_MAX_POUR_1RM) {
-                continue;
-            }
+       Cette classe portait `getRmEstime()`, expose en `seance:lire`, avec sa
+       propre ecriture d'Epley et son propre plafond de 15 repetitions. Le
+       commentaire d'alors assumait la copie et jurait que
+       `tests/Entity/RmEstimeTest.php` « la tient alignee » : c'etait faux dans
+       un sens, ce test n'eprouvait que le PHP. Deplacer le plafond cote front
+       laissait les deux suites vertes et l'API renvoyer un autre chiffre.
 
-            $rm = 1 === $reps ? (float) $poids : $poids * (1 + self::COEF_EPLEY * $reps);
-            if (null === $meilleur || $rm > $meilleur) {
-                $meilleur = $rm;
-            }
-        }
+       PERSONNE NE LISAIT CE CHAMP. Ni le front — il recalcule tout ce qu'il
+       affiche —, ni rien d'autre dans le depot. On retire donc la copie au
+       lieu de la synchroniser : `front/src/calcul/performance.ts` est le seul
+       domicile de la formule, et `front/src/calcul/epleyUnique.test.ts` refuse
+       desormais toute reecriture du coefficient, PHP et SQL compris.
 
-        return null === $meilleur ? null : round($meilleur, 1);
-    }
+       Si un jour l'API doit rendre ce chiffre a un autre lecteur, ce sera une
+       decision a prendre — et il faudra alors un `api/regles/rm.json` lu par
+       les deux suites, comme pour le mot de passe et le rendement. */
 }

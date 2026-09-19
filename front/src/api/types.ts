@@ -141,7 +141,9 @@ export interface SeanceExercice {
   /** temps global d'un « for time » : les séries en dessous détaillent l'effort */
   secondesTotal: number | null;
   series: Serie[];
-  rmEstime?: number | null;
+  /* PAS DE `rmEstime` — l'API ne le rend plus depuis le 19 septembre 2026.
+     Elle le calculait avec sa propre ecriture d'Epley, que personne ne lisait :
+     le front recalcule tout ce qu'il affiche, par `calcul/performance.ts`. */
 }
 
 export interface Seance {

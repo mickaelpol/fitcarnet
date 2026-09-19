@@ -381,21 +381,17 @@ CREATE INDEX modele_exercice_par_exercice ON modele_exercice (exercice_id);
 CREATE INDEX exercice_par_auteur ON exercice (cree_par) WHERE cree_par IS NOT NULL;
 
 -- ---------------------------------------------------------------------
---  Vue pratique : dernière performance et 1RM estimé par exercice
---  (Epley : 1RM = poids × (1 + 0,0333 × répétitions))
+--  PAS DE VUE v_performance — retiree le 19 septembre 2026 (migration 39)
+--
+--  Elle calculait un 1RM : `MAX(sr.poids * (1 + 0.0333 * sr.reps))`, une
+--  troisieme ecriture d'Epley apres TypeScript et PHP, et la seule des trois
+--  deja fausse — aucun plafond de repetitions, donc un « record » sur une
+--  serie de 93 repetitions. Personne ne la lisait.
+--
+--  La formule n'a qu'un domicile, `front/src/calcul/performance.ts` (regle 5),
+--  et `front/src/calcul/epleyUnique.test.ts` refuse toute reecriture du
+--  coefficient dans le depot, SQL compris. Ne pas la recreer ici.
 -- ---------------------------------------------------------------------
-CREATE VIEW v_performance AS
-SELECT  s.utilisateur_id,
-        se.exercice_id,
-        s.date,
-        MAX(sr.poids * (1 + 0.0333 * sr.reps)) AS rm_estime,
-        MAX(sr.secondes)                       AS meilleure_tenue,
-        MIN(NULLIF(sr.secondes, 0))            AS meilleur_chrono
-FROM    seance s
-JOIN    seance_exercice se ON se.seance_id = s.id
-JOIN    serie sr           ON sr.seance_exercice_id = se.id
-WHERE   sr.faite
-GROUP BY s.utilisateur_id, se.exercice_id, s.date;
 
 -- ---------------------------------------------------------------------
 --  Sessions : jetons de rafraîchissement

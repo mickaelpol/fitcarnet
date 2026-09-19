@@ -108,7 +108,15 @@ final class ChampsInconnusTest extends TestCase
     /**
      * Une propriete CALCULEE, exposee par un accesseur sans colonne : elle
      * revient avec l'objet lu, elle doit passer. `Seance::getAvancement()`,
-     * `SeanceExercice::getRmEstime()`.
+     * `Exercice::getNomAffiche()`.
+     *
+     * L'EXEMPLE IMBRIQUE ETAIT `SeanceExercice::getRmEstime()`, retire le
+     * 19 septembre 2026 — il portait une seconde ecriture d'Epley que personne
+     * ne lisait. Ce test est tombe le jour du retrait, et c'est exactement ce
+     * qu'on lui demande : une propriete calculee qui disparait devient un champ
+     * INCONNU, donc un 400 sur toute ecriture qui la renvoie. Ici le front ne
+     * la renvoyait plus non plus, mais le prochain retrait ne sera peut-etre
+     * pas aussi propre.
      */
     public function testUneProprieteCalculeeRevenueDeLaLecturePasse(): void
     {
@@ -117,11 +125,28 @@ final class ChampsInconnusTest extends TestCase
             'avancement' => ['faites' => 0, 'prevues' => 0],
             'exercices' => [[
                 'exercice' => '/api/exercices/1',
-                'rmEstime' => 52.5,
                 'series' => [],
             ]],
         ]));
         self::assertSame([], $this->champs->inconnus(Exercice::class, ['nomAffiche' => 'Développé couché']));
+    }
+
+    /**
+     * ET LE TEMOIN DU TEST PRECEDENT : un champ qui n'existe VRAIMENT pas,
+     * imbrique au meme endroit, doit bien etre nomme. Sans lui, le test
+     * ci-dessus passerait aussi le jour ou `inconnus()` cesserait de descendre
+     * dans `exercices[]` — il ne rendrait plus rien, jamais.
+     */
+    public function testUnChampCalculeDisparuEstBienSignale(): void
+    {
+        self::assertSame(['exercices[0].rmEstime'], $this->champs->inconnus(Seance::class, [
+            'date' => '2026-09-15',
+            'exercices' => [[
+                'exercice' => '/api/exercices/1',
+                'rmEstime' => 52.5,
+                'series' => [],
+            ]],
+        ]));
     }
 
     /** Une relation ecrite par IRI est une chaine : on ne descend pas dedans. */
