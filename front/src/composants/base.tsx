@@ -172,14 +172,35 @@ export function Champ({
              donne la main au champ suivant, « go » quand elle valide. Sans
              rien des deux, on ne touche à rien. */
           returnKeyType={surEntree === undefined ? undefined : (onSuivant === undefined ? 'go' : 'next')}
-          /* LE PIÈGE QUI DORT : sur un champ multiligne, React Native fait
-             par défaut insérer un saut de ligne AU LIEU d'appeler
-             `onSubmitEditing`. Combiner `multiligne` et `onValider` donnerait
-             donc un champ dont la touche Entrée ne valide jamais — en
-             silence, c'est-à-dire le défaut du 18 septembre réintroduit.
-             Aucun appelant ne les combine aujourd'hui ; cette ligne fait que
-             le premier qui le fera obtiendra ce qu'il demande. */
-          submitBehavior={multiligne === true && surEntree !== undefined ? 'blurAndSubmit' : undefined}
+          /* TROIS CAS, ET LE DÉFAUT DE REACT NATIVE EST LE BON DANS UN SEUL.
+             La documentation (`textinput.md`) est explicite :
+
+               champ d'une ligne   : `undefined` vaut `'blurAndSubmit'`
+               champ multiligne    : `undefined` vaut `'newline'`
+               `'submit'`          : envoie l'événement SANS retirer le focus
+
+             1. UN CHAMP QUI PASSE LA MAIN NE DOIT PAS PERDRE LE FOCUS.
+                C'était le cas : `onSuivant` laissait `undefined`, donc
+                `blurAndSubmit`. Sur Android, « Entrée » depuis l'adresse
+                fermait le clavier, puis `focus()` le rouvrait — un
+                clignotement, et un enchaînement qui repose sur une course
+                entre le blur natif et le `focus()`. L'exemple officiel
+                (`improvingux.md`) met d'ailleurs `blurOnSubmit={false}` sur ce
+                champ-là, dont `'submit'` est l'équivalent moderne.
+                Relevé par `revue-pile` le 19 septembre 2026, en confrontant ce
+                composant à sa documentation.
+             2. UN CHAMP MULTILIGNE QUI VALIDE doit dire `blurAndSubmit`, sans
+                quoi « Entrée » insère un saut de ligne et `onValider` ne part
+                jamais — en silence, c'est-à-dire le défaut du 18 septembre
+                réintroduit. Aucun appelant ne combine `multiligne` et
+                `onValider` aujourd'hui ; cette ligne fait que le premier qui le
+                fera obtiendra ce qu'il demande.
+             3. PARTOUT AILLEURS, le défaut de React Native convient. */
+          submitBehavior={
+            onSuivant !== undefined
+              ? 'submit'
+              : (multiligne === true && onValider !== undefined ? 'blurAndSubmit' : undefined)
+          }
           style={[s.champ, numerique && s.champNombre, multiligne === true && s.champLong]}
         />
         {unite !== undefined && <Text style={s.unite}>{unite}</Text>}
