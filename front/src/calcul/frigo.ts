@@ -7,19 +7,31 @@
  */
 
 import { nombreSaisi } from './saisieNombre';
-import type { AlimentDisponible } from '@/api/types';
+import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import { sansAccent } from './texte';
 
 /** Ordre de parcours d'un inventaire réel : on descend du frais au sec. */
 export const ORDRE_EMPLACEMENTS = ['Frigo', 'Congélateur', 'Congelateur', 'Placard'];
 
+/**
+ * Une ligne du frigo : un aliment utilisable, OU un produit Grocy incomplet.
+ *
+ * Les deux se rangent dans la même section depuis le 19 septembre 2026 —
+ * « je veux que TOUS mes aliments apparaissent dans mon frigo ». Ce qui les
+ * distingue à la lecture est la présence de `manquants`, et le typage oblige
+ * à choisir : aucun code ne peut lire `kcal100` sur une ligne incomplète.
+ */
+export type LigneFrigo = AlimentDisponible | AlimentIncomplet;
+
+export const estIncomplet = (l: LigneFrigo): l is AlimentIncomplet => 'manquants' in l;
+
 export interface SectionFrigo {
   titre: string;
-  data: AlimentDisponible[];
+  data: LigneFrigo[];
 }
 
-export function grouperParEmplacement(aliments: AlimentDisponible[]): SectionFrigo[] {
-  const parLieu = new Map<string, AlimentDisponible[]>();
+export function grouperParEmplacement(aliments: LigneFrigo[]): SectionFrigo[] {
+  const parLieu = new Map<string, LigneFrigo[]>();
   for (const a of aliments) {
     const lieu = a.emplacement ?? 'Sans emplacement';
     parLieu.set(lieu, [...(parLieu.get(lieu) ?? []), a]);
@@ -43,9 +55,9 @@ export function grouperParEmplacement(aliments: AlimentDisponible[]): SectionFri
  * « congelateur » doit trouver le congélateur, sinon la barre ne sert à rien.
  */
 export function filtrerFrigo(
-  aliments: AlimentDisponible[],
+  aliments: LigneFrigo[],
   recherche: string,
-): AlimentDisponible[] {
+): LigneFrigo[] {
   const q = sansAccent(recherche.trim());
   if (q === '') return aliments;
 

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { AlimentDisponible } from '@/api/types';
-import { SEUIL_ECART, ecartsInventaire, filtrerFrigo, grouperParEmplacement } from './frigo';
+import type { AlimentIncomplet } from '@/api/types';
+import {
+  SEUIL_ECART, ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement,
+} from './frigo';
 
 const aliment = (
   reference: string,
@@ -104,5 +107,53 @@ describe('recherche dans le frigo', () => {
 
   it('rend tout sur une recherche vide', () => {
     assert.equal(filtrerFrigo(liste, '   ').length, 2);
+  });
+});
+
+describe('les produits Grocy incomplets sont dans la MÊME liste', () => {
+  /* Relevé par le propriétaire du projet le 19 septembre 2026, sur son frigo
+     réel : « pourquoi les flageolet rouge n'apparaissent toujours pas dans mon
+     frigo ? […] je veux que TOUS mes aliments apparaissent dans mon frigo ».
+
+     `FrigoGrocy::lire()` les écartait faute de macros, et `creerProduit()`
+     refusait de les recréer puisqu'ils existent déjà dans Grocy : invisibles
+     ET impossibles à ajouter. Un premier correctif s'était contenté de les
+     NOMMER dans un bandeau — ce n'était pas la demande. */
+  const flageolet: AlimentIncomplet = {
+    reference: 'grocy:7',
+    nom: 'Flageolet rouge',
+    stock: 0,
+    emplacement: 'Placard',
+    unite: 'g',
+    manquants: ['kcal100', 'prot100'],
+  };
+
+  it('se range dans la section de son emplacement, avec les autres', () => {
+    const sections = grouperParEmplacement([
+      aliment('grocy:4', 'Riz basmati', 1500, 'Placard'),
+      flageolet,
+    ]);
+
+    const placard = sections.find((s) => s.titre === 'Placard');
+    assert.ok(placard, 'la section Placard doit exister');
+    assert.equal(placard.data.length, 2,
+      'la ligne doit être DANS la liste, pas dans un bandeau à côté');
+    assert.deepEqual(placard.data.map((l) => l.nom), ['Flageolet rouge', 'Riz basmati'],
+      'et triée comme les autres, sans traitement de faveur');
+  });
+
+  it('la recherche le trouve comme les autres', () => {
+    /* Sans cela on chercherait « flageolet », on ne verrait rien, et on
+       conclurait de nouveau qu'il n'existe pas. */
+    assert.equal(filtrerFrigo([flageolet], 'flageolet').length, 1);
+    assert.equal(filtrerFrigo([flageolet], 'riz').length, 0);
+  });
+
+  it('se distingue d\'un aliment sans qu\'on ait à lire ses macros', () => {
+    /* `estIncomplet` regarde `manquants`, jamais `kcal100`. Un aliment réel à
+       0 kcal serait sinon pris pour un produit incomplet — et 0 kcal existe :
+       l'eau, le café noir. */
+    assert.equal(estIncomplet(flageolet), true);
+    assert.equal(estIncomplet(aliment('base:1', 'Eau', 1000)), false);
   });
 });

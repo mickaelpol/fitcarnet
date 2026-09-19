@@ -11,12 +11,12 @@ import { Bouton, Champ, Chargement, Discret, Erreur, Vide } from '@/composants/b
 import { AlertesFrigo } from '@/composants/alertesFrigo';
 import { Confirmer } from '@/composants/confirmer';
 import { EditeurAlimentConnecte } from '@/composants/editeurAlimentConnecte';
-import { LigneInventaire, LigneStock } from '@/composants/ligneFrigo';
+import { LigneIncomplete, LigneInventaire, LigneStock } from '@/composants/ligneFrigo';
 import {
   abonnerInventaire, allerAuStock, basculerVu, cloreInventaire, modeFrigo, ouvrirInventaire,
   reinitialiserInventaire, saisirQuantite, saisiesInventaire, vusInventaire,
 } from '@/composants/etatInventaire';
-import { ecartsInventaire, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
+import { ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 /**
@@ -81,9 +81,21 @@ export default function MonFrigo() {
 
   const tous = frigo.data?.aliments ?? [];
 
+  /* LES PRODUITS GROCY INCOMPLETS SONT DANS LA MEME LISTE — 19 septembre 2026.
+     Ils étaient purement absents : `FrigoGrocy::lire()` les écartait, et
+     l'application refusait de les recréer puisqu'ils existent déjà dans Grocy.
+     On cherchait un aliment qu'on ne voyait nulle part et qu'on ne pouvait pas
+     ajouter.
+
+     ILS RESTENT HORS DE `tous`, ET C'EST VOLONTAIRE : `tous` alimente les
+     écarts d'inventaire, le compteur « en stock » et tout ce qui compte. Un
+     produit sans macros n'a rien à y faire — il n'a pas de valeurs, pas un
+     zéro. Seul l'AFFICHAGE les réunit. */
+  const incompletsGrocy = frigo.data?.incomplets ?? [];
+
   const sections = useMemo(
-    () => grouperParEmplacement(filtrerFrigo(tous, recherche)),
-    [tous, recherche],
+    () => grouperParEmplacement(filtrerFrigo([...tous, ...incompletsGrocy], recherche)),
+    [tous, incompletsGrocy, recherche],
   );
 
   /* Les écarts se calculent sur TOUT le frigo, pas sur ce que la recherche
@@ -215,6 +227,11 @@ export default function MonFrigo() {
           <Discret style={s.section}>{section.titre} · {section.data.length}</Discret>
         )}
         renderItem={({ item }) => (
+          /* SANS MACROS, PAS DE FICHE NI DE COMPTAGE. On ne peut ni corriger
+             ses valeurs ici (elles vivent dans Grocy), ni le compter dans un
+             inventaire dont le résultat nourrit le calculateur. On le MONTRE,
+             et on dit pourquoi il est à part. */
+          estIncomplet(item) ? <LigneIncomplete produit={item} /> : (
           mode === 'inventaire'
             ? (
               <LigneInventaire
@@ -240,6 +257,7 @@ export default function MonFrigo() {
                 onSupprimer={() => { supprimer.reset(); setASupprimer(item); }}
               />
             )
+          )
         )}
       />
 

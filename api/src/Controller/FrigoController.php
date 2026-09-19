@@ -65,26 +65,36 @@ final class FrigoController extends AbstractController
             return $this->json([
                 'source' => $this->frigo->source($utilisateur),
                 'aliments' => [],
+                'incomplets' => [],
                 'probleme' => $probleme,
             ]);
         }
 
         try {
-            $aliments = $this->frigo->lire($utilisateur);
+            $tout = $this->frigo->lireTout($utilisateur);
         } catch (\RuntimeException $e) {
             // une panne de Grocy ne doit pas casser l'application : on rend
             // une liste vide et on explique, plutot qu'une erreur 500
             return $this->json([
                 'source' => $this->frigo->source($utilisateur),
                 'aliments' => [],
+                'incomplets' => [],
                 'probleme' => $e->getMessage(),
             ]);
         }
 
+        /* `incomplets` PART DANS LA MEME REPONSE, et c'est le point : ces
+           produits sortent des cinq appels Grocy que `lire()` faisait deja.
+           Les demander a part aurait coute deux appels de plus sur un serveur
+           dont l'en-tete de `FrigoGrocy::lire()` rappelle qu'il fait la queue.
+
+           Ils sont SEPARES des aliments parce qu'ils n'ont pas de macros :
+           l'ecran les affiche, le calculateur ne les voit pas. */
         return $this->json([
             'source' => $this->frigo->source($utilisateur),
             'aliments' => \array_map(
-                static fn ($a) => $a->versTableau(), $aliments),
+                static fn ($a) => $a->versTableau(), $tout['aliments']),
+            'incomplets' => $tout['incomplets'],
             'probleme' => null,
         ]);
     }

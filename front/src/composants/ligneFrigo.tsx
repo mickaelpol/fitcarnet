@@ -10,9 +10,45 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Bouton, Carte, Champ, Chiffre, Discret, Texte } from './base';
 import { controler } from '../calcul/nutrition';
-import type { AlimentDisponible } from '../api/types';
+import type { AlimentDisponible, AlimentIncomplet } from '../api/types';
 import { C, E, N, P, T, couleurRole, nb } from '../theme';
 import { nombreSaisi } from '@/calcul/saisieNombre';
+
+/**
+ * LA LIGNE D'UN PRODUIT GROCY QU'ON NE PEUT PAS CALCULER.
+ *
+ * Ajoutée le 19 septembre 2026. Ces produits étaient purement absents de la
+ * liste — `FrigoGrocy::lire()` les écartait — et l'application refusait de
+ * les recréer puisqu'ils existent déjà dans Grocy. Le propriétaire du projet
+ * cherchait « Flageolet rouge » et ne le trouvait nulle part : *« je veux que
+ * TOUS mes aliments apparaissent dans mon frigo »*.
+ *
+ * ELLE NE MONTRE AUCUN CHIFFRE NUTRITIONNEL, et c'est le point : il n'y en a
+ * pas. Afficher « 0 kcal » serait un chiffre faux devant une balance (règle
+ * 7). Elle montre ce qu'on SAIT — le nom, le stock — et nomme ce qui manque.
+ *
+ * Le stock, lui, est vrai : il vient de Grocy comme celui des autres lignes.
+ */
+export function LigneIncomplete({ produit }: { produit: AlimentIncomplet }) {
+  return (
+    <Carte style={[s.carte, { borderColor: C.attenue, borderStyle: 'dashed' }]}>
+      <View style={s.ligne}>
+        <View style={[s.pastille, { backgroundColor: C.attenue }]} />
+        <View style={{ flex: 1 }}>
+          <Texte numberOfLines={2}>{produit.nom}</Texte>
+          <Discret style={{ fontSize: T.petit }} numberOfLines={2}>
+            Valeurs manquantes dans Grocy : {produit.manquants.join(', ')}.
+            {' '}Tant qu'elles n'y sont pas, cet aliment ne peut pas entrer
+            dans un calcul.
+          </Discret>
+        </View>
+        <Chiffre taille={N.petit} couleur={C.discret}>
+          {nb(produit.stock)} {produit.unite}
+        </Chiffre>
+      </View>
+    </Carte>
+  );
+}
 
 /* ------------------------------------------------------------- mode stock */
 

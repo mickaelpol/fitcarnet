@@ -89,8 +89,43 @@ final readonly class FrigoGrocy
         return '' !== $this->url && '' !== $this->cle;
     }
 
-    /** @return AlimentDisponible[] */
+    /**
+     * Les aliments utilisables, et eux seuls.
+     *
+     * Contrat inchange : `Frigo::lire()` et tout le calculateur passent par
+     * ici, et ne doivent JAMAIS voir un produit sans macros. Pour l'ecran, qui
+     * doit tout montrer, voir `lireTout()`.
+     *
+     * @return AlimentDisponible[]
+     */
     public function lire(): array
+    {
+        return $this->lireTout()['aliments'];
+    }
+
+    /**
+     * TOUT le frigo : ce qui se calcule, ET ce qui manque.
+     *
+     * AJOUTE LE 19 SEPTEMBRE 2026, sur un constat du proprietaire du projet :
+     * « pourquoi les flageolet rouge n'apparaissent toujours pas dans mon
+     * frigo ? […] je veux que TOUS mes aliments apparaissent ». Un produit a
+     * qui il manquait une valeur nutritionnelle etait purement ecarte, avec une
+     * ligne de journal pour toute trace — et `creerProduit()` refusait de le
+     * recreer puisqu'il existait. L'application refusait a la fois de le
+     * montrer et de le creer.
+     *
+     * POURQUOI DEUX LISTES ET NON UNE. Un produit sans `kcal100` n'a pas de
+     * kcal100. Lui en inventer une — zero, au hasard — serait un chiffre faux
+     * dans une application ou ce qui est affiche sera pese et mange (regles 6
+     * et 7). `AlimentDisponible` garde donc ses valeurs obligatoires, et le
+     * calculateur ne peut pas voir ces produits meme par accident. L'ecran les
+     * affiche a part, et dit ce qui leur manque.
+     *
+     * SANS UN SEUL APPEL DE PLUS : les cinq reponses etaient deja la.
+     *
+     * @return array{aliments: list<AlimentDisponible>, incomplets: list<array<string, mixed>>}
+     */
+    public function lireTout(): array
     {
         if (!$this->estConfigure()) {
             throw new \RuntimeException(
@@ -150,6 +185,7 @@ final readonly class FrigoGrocy
         }
 
         $aliments = [];
+        $incomplets = [];
         $sansMacros = [];
 
         foreach ($produits as $produit) {
@@ -160,7 +196,18 @@ final readonly class FrigoGrocy
             $manquants = \array_diff(self::CHAMPS, \array_keys(\array_filter(
                 $champs, static fn ($v) => null !== $v && '' !== $v)));
             if ([] !== $manquants) {
+                /* ON LE GARDE, avec de quoi l'afficher dans la meme liste :
+                   son stock, son emplacement (sans quoi la ligne ne sait pas
+                   dans quelle section aller) et son unite. */
                 $sansMacros[] = $produit['name'];
+                $incomplets[] = [
+                    'reference' => 'grocy:' . $id,
+                    'nom' => (string) $produit['name'],
+                    'stock' => $quantites[$id] ?? 0.0,
+                    'emplacement' => $parEmplacement[(int) ($produit['location_id'] ?? 0)] ?? null,
+                    'unite' => $parUnite[$uniteStock] ?? '?',
+                    'manquants' => \array_values($manquants),
+                ];
                 continue;
             }
 
@@ -211,8 +258,9 @@ final readonly class FrigoGrocy
         }
 
         \usort($aliments, static fn ($a, $b) => \strcasecmp($a->nom, $b->nom));
+        \usort($incomplets, static fn ($a, $b) => \strcasecmp($a['nom'], $b['nom']));
 
-        return $aliments;
+        return ['aliments' => $aliments, 'incomplets' => $incomplets];
     }
 
     /** Les produits sans macros, pour que l'application puisse les signaler. */

@@ -24,11 +24,26 @@ final readonly class Frigo
     /** @return AlimentDisponible[] */
     public function lire(Utilisateur $utilisateur): array
     {
+        return $this->lireTout($utilisateur)['aliments'];
+    }
+
+    /**
+     * TOUT le frigo, y compris ce qui n'est pas utilisable.
+     *
+     * Seul Grocy peut rendre des produits incomplets : la base, elle, impose
+     * ses valeurs a l'ecriture (`Aliment`, contraintes `NotNull`), donc un
+     * aliment sans macros n'y existe pas. Sa liste d'incomplets est vide, et
+     * c'est un fait, pas un oubli.
+     *
+     * @return array{aliments: list<AlimentDisponible>, incomplets: list<array<string, mixed>>}
+     */
+    public function lireTout(Utilisateur $utilisateur): array
+    {
         if ('grocy' === $utilisateur->getSourceFrigo()) {
-            return $this->grocy->lire();
+            return $this->grocy->lireTout();
         }
 
-        return $this->base->lire($utilisateur);
+        return ['aliments' => \array_values($this->base->lire($utilisateur)), 'incomplets' => []];
     }
 
     public function source(Utilisateur $utilisateur): string

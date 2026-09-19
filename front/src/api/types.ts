@@ -276,9 +276,31 @@ export interface AlimentDisponible {
   provenanceRatio: 'mesure' | 'table';
 }
 
+/**
+ * Un produit Grocy que l'application ne peut PAS calculer, et qu'elle montre
+ * quand meme.
+ *
+ * Il n'a pas de macros — pas « zéro macro » : pas de valeur du tout. Lui en
+ * inventer une serait un chiffre faux devant une balance (règles 6 et 7). Il
+ * est donc d'un AUTRE type que `AlimentDisponible`, et c'est ce qui empêche
+ * le calculateur de le voir par accident : il ne peut pas se glisser dans une
+ * liste d'aliments, le compilateur le refuse.
+ */
+export interface AlimentIncomplet {
+  reference: string;
+  nom: string;
+  stock: number;
+  emplacement: string | null;
+  unite: string;
+  /** les champs Grocy vides : `kcal100`, `prot100`… */
+  manquants: string[];
+}
+
 export interface MonFrigo {
   source: 'grocy' | 'base';
   aliments: AlimentDisponible[];
+  /** Grocy seulement : visibles à l'écran, invisibles au calculateur. */
+  incomplets?: AlimentIncomplet[];
   /** message expliquant pourquoi la liste est vide, le cas échéant */
   probleme: string | null;
 }
