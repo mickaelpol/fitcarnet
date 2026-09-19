@@ -236,7 +236,13 @@ export default function AdminUtilisateurs() {
               {i.statut === 'perimee' && `Invitée le ${jour(i.creeLe)}, périmée depuis le ${jour(i.expireLe)}.`}
             </Discret>
 
-            {i.statut !== 'acceptee' && (
+            {/* DEUX MOTS DIFFERENTS POUR DEUX GESTES DIFFERENTS.
+                « Révoquer » tue un lien qui marche encore ; « Supprimer »
+                efface une ligne d'historique dont le lien ne sert plus depuis
+                longtemps. Le même mot pour les deux ferait craindre, sur une
+                invitation acceptée, de couper l'accès de quelqu'un — ce qui
+                n'arrive pas. */}
+            {i.statut !== 'acceptee' ? (
               <View style={s.ligne}>
                 <Bouton
                   variante="contour"
@@ -250,6 +256,10 @@ export default function AdminUtilisateurs() {
                   Révoquer
                 </Bouton>
               </View>
+            ) : (
+              <Bouton variante="contour" onPress={() => setARevoquer(i)}>
+                Supprimer de la liste
+              </Bouton>
             )}
 
             {i.statut === 'en_attente' && (
@@ -339,10 +349,23 @@ export default function AdminUtilisateurs() {
         )}
       </ScrollView>
 
+      {/* LE MESSAGE CHANGE AVEC LE STATUT, PARCE QUE CE QU'ON DÉTRUIT CHANGE.
+          Sur une invitation acceptée, la seule question que se pose
+          l'administrateur est « est-ce que je coupe l'accès de quelqu'un ? ».
+          La réponse est non, et elle doit être dans la phrase, pas dans une
+          documentation. */}
       <Confirmer
         visible={aRevoquer !== null}
-        titre={`Révoquer l’invitation de ${aRevoquer?.email ?? ''} ?`}
-        message="Le lien cesse de fonctionner immédiatement, même s’il a déjà été transmis. Aucun compte n’est supprimé : cette invitation n’en a pas encore créé."
+        titre={aRevoquer?.statut === 'acceptee'
+          ? `Supprimer l’invitation de ${aRevoquer.email} ?`
+          : `Révoquer l’invitation de ${aRevoquer?.email ?? ''} ?`}
+        message={aRevoquer?.statut === 'acceptee'
+          ? 'Cette ligne disparaît de la liste. Le compte, lui, n’est pas touché : '
+            + 'la personne garde son accès et ses données. Seule la trace de son '
+            + 'invitation est effacée, et elle ne se retrouve pas.'
+          : 'Le lien cesse de fonctionner immédiatement, même s’il a déjà été '
+            + 'transmis. Aucun compte n’est supprimé : cette invitation n’en a pas '
+            + 'encore créé.'}
         onConfirmer={() => {
           if (aRevoquer !== null) revoquer.mutate(aRevoquer.id);
           setARevoquer(null);

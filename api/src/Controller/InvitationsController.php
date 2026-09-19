@@ -167,14 +167,20 @@ final class InvitationsController extends AbstractController
     }
 
     /**
-     * Annule une invitation en attente.
+     * Supprime une invitation — en attente, perimee OU acceptee.
      *
-     * On SUPPRIME la ligne au lieu de la marquer annulee. Une invitation en
-     * attente ne raconte rien qu'on veuille garder ; et laisser la ligne
+     * On SUPPRIME la ligne au lieu de la marquer annulee. Laisser la ligne
      * imposerait de tenir compte d'un troisieme etat partout ailleurs.
      *
-     * Les invitations ACCEPTEES, elles, ne se suppriment pas ici : elles
-     * portent la trace de qui a invite qui.
+     * LES ACCEPTEES AUSSI, depuis le 19 septembre 2026. Elles en etaient
+     * exclues « parce qu'elles portent la trace de qui a invite qui » : une
+     * raison honnete, mais qui decidait a la place de l'administrateur. La
+     * purge automatique continue de tourner ; ceci lui ajoute la main.
+     *
+     * AUCUN COMPTE N'EST SUPPRIME. `invitation.utilisateur_id` pointe vers
+     * `utilisateur`, pas l'inverse : la personne invitee garde son compte,
+     * ses donnees et son acces. C'est le seul point que l'ecran doit dire
+     * avant de demander confirmation, et il le dit.
      */
     #[Route('/api/invitations/{id}', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     #[IsGranted('ROLE_ADMIN')]
@@ -184,7 +190,7 @@ final class InvitationsController extends AbstractController
 
         if (0 === $supprimees) {
             return $this->refus(
-                "Rien à révoquer : cette invitation n'existe pas, ou elle a déjà été acceptée.",
+                "Rien à supprimer : cette invitation n'existe déjà plus.",
                 Response::HTTP_NOT_FOUND,
             );
         }

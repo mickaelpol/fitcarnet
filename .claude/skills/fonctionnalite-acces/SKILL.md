@@ -274,10 +274,20 @@ critère.
     (`InvitationsController.php:316-325`).
 11. **Réinviter la même adresse tue l'ancien lien.** L'ancien doit répondre lien
     mort immédiatement après (`InvitationsController.php:165-167`).
-12. **Révoquer une invitation en attente la fait disparaître** et son lien cesse
-    de fonctionner ; révoquer une invitation déjà acceptée est refusé —
-    « Rien à révoquer : cette invitation n'existe pas, ou elle a déjà été
-    acceptée. » en 404 (`InvitationsController.php:210-215`).
+12. **L'administrateur supprime N'IMPORTE QUELLE invitation**, en attente,
+    périmée ou **acceptée** (`InvitationsController.php:187-198`). Sur une
+    invitation en attente, le lien cesse de fonctionner immédiatement. Sur une
+    acceptée, la ligne disparaît de la liste et **le compte n'est pas touché** :
+    la personne garde son accès, ses données, et se reconnecte — mesuré. Une
+    seconde suppression rend 404, « Rien à supprimer : cette invitation
+    n'existe déjà plus. »
+
+    *Les acceptées en étaient exclues jusqu'au 19 septembre 2026, « parce
+    qu'elles portent la trace de qui a invité qui ». La trace est réelle, mais
+    c'était au code de décider à la place de l'administrateur : sans ce geste,
+    ranger la liste demandait d'attendre la purge automatique ou d'ouvrir psql.
+    La purge (`app:invitations:purger`) continue de tourner ; ceci lui ajoute la
+    main.*
 13. **Le jeton n'est jamais relisible.** `GET /api/invitations` ne porte que
     `id`, `email`, dates, `nomInvite`, `statut` — jamais l'empreinte ni le jeton
     (`InvitationsController.php:110-122`).

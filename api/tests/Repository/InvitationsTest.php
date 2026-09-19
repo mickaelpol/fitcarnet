@@ -89,8 +89,25 @@ final class InvitationsTest extends TestCase
         self::assertSame('INSERT', $trace[2]);
     }
 
-    /** Revoquer ne touche pas a une invitation deja acceptee, et rend le compte. */
-    public function testRevoquerNeViseQueLesInvitationsEnAttente(): void
+    /**
+     * SUPPRIMER VISE N'IMPORTE QUELLE INVITATION, ACCEPTEE COMPRISE.
+     *
+     * Elle ne visait que celles en attente jusqu'au 19 septembre 2026, au nom
+     * de « la trace de qui a invite qui ». La trace est reelle, mais elle
+     * n'appartient pas au code : c'est au proprietaire du projet de decider
+     * quand une ligne cesse d'etre utile. Sans ce bouton, la seule facon de
+     * nettoyer la liste etait d'attendre la purge automatique ou d'ouvrir
+     * psql — et une liste qu'on ne peut pas ranger finit par n'etre plus lue.
+     *
+     * CE QUE CA NE FAIT PAS : supprimer le compte. `invitation.utilisateur_id`
+     * pointe vers `utilisateur` et non l'inverse ; effacer la ligne
+     * d'invitation ne touche a personne. L'ecran le dit.
+     *
+     * A NE PAS CONFONDRE AVEC `remplacer()`, juste au-dessus, qui garde son
+     * `accepte_le IS NULL` : renvoyer un lien efface l'invitation EN ATTENTE
+     * de cette adresse, jamais celle qui a deja cree un compte.
+     */
+    public function testSupprimerViseAussiUneInvitationAcceptee(): void
     {
         $sqlVu = '';
         $cnx = self::createStub(Connection::class);
@@ -98,11 +115,14 @@ final class InvitationsTest extends TestCase
             function (string $sql) use (&$sqlVu): int {
                 $sqlVu = $sql;
 
-                return 0;
+                return 1;
             });
 
-        self::assertSame(0, (new Invitations($cnx, self::em()))->revoquer(12));
-        self::assertStringContainsString('accepte_le IS NULL', $sqlVu);
+        self::assertSame(1, (new Invitations($cnx, self::em()))->revoquer(12));
+        self::assertStringNotContainsString('accepte_le', $sqlVu,
+            'Le statut ne doit plus decider : l\'administrateur supprime ce qu\'il veut.');
+        self::assertStringContainsString('DELETE FROM invitation', $sqlVu);
+        self::assertStringContainsString('id = :id', $sqlVu);
     }
 
     /**

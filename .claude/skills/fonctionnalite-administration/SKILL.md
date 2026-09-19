@@ -356,12 +356,16 @@ critères d'isolation.
 30. **Compte inexistant → 404**, refus métier → **422**
     (`ComptesController.php:138-140,312-315`).
 31. **Invitation** — le lien n'est rendu qu'**une fois** ; la base n'en garde
-    qu'une empreinte (`InvitationsController.php:183-188`). Inviter une adresse
-    déjà titulaire d'un compte est refusé en nommant la personne (`:149-157`).
-    Révoquer rend le lien inopérant **immédiatement** (`:201-218`).
+    qu'une empreinte (`InvitationsController.php:159-166`). Inviter une adresse
+    déjà titulaire d'un compte est refusé en nommant la personne (`:140-148`).
+    Révoquer rend le lien inopérant **immédiatement**, et depuis le
+    19 septembre 2026 **une invitation ACCEPTÉE se supprime aussi** — la ligne
+    quitte la liste, le compte n'est pas touché (`:187-198`). Deux boutons
+    distincts à l'écran, « Révoquer » et « Supprimer de la liste », parce que
+    ce ne sont pas les mêmes gestes.
 32. **Un lien mort ne dit pas pourquoi** — jeton inconnu, déjà utilisé ou périmé
     donnent le **même** 404 et le même texte : « Ce lien n'est plus valable.
-    Demande une nouvelle invitation. » (`:231-236,379-384`).
+    Demande une nouvelle invitation. » (`:224`, `:254`, `:369-374`).
 
 ## Comment l'éprouver
 

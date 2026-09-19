@@ -116,8 +116,24 @@ final readonly class Invitations
      */
     public function revoquer(int $id): int
     {
+        /* AUCUNE CONDITION DE STATUT — depuis le 19 septembre 2026.
+           Cette requete portait `AND accepte_le IS NULL` : une invitation
+           acceptee ne se supprimait pas, au nom de « la trace de qui a invite
+           qui ». La trace est reelle, mais c'est au proprietaire du projet de
+           decider quand une ligne cesse d'etre utile — pas au code. Sans ce
+           geste, la seule facon de ranger la liste etait d'attendre la purge
+           automatique ou d'ouvrir psql.
+
+           EFFACER UNE INVITATION NE TOUCHE AUCUN COMPTE :
+           `invitation.utilisateur_id` pointe vers `utilisateur`, jamais
+           l'inverse. L'ecran d'administration le dit avant de demander
+           confirmation.
+
+           Ne pas confondre avec `remplacer()`, qui garde son
+           `accepte_le IS NULL` : renvoyer un lien efface l'invitation EN
+           ATTENTE de cette adresse, jamais celle qui a deja cree un compte. */
         return $this->cnx->executeStatement(
-            'DELETE FROM invitation WHERE id = :id AND accepte_le IS NULL',
+            'DELETE FROM invitation WHERE id = :id',
             ['id' => $id],
         );
     }
