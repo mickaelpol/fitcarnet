@@ -253,6 +253,7 @@ sont dans `.claude/skills/`, toutes actives, et disent le métier et les pièges
 | `verification-android` | Émulateur, Expo Go, pilotage par `adb`, et les pièges qui font croire à un faux résultat |
 | `fonctionnalite-*` | Une fiche par fonctionnalité : le besoin, le parcours, les critères, la capture |
 | `postgres` | Index, plan de requête, `VACUUM` |
+| `passe-de-controle` | **Avant de publier quoi que ce soit** : quels agents lancer, dans quel ordre, et surtout **ce que chacun ne verra jamais** |
 
 Le 9 septembre 2026, dix skills « du projet » ont été **supprimées** : génériques,
 sans une ligne sur fitcarnet, toutes écrites pour une architecture hexagonale que
@@ -288,6 +289,7 @@ Pour l'aiguillage :
 | Après un `eas update` : est-il arrivé sur les téléphones | **`expo:eas-update-insights`** — aucune skill ne couvre la publication elle-même, c'est `publier.sh` |
 | Index, plan de requête, VACUUM | **`postgres`** |
 | Déployer, publier, restaurer | **rien d'automatique** : lire `DEPLOIEMENT.md`, qui couvre aussi la livraison quotidienne depuis le 16 septembre 2026 |
+| **Avant un APK, une démonstration, une passation** | **`passe-de-controle`** — les six agents, leurs angles morts respectifs, et les trois pièges de la passe elle-même |
 
 ## Agents
 
