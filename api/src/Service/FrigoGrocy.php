@@ -76,6 +76,32 @@ final readonly class FrigoGrocy
     private const ATTENTE_MAX_S = 10;
     private const DUREE_MAX_S = 20;
 
+    /**
+     * UNE ECRITURE ATTEND PLUS LONGTEMPS, ET DIT AUTRE CHOSE QUAND ELLE EXPIRE.
+     *
+     * Vecu le 19 septembre 2026 : renseigner les valeurs de « flageolet rouge »
+     * a rendu « Grocy est injoignable sur /userfields/products/64 : Idle
+     * timeout reached ». VERIFIE ENSUITE — l'ecriture etait PASSEE, le produit
+     * etait complet et la liste des incomplets etait tombee de neuf a huit.
+     * Grocy avait applique le PUT et mis plus de dix secondes a repondre.
+     *
+     * Deux choses distinguent une ecriture d'une lecture, et les deux comptent :
+     *
+     *  - ON ACCEPTE D'ATTENDRE. Une lecture se fait pendant qu'on regarde un
+     *    ecran, une ecriture est un geste decide. Vingt secondes d'attente et
+     *    vingt-cinq au total — toujours SOUS les trente du front
+     *    (`DELAI_DE_GARDE_MS`, `front/src/api/client.ts`), sans quoi c'est lui
+     *    qui abandonne le premier et le vrai diagnostic se perd. C'est la meme
+     *    raison qui avait fixe les bornes de lecture.
+     *  - ON NE SAIT PAS CE QUI S'EST PASSE. Une lecture qui expire n'a rien
+     *    change ; une ecriture, peut-etre tout. Le message doit dire ce doute
+     *    au lieu d'annoncer un echec : recommencer une ecriture deja faite, ou
+     *    renoncer en croyant l'outil casse, coutent tous les deux plus cher que
+     *    d'aller verifier. Voir `appeler()`.
+     */
+    private const ATTENTE_ECRITURE_S = 20;
+    private const DUREE_ECRITURE_S = 25;
+
     public function __construct(
         private HttpClientInterface $http,
         private LoggerInterface $journal,
@@ -651,10 +677,12 @@ final readonly class FrigoGrocy
 
     private function appeler(string $chemin, string $methode = 'GET', ?array $corps = null): array
     {
+        $ecriture = 'GET' !== $methode;
+
         try {
             $options = [
-                'timeout' => self::ATTENTE_MAX_S,
-                'max_duration' => self::DUREE_MAX_S,
+                'timeout' => $ecriture ? self::ATTENTE_ECRITURE_S : self::ATTENTE_MAX_S,
+                'max_duration' => $ecriture ? self::DUREE_ECRITURE_S : self::DUREE_MAX_S,
                 'headers' => [
                     'GROCY-API-KEY' => $this->cle,
                     'Accept' => 'application/json',
@@ -669,6 +697,16 @@ final readonly class FrigoGrocy
 
             return '' === $contenu ? [] : (array) \json_decode($contenu, true, 512, \JSON_THROW_ON_ERROR);
         } catch (ExceptionInterface | \JsonException $e) {
+            /* SUR UNE ECRITURE, ON NE SAIT PAS. Grocy a pu tout enregistrer et
+               repondre trop tard — c'est exactement ce qui est arrive le
+               19 septembre 2026. Annoncer « injoignable » serait affirmer un
+               echec qu'on n'a pas constate. */
+            if ($ecriture) {
+                throw new \RuntimeException(
+                    'Grocy a mis trop de temps à répondre. Ta saisie est peut-être enregistrée '
+                    . 'quand même : rouvre ton frigo pour vérifier avant de recommencer.', 0, $e);
+            }
+
             throw new \RuntimeException(
                 \sprintf('Grocy est injoignable sur %s : %s', $chemin, $e->getMessage()), 0, $e);
         }
