@@ -81,7 +81,8 @@ describe('sansAccent', () => {
    */
   it('ne dépend pas de String.prototype.normalize (Hermes)', () => {
     const vrai = String.prototype.normalize;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // `any` assume ici : on retire `String.prototype.normalize` du prototype
+    // le temps de l'appel, ce qu'aucun type ne decrit.
     delete (String.prototype as any).normalize;
     try {
       assert.equal(sansAccent('Congélateur'), 'congelateur');

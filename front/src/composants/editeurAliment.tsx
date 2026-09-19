@@ -195,7 +195,6 @@ export function EditeurAliment({
       setApres(depart.peseeApres ? String(depart.peseeApres) : '');
     }
     // `aliment` est volontairement absent des dépendances : voir ci-dessus.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, identite]);
 
   const maj = (champs: Partial<AlimentSaisi>) => setA({ ...a, ...champs });

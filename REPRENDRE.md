@@ -267,6 +267,7 @@ mettre à jour son statut dans le rapport et dans le README de l'audit.
 | **Table des paliers du 1RM** | Tranchée le 15 septembre (zone 70-90 %, pas de 2,5 %), mais trois points restent à ton avis : 95 % et 100 % retirés ; échauffement à 60/50/40 sans granularité fine ; sous 10 kg de 1RM, une ligne fusionnée peut perdre une prédiction juste à cause d'un voisin hors domaine. | à trancher |
 | **Publier un exercice depuis l'administration** | `Exercice.public` n'est écrit par personne : aucun mécanisme de publication n'existe. L'ouvrir aux seuls administrateurs est la proposition « C » de la revue. | à trancher |
 | **`choixRatio.tsx`** | dernier morceau du lot 6 ; il appartient à `editeurAliment.tsx`. | 1 h |
+| **Ouvrir `exhaustive-deps` et le reste d'`eslint-config-expo`** | `front/eslint.config.mjs` n'active qu'une règle, `react-hooks/rules-of-hooks`, et c'est assumé : elle rend **zéro** sur les 188 fichiers, donc toute sortie est un vrai défaut. Ouvrir le reste d'un coup rendrait des centaines d'avertissements que personne ne traiterait. À faire quand on aura le temps de les traiter, pas avant. | ~4 h |
 | **Le câblage des hooks React** | reste du lot 7 ; `@testing-library/react` est installé, la porte est ouverte. | ~4 h |
 | **Extraire `LigneAliment` de `carteRepas.tsx`** | pour tester le composant comme `calcul/poidsServi.ts` l'est déjà. | 1 h |
 | **Un second `tsconfig` pour les tests de rendu** | rendrait aux tests ordinaires la garde « pas d'import de `.tsx` ». | 1 h |

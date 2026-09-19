@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * LES DEUX SILHOUETTES, ET RIEN D'AUTRE.
  *

@@ -141,7 +141,7 @@ function Lignes({ recus }: { recus: (number | null)[] }) {
       <button type="button" onClick={() => setSeries((s) => s.slice(1))}>supprimer la première</button>
       {series.map((v, i) => (
         <ChampNombre
-          // eslint-disable-next-line react/no-array-index-key -- c'est précisément le cas éprouvé
+          // Cle par index ASSUMEE : c'est precisement le cas eprouve ici.
           key={i}
           valeur={v}
           onChange={(n) => { recus.push(n); setSeries((s) => s.map((x, k) => (k === i ? n : x))); }}

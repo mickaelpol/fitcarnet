@@ -16,7 +16,8 @@ export interface Sonnerie {
   source: number;
 }
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* `require` assume : Metro resout les ressources audio a la construction du
+   paquet, et un `import` dynamique ne lui donne pas le meme graphe. */
 /**
  * LES CINQ FICHIERS SONT AUSSI DES RESSOURCES ANDROID.
  *
@@ -62,7 +63,6 @@ export const SONNERIES: Sonnerie[] = [
     source: require('../../assets/sons/gong.wav'),
   },
 ];
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 export const SONNERIE_DEFAUT = 'bois';
 

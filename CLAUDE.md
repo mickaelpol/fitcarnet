@@ -33,8 +33,9 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # tsc --noEmit + 649 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
-cd front && npm run verif     # typage seul, plus rapide
+cd front && npm test          # eslint + tsc --noEmit + 649 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm run verif     # typage + lint, sans les tests : plus rapide
+cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
 # 419 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de

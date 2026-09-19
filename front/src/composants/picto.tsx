@@ -36,7 +36,7 @@ export function Picto({
     <Svg width={taille} height={taille} viewBox={groupe.viewBox}>
       {tracés.map((d, i) => (
         <Path
-          // eslint-disable-next-line react/no-array-index-key
+          // Cle par index assumee : la liste est figee et jamais reordonnee.
           key={i}
           d={d}
           fill={couleur}

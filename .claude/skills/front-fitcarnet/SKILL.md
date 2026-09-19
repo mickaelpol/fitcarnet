@@ -115,13 +115,42 @@ Autrement dit : tout marche, sauf le cas pour lequel l'écran existe. Les
 captures d'un cas d'erreur rassurent, la suite de tests reste verte — `tsc` ne
 connaît pas la règle des hooks, et aucun test de rendu ne montait cet écran.
 
-**Ce qui l'a attrapé** : un script Playwright qui ouvre l'URL avec un **vrai**
-jeton et attend un `input`. Rien d'autre ne pouvait le voir. Et ce qui a donné
-la réponse en une ligne, c'est d'écouter `pageerror` — sans quoi on ne lit qu'un
-`TimeoutError` sur `waitForSelector`, qui ne dit pas pourquoi.
+**Ce qui l'a attrapé ce jour-là** : un script Playwright qui ouvre l'URL avec un
+**vrai** jeton et attend un `input`. Rien d'autre ne pouvait le voir. Et ce qui
+a donné la réponse en une ligne, c'est d'écouter `pageerror` — sans quoi on ne
+lit qu'un `TimeoutError` sur `waitForSelector`, qui ne dit pas pourquoi.
 
 **La règle : tous les hooks en haut, avant le premier `return`.** Sans
 exception, et y compris quand le hook ne sert qu'au chemin du bas.
+
+### Et depuis, c'est la machine qui le refuse
+
+`front/eslint.config.mjs`, branché dans `npm test` et dans `npm run verif`.
+**Une seule règle activée**, `react-hooks/rules-of-hooks`, et c'est délibéré :
+le dépôt portait déjà **six** directives `eslint-disable` alors qu'aucun linter
+n'y avait jamais tourné — du code écrit comme si quelqu'un regardait. Ouvrir
+`eslint-config-expo` en entier rendrait des centaines d'avertissements, et un
+garde-fou qui crie finit désactivé.
+
+Les six directives orphelines ont été **remplacées par leur raison, en
+français** : elles nommaient des règles qu'aucun greffon ne définissait, donc
+elles ne protégeaient rien et faisaient échouer le lint. Ce qu'elles portaient
+de vrai — « ce `require` est voulu, Metro résout les ressources audio à la
+construction » — est maintenant un commentaire que personne ne peut prendre pour
+une protection.
+
+**La règle a été éprouvée AVANT d'être posée**, en redescendant les deux
+`useRef` sous le premier `return` :
+
+```
+67:27  error  React Hook "useRef" is called conditionally…  react-hooks/rules-of-hooks
+68:29  error  React Hook "useRef" is called conditionally…  react-hooks/rules-of-hooks
+```
+
+Sur l'état réel des 188 fichiers : **zéro**. Toute sortie de ce linter est donc
+un vrai défaut, jamais du bruit à filtrer. Le jour où l'on voudra
+`exhaustive-deps`, ce sera une décision séparée, avec le temps de traiter ce
+qu'elle rendra.
 
 ## Les tests
 

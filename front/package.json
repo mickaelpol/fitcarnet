@@ -7,8 +7,9 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
-    "test": "tsc --noEmit && node -e \"require('fs').rmSync('dist-tests',{recursive:true,force:true})\" && tsc -p tsconfig.tests.json && node --test \"dist-tests/**/*.test.js\" && node --import ./dist-tests/tests/environnement.js --test \"dist-tests/**/*.test-rendu.js\"",
-    "verif": "tsc --noEmit"
+    "lint": "eslint app src",
+    "test": "npm run lint && tsc --noEmit && node -e \"require('fs').rmSync('dist-tests',{recursive:true,force:true})\" && tsc -p tsconfig.tests.json && node --test \"dist-tests/**/*.test.js\" && node --import ./dist-tests/tests/environnement.js --test \"dist-tests/**/*.test-rendu.js\"",
+    "verif": "tsc --noEmit && eslint app src"
   },
   "dependencies": {
     "@expo-google-fonts/barlow-condensed": "^0.2.3",
@@ -54,9 +55,12 @@
     "@types/node": "^22.10.0",
     "@types/react": "~19.1.10",
     "babel-preset-expo": "^54.0.12",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "global-jsdom": "^29.0.0",
     "jsdom": "^29.1.1",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "typescript-eslint": "^8.70.0"
   },
   "private": true
 }
