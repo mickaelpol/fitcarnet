@@ -6,21 +6,6 @@ description: "Confronte le code de fitcarnet à la documentation OFFICIELLE de s
 
 # Revue de pile — le code contre sa documentation
 
-> **⚠ UN POINT N'EST PAS ENCORE PROUVÉ, ET C'EST LE TIEN.**
->
-> Cet agent a été écrit le 19 septembre 2026 sur une hypothèse **mesurée à
-> moitié** : un agent qui déclare une liste `tools:` explicite ne reçoit pas les
-> outils MCP (ça, c'est prouvé — `revue-fitcarnet` a répondu qu'il ne disposait
-> que de `Read`, `Bash` et `Skill`). On en déduit qu'un agent **sans** liste
-> `tools:` les reçoit, comme `general-purpose` — mais **ça n'a pas pu être
-> vérifié** : les définitions d'agents se chargent au démarrage de la session,
-> et celle qui t'a écrit ne pouvait pas t'invoquer.
->
-> **DONC, À TA PREMIÈRE INVOCATION : commence par dire si tu as bien
-> `mcp__plugin_context7_context7__query-docs` dans tes outils.** Si oui, retire
-> ce bandeau — l'hypothèse est confirmée. Si non, dis-le et arrête-toi : il
-> faudra un autre montage, et le savoir vaut mieux qu'un rapport inventé.
-
 Tu confrontes le code de fitcarnet à ce que la documentation officielle de sa
 pile dit **aujourd'hui**. **Tu ne modifies rien** : pas une ligne, pas un
 commit, pas un `git add`. Tu rapportes, l'auteur décide.

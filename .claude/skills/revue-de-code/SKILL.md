@@ -1,6 +1,6 @@
 ---
 name: revue-de-code
-description: Comment relire du code sur fitcarnet — les huit motifs de défaut que l'audit de septembre 2026 a réellement trouvés, par ordre de rendement, avec un cas daté pour chacun, plus une neuvième question qui confronte le code à la documentation officielle de sa pile par context7 — à poser depuis la session principale, l'agent n'y a pas accès. À charger avant toute relecture, revue de modification, ou recherche de régression.
+description: Comment relire du code sur fitcarnet — les huit motifs de défaut que l'audit de septembre 2026 a réellement trouvés, par ordre de rendement, avec un cas daté pour chacun, plus une neuvième question qui confronte le code à la documentation officielle de sa pile par context7 — portée par l'agent `revue-pile`. À charger avant toute relecture, revue de modification, ou recherche de régression.
 ---
 
 # Relire du code sur fitcarnet
@@ -205,11 +205,20 @@ Elle se pose donc **depuis la session principale**, ou depuis un agent qui ne
 déclare pas de liste `tools:` — `general-purpose`, qui reçoit tous les outils.
 C'est ainsi que les quatre trouvailles du tableau ci-dessus ont été faites.
 
-**L'agent `revue-pile` est écrit pour ça**, et il porte un bandeau disant que son
-accès au MCP n'a pas encore été prouvé : les définitions d'agents se chargent au
-démarrage de la session, et celle qui l'a écrit ne pouvait pas l'invoquer. Sa
-première invocation doit commencer par le dire. **Tant que ce n'est pas
-confirmé, la voie sûre reste la session principale.**
+**L'agent `revue-pile` est écrit pour ça, et son accès au MCP est CONFIRMÉ** —
+première invocation le 19 septembre 2026 : « oui, `query-docs` est bien dans mes
+outils, et il répond ». La règle complète est donc, des deux côtés :
+
+> **Une liste `tools:` explicite prive des outils MCP. Pas de liste `tools:` ⇒
+> tous les outils, MCP compris.**
+
+C'est ce qui force la séparation en deux agents : `revue-fitcarnet` déclare sa
+liste pour rester en lecture seule et perd le MCP ; `revue-pile` n'en déclare
+pas, gagne le MCP, et son interdiction d'écrire ne tient plus qu'à sa consigne.
+
+**Une chausse-trappe de l'outil, relevée à cette occasion** :
+`resolve-library-id` exige **les deux** paramètres `libraryName` ET `query`. Sans
+le second, il refuse.
 
 **ET SURTOUT PAS EN LISANT `vendor/`.** Le code installé dit ce que la
 bibliothèque ACCEPTE, pas ce qu'elle RECOMMANDE — et c'est exactement la

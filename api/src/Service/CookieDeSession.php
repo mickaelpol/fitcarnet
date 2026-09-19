@@ -56,18 +56,32 @@ final readonly class CookieDeSession
      * n'avait AUCUN `trusted_proxies` configure : il ignorait donc
      * `X-Forwarded-Proto` et voyait une requete HTTP.
      *
-     * DEPUIS, `SYMFONY_TRUSTED_PROXIES` EXISTE (18 septembre 2026, pour une
-     * toute autre raison : `login_throttling` comptait toutes les tentatives
-     * sous l'adresse du proxy). `isSecure()` repondrait donc juste
-     * aujourd'hui — ET ON NE REVIENT PAS DESSUS POUR AUTANT. Une declaration
-     * de configuration ne depend de personne ; `isSecure()` depend de ce
-     * qu'un proxy a bien voulu transmettre, et d'une variable d'environnement
-     * qu'un deploiement peut perdre. Le jour ou elle disparaitrait, le cookie
-     * continuerait d'etre `Secure` au lieu de cesser de l'etre en silence. `Response::prepare()`
-     * n'aurait jamais pose `Secure`, et le jeton de rafraichissement de
-     * quatre-vingt-dix jours serait parti en clair a la premiere requete
+     * CE QUI SE SERAIT PASSE, ET C'EST UN CONTREFACTUEL : si on avait laisse
+     * Symfony decider, `Response::prepare()` n'aurait jamais pose `Secure` — il
+     * ne le fait que sur un cookie dont `secure` est reste a `null`, et
+     * seulement `if ($request->isSecure())`. Le jeton de rafraichissement de
+     * quatre-vingt-dix jours serait alors parti en clair a la premiere requete
      * `http://` — il n'y a pas de HSTS, le Caddyfile explique pourquoi.
      * C'est-a-dire exactement la fuite durable que ce constat visait.
+     *
+     * (Ce paragraphe se lisait comme si `prepare()` etait en jeu aujourd'hui.
+     * Il ne l'est pas : `withSecure()` recoit ici un booleen explicite, donc
+     * `setSecureDefault()` ne s'applique jamais a ce cookie. Precision apportee
+     * par `revue-pile` le 19 septembre 2026.)
+     *
+     * DEPUIS, `SYMFONY_TRUSTED_PROXIES` EXISTE (18 septembre 2026, pose pour
+     * une toute autre raison : `login_throttling` comptait toutes les
+     * tentatives sous l'adresse du proxy). `isSecure()` repondrait donc juste
+     * aujourd'hui — ET ON NE REVIENT PAS DESSUS POUR AUTANT.
+     *
+     * LA RAISON EST UNE ASYMETRIE DE PANNE, et elle est plus forte qu'il n'y
+     * parait. `SYMFONY_TRUSTED_PROXIES` est lu avec `default::` : s'il
+     * disparaissait d'un deploiement, personne ne le saurait, `isSecure()`
+     * redeviendrait faux, et le cookie cesserait d'etre `Secure` EN SILENCE.
+     * `DEFAULT_URI`, lui, n'a aucun defaut — `docker-compose.yml` note qu'un
+     * `DEFAULT_URI` manquant empeche le conteneur de demarrer. Perdre l'un
+     * echoue EN OUVERT, perdre l'autre echoue EN FERME. On choisit celui qui
+     * echoue en ferme.
      *
      * `DEFAULT_URI` est la DECLARATION du projet sur l'endroit ou il vit. Elle
      * sert deja a fabriquer les liens d'invitation, qui doivent etre ouvrables
