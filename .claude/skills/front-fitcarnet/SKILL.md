@@ -94,6 +94,35 @@ Ce qu'il faut faire à la place, dans l'ordre où ça se pose :
 qu'à émettre, et `npm test` lance `tsc --noEmit` (donc `tsconfig.json`, qui
 couvre `src/` **et** `app/`) avant lui.
 
+## `expo doctor` : une exclusion assumée, et une seule
+
+`package.json` porte :
+
+```json
+"expo": { "install": { "exclude": ["@react-navigation/native-stack"] } }
+```
+
+**Ce n'est pas un contournement, c'est une fausse alerte mesurée** (19 septembre
+2026). `expo doctor` comparait la version installée — **7.19.2** — à la version
+*recommandée* par le SDK 54, `^7.3.16`, et criait « minor version mismatch ». Or
+`^7.3.16` signifie « ≥ 7.3.16 et < 8.0.0 » : **7.19.2 est dans la plage**. On est
+en avance, pas en retard, et `npx expo install --fix` aurait **rétrogradé** la
+déclaration.
+
+**Ne pas ajouter d'autre paquet à cette liste sans la même démonstration.** Une
+exclusion rend un contrôle muet ; celle-ci est justifiée parce que le contrôle
+avait tort. Le jour où `native-stack` passera en 8.x, il faudra la retirer et
+regarder pour de vrai.
+
+Le reste du diagnostic se prend, lui : le 19 septembre, trois patchs de retard
+dont **`expo-updates` 29.0.20, un correctif de sécurité** — un manifeste piégé
+pouvait « écrire et supprimer des fichiers hors du dossier des mises à jour ».
+Ce projet utilise l'OTA (`app.json` : `updates.enabled`, `checkAutomatically:
+ON_LOAD` ; `publier-android.sh:244` : `eas update --branch production`), donc ce
+composant tourne à chaque lancement. **Lire le changelog avant de décider qu'un
+patch est cosmétique** : `expo-constants` ne changeait rien, `expo-updates`
+fermait un trou.
+
 ## Un hook après un `return`, et l'écran devient blanc
 
 **`tsc` compile, les 680 tests passent, et l'écran ne s'affiche plus.** Mesuré le
