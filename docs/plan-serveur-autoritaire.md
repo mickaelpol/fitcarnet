@@ -8,10 +8,45 @@
 > en mode hors ligne tout en prenant en compte que le front ne fait que lire la
 > data. »
 
+Et, le lendemain, **la raison de fond** — celle qui doit trancher tous les
+arbitrages de ce document :
+
+> « Je veux vraiment que ce soit le back qui fasse tous ces traitements, car si
+> un jour je change le front pour utiliser une autre techno, je ne veux pas être
+> dépendant du front et que tout se traite côté back. »
+
 **À commencer APRÈS la publication de l'APK.** Ce document est la carte, pas le
 chantier.
 
 ---
+
+## 0. La raison de fond, et ce qu'elle change
+
+Le but n'est pas de « mieux répartir » le calcul : c'est que **le métier survive
+au remplacement du front**. Aujourd'hui, jeter `front/` jetterait avec lui la
+convention européenne des fibres, Epley et ses garde-fous, le cru/cuit, la
+composition de repas — soit 4 893 lignes que personne n'aurait écrites deux fois.
+Une réécriture du front en Vue, en Flutter ou en natif repartirait de zéro sur le
+métier, et **referait les mêmes erreurs** : le rendement 2,26, les 425 kg, le
+« record » à 79,96 kg.
+
+Trois conséquences directes sur ce plan :
+
+1. **Le palier 3 n'est pas optionnel.** Le solveur est le plus gros morceau de
+   métier du projet ; le laisser au front, c'est laisser le cœur dans la pièce
+   qu'on veut pouvoir remplacer.
+2. **« Déclarer un double juge assumé » cesse d'être une porte de sortie
+   acceptable** pour un calcul métier. C'était le repli envisagé pour le solveur
+   si la latence l'imposait : il faut désormais le traiter comme un **échec
+   provisoire**, à documenter comme tel, pas comme une solution.
+3. **Le critère de fin est vérifiable** : le jour où un client neuf — un simple
+   script `curl` — peut afficher un plan de repas complet et juste sans porter
+   une ligne de calcul, le chantier est fini. C'est ce qu'il faut éprouver, et
+   non « le front a maigri ».
+
+Ce qui reste légitimement au front après tout ça — la lecture de ce qui est tapé,
+la mise en forme — n'est pas du métier : c'est de l'interface, et ça se réécrit
+avec elle (voir §6).
 
 ## 1. D'où l'on part — mesuré le 19 septembre 2026
 
@@ -181,12 +216,19 @@ verrouiller un rôle, déclarer un reste, remplacer un aliment.
 3. Un appel unique par recalcul, anti-rebond de ~300 ms et annulation de la
    requête en vol suffisent-ils à rendre l'écran vivable ?
 
-Si la réponse est non, l'alternative honnête n'est pas de garder deux copies :
-c'est **d'admettre que le solveur est un cas à deux juges assumés**, comme la
-jauge de mot de passe, et de le verrouiller par un fichier de règles partagé.
-Une duplication déclarée et gardée vaut infiniment mieux qu'une duplication
-qu'on a oubliée — c'est toute la leçon d'Epley, qui était écrit **trois** fois
-dont une version fausse.
+Si la réponse est non, le repli est **un échec provisoire, pas une solution** :
+on déclare le solveur cas à deux juges assumés, on le verrouille par un fichier
+de règles partagé comme la jauge de mot de passe, **et on écrit en toutes lettres
+que le but n'est pas atteint** — parce qu'une copie au front reste une copie
+qu'un changement de technologie ferait perdre (§0). Une duplication déclarée et
+gardée vaut infiniment mieux qu'une duplication oubliée — c'est la leçon
+d'Epley, écrit **trois** fois dont une version fausse — mais ici elle ne vaut
+pas le but recherché.
+
+Les pistes à éprouver avant d'en arriver là : un seul appel par recalcul plutôt
+qu'un par geste, un anti-rebond, l'annulation de la requête en vol, et la
+résolution rendue **avec** tous les chiffres d'affichage (fibres, écarts, par
+personne) pour ne pas ajouter d'aller-retour derrière.
 
 ## 6. Ce qui reste au front, et pourquoi ce n'est pas du calcul métier
 
