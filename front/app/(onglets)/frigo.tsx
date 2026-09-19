@@ -194,7 +194,7 @@ export default function MonFrigo() {
           echecs={echecsInventaire}
           sansPoids={sansPoids}
           probleme={frigo.data?.probleme}
-          bloquants={bloquants.length}
+          bloquants={bloquants}
           sansFibres={sansFibres}
         />
       </View>

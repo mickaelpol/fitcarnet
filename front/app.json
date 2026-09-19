@@ -2,7 +2,7 @@
   "expo": {
     "name": "fitcarnet",
     "slug": "fitcarnet",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "orientation": "portrait",
     "scheme": "fitcarnet",
     "userInterfaceStyle": "dark",
@@ -14,7 +14,7 @@
         "foregroundImage": "./assets/images/icone-adaptative.png",
         "backgroundColor": "#14161a"
       },
-      "versionCode": 14,
+      "versionCode": 15,
       "permissions": [
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]

@@ -37,8 +37,15 @@ export function AlertesFrigo({
   echecs: EchecInventaire[];
   sansPoids: AlimentDisponible[];
   probleme?: string | null;
-  /** nombre de produits Grocy sans macros : ils n'apparaissent pas dans la liste */
-  bloquants: number;
+  /**
+   * Les produits Grocy sans macros. Ils n'apparaissent PAS dans la liste, et
+   * c'est pour ça qu'il faut les nommer : jusqu'au 19 septembre 2026 cette
+   * propriété était un simple `number`, et l'écran annonçait « 3 produit(s) »
+   * sans dire lesquels. Quelqu'un cherchait « Flageolet rouge », ne le voyait
+   * nulle part, tentait de le créer, et s'entendait répondre qu'il existait
+   * déjà : l'application refusait à la fois de le montrer et de le créer.
+   */
+  bloquants: { nom: string }[];
   sansFibres: { nom: string }[];
 }) {
   return (
@@ -131,12 +138,14 @@ export function AlertesFrigo({
           disparaît — on le voit. Un aliment sans fibres reste là et fausse
           en silence une cible exprimée en glucides totaux : c'est le plus
           dangereux des deux, et il mérite sa propre alerte. */}
-      {bloquants > 0 && (
+      {bloquants.length > 0 && (
         <View style={s.alerte}>
           <Discret style={{ color: C.attenue, fontSize: T.petit, lineHeight: 17 }}>
-            {bloquants} produit(s) Grocy sans valeurs nutritionnelles :
-            ils n'apparaissent pas ici et restent invisibles au calculateur.
-            Renseigne-les dans Grocy pour les utiliser.
+            {bloquants.length} produit(s) Grocy sans valeurs nutritionnelles :
+            {' '}{bloquants.map((p) => p.nom).join(', ')}. Ils n'apparaissent
+            pas dans cette liste et restent invisibles au calculateur — et
+            l'application refusera de les recréer, puisqu'ils existent déjà.
+            Complète leurs valeurs dans Grocy pour les faire apparaître.
           </Discret>
         </View>
       )}

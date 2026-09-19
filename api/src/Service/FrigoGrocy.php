@@ -283,11 +283,25 @@ final readonly class FrigoGrocy
             throw new \RuntimeException('Le nom est obligatoire.');
         }
 
+        /* ON DIT AUSSI POURQUOI IL EST INVISIBLE — releve par l'utilisateur le
+           19 septembre 2026, sur un frigo Grocy reel. Le message disait
+           « ouvre-le pour corriger ses valeurs », ce qui est un conseil
+           inapplicable quand on ne voit le produit NULLE PART : `lire()` ecarte
+           tout produit a qui il manque une valeur nutritionnelle. La personne
+           cherchait « Flageolet rouge », ne le trouvait pas dans son frigo,
+           tentait de le creer, et s'entendait repondre qu'il existait deja.
+           L'application refusait a la fois de le montrer et de le creer.
+
+           L'ecran nomme desormais ces produits (`AlertesFrigo`, propriete
+           `bloquants`) ; cette phrase-ci dit la meme chose a qui arrive par
+           l'autre porte. */
         $repere = self::repere($nom);
         foreach ($this->appeler('/objects/products') as $produit) {
             if (self::repere((string) ($produit['name'] ?? '')) === $repere) {
                 throw new \RuntimeException(\sprintf(
-                    '« %s » existe déjà dans Grocy. Ouvre-le pour corriger ses valeurs.',
+                    '« %s » existe déjà dans Grocy. S\'il n\'apparaît pas dans ton frigo, '
+                    . 'c\'est qu\'il lui manque des valeurs nutritionnelles : complète-les '
+                    . 'dans Grocy et il réapparaîtra.',
                     (string) $produit['name']));
             }
         }
