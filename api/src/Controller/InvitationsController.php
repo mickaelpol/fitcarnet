@@ -283,10 +283,36 @@ final class InvitationsController extends AbstractController
         $utilisateur->setSourceFrigo('base');
         $utilisateur->setActif(true);
 
-        // Le compte cree et l'invitation consommee sont UN SEUL FAIT : le
-        // depot les tient dans une transaction, et leve si le lien a ete
-        // consomme entre-temps.
-        $this->invitations->creerLeCompteEtConsommer($utilisateur, (int) $ligne['id']);
+        /* Le compte cree et l'invitation consommee sont UN SEUL FAIT : le
+           depot les tient dans une transaction, et leve si le lien a ete
+           consomme entre-temps.
+
+           ET ON ATTRAPE CETTE LEVEE — releve le 19 septembre 2026, avant
+           l'APK. Elle ne l'etait pas, et le `@throws` du depot annoncait un
+           contrat que personne n'honorait. Un double appui sur « Creer mon
+           compte », ou un rejeu de requete par le navigateur, suffisait : le
+           second appel voyait l'invitation deja consommee, levait, et la
+           personne recevait une 500 AVEC TRACE — sur le premier ecran de sa
+           vie dans l'application.
+
+           Pire : `wrapInTransaction` FERME l'EntityManager quand la fermeture
+           leve (documentation Doctrine ORM). Rien ne se corrompt, la
+           transaction retombe proprement — mais l'exception remonte jusqu'au
+           noyau.
+
+           LA COURSE JUMELLE, QUARANTE LIGNES PLUS HAUT, REPONDAIT DEJA
+           PROPREMENT : `compteExiste()` rend un 409 avec, en commentaire,
+           « l'index unique trancherait de toute facon, mais avec une erreur
+           500 illisible ». Le risque etait nomme ; une porte sur deux etait
+           fermee. */
+        try {
+            $this->invitations->creerLeCompteEtConsommer($utilisateur, (int) $ligne['id']);
+        } catch (\RuntimeException) {
+            return $this->refus(
+                "Ce lien vient d'être utilisé. Si ce n'était pas toi, demande une nouvelle invitation.",
+                Response::HTTP_CONFLICT,
+            );
+        }
 
         return $this->json([
             'cree' => true,

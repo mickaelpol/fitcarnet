@@ -674,13 +674,31 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
     return { statut: reponse.status, ok: true, donnees: donnees as T, message: '' };
   }
 
-  const d = donnees as { detail?: string; message?: string; 'hydra:description'?: string } | null;
+  /* QUATRE FORMES, PAS TROIS — et la quatrieme est celle du projet.
+     
+     `detail` et `hydra:description` viennent d'API Platform, `message` de
+     Symfony. Mais les contrôleurs écrits à la main répondent `{'erreur': …}` :
+     36 réponses dans `api/src`, tout `FrigoController` compris. Elle manquait
+     ici, et manquait aussi dans la table de `client.test.ts` qui devait garder
+     cet endroit — si bien que le test ne pouvait pas tomber.
+
+     Ce que ça coûtait, mesuré le 19 septembre 2026 : le serveur répondait
+     « Ce lien n'est plus valable. Demande une nouvelle invitation. » et l'écran
+     affichait « Erreur 404 ». Des phrases écrites avec soin depuis des mois,
+     qu'aucun utilisateur n'a jamais lues.
+
+     L'ORDRE COMPTE. `erreur` vient en dernier des quatre : une réponse
+     d'API Platform qui porterait les deux doit montrer son `detail`, plus
+     précis. Et le repli reste derrière tout le monde. */
+  const d = donnees as {
+    detail?: string; message?: string; 'hydra:description'?: string; erreur?: string;
+  } | null;
 
   return {
     statut: reponse.status,
     ok: false,
     donnees: null,
-    message: d?.detail ?? d?.['hydra:description'] ?? d?.message
+    message: d?.detail ?? d?.['hydra:description'] ?? d?.message ?? d?.erreur
       ?? repli(reponse.status, sansJeton),
   };
 }

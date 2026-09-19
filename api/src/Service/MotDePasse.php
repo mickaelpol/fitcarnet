@@ -104,9 +104,14 @@ final class MotDePasse
     /**
      * Ce qui manque, dit a la personne qui tape.
      *
-     * UNE SEULE PHRASE, QUI ENUMERE. « Il manque une majuscule et un chiffre »
-     * se lit d'un coup d'oeil ; quatre messages successifs font recommencer
-     * quatre fois, et c'est ainsi qu'on obtient « Motdepasse1! ».
+     * UNE SEULE PHRASE, QUI ENUMERE. Quatre messages successifs font
+     * recommencer quatre fois, et c'est ainsi qu'on obtient « Motdepasse1! ».
+     *
+     * ELLE ENONCE DES EXIGENCES, ELLE NE COMPTE PAS. La premiere ecriture
+     * commencait par « Il manque », ce qui se lisait « il manque 12
+     * caracteres » sur un mot de passe qui en a huit — alors qu'il n'en manque
+     * que quatre. Regle 7 appliquee a un texte : ne rien promettre plutot que
+     * promettre faux.
      *
      * Le front a sa propre traduction — il affiche une liste cochee pendant la
      * frappe, ce qu'un message d'erreur ne peut pas faire. Les deux disent la
@@ -135,6 +140,7 @@ final class MotDePasse
 
         $dernier = \array_pop($dits);
 
-        return 'Il manque ' . ([] === $dits ? $dernier : \implode(', ', $dits) . ' et ' . $dernier) . '.';
+        return 'Ce mot de passe doit contenir '
+            . ([] === $dits ? $dernier : \implode(', ', $dits) . ' et ' . $dernier) . '.';
     }
 }

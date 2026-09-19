@@ -151,6 +151,29 @@ final class MotDePassePartageTest extends TestCase
         }
     }
 
+    /**
+     * « IL MANQUE 12 CARACTERES AU MINIMUM » SE LIT COMME « TAPES-EN 12 DE PLUS ».
+     *
+     * Releve le 19 septembre 2026 en relisant l'ecran : sur « Poireau3 », il
+     * manque quatre caracteres, pas douze — mais la phrase enumere des
+     * EXIGENCES, pas des quantites manquantes, et « il manque » leur donne le
+     * sens d'un decompte. Quelqu'un qui tape quatre caracteres de plus et se
+     * fait refuser une deuxieme fois ne cherche pas l'erreur dans la phrase :
+     * il cherche un autre mot de passe, plus court, puis abandonne.
+     *
+     * C'est la regle 7 sur un texte plutot que sur un chiffre : mieux vaut ne
+     * rien promettre que promettre faux.
+     */
+    public function testLaPhraseDeRefusEnonceUneExigenceEtNePrometPasUnDecompte(): void
+    {
+        $phrase = (string) MotDePasse::pourquoiRefuse('Poireau3');
+
+        self::assertStringNotContainsString('Il manque', $phrase,
+            'Cette tournure fait lire les exigences comme un nombre de caracteres a ajouter.');
+        self::assertStringContainsString('12 caractères au minimum', $phrase);
+        self::assertStringContainsString('un caractère spécial', $phrase);
+    }
+
     /** Un mot de passe conforme, sauf sur l'exigence demandee. */
     private static function motDePasseAuquelIlNeManqueQue(string $code): string
     {

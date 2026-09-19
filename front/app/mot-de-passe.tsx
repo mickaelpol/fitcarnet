@@ -17,9 +17,13 @@ import { C, E, T } from '@/theme';
  * ouvert dans une bibliothèque suffirait à s'approprier un compte.
  *
  * LA RÉUSSITE DÉCONNECTE, ET L'ÉCRAN DOIT LE DIRE AVANT. Le serveur révoque
- * TOUTES les sessions du compte — y compris celle qui fait le changement,
- * parce qu'un jeton de rafraîchissement volé ne doit pas survivre au
- * changement de mot de passe qu'il a motivé. On affiche donc un panneau qui
+ * tous les jetons de RAFRAÎCHISSEMENT du compte — y compris celui de l'appareil
+ * qui fait le changement, parce qu'un jeton volé ne doit pas survivre au
+ * changement de mot de passe qu'il a motivé.
+ *
+ * MAIS PAS LES JWT DÉJÀ ÉMIS, et le panneau de fin le dit maintenant. Un autre
+ * appareil garde son jeton d'accès jusqu'à son échéance — une heure au plus —
+ * et peut lire ET écrire pendant ce temps. Mesuré le 19 septembre 2026. On affiche donc un panneau qui
  * l'annonce et on attend un geste, au lieu de renvoyer vers la connexion sans
  * un mot : être éjecté juste après avoir validé ressemble à un échec, et on
  * retape alors l'ancien mot de passe en croyant que rien n'a pris.
@@ -58,11 +62,47 @@ export default function MotDePasse() {
         <Titre>C’est fait</Titre>
         <Carte style={{ gap: E.s }}>
           <Texte>Ton mot de passe a été remplacé.</Texte>
+          {/* CE TEXTE A ÉTÉ CORRIGÉ LE 19 SEPTEMBRE 2026, ET C'EST UNE
+              QUESTION DE RÈGLE 7, PAS DE STYLE.
+
+              Il disait : « si quelqu'un avait mis la main sur l'une d'elles,
+              elle ne sert plus à rien ». C'est faux pendant une heure, et
+              `verification-fonctionnalites` l'a prouvé en faisant écrire un
+              second appareil APRÈS le changement — `POST /api/seances` → 201.
+
+              Le serveur révoque les jetons de RAFRAÎCHISSEMENT ; le JWT déjà
+              émis, lui, vit son heure. La protection est donc réelle mais
+              DIFFÉRÉE : l'appareil d'en face ne peut plus se prolonger, et
+              s'éteint à l'expiration. Promettre l'immédiat sur un écran de
+              sécurité, c'est exactement le chiffre faux de la règle 7 — la
+              personne croit le danger écarté et ne fait pas le geste suivant.
+
+              On dit donc la vérité, avec son délai.
+
+              ET LE RECOURS QU'IL PROPOSAIT ÉTAIT FAUX — corrigé quelques
+              heures plus tard le même jour. Il disait « désactive puis
+              réactive le compte depuis l'écran d'administration ». Ce geste
+              n'existe dans AUCUN des cas où cette phrase s'affiche :
+
+                - un compte ordinaire n'a pas d'écran d'administration
+                  (`_layout.tsx` renvoie tout segment `admin-*` ailleurs) ;
+                - un administrateur ne peut pas se désactiver lui-même —
+                  `ProtectionDuCompte.php:41` refuse : « la requête suivante
+                  serait refusée, y compris celle qui te réactiverait » ; et
+                  `admin-utilisateurs.tsx` ne lui montre même pas de bouton sur
+                  sa propre ligne.
+
+              Renvoyer vers une porte fermée quelqu'un qui croit être attaqué
+              est pire que ne rien proposer : il perd le temps qu'il croyait
+              gagner. On dit ce qui existe vraiment. */}
           <Discret style={s.aide}>
-            Toutes les sessions de ton compte ont été fermées — celle-ci
-            comprise, et celles de tes autres appareils. C’est voulu : si
-            quelqu’un avait mis la main sur l’une d’elles, elle ne sert plus à
-            rien. Reconnecte-toi avec ton nouveau mot de passe.
+            Les sessions de tes autres appareils ne peuvent plus se prolonger :
+            elles s’arrêteront d’elles-mêmes dans l’heure qui vient.
+            Reconnecte-toi avec ton nouveau mot de passe. Si tu crains une
+            intrusion et que tu veux couper sans attendre cette heure, il n’y a
+            pas de bouton pour le faire : demande à un administrateur de
+            désactiver ton compte un instant — la coupure est alors immédiate,
+            dès la requête suivante.
           </Discret>
           <Bouton
             onPress={() => {
@@ -170,9 +210,19 @@ export default function MotDePasse() {
           )}
         </Carte>
 
+        {/* « TOUT DE SUITE » ÉTAIT FAUX ICI AUSSI — relevé le 19 septembre
+            2026, quatre-vingt-dix lignes sous la phrase qu'on venait de
+            corriger pour la même raison. Le jumeau oublié, appliqué à un
+            texte.
+
+            `useChangerMotDePasse` ne fait qu'un `PATCH` : il ne touche pas à
+            la session locale. En repartant par la flèche de retour au lieu du
+            bouton « Se reconnecter », on reste connecté — exactement comme les
+            autres appareils, et pour la même heure. */}
         <Discret style={s.aide}>
-          En validant, tu seras déconnecté de tous tes appareils, celui-ci
-          compris.
+          En validant, ta session d’ici ne pourra plus se prolonger non plus :
+          reconnecte-toi avec ton nouveau mot de passe. Tes autres appareils
+          s’arrêteront d’eux-mêmes dans l’heure qui vient.
         </Discret>
       </ScrollView>
     </KeyboardAvoidingView>

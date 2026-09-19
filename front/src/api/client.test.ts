@@ -457,11 +457,34 @@ describe('le corps n\'est pas supposé être du JSON', () => {
   });
 });
 
+/**
+ * CETTE TABLE EST LA LISTE DE RÉFÉRENCE DES FORMES D'ERREUR DE L'API.
+ *
+ * Elle a été écrite à la main, et il y manquait **celle que les contrôleurs du
+ * projet émettent vraiment** — relevé le 19 septembre 2026. `erreur` n'y
+ * figurait pas, et `client.ts` ne la lisait pas : les **36** réponses
+ * `{'erreur': …}` de `api/src` arrivaient à l'écran sous la forme
+ * « Erreur 422 ». Mesuré sur la dev :
+ *
+ *     POST /api/invitation/aaaa…
+ *     {"erreur":"Ce lien n'est plus valable. Demande une nouvelle invitation."}
+ *     → l'écran affichait « Erreur 404 »
+ *
+ * Des phrases écrites avec soin depuis des mois — « Les calories sont
+ * obligatoires. », « Cet emplacement n'existe pas. » — que personne n'a jamais
+ * lues. Le test ne pouvait pas tomber : il n'énumérait que ce que le code
+ * lisait déjà. C'est le motif 4 de l'audit, le test qui ne peut pas échouer.
+ *
+ * **Ajouter une forme ici SANS l'ajouter à `client.ts` doit faire tomber ce
+ * test** : c'est tout ce qu'on lui demande.
+ */
 describe('le message montré vient du serveur', () => {
   const cas: { nom: string; corps: unknown; statut: number; attendu: string }[] = [
     { nom: 'le detail d\'API Platform', corps: { detail: 'Ce champ est obligatoire.' }, statut: 422, attendu: 'Ce champ est obligatoire.' },
     { nom: 'hydra:description à défaut', corps: { 'hydra:description': 'aliment: valeur invalide' }, statut: 422, attendu: 'aliment: valeur invalide' },
     { nom: 'message à défaut', corps: { message: 'Trop de tentatives.' }, statut: 429, attendu: 'Trop de tentatives.' },
+    { nom: 'erreur — la forme des contrôleurs du projet', corps: { erreur: 'Ce lien n\'est plus valable. Demande une nouvelle invitation.' }, statut: 404, attendu: 'Ce lien n\'est plus valable. Demande une nouvelle invitation.' },
+    { nom: 'erreur sur un 409, le cas de la course à l\'invitation', corps: { erreur: 'Ce lien vient d\'être utilisé.' }, statut: 409, attendu: 'Ce lien vient d\'être utilisé.' },
     { nom: 'un repli lisible quand le serveur ne dit rien', corps: { foo: 1 }, statut: 500, attendu: 'Erreur 500' },
   ];
 

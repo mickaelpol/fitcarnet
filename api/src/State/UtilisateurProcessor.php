@@ -87,7 +87,61 @@ final readonly class UtilisateurProcessor implements ProcessorInterface
            regle — `InvitationsController::accepter` via
            `Invitation::motDePasseAcceptable()`, et `CreerUtilisateurCommand`.
            Trois chemins, deux verifiaient. */
-        if ($creation && '' === (string) $data->getMotDePasseClair()) {
+        /* PLUS DE `$creation &&`, ET C'ETAIT UN TROU BEANT — 19 septembre 2026.
+         *
+         * Ce garde ne couvrait que la NAISSANCE d'un compte. Sur un `PATCH`,
+         * `{"motDePasseClair": ""}` passait : la contrainte `MotDePasseSolide`
+         * sort sans rien dire sur `''` (« une contrainte ne double pas
+         * `NotBlank` »), et plus rien derriere. Mesure par HTTP :
+         *
+         *     PATCH {"motDePasseClair": ""}   -> 200
+         *     hash en base                    -> change
+         *     mot_de_passe_faible             -> false  (!)
+         *     connexion, ancien mot de passe  -> 401
+         *     connexion, mot de passe vide    -> 401
+         *
+         * Le compte devenait MUET, definitivement, et le drapeau declarait
+         * conforme le pire mot de passe possible. Sans commande de
+         * reinitialisation, un administrateur unique se serait enferme dehors.
+         *
+         * D'OU VIENT LA REGRESSION. `Assert\Length(min: 10)` refusait `''` —
+         * longueur 0 < 10. Son remplacement par `MotDePasseSolide`, le
+         * 18 septembre, a retire cette premiere ligne de defense ; la seconde
+         * etait la, mais trop etroite. Le commentaire du test qui garde ce cas
+         * avait PREDIT la panne : « le traitement de la chaine vide par
+         * `Length` est un detail d'implementation de Symfony, et il a DEJA
+         * change une fois ». Il avait raison, et la seconde ligne n'a pas
+         * suffi parce qu'elle regardait `$creation`.
+         *
+         * Le garde dit « ce compte doit avoir un mot de passe », pas « ce
+         * compte nait ». Les deux autres portes, elles, refusaient deja `''` :
+         * `Invitation::motDePasseAcceptable('')` et `MotDePasse::acceptable('')`
+         * rendent faux. Trois chemins, deux verifiaient. Encore.
+         *
+         * DEUX CAS, ET PAS UN — la premiere ecriture de ce garde elargi les
+         * confondait, et `testUnCompteCreeSansMotDePasseEstRefuse` l'a
+         * attrape aussitot :
+         *
+         *   A LA CREATION, `null` ET `''` sont refuses : un compte doit naitre
+         *   avec un mot de passe (constat F-06). C'est ce que faisait la
+         *   version d'avant, et il ne faut surtout pas le perdre.
+         *
+         *   A LA MODIFICATION, `null` veut dire « je ne touche pas au mot de
+         *   passe » et doit passer — c'est le cas de tous les `PATCH` qui
+         *   changent autre chose. Seul un `''` ENVOYE EXPRES est refuse.
+         *
+         * D'ou la condition en deux temps : le mot de passe resultant serait
+         * vide, ET (on cree, OU le client a explicitement envoye la chaine
+         * vide). */
+        $seraitVide = '' === (string) $data->getMotDePasseClair();
+        /* « LE CHAMP A ETE ENVOYE », et rien de plus. Ce booleen s'est appele
+           `$videEnvoyeExpres` : il ne mesure pas ca. Combine a `$seraitVide`,
+           il donne « vide envoye expres » ; seul, il dit seulement que le
+           client a nomme le champ. Un nom qui promet plus que ce qu'il mesure
+           ralentit la relecture suivante — releve le 19 septembre 2026. */
+        $champEnvoye = null !== $data->getMotDePasseClair();
+
+        if ($seraitVide && ($creation || $champEnvoye)) {
             throw new UnprocessableEntityHttpException(
                 'Donne un mot de passe a ce compte : sans lui, personne ne pourra s\'y connecter.'
             );

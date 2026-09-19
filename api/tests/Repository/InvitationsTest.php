@@ -129,19 +129,43 @@ final class InvitationsTest extends TestCase
     }
 
     /**
-     * LE COMPTE ET LA CONSOMMATION DU LIEN SONT UN SEUL FAIT.
+     * L'INVITATION SE RESERVE AVANT QUE LE COMPTE SOIT ECRIT.
      *
-     * Le compte est ecrit, PUIS l'invitation marquee — jamais l'inverse : si
-     * l'UPDATE ne marque rien, c'est qu'un second envoi est passe entre-temps,
-     * et toute la transaction doit tomber.
+     * CE TEST FIGEAIT L'ORDRE INVERSE, ET C'EST CE QUI A LAISSE PASSER LE
+     * DEFAUT — mesure le 19 septembre 2026, deux POST vraiment simultanes sur
+     * le meme jeton :
+     *
+     *     requete A : HTTP 201
+     *     requete B : HTTP 500 — 407 Ko de page d'exception
+     *       duplicate key value violates unique constraint "utilisateur_email_unique"
+     *
+     * L'en-tete de `creerLeCompteEtConsommer` promettait pourtant : « si deux
+     * envois arrivent ensemble, le second ne marque rien, la levee fait tomber
+     * sa transaction ». Faux : avec `persist`+`flush` EN PREMIER, le perdant de
+     * la course butait sur l'unicite de l'adresse et n'atteignait jamais le
+     * `if (0 === $marquees)`. Et l'exception levee par la base,
+     * `UniqueConstraintViolationException`, ne descend PAS de `\RuntimeException`
+     * (verifie) : le `catch` du controleur ne pouvait pas l'attraper non plus.
+     * Deux gardes ecrites, aucune atteinte, sur l'ecran d'entree de tout
+     * nouvel arrivant.
+     *
+     * L'ORDRE JUSTE FAIT DE LA LIGNE `invitation` LE POINT DE SERIALISATION :
+     * le second envoi attend le verrou de ligne, lit `accepte_le` desormais
+     * non nul, ne marque rien, et leve — sans jamais tenter d'INSERT.
+     *
+     * TROIS TEMPS, ET PAS DEUX : `invitation.utilisateur_id` porte une cle
+     * etrangere immediate vers `utilisateur`, donc on ne peut pas la poser
+     * avant que le compte existe. On reserve, on cree, on rattache.
      */
-    public function testLeCompteEstCreeEtLInvitationConsommeeEnsemble(): void
+    public function testLInvitationEstReserveeAvantQueLeCompteSoitEcrit(): void
     {
         $trace = [];
         $cnx = self::createStub(Connection::class);
         $cnx->method('executeStatement')->willReturnCallback(
             function (string $sql) use (&$trace): int {
-                $trace[] = \str_contains($sql, 'UPDATE invitation') ? 'invitation marquee' : $sql;
+                $trace[] = \str_contains($sql, 'accepte_le = now()')
+                    ? 'invitation reservee'
+                    : (\str_contains($sql, 'utilisateur_id') ? 'invitation rattachee' : $sql);
 
                 return 1;
             });
@@ -149,7 +173,35 @@ final class InvitationsTest extends TestCase
         $depot = new Invitations($cnx, self::em($trace));
         $depot->creerLeCompteEtConsommer(new Utilisateur(), 7);
 
-        self::assertSame(['transaction', 'compte persiste', 'flush', 'invitation marquee'], $trace);
+        self::assertSame(
+            ['transaction', 'invitation reservee', 'compte persiste', 'flush', 'invitation rattachee'],
+            $trace,
+            'La reservation doit precede l\'INSERT du compte : c\'est elle qui serialise la course.',
+        );
+    }
+
+    /**
+     * ET LE PERDANT NE TENTE MEME PAS DE CREER LE COMPTE.
+     *
+     * C'est la difference entre un 409 et un 500 : si l'INSERT partait quand
+     * meme, la base trancherait par l'unicite de l'adresse et rendrait une
+     * exception que personne n'attrape.
+     */
+    public function testLePerdantDeLaCourseNEcritAucunCompte(): void
+    {
+        $trace = [];
+        $cnx = self::createStub(Connection::class);
+        $cnx->method('executeStatement')->willReturn(0);
+
+        $depot = new Invitations($cnx, self::em($trace));
+
+        try {
+            $depot->creerLeCompteEtConsommer(new Utilisateur(), 7);
+            self::fail('Une invitation deja consommee doit lever.');
+        } catch (\RuntimeException) {
+            self::assertSame(['transaction'], $trace,
+                'Ni persist ni flush ne doivent avoir eu lieu.');
+        }
     }
 
     /**

@@ -66,7 +66,22 @@ export function BandeauMotDePasse() {
       accessibilityRole="button"
       accessibilityLabel="Ton mot de passe ne suit plus les règles. Toucher pour en choisir un autre."
     >
-      <Texte style={s.texte} numberOfLines={1}>
+      {/* DEUX LIGNES AUTORISÉES, ET C'ÉTAIT UN `numberOfLines={1}` — corrigé le
+          19 septembre 2026. Largeurs mesurées : à 430, 412 et 393 px la ligne
+          tient ; **à 360 px elle se coupe**, et on lit « Ton mot de passe ne
+          suit plus les règles — le cha… ».
+
+          Ce qui disparaît est exactement ce qu'il ne fallait pas perdre : « le
+          changer » et le chevron, c'est-à-dire tout ce qui dit que la ligne se
+          TOUCHE. Le bandeau devenait un constat au lieu d'un bouton — et 360 dp
+          est la largeur des Pixel 4a/5 et de la série Galaxy A, c'est-à-dire
+          d'une bonne part des téléphones en service. Une taille de police
+          système agrandie tronquait même à 393.
+
+          `2` et pas `undefined` : une borne reste utile — un bandeau qui
+          s'étalerait sur quatre lignes mangerait l'écran. Deux suffisent au
+          texte le plus long avec la plus grande police. */}
+      <Texte style={s.texte} numberOfLines={2}>
         Ton mot de passe ne suit plus les règles — le changer ›
       </Texte>
     </Pressable>

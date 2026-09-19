@@ -71,18 +71,23 @@ final class UtilisateurProcessorTest extends TestCase
     /**
      * SECONDE LIGNE, ET ELLE EST ASSUMEE COMME TELLE.
      *
-     * Par la route HTTP, `''` n'arrive jamais jusqu'ici : `Assert\Length`
-     * l'arrete d'abord, avec un 422 qui nomme le champ. Ce test ne decrit
-     * donc pas un scenario reproductible depuis l'application — il verifie
-     * que le dernier verrou tient si le premier saute.
+     * CE COMMENTAIRE A DIT LE CONTRAIRE DE LA REALITE, ET LE JOUR OU IL EST
+     * DEVENU FAUX, PERSONNE N'EST VENU LE RELIRE. Il affirmait : « par la
+     * route HTTP, `''` n'arrive jamais jusqu'ici : `Assert\Length` l'arrete
+     * d'abord […] ce test ne decrit donc pas un scenario reproductible depuis
+     * l'application ».
      *
-     * Pourquoi le garder : le traitement de la chaine vide par `Length` est
-     * un detail d'implementation de Symfony, et il a DEJA change une fois —
-     * l'option `allowEmptyString`, retiree en 5.0. Le processeur, lui, est le
-     * point de passage oblige des deux operations d'ecriture. Un mot de passe
-     * vide hache par bcrypt donnerait une empreinte parfaitement VALIDE :
-     * pas une colonne vide qu'on remarque, un compte dont le mot de passe est
-     * « rien ».
+     * `Assert\Length` a ete retire le 18 septembre 2026 au profit de
+     * `MotDePasseSolide`, dont le validateur sort explicitement sur `''`
+     * (`MotDePasseSolideValidator.php:35-37`). Le premier verrou avait donc
+     * saute, et le scenario est devenu parfaitement reproductible : un
+     * `PATCH {"motDePasseClair": ""}` rendait 200, rehachait la chaine vide et
+     * MURAIT le compte — l'ancien mot de passe en 401, le vide en 401 aussi.
+     *
+     * Le processeur est le point de passage oblige des deux operations
+     * d'ecriture, et c'est pour ca qu'on le garde. Un mot de passe vide hache
+     * par bcrypt donne une empreinte parfaitement VALIDE : pas une colonne
+     * vide qu'on remarque, un compte dont le mot de passe est « rien ».
      */
     public function testUnCompteCreeAvecUnMotDePasseVideEstRefuseAussi(): void
     {
@@ -146,6 +151,61 @@ final class UtilisateurProcessorTest extends TestCase
 
         self::assertSame([$existant], $persistes,
             'modifier son nom ne doit pas exiger un mot de passe');
+    }
+
+    /**
+     * LE CAS QUI MANQUAIT — ET C'ETAIT LE PLUS GRAVE DES QUATRE.
+     *
+     * Les quatre tests au-dessus couvrent `Post`+`null`, `Post`+`''`,
+     * `Post`+valable et `Patch`+`null`. Aucun ne passait `Patch` avec `''`.
+     * Consequence mesuree le 19 septembre 2026 : remettre l'ancienne condition
+     * `if ($creation && $seraitVide)` laissait les QUATRE au vert, alors que le
+     * defaut qu'elle a produit murait un compte pour de bon.
+     *
+     * Le correctif le plus lourd de la journee etait le seul sans test. C'est
+     * le motif 4 : ce qui n'est pas eprouve n'est pas garde.
+     *
+     * LA DISTINCTION QUI COMPTE : sur un `PATCH`, `null` veut dire « je ne
+     * touche pas au mot de passe » et doit passer (test precedent) ; `''` veut
+     * dire « efface-le », ce que personne ne peut vouloir. Les deux se
+     * ressemblent apres deserialisation, et c'est tout le piege.
+     *
+     * ON VERIFIE LE MESSAGE, PAS SEULEMENT LA CLASSE — et ce n'est pas du
+     * zele. La premiere ecriture de ce test n'attendait que
+     * `UnprocessableEntityHttpException`, et elle passait AUSSI avec l'ancienne
+     * condition : le `PATCH` tombait alors deux lignes plus bas sur « Indique
+     * ton mot de passe actuel », qui leve la MEME classe. Un test vert pour la
+     * mauvaise raison — exactement ce qu'il etait cense empecher. Mesure en
+     * remettant l'ancienne condition : `OK (5 tests)`.
+     */
+    public function testUnPatchQuiEnvoieUnMotDePasseVideEstRefuse(): void
+    {
+        $existant = (new Utilisateur())->setEmail('deja@exemple.fr')->setNom('Deja');
+        $existant->setMotDePasseClair('');
+        $precedent = (new Utilisateur())->setEmail('deja@exemple.fr')->setNom('Deja');
+
+        $persistes = [];
+
+        try {
+            self::processeur($persistes)->process(
+                $existant,
+                new Patch(),
+                [],
+                ['previous_data' => $precedent],
+            );
+            self::fail('Un mot de passe vide envoye expres doit etre refuse.');
+        } catch (UnprocessableEntityHttpException $e) {
+            self::assertStringContainsString(
+                'Donne un mot de passe a ce compte', $e->getMessage(),
+                'Le refus doit venir du garde du mot de passe vide, et non du '
+                . 'controle du mot de passe actuel qui leve la meme classe deux '
+                . 'lignes plus bas.',
+            );
+        } finally {
+            self::assertSame([], $persistes,
+                'un mot de passe vide ne doit jamais atteindre la persistance, '
+                . 'ni a la creation ni a la modification');
+        }
     }
 
     /**

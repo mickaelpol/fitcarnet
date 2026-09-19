@@ -205,28 +205,54 @@ final readonly class Invitations
      * laisse soit un compte sans trace, soit un lien deja utilise qui ne mene a
      * rien — et dans les deux cas quelqu'un attend devant un ecran.
      *
-     * `accepte_le IS NULL` dans la clause : si deux envois arrivent ensemble, le
-     * second ne marque rien, la levee fait tomber sa transaction, et le compte
-     * n'est cree qu'une fois.
+     * L'INVITATION SE RESERVE EN PREMIER — ET CE PARAGRAPHE A DIT LE CONTRAIRE
+     * DE CE QUE FAISAIT LE CODE JUSQU'AU 19 SEPTEMBRE 2026. Il promettait « si
+     * deux envois arrivent ensemble, le second ne marque rien, la levee fait
+     * tomber sa transaction ». Le code, lui, ecrivait le compte D'ABORD :
+     *
+     *     requete A : HTTP 201
+     *     requete B : HTTP 500 — 407 Ko de page d'exception
+     *       duplicate key value violates unique constraint "utilisateur_email_unique"
+     *
+     * Le perdant butait sur l'unicite de l'adresse avant d'atteindre le
+     * `if (0 === $marquees)`, et l'exception de la base
+     * (`UniqueConstraintViolationException`) ne descend pas de
+     * `\RuntimeException` : le `catch` du controleur ne la voyait pas non plus.
+     * Deux gardes ecrites, aucune atteinte, sur l'ecran d'entree de tout
+     * nouvel arrivant.
+     *
+     * Desormais la ligne `invitation` est LE POINT DE SERIALISATION : le second
+     * envoi attend le verrou de ligne, lit `accepte_le` non nul, ne marque
+     * rien, et leve — sans jamais tenter d'INSERT.
+     *
+     * TROIS TEMPS, ET PAS DEUX. `invitation.utilisateur_id` porte une cle
+     * etrangere immediate vers `utilisateur` : on ne peut pas la poser avant
+     * que le compte existe. On reserve, on cree, on rattache — le tout dans la
+     * meme transaction, donc toujours un seul fait.
      *
      * @throws \RuntimeException si l'invitation a ete consommee entre-temps
      */
     public function creerLeCompteEtConsommer(Utilisateur $nouveau, int $invitation): void
     {
         $this->em->wrapInTransaction(function () use ($nouveau, $invitation): void {
-            $this->em->persist($nouveau);
-            $this->em->flush();
-
             $marquees = $this->cnx->executeStatement(
                 'UPDATE invitation
-                    SET accepte_le = now(), utilisateur_id = :u
+                    SET accepte_le = now()
                   WHERE id = :id AND accepte_le IS NULL',
-                ['u' => $nouveau->getId()->toRfc4122(), 'id' => $invitation],
+                ['id' => $invitation],
             );
 
             if (0 === $marquees) {
                 throw new \RuntimeException('Invitation consommée entre-temps.');
             }
+
+            $this->em->persist($nouveau);
+            $this->em->flush();
+
+            $this->cnx->executeStatement(
+                'UPDATE invitation SET utilisateur_id = :u WHERE id = :id',
+                ['u' => $nouveau->getId()->toRfc4122(), 'id' => $invitation],
+            );
         });
     }
 }

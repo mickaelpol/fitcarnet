@@ -1,6 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, type TextInput,
+} from 'react-native';
 
 import { useAccepterInvitation, useInvitation } from '@/api/hooks';
 import { acceptable } from '@/calcul/motDePasse';
@@ -41,6 +43,27 @@ export default function AccepterInvitation() {
   const [motDePasse, setMotDePasse] = useState('');
   const [confirmation, setConfirmation] = useState('');
 
+  /* « ENTRÉE » NE FAISAIT PAS RIEN : ELLE PERDAIT LE CHAMP — relevé le
+     19 septembre 2026, et c'est pire que ce qu'on croyait. Mesuré :
+
+         Entrée depuis « Ton nom »     → index du focus = -1
+
+     Pas « le focus reste », pas « le focus avance » : **plus aucun champ n'a
+     le focus**. Sur Android le clavier se referme, et il faut retoucher le
+     champ suivant du doigt. Le défaut exact que `0ccae23` a corrigé sur
+     l'écran de connexion, réintroduit UN ÉCRAN PLUS LOIN — et sur celui-ci la
+     personne n'a encore aucune habitude de l'application pour compenser.
+
+     ICI, AVEC LES AUTRES HOOKS, ET SURTOUT PAS PLUS BAS. La première écriture
+     de ce correctif posait ces deux `useRef` après les retours anticipés de
+     l'écran (lien mort, compte créé) : des hooks appelés conditionnellement,
+     donc React qui refuse de rendre dès que le lien est VALIDE. Le lien mort
+     s'affichait parfaitement, le lien vivant donnait une page blanche — un
+     écran de plus en plus difficile à diagnostiquer à mesure qu'on s'éloigne.
+     Attrapé en mesurant, pas en relisant. */
+  const champMotDePasse = useRef<TextInput>(null);
+  const champConfirmation = useRef<TextInput>(null);
+
   if (invitation.isLoading) return <Chargement texte="Vérification du lien…" />;
 
   if (invitation.isError || invitation.data === undefined) {
@@ -79,7 +102,17 @@ export default function AccepterInvitation() {
      alerter dès la première lettre reviendrait à crier pendant toute la
      saisie. */
   const differe = confirmation !== '' && confirmation !== motDePasse;
+
+  /* UNE SEULE FONCTION POUR LA TOUCHE ET POUR LE BOUTON. La garde `pret` est
+     donc la même des deux côtés : impossible que « Entrée » envoie ce que le
+     bouton refuse, ou l'inverse. C'est ce que font déjà `connexion.tsx` et
+     `mot-de-passe.tsx`. */
   const pret = nom.trim() !== '' && acceptable(motDePasse) && confirmation === motDePasse;
+
+  const creer = () => {
+    if (!pret || accepter.isPending) return;
+    accepter.mutate({ nom: nom.trim(), motDePasse });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -99,6 +132,8 @@ export default function AccepterInvitation() {
             onChange={setNom}
             placeholder="Mickaël"
             etiquette="Ton nom"
+            autoComplete="name"
+            onSuivant={() => champMotDePasse.current?.focus()}
           />
           <Discret style={s.aide}>
             Celui qui s’affichera dans l’application. Le prénom suffit.
@@ -120,6 +155,8 @@ export default function AccepterInvitation() {
             motDePasse
             autoComplete="new-password"
             etiquette="Mot de passe"
+            champRef={champMotDePasse}
+            onSuivant={() => champConfirmation.current?.focus()}
           />
           <JaugeMotDePasse valeur={motDePasse} />
 
@@ -129,6 +166,8 @@ export default function AccepterInvitation() {
             motDePasse
             autoComplete="new-password"
             etiquette="Répète-le"
+            champRef={champConfirmation}
+            onValider={creer}
             illisible={differe}
           />
           {differe && (
@@ -138,7 +177,7 @@ export default function AccepterInvitation() {
           )}
 
           <Bouton
-            onPress={() => accepter.mutate({ nom: nom.trim(), motDePasse })}
+            onPress={creer}
             desactive={!pret || accepter.isPending}
           >
             {accepter.isPending ? 'Création…' : 'Créer mon compte'}
