@@ -81,9 +81,25 @@ final readonly class FrigoGrocy
      *
      * Vecu le 19 septembre 2026 : renseigner les valeurs de « flageolet rouge »
      * a rendu « Grocy est injoignable sur /userfields/products/64 : Idle
-     * timeout reached ». VERIFIE ENSUITE — l'ecriture etait PASSEE, le produit
-     * etait complet et la liste des incomplets etait tombee de neuf a huit.
-     * Grocy avait applique le PUT et mis plus de dix secondes a repondre.
+     * timeout reached ».
+     *
+     * CE QUI EST SU, ET CE QUI NE L'EST PAS. L'appel a expire : c'est un fait.
+     * Que Grocy ait applique le PUT avant de se taire, ON NE LE SAIT PAS — et
+     * on ne le saura jamais depuis ici. Un premier commentaire affirmait que
+     * l'ecriture « etait passee », sur la foi du produit trouve complet juste
+     * apres ; c'etait une cause deduite d'un etat, et elle etait fausse : le
+     * proprietaire du projet l'avait rempli lui-meme entre-temps. L'erreur est
+     * notee parce qu'elle a ete commise DANS un correctif dont le sujet est
+     * exactement « ne pas affirmer ce qu'on n'a pas constate ».
+     *
+     * Le raisonnement ci-dessous ne s'appuie donc pas sur ce cas, mais sur le
+     * protocole : une attente qui expire pendant un PUT laisse le resultat
+     * INDETERMINE, toujours. La requete a pu etre recue et appliquee, ou pas.
+     *
+     * Mesure de contexte, celle-la reelle : les cinq appels de LECTURE de
+     * `lire()` prennent 1 a 5 secondes sur ce Grocy. L'ecriture a depasse dix
+     * secondes. Vingt secondes donnent donc de l'air — sans garantie que ce
+     * soit assez, et c'est pour ca que le message compte autant que la borne.
      *
      * Deux choses distinguent une ecriture d'une lecture, et les deux comptent :
      *
@@ -97,7 +113,8 @@ final readonly class FrigoGrocy
      *    change ; une ecriture, peut-etre tout. Le message doit dire ce doute
      *    au lieu d'annoncer un echec : recommencer une ecriture deja faite, ou
      *    renoncer en croyant l'outil casse, coutent tous les deux plus cher que
-     *    d'aller verifier. Voir `appeler()`.
+     *    d'aller verifier. Voir `appeler()`. C'est la regle 7 portee a un ETAT
+     *    plutot qu'a un chiffre.
      */
     private const ATTENTE_ECRITURE_S = 20;
     private const DUREE_ECRITURE_S = 25;
@@ -698,9 +715,9 @@ final readonly class FrigoGrocy
             return '' === $contenu ? [] : (array) \json_decode($contenu, true, 512, \JSON_THROW_ON_ERROR);
         } catch (ExceptionInterface | \JsonException $e) {
             /* SUR UNE ECRITURE, ON NE SAIT PAS. Grocy a pu tout enregistrer et
-               repondre trop tard — c'est exactement ce qui est arrive le
-               19 septembre 2026. Annoncer « injoignable » serait affirmer un
-               echec qu'on n'a pas constate. */
+               repondre trop tard, ou n'avoir rien recu : une attente qui expire
+               pendant un PUT ne distingue pas les deux. Annoncer « injoignable »
+               serait affirmer un echec qu'on n'a pas constate. */
             if ($ecriture) {
                 throw new \RuntimeException(
                     'Grocy a mis trop de temps à répondre. Ta saisie est peut-être enregistrée '

@@ -20,14 +20,21 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  *   « Grocy est injoignable sur /userfields/products/64 : Idle timeout
  *     reached for "https://grocy.…/api/userfields/products/64". »
  *
- * VERIFIE ENSUITE : l'ecriture ETAIT PASSEE. Le produit est complet, et la
- * liste des incomplets est tombee de neuf a huit. Grocy avait applique le PUT
- * et mis plus de dix secondes a repondre.
+ * CE QUI EST SU : l'appel a expire. CE QUI NE L'EST PAS : si Grocy avait
+ * applique le PUT avant de se taire. Une attente qui expire pendant un PUT ne
+ * distingue pas « rien recu » de « tout applique, repondu trop tard ».
  *
- * Le message annoncait donc un echec qui n'avait pas eu lieu. C'est le pire
- * des deux sens : on recommence une ecriture deja faite, ou on renonce en
- * croyant l'outil casse. La regle 7 du projet vaut ici pour un ETAT et non un
- * chiffre — mieux vaut avouer qu'on ne sait pas que d'affirmer faux.
+ * LA PREMIERE ECRITURE DE CE TEST AFFIRMAIT LE CONTRAIRE — « verifie ensuite :
+ * l'ecriture ETAIT passee » — sur la foi du produit trouve complet quelques
+ * minutes plus tard. C'etait une cause deduite d'un etat, et c'etait faux : le
+ * proprietaire du projet l'avait rempli lui-meme entre-temps. L'erreur reste
+ * ecrite ici parce qu'elle a ete commise DANS un correctif dont le sujet est
+ * « ne pas affirmer ce qu'on n'a pas constate ».
+ *
+ * Le message, lui, annonce un echec qu'il n'a pas constate non plus. C'est le
+ * pire des deux sens : on recommence une ecriture peut-etre deja faite, ou on
+ * renonce en croyant l'outil casse. La regle 7 du projet vaut ici pour un ETAT
+ * et non un chiffre — mieux vaut avouer qu'on ne sait pas que d'affirmer faux.
  *
  * DEUX CORRECTIFS, ET LES DEUX COMPTENT :
  *
@@ -35,7 +42,10 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  *     pendant qu'on regarde un ecran ; une ecriture est un geste decide, et on
  *     accepte d'attendre. La borne reste sous les trente secondes du front
  *     (`DELAI_DE_GARDE_MS`), sans quoi c'est lui qui abandonne le premier et
- *     le vrai diagnostic se perd.
+ *     le vrai diagnostic se perd. Mesure de contexte : les cinq appels de
+ *     lecture de `lire()` prennent 1 a 5 s sur ce Grocy, l'ecriture a depasse
+ *     dix. Vingt donnent de l'air, SANS GARANTIE que ce soit assez — d'ou le
+ *     point 2, qui compte autant.
  *  2. Quand l'attente expire sur une ecriture, le message DIT QU'ON NE SAIT
  *     PAS, et invite a verifier avant de recommencer.
  */
