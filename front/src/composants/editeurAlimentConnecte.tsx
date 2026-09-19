@@ -20,7 +20,7 @@
  */
 
 import { EditeurAliment, type AlimentSaisi } from './editeurAliment';
-import type { AlimentDisponible } from '../api/types';
+import type { AlimentDisponible, AlimentIncomplet } from '../api/types';
 import type {
   useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
   useEnregistrerAliment, useMajAliment,
@@ -41,7 +41,7 @@ const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
 });
 
 export function EditeurAlimentConnecte({
-  source, creation, edite, quantite,
+  source, creation, edite, aCompleter, quantite,
   onQuantiteChange, onFermer, onCreationEnvoyee, onEditionFaite,
   creer, majAliment, definir, enregistrer, poserQuantite,
 }: {
@@ -60,6 +60,21 @@ export function EditeurAlimentConnecte({
   creation: boolean;
   /** aliment dont on corrige les valeurs ; `null` hors correction */
   edite: AlimentDisponible | null;
+  /**
+   * PRODUIT GROCY DONT ON RENSEIGNE LES VALEURS POUR LA PREMIÈRE FOIS.
+   *
+   * Ajouté le 19 septembre 2026. Ces produits existent dans Grocy sans aucune
+   * valeur nutritionnelle : ils n'apparaissaient pas dans le frigo, et
+   * l'application refusait de les recréer puisqu'ils existaient déjà. Le
+   * propriétaire du projet les veut CORRIGEABLES ici, son but étant de quitter
+   * Grocy à terme.
+   *
+   * Ce n'est ni une création — le produit est là, avec son stock et son
+   * emplacement — ni une correction au sens habituel : il n'y a rien à
+   * pré-remplir. D'où un troisième cas, et non un `edite` bricolé avec des
+   * zéros qui partiraient en base comme des valeurs (règle 6).
+   */
+  aCompleter: AlimentIncomplet | null;
   quantite: string;
   onQuantiteChange: (v: string) => void;
   onFermer: () => void;
@@ -84,9 +99,13 @@ export function EditeurAlimentConnecte({
 
   return (
     <EditeurAliment
-      visible={(surGrocy || source === 'base') && (creation || edite !== null)}
-      titre={creation ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment')}
+      visible={(surGrocy || source === 'base')
+        && (creation || edite !== null || aCompleter !== null)}
+      titre={aCompleter?.nom ?? (creation ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment'))}
+      /* `aCompleter` n'a AUCUNE valeur à pré-remplir : on laisse les champs
+         vides, et `nomImpose` pose le seul fait connu. */
       aliment={!creation && edite !== null ? versSaisie(edite) : undefined}
+      nomImpose={aCompleter?.nom}
       enCours={surGrocy
         ? enregistrer.isPending || poserQuantite.isPending
         : creer.isPending || majAliment.isPending || definir.isPending}
@@ -95,7 +114,7 @@ export function EditeurAlimentConnecte({
         : (creer.error ?? majAliment.error)?.message ?? null}
       /* Côté Grocy, le nom ne se saisit qu'à la création : ensuite Grocy en est
          maître, et le changer ici ferait diverger les deux outils. */
-      nomModifiable={surGrocy ? creation : true}
+      nomModifiable={surGrocy ? (creation && aCompleter === null) : true}
       // la quantité ne se saisit qu'à la création : ailleurs elle se corrige
       // dans l'inventaire, seul endroit où elle s'écrit
       quantite={creation ? quantite : undefined}
@@ -118,16 +137,18 @@ export function EditeurAlimentConnecte({
         };
 
         if (surGrocy) {
-          if (!creation && edite === null) return;
+          if (!creation && edite === null && aCompleter === null) return;
 
           enregistrer.mutate({
             /* Vide = création : l'API pose le produit dans Grocy avant
-               d'écrire ses valeurs. */
-            reference: edite?.reference ?? '',
+               d'écrire ses valeurs. Une référence = elle écrit sur le produit
+               qui existe déjà — c'est le cas d'`aCompleter`, et c'est ce qui
+               le distingue d'une création qui échouerait sur « existe déjà ». */
+            reference: aCompleter?.reference ?? edite?.reference ?? '',
             ...corps,
           }, {
             onSuccess: (rendu) => {
-              if (!creation) { onEditionFaite(); return; }
+              if (!creation || aCompleter !== null) { onEditionFaite(); return; }
 
               const q = quantiteSaisie();
               onCreationEnvoyee();

@@ -6,7 +6,7 @@ import {
   useEnregistrerAliment, useEnvoyerInventaire, useFrigoIncomplets, useMajAliment,
   useMonFrigo, useSuiviInventaire, useSupprimerAliment,
 } from '@/api/hooks';
-import type { AlimentDisponible } from '@/api/types';
+import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import { Bouton, Champ, Chargement, Discret, Erreur, Vide } from '@/composants/base';
 import { AlertesFrigo } from '@/composants/alertesFrigo';
 import { Confirmer } from '@/composants/confirmer';
@@ -59,6 +59,11 @@ export default function MonFrigo() {
   const [creation, setCreation] = useState(false);
   const [quantiteNouvelle, setQuantiteNouvelle] = useState('');
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
+  /* Le produit Grocy dont on renseigne les valeurs pour la PREMIÈRE fois. Un
+     état à part de `edite` : il n'a aucune valeur à corriger, seulement un nom
+     et une référence. Les mélanger aurait obligé à fabriquer un aliment à
+     zéros, et un zéro inventé s'enregistre comme une valeur (règle 6). */
+  const [aCompleter, setACompleter] = useState<AlimentIncomplet | null>(null);
 
   /** Les comptes lisant Grocy gèrent leurs fiches et leurs quantités là-bas. */
   /* Qui tient la fiche d'un aliment : la base pour un compte ordinaire,
@@ -231,7 +236,12 @@ export default function MonFrigo() {
              ses valeurs ici (elles vivent dans Grocy), ni le compter dans un
              inventaire dont le résultat nourrit le calculateur. On le MONTRE,
              et on dit pourquoi il est à part. */
-          estIncomplet(item) ? <LigneIncomplete produit={item} /> : (
+          estIncomplet(item) ? (
+            <LigneIncomplete
+              produit={item}
+              onRenseigner={() => { enregistrer.reset(); setACompleter(item); }}
+            />
+          ) : (
           mode === 'inventaire'
             ? (
               <LigneInventaire
@@ -327,11 +337,14 @@ export default function MonFrigo() {
         source={frigo.data?.source}
         creation={creation}
         edite={edite}
+        aCompleter={aCompleter}
         quantite={quantiteNouvelle}
         onQuantiteChange={setQuantiteNouvelle}
-        onFermer={() => { setCreation(false); setEdite(null); setQuantiteNouvelle(''); }}
+        onFermer={() => {
+          setCreation(false); setEdite(null); setACompleter(null); setQuantiteNouvelle('');
+        }}
         onCreationEnvoyee={() => { setCreation(false); setQuantiteNouvelle(''); }}
-        onEditionFaite={() => setEdite(null)}
+        onEditionFaite={() => { setEdite(null); setACompleter(null); }}
         creer={creer}
         majAliment={majAliment}
         definir={definir}

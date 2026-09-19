@@ -45,6 +45,7 @@ function creer(t: TestContext): unknown[] {
       source="base"
       creation
       edite={null}
+      aCompleter={null}
       quantite=""
       onQuantiteChange={() => undefined}
       onFermer={() => undefined}

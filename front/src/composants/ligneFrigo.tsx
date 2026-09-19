@@ -29,7 +29,12 @@ import { nombreSaisi } from '@/calcul/saisieNombre';
  *
  * Le stock, lui, est vrai : il vient de Grocy comme celui des autres lignes.
  */
-export function LigneIncomplete({ produit }: { produit: AlimentIncomplet }) {
+export function LigneIncomplete({
+  produit, onRenseigner,
+}: {
+  produit: AlimentIncomplet;
+  onRenseigner: () => void;
+}) {
   return (
     <Carte style={[s.carte, { borderColor: C.attenue, borderStyle: 'dashed' }]}>
       <View style={s.ligne}>
@@ -37,15 +42,19 @@ export function LigneIncomplete({ produit }: { produit: AlimentIncomplet }) {
         <View style={{ flex: 1 }}>
           <Texte numberOfLines={2}>{produit.nom}</Texte>
           <Discret style={{ fontSize: T.petit }} numberOfLines={2}>
-            Valeurs manquantes dans Grocy : {produit.manquants.join(', ')}.
-            {' '}Tant qu'elles n'y sont pas, cet aliment ne peut pas entrer
-            dans un calcul.
+            Valeurs manquantes : {produit.manquants.join(', ')}.
           </Discret>
         </View>
         <Chiffre taille={N.petit} couleur={C.discret}>
           {nb(produit.stock)} {produit.unite}
         </Chiffre>
       </View>
+      {/* LE BOUTON EST LE POINT DE TOUT CE CORRECTIF. Montrer la ligne sans
+          pouvoir la corriger ne servait a rien : le but declare est de
+          renseigner ces produits ICI, pour quitter Grocy a terme. */}
+      <Bouton variante="contour" onPress={onRenseigner} style={{ margin: E.m, marginTop: 0 }}>
+        Renseigner ses valeurs
+      </Bouton>
     </Carte>
   );
 }

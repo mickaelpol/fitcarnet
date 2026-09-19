@@ -117,10 +117,20 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
  */
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
-  quantite, onQuantiteChange, nomModifiable = true,
+  quantite, onQuantiteChange, nomModifiable = true, nomImpose,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
+  /**
+   * Le nom d'un aliment dont on ne connaît AUCUNE valeur.
+   *
+   * Le cas des produits Grocy jamais renseignés (19 septembre 2026) : le nom
+   * existe, les macros n'existent pas. On ne peut donc pas passer `aliment` —
+   * il obligerait à inventer des nombres, et `ALIMENT_VIDE` les met à zéro,
+   * ce qui est précisément le défaut corrigé le 17 septembre (règle 6 : un
+   * oubli n'est pas un zéro). Les champs restent vides, seul le nom est posé.
+   */
+  nomImpose?: string;
   titre?: string;
   onEnregistrer: (a: AlimentSaisi) => void;
   onFermer: () => void;
@@ -137,7 +147,7 @@ export function EditeurAliment({
   /** faux quand le nom appartient à une source externe, Grocy par exemple */
   nomModifiable?: boolean;
 }) {
-  const [a, setA] = useState<AlimentSaisi>(aliment ?? ALIMENT_VIDE);
+  const [a, setA] = useState<AlimentSaisi>(aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' });
   const [mesurer, setMesurer] = useState(false);
   const [avant, setAvant] = useState('');
   const [apres, setApres] = useState('');
@@ -182,11 +192,11 @@ export function EditeurAliment({
      silence. Le nom sert donc de repli — il identifie l'aliment aussi bien, il
      est toujours présent, et il ne change pas pendant la saisie puisque c'est
      la PROP, pas l'état local du formulaire. */
-  const identite = aliment?.id ?? aliment?.nom ?? null;
+  const identite = aliment?.id ?? aliment?.nom ?? nomImpose ?? null;
 
   useEffect(() => {
     if (visible) {
-      const depart = aliment ?? ALIMENT_VIDE;
+      const depart = aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' };
       setA(depart);
       setTextes(textesDe(aliment));
       setMesurer(false);
