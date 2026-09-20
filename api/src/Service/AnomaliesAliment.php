@@ -16,8 +16,8 @@ namespace App\Service;
  * messages que l'utilisateur lit.
  *
  * COMMENT ON SAIT QUE LA TRADUCTION EST FIDELE : pas en se relisant. Le front a
- * tourne sur un corpus de 14 400 combinaisons — 50 aliments CIQUAL reels x
- * 8 categories x 12 rendements, plus douze cas fabriques pour les anomalies que
+ * tourne sur un corpus de 7 936 combinaisons — 50 aliments CIQUAL reels x
+ * 8 categories x 16 rendements, plus douze cas fabriques pour les anomalies que
  * des donnees propres ne declenchent jamais — et sa reponse est figee dans
  * `tests/corpus/anomalies-reference.json.gz`. `AnomaliesPortageTest` exige le
  * MEME resultat, message par message. Porter « a l'oeil » et se relire, c'est

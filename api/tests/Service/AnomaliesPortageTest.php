@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
  * pas ca en se relisant — c'est exactement la methode qui produit une
  * divergence silencieuse, celle que ce depot passe son temps a rattraper.
  *
- * ON COMPARE DONC SUR UN CORPUS. Le front a tourne sur 14 400 combinaisons —
+ * ON COMPARE DONC SUR UN CORPUS. Le front a tourne sur 7 936 combinaisons —
  * 50 aliments CIQUAL reels x 8 categories x 12 rendements, plus douze cas
  * fabriques pour les anomalies que des donnees propres ne declenchent jamais —
  * et sa reponse est figee dans `tests/corpus/anomalies-reference.json.gz`.
@@ -70,6 +70,42 @@ final class AnomaliesPortageTest extends TestCase
      * test ci-dessus en ne garantissant rien — motif 4 du projet, le test qui
      * ne peut pas echouer.
      */
+    public function testLeCorpusPORTE_AUSSI_DES_CAS_SANS_ANOMALIE(): void
+    {
+        /* SANS EUX, LE CORPUS NE GARDE QU'UNE DIRECTION — releve par
+           `revue-fitcarnet` le 20 septembre 2026, et c'est le motif 4 sous sa
+           forme la plus discrete.
+
+           La premiere version jetait les cas sans anomalie : elle prouvait que
+           le PHP dit la meme chose QUAND le front dit quelque chose. Si le
+           portage criait `calories_incoherentes` sur un aliment PROPRE, rien
+           ne tombait — et le frigo de tout le monde se couvrait d'alertes. */
+        $propres = \array_filter(self::reference(),
+            static fn (array $c): bool => [] === $c['anomalies']);
+
+        self::assertGreaterThan(1_000, \count($propres),
+            'il faut des milliers de cas propres pour qu\'un faux positif tombe');
+    }
+
+    public function testLeCorpusFRANCHIT_LES_BORNES_ET_NE_LES_TOUCHE_PAS(): void
+    {
+        /* Les tests sont stricts (`> maxi`, `< mini`) : un corpus qui ATTEINT
+           les bornes sans les depasser ne compare jamais deux des messages —
+           dont celui qui porte le seul `toFixed(0)` non trivial du portage,
+           les 88 g de matiere seche. */
+        $vus = [];
+        foreach (self::reference() as $cas) {
+            foreach ($cas['anomalies'] as $a) {
+                $vus[(string) $a['gravite'] . '|' . (string) $a['code']] = true;
+            }
+        }
+
+        self::assertArrayHasKey('avertissement|rendement_hors_norme', $vus,
+            'le legume sous 0,30 et le feculent au-dessus de 5 doivent etre compares');
+        self::assertArrayHasKey('info|rendement_hors_norme', $vus,
+            'et la proteine sous 0,60, qui est une INFO et non un avertissement');
+    }
+
     public function testLeCorpusCouvreLesQuatorzeAnomalies(): void
     {
         $codes = [];

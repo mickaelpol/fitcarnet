@@ -6,7 +6,7 @@ import {
   useEnregistrerAliment, useEnvoyerInventaire, useFrigoIncomplets, useMajAliment,
   useMonFrigo, useSuiviInventaire, useSupprimerAliment,
 } from '@/api/hooks';
-import { useRetarde, useVerdictAliment, type SaisieAliment } from '@/api/hooks/verification';
+import { useVerdictAliment, type SaisieAliment } from '@/api/hooks/verification';
 import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import { Bouton, Champ, Chargement, Discret, Erreur, Vide } from '@/composants/base';
 import { AlertesFrigo } from '@/composants/alertesFrigo';
@@ -71,7 +71,10 @@ export default function MonFrigo() {
      hook par convention — c'est ce qui lui permet d'être monté dans un test
      sans client HTTP. */
   const [saisie, setSaisie] = useState<SaisieAliment | null>(null);
-  const { verdict, perime } = useVerdictAliment(useRetarde(saisie));
+  /* L'ANTI-REBOND EST DANS LE HOOK depuis le 20 septembre 2026 : applique
+     ici, il lui cachait la saisie courante, et « périmé » ne couvrait que la
+     moitié de l'attente. */
+  const { verdict, perime, enPanne } = useVerdictAliment(saisie);
   const [quantiteNouvelle, setQuantiteNouvelle] = useState('');
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
   /* Le produit Grocy dont on renseigne les valeurs pour la PREMIÈRE fois. Un
@@ -370,6 +373,7 @@ export default function MonFrigo() {
         source={frigo.data?.source}
         verdict={verdict}
         verdictPerime={perime}
+        verdictEnPanne={enPanne}
         onSaisie={setSaisie}
         creation={creation}
         edite={edite}

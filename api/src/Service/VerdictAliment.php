@@ -31,19 +31,7 @@ namespace App\Service;
 final class VerdictAliment
 {
 
-    /** Ecart tolere entre les calories annoncees et ce que les macros donnent. */
-    private const TOLERANCE = 0.08;
 
-    /**
-     * Sans fibres renseignees, on tolere beaucoup plus.
-     *
-     * Elles comptent 2 kcal/g et manquent a la somme : un aliment fibreux
-     * paraitrait incoherent alors que ses valeurs sont justes.
-     */
-    private const TOLERANCE_SANS_FIBRES = 0.2;
-
-    /** Au-dela, ce n'est plus un arrondi mais une valeur a reprendre. */
-    private const ECART_FRANC = 0.3;
 
     /**
      * Plafond physique pour 100 g : rien n'est plus dense que la matiere
@@ -170,7 +158,12 @@ final class VerdictAliment
             }
         }
 
-        $controle = self::controle($lus);
+        /* LE CONTROLE VIT DANS SON PROPRE SERVICE depuis le 20 septembre
+           2026 : deux ecrans posent la meme question, et le detail d'une ligne
+           du frigo la calculait encore lui-meme. */
+        $controle = ControleDesMacros::pour(
+            $lus['kcal100'] ?? null, $lus['prot100'] ?? null,
+            $lus['gluc100'] ?? null, $lus['lip100'] ?? null, $lus['fibres100'] ?? null);
         if (null !== $controle['avertissement']) {
             $avertissements[] = ['champ' => 'kcal100', 'message' => $controle['avertissement']];
         }
@@ -208,98 +201,6 @@ final class VerdictAliment
                `revue-fitcarnet` le 20 septembre 2026. */
             'enregistrable' => [] === $refus && $complet
                 && 'incoherent' !== $controle['verdict'],
-        ];
-    }
-
-    /**
-     * Les calories annoncees collent-elles a ce que les macros donnent ?
-     *
-     * ON AVERTIT, ON NE REFUSE PAS, et c'est mesure : 34 des 3 006 entrees
-     * CIQUAL exploitables ont un ecart legitime — les alcools, dont les
-     * 7 kcal/g n'entrent dans aucune macro, et les confiseries aux polyols,
-     * comptes 2,4 et non 4. Les refuser serait accuser quelqu'un d'une faute
-     * qu'il n'a pas commise.
-     *
-     * @param array<string, float|null> $lus
-     *
-     * @return array{resume: string, avertissement: string|null, verdict: string}
-     */
-    private static function controle(array $lus): array
-    {
-        $kcal = $lus['kcal100'] ?? null;
-        $fibresConnues = null !== ($lus['fibres100'] ?? null);
-
-        $calculees = Atwater::kcal($lus['prot100'] ?? 0.0, $lus['gluc100'] ?? 0.0,
-            $lus['lip100'] ?? 0.0, $lus['fibres100'] ?? null);
-
-        if (null === $kcal || $kcal <= 0.0) {
-            return [
-                'resume' => \sprintf('Ces macros représentent %d calories.', (int) \round($calculees)),
-                'avertissement' => null,
-                'verdict' => 'indecidable',
-            ];
-        }
-
-        /* RIEN A COMPARER TANT QUE LES TROIS MACROS NE SONT PAS LA — releve en
-           eprouvant la route par HTTP le 20 septembre 2026. Avec les seules
-           calories, elle repondait « le calcul donne 0 calories contre 130
-           annoncees » : c'est vrai, et c'est du bruit pendant la frappe.
-
-           Le REFUS, lui, continue de parler : la regle du grain sec n'a pas
-           besoin des macros, et c'est justement ce qu'on voulait. */
-        $macrosCompletes = null !== ($lus['prot100'] ?? null)
-            && null !== ($lus['gluc100'] ?? null)
-            && null !== ($lus['lip100'] ?? null);
-
-        if (!$macrosCompletes) {
-            return [
-                'resume' => 'Renseigne les protéines, les glucides et les lipides '
-                    . 'pour que le contrôle soit possible.',
-                'avertissement' => null,
-                'verdict' => 'indecidable',
-            ];
-        }
-
-        $ecart = ($calculees - $kcal) / $kcal;
-        $seuil = $fibresConnues ? self::TOLERANCE : self::TOLERANCE_SANS_FIBRES;
-
-        if (\abs($ecart) <= $seuil) {
-            return [
-                'resume' => $fibresConnues
-                    ? 'Les valeurs sont cohérentes entre elles.'
-                    : 'Cohérent, mais sans les fibres le contrôle reste approximatif.',
-                'avertissement' => null,
-                'verdict' => 'coherent',
-            ];
-        }
-
-        /* Sans fibres renseignees, un ecart NEGATIF est normal sur un aliment
-           qui en contient : les calories annoncees incluent leur apport, pas
-           le calcul. Inutile d'alarmer sur ce cas-la. */
-        if (!$fibresConnues && $ecart < 0.0) {
-            $dit = \sprintf(
-                'Le calcul donne %d calories contre %d annoncées. C\'est normal si '
-                . 'l\'aliment contient des fibres — renseigne-les pour lever le doute.',
-                (int) \round($calculees), (int) \round($kcal));
-
-            return ['resume' => $dit, 'avertissement' => $dit, 'verdict' => 'ecart'];
-        }
-
-        $dit = \sprintf(
-            'Le calcul donne %d calories contre %d annoncées, soit %s%d %%. %s',
-            (int) \round($calculees),
-            (int) \round($kcal),
-            $ecart > 0.0 ? '+' : '',
-            (int) \round($ecart * 100),
-            \abs($ecart) > self::ECART_FRANC
-                ? 'Vérifie tes saisies : une valeur semble erronée.'
-                : 'Vérifie les glucides — les sucres en font partie, ils ne s\'ajoutent pas.',
-        );
-
-        return [
-            'resume' => $dit,
-            'avertissement' => $dit,
-            'verdict' => \abs($ecart) > self::ECART_FRANC ? 'incoherent' : 'ecart',
         ];
     }
 
@@ -375,9 +276,10 @@ final class VerdictAliment
     /**
      * Le rendement mesure a l'instant est-il acceptable ?
      *
-     * `null` quand il n'y a pas de candidat — aucune pesee en cours. Sinon,
-     * un motif de refus ou `null` dans `motif` : la MEME fonction que l'entite
-     * appelle, jamais une seconde ecriture.
+     * `null` quand il n'y a pas de candidat — aucune pesee en cours. L'ecran
+     * propose « utiliser ce resultat » apres deux pesees : c'est un CANDIDAT,
+     * pas la valeur en cours, et il fallait donc une reponse distincte. Sans
+     * elle, l'ecran aurait garde un juge local pour ce seul bouton.
      *
      * @param array<string, mixed> $saisie
      *

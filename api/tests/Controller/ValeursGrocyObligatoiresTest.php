@@ -172,6 +172,51 @@ final class ValeursGrocyObligatoiresTest extends TestCase
         self::assertNotSame([], $appels, 'le riz sec doit bien etre ecrit dans Grocy');
     }
 
+    /**
+     * LE SENS DU RENDEMENT MANQUAIT SUR CE CHEMIN — troisieme fois sur ce
+     * controleur, relevee par `revue-fitcarnet` le 20 septembre 2026.
+     *
+     * Le chemin base le controle par l'entite
+     * (`Aliment::verifierLeSensDuRendement`). Ce chemin-ci controlait la
+     * categorie, les calories, les macros, la coherence — et laissait passer
+     * un feculent a 0,8, c'est-a-dire une pesee a l'envers.
+     *
+     * Et rien ne le rattrapait : la contrainte `aliment_ratio_sens` de la base
+     * ne s'applique pas, puisque l'aliment n'y est pas. Le produit entrait
+     * dans Grocy avec un rendement impossible.
+     *
+     * Le corollaire de la regle 2 dit « verifier sur CHAQUE chemin
+     * d'ecriture ». Le commentaire de cette route raconte deja les deux
+     * precedentes fois.
+     */
+    public function testUnRendementAContresensNePartPasDansGrocy(): void
+    {
+        $appels = [];
+        $corps = ['reference' => 'grocy:12', 'categorie' => 'fec', 'kcal100' => 350,
+            'prot100' => 7, 'gluc100' => 78, 'lip100' => 0.6, 'ratio' => 0.8];
+
+        $reponse = self::controleur($appels)->enregistrerAliment(self::envoi($corps));
+
+        self::assertSame(422, $reponse->getStatusCode(),
+            'un feculent qui retrecit est une pesee a l\'envers');
+        $erreur = \json_decode((string) $reponse->getContent(), true, flags: \JSON_THROW_ON_ERROR)['erreur'] ?? '';
+        self::assertStringContainsString('feculent', (string) $erreur,
+            'et le message doit dire POURQUOI');
+        self::assertSame([], $appels, 'rien ne doit partir vers Grocy');
+    }
+
+    public function testLE_TEMOIN_UN_RENDEMENT_NORMAL_PART_BIEN(): void
+    {
+        /* Sans lui, refuser tout rendement passerait le test ci-dessus en
+           rendant l'application inutilisable pour un compte Grocy. */
+        $appels = [];
+        $corps = ['reference' => 'grocy:12', 'categorie' => 'fec', 'kcal100' => 350,
+            'prot100' => 7, 'gluc100' => 78, 'lip100' => 0.6, 'ratio' => 2.26];
+
+        self::assertSame(200, self::controleur($appels)->enregistrerAliment(self::envoi($corps))->getStatusCode());
+        self::assertNotSame([], $appels);
+    }
+
     /** @return array<string, mixed> */
     private static function corpsComplet(): array
     {

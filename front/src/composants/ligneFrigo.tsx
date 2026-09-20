@@ -9,7 +9,7 @@
 
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Bouton, Carte, Champ, Chiffre, Discret, Texte } from './base';
-import { controler, resumeRatio } from '../calcul/nutrition';
+import { resumeRatio } from '../calcul/nutrition';
 import type { AlimentDisponible, AlimentIncomplet } from '../api/types';
 import { C, E, N, P, T, couleurRole, nb } from '../theme';
 import { nombreSaisi } from '@/calcul/saisieNombre';
@@ -72,10 +72,14 @@ export function LigneStock({
   onCorriger: () => void;
   onSupprimer: () => void;
 }) {
-  const controle = controler({
-    kcal: aliment.kcal100, prot: aliment.prot100, gluc: aliment.gluc100,
-    lip: aliment.lip100, fibres: aliment.fibres100,
-  });
+  /* LE CONTROLE VIENT DU SERVEUR — 20 septembre 2026. Cette ligne le
+     calculait elle-même : même question, même phrase que l'API, deux
+     écritures. Dernier juge du front sur cet écran.
+
+     Il arrive AVEC l'aliment, donc sans aller-retour de plus. `?? null` et non
+     un calcul de repli : pendant le chargement il n'y a pas « cohérent », il
+     n'y a pas encore de réponse. */
+  const controle = aliment.controle ?? null;
   /* Un féculent qui gonfle se pèse sec, tout le reste se pèse cru. C'est la
      seule nuance de vocabulaire qui reste : le geste est le même. */
   const sec = aliment.categorie === 'fec' && aliment.ratio > 1;
@@ -122,9 +126,9 @@ export function LigneStock({
             <Mesure cle="À la cuisson" valeur={resumeRatio(aliment.ratio)} />
           </View>
 
-          {controle.verdict !== 'coherent' && (
+          {controle !== null && controle.verdict !== 'coherent' && (
             <Discret style={{ color: C.vif, fontSize: T.petit, lineHeight: 16 }}>
-              {controle.message}
+              {controle.resume}
             </Discret>
           )}
 

@@ -130,7 +130,7 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
   quantite, onQuantiteChange, nomModifiable = true, nomImpose,
-  rattachement, verdict, verdictPerime, onSaisie,
+  rattachement, verdict, verdictPerime, verdictEnPanne, onSaisie,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -195,7 +195,23 @@ export function EditeurAliment({
    * serveur accepte.
    */
   verdictPerime?: boolean;
-  /** Appelé à chaque frappe, avec les champs TELS QU'ILS SONT TAPÉS. */
+  /**
+   * LE SERVEUR N'A PAS RÉPONDU — réseau coupé, ou erreur.
+   *
+   * Il FAUT le dire. Sans réponse, `verdict` vaut `undefined` et l'écran
+   * affichait un cadre bordé et VIDE, avec le bouton actif : ni un refus, ni
+   * une incertitude énoncée, mais une absence de réponse déguisée en réponse.
+   * La règle 7 demande l'inverse.
+   */
+  verdictEnPanne?: boolean;
+  /**
+   * Appelé à chaque frappe, avec les champs TELS QU'ILS SONT TAPÉS.
+   *
+   * SA RÉFÉRENCE DOIT ÊTRE STABLE — un `setState` de React, ou un
+   * `useCallback`. Elle est dans les dépendances de l'effet qui la déclenche :
+   * une lambda écrite en ligne bouclerait à l'infini, et ni le typage ni un
+   * test ne l'annoncent.
+   */
   onSaisie?: (s: SaisieAliment) => void;
 }) {
   const [a, setA] = useState<AlimentSaisi>(aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' });
@@ -275,11 +291,6 @@ export function EditeurAliment({
   };
 
   const changerCategorie = (categorie: string) => maj({ categorie });
-
-  const macros = {
-    kcal: a.kcal100, prot: a.prot100, gluc: a.gluc100,
-    lip: a.lip100, fibres: a.fibres100,
-  };
 
 
 
@@ -476,7 +487,7 @@ export function EditeurAliment({
                 Idem pour les acides gras saturés, compris dans les lipides.
               </Discret>
 
-              {verdict?.conversion != null && (
+              {verdict?.conversion != null && verdictPerime !== true && (
                 <View style={[s.controle, { borderColor: C.vif }]}>
                   <Discret style={{ color: C.vif, fontSize: T.normal, lineHeight: 18 }}>
                     {verdict.conversion.motif === 'plafond'
@@ -512,7 +523,16 @@ export function EditeurAliment({
               )}
 
               {/* ---- contrôle ---- */}
-              {refus.length > 0 ? (
+              {verdictEnPanne === true ? (
+                /* ON DIT L'INCERTITUDE PLUTÔT QU'UN CADRE VIDE (règle 7). */
+                <View style={[s.controle, { borderColor: C.attenue }]}>
+                  <Discret style={{ color: C.attenue, fontSize: T.normal, lineHeight: 18 }}>
+                    Le contrôle des valeurs n'a pas pu être fait : le serveur
+                    n'a pas répondu. Tu peux enregistrer — il vérifiera à ce
+                    moment-là.
+                  </Discret>
+                </View>
+              ) : refus.length > 0 ? (
                 /* LE REFUS PASSE DEVANT. Afficher « cohérent » au-dessus de
                    « le serveur va refuser » serait deux réponses à la même
                    question. */
@@ -622,7 +642,7 @@ export function EditeurAliment({
                         });
                         setMesurer(false);
                       }}
-                      desactive={verdict?.candidat?.acceptable === false}
+                      desactive={verdictPerime === true || verdict?.candidat?.acceptable === false}
                       style={{ marginTop: E.s }}
                     >
                       {verdict?.candidat?.acceptable === false

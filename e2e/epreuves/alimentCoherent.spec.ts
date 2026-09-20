@@ -64,6 +64,18 @@ test.describe('l\'éditeur d\'aliment', () => {
        mauvaise raison : le bouton était éteint faute de nom. */
     const bouton = page.getByText('Enregistrer', { exact: true });
     await expect(bouton).toBeVisible();
+
+    /* ON VÉRIFIE QU'IL EST BIEN ÉTEINT — relevé par `revue-fitcarnet` le
+       20 septembre 2026. Cette épreuve s'appelait « éteint le bouton » et ne
+       vérifiait que sa PRÉSENCE : elle serait restée verte avec un bouton
+       parfaitement actif, et c'est exactement ce qui est arrivé pendant la
+       refonte. Le motif 4 du projet, dans son propre garde-fou.
+
+       React Native Web rend un bouton inactif en `aria-disabled` : c'est ce
+       qu'il faut lire, `toBeDisabled` ne voit que l'attribut HTML natif. */
+    await expect(bouton.locator('xpath=ancestor-or-self::*[@aria-disabled]').first())
+      .toHaveAttribute('aria-disabled', 'true');
+
     await bouton.click({ force: true });
 
     /* LA VRAIE VÉRIFICATION EST EN BASE. Un écran peut afficher un refus et
@@ -82,7 +94,18 @@ test.describe('l\'éditeur d\'aliment', () => {
       await remplir(page, RIZ_SEC, 'Riz de l\'epreuve');
 
       await expect(page.getByText(/grain sec/)).toBeHidden();
-      await page.getByText('Enregistrer', { exact: true }).click();
+
+      /* LE TÉMOIN DU TÉMOIN : le bouton doit être ACTIF ici. Sans cette
+         ligne, un écran qui éteindrait tout passerait les trois épreuves.
+
+         MESURÉ : quand il est actif, React Native Web ne pose PAS
+         `aria-disabled` — il le retire. On vérifie donc son absence, et non sa
+         valeur « false », qui n'existe jamais. */
+      const bouton = page.getByText('Enregistrer', { exact: true });
+      await expect(bouton.locator('xpath=ancestor-or-self::*[@aria-disabled="true"]'))
+        .toHaveCount(0);
+
+      await bouton.click();
 
       await expect.poll(() => alimentsDe(email).length, { timeout: 10_000 }).toBe(1);
 

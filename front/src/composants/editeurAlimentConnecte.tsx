@@ -46,7 +46,7 @@ export function EditeurAlimentConnecte({
   source, creation, edite, aCompleter, quantite, rattachement,
   onQuantiteChange, onFermer, onCreationEnvoyee, onEditionFaite,
   creer, majAliment, definir, enregistrer, poserQuantite,
-  verdict, verdictPerime, onSaisie,
+  verdict, verdictPerime, verdictEnPanne, onSaisie,
 }: {
   /** qui tient la fiche : Grocy pour l'administrateur, la base pour les autres */
   source?: 'grocy' | 'base';
@@ -117,6 +117,7 @@ export function EditeurAlimentConnecte({
    */
   verdict?: VerdictAliment;
   verdictPerime?: boolean;
+  verdictEnPanne?: boolean;
   onSaisie?: (s: SaisieAliment) => void;
 }) {
   const surGrocy = source === 'grocy';
@@ -132,6 +133,7 @@ export function EditeurAlimentConnecte({
     <EditeurAliment
       verdict={verdict}
       verdictPerime={verdictPerime}
+      verdictEnPanne={verdictEnPanne}
       onSaisie={onSaisie}
       visible={(surGrocy || source === 'base')
         && (creation || edite !== null || aCompleter !== null)}

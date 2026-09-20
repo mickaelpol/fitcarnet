@@ -244,6 +244,8 @@ export interface AlimentDisponible {
   nom: string;
   /** code CIQUAL ; `null` quand l'aliment n'est rattaché à rien */
   referenceCiqual?: string | null;
+  /** Ce que le serveur dit de ses macros — l'écran l'affiche, il ne le calcule plus. */
+  controle?: ControleMacros;
   categorie: 'prot' | 'fec' | 'leg' | 'ole' | 'huile' | 'lait' | 'fruit' | 'autre';
   kcal100: number;
   prot100: number;
@@ -347,6 +349,20 @@ export interface AlimentAMigrer {
   peseeApres?: number | null;
   /** ce qui manque, pour les produits jamais renseignés */
   manquants?: string[];
+}
+
+/**
+ * CE QUE LE SERVEUR DIT DES MACROS D'UN ALIMENT.
+ *
+ * Il arrive avec l'aliment, et l'écran l'affiche. Le détail d'une ligne du
+ * frigo le calculait encore lui-même jusqu'au 20 septembre 2026 : même
+ * question, même phrase, deux écritures.
+ */
+export interface ControleMacros {
+  /** La teinte est une DÉCISION du serveur, l'écran ne fait que la traduire. */
+  verdict: 'coherent' | 'ecart' | 'incoherent' | 'indecidable';
+  resume: string;
+  avertissement: string | null;
 }
 
 /** Une anomalie du catalogue, telle que le serveur la formule. */

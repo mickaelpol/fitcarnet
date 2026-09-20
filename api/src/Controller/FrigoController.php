@@ -8,7 +8,9 @@ use App\Entity\Aliment;
 use App\Entity\Utilisateur;
 use App\Service\AnomaliesAliment;
 use App\Service\CoherenceNutritionnelle;
+use App\Service\ControleDesMacros;
 use App\Service\Frigo;
+use App\Service\RendementPlausible;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
 use App\Service\InventaireLots;
@@ -94,7 +96,24 @@ final class FrigoController extends AbstractController
 
            Ils sont SEPARES des aliments parce qu'ils n'ont pas de macros :
            l'ecran les affiche, le calculateur ne les voit pas. */
-        $aliments = \array_map(static fn ($a) => $a->versTableau(), $tout['aliments']);
+        /* CHAQUE ALIMENT PORTE SON CONTROLE — 20 septembre 2026. Le detail
+           d'une ligne du frigo le calculait encore lui-meme
+           (`ligneFrigo.tsx`), c'est-a-dire que le front posait la meme
+           question que le serveur, avec la meme phrase. Dernier juge du front
+           sur cet ecran, releve par `revue-fitcarnet`.
+
+           Il part avec l'aliment plutot que dans une liste a part : c'est la
+           ligne qui l'affiche, et l'apparier apres coup demanderait une cle
+           que le nom ne garantit pas. */
+        $aliments = \array_map(static function ($a): array {
+            $t = $a->versTableau();
+            $t['controle'] = ControleDesMacros::pour(
+                (float) $t['kcal100'], (float) $t['prot100'], (float) $t['gluc100'],
+                (float) $t['lip100'],
+                null === $t['fibres100'] ? null : (float) $t['fibres100']);
+
+            return $t;
+        }, $tout['aliments']);
 
         /* LES ANOMALIES PARTENT AVEC LE FRIGO, pas par une route a part — et
            c'est le meme argument que pour `incomplets` juste au-dessus : les
@@ -292,6 +311,24 @@ final class FrigoController extends AbstractController
 
         if (null !== $incoherence) {
             return $this->json(['erreur' => $incoherence], 422);
+        }
+
+        /* LE SENS DU RENDEMENT, SUR CE CHEMIN AUSSI — pose le 20 septembre
+           2026, apres que `revue-fitcarnet` l'a releve. C'est la TROISIEME
+           fois sur ce controleur, et le commentaire ci-dessus raconte deja les
+           deux precedentes.
+
+           Le chemin base le controle par l'entite
+           (`Aliment::verifierLeSensDuRendement`). Ici, rien : un feculent a
+           0,8 — une pesee a l'envers — entrait dans Grocy. Et rien ne le
+           rattrapait, puisque la contrainte `aliment_ratio_sens` de la base ne
+           s'applique pas a un produit qui n'y est pas.
+
+           La regle n'est pas reecrite : c'est la meme fonction que l'entite
+           appelle. */
+        $sens = RendementPlausible::sens($categorie, $ratio);
+        if (null !== $sens) {
+            return $this->json(['erreur' => $sens], 422);
         }
 
         /* Sans reference, c'est une CREATION : le produit n'existe pas encore

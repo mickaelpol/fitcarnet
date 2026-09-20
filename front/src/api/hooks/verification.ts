@@ -85,16 +85,34 @@ export interface SaisieAliment {
  * ne doit pas interroger le serveur pour lui dire qu'elle est vide.
  */
 export function useVerdictAliment(saisie: SaisieAliment | null) {
+  /* L'ANTI-REBOND VIT ICI, ET C'EST TOUT LE POINT DE LA CORRECTION.
+     
+     Il etait applique par l'appelant — `useVerdictAliment(useRetarde(saisie))`
+     — si bien que le hook ne voyait JAMAIS la saisie courante. Or
+     `isPlaceholderData` de TanStack Query ne devient vrai qu'une fois la cle
+     changee : pendant les 250 ms du retard, la cle etait encore l'ancienne, la
+     requete avait ses donnees, et `perime` valait FAUX.
+     
+     Resultat mesure par `revue-pile` : on tape « 350 » (vert, « cohérent »),
+     on efface le 0 — et pendant 250 ms le bandeau reste vert, PLEINE OPACITE,
+     bouton actif, sur « 35 ». Un chiffre faux affiche comme s'il etait
+     verifie : la regle 7 prise a revers.
+     
+     La bibliotheque ne pouvait pas le voir : le retard etait en amont d'elle.
+     Le hook compare donc lui-meme ce qui est TAPE a ce qui est INTERROGE. */
+  const interrogee = useRetarde(saisie);
+  const enRetard = JSON.stringify(saisie) !== JSON.stringify(interrogee);
+
   const requete = useQuery({
-    queryKey: ['verdict-aliment', saisie],
-    enabled: saisie !== null,
+    queryKey: ['verdict-aliment', interrogee],
+    enabled: interrogee !== null,
     /* Le verdict ne vieillit pas : pour une saisie donnee, la reponse est
        toujours la meme. On ne redemande donc jamais la meme. */
     staleTime: Infinity,
     gcTime: 60_000,
     placeholderData: (precedent: VerdictAliment | undefined) => precedent,
     queryFn: () => api<VerdictAliment>(
-      '/verification/aliment', { methode: 'POST', corps: saisie }),
+      '/verification/aliment', { methode: 'POST', corps: interrogee }),
   });
 
   /* CE QU'ON REND EST-IL LE VERDICT DE CETTE SAISIE, OU DE LA PRECEDENTE ?
@@ -116,8 +134,24 @@ export function useVerdictAliment(saisie: SaisieAliment | null) {
   return {
     ...requete,
     verdict: requete.data,
-    /** Vrai quand ce qui est rendu decrit une saisie PRECEDENTE. */
-    perime: requete.isPlaceholderData,
+    /**
+     * Vrai quand ce qui est rendu decrit une saisie PRECEDENTE.
+     *
+     * DEUX FENETRES, ET LA BIBLIOTHEQUE N'EN VOIT QU'UNE : l'anti-rebond
+     * (avant que la cle change) et l'aller-retour (apres). `isPlaceholderData`
+     * ne couvre que la seconde.
+     */
+    perime: enRetard || requete.isPlaceholderData,
+    /**
+     * LE SERVEUR N'A PAS REPONDU, et il faut le DIRE.
+     *
+     * Avec `placeholderData` pose, TanStack Query v5 ne l'applique JAMAIS
+     * par-dessus une erreur : `data` redevient `undefined`. L'ecran affichait
+     * alors un cadre borde et VIDE, sans un mot, avec le bouton actif — ni un
+     * refus, ni une incertitude enoncee, mais une absence de reponse deguisee
+     * en reponse. La regle 7 demande l'inverse.
+     */
+    enPanne: requete.isError,
   };
 }
 
