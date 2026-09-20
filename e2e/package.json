@@ -1,0 +1,13 @@
+{
+  "name": "fitcarnet-e2e",
+  "private": true,
+  "description": "Epreuves de bout en bout : un vrai navigateur, la vraie API, la vraie base.",
+  "scripts": {
+    "test": "playwright test",
+    "test:vu": "playwright test --headed",
+    "rapport": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

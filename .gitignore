@@ -160,3 +160,9 @@ pictogrammes-muscles.zip
 # vraiment. Releve le 17 septembre 2026 en assainissant test_ciqual.py.
 __pycache__/
 *.pyc
+
+# Épreuves de bout en bout : les dépendances et les traces, jamais les tests.
+e2e/node_modules/
+e2e/rapport/
+e2e/test-results/
+e2e/package-lock.json

@@ -157,6 +157,14 @@ export function Champ({
       {etiquette !== undefined && <Text style={s.etiquette}>{etiquette}</Text>}
       <View style={[s.champCadre, multiligne === true && s.champCadreLong, illisible === true && s.champIllisible]}>
         <TextInput
+          /* L'ÉTIQUETTE SUIT LE CHAMP, pour qui ne voit pas l'écran.
+             Elle n'était qu'un `<Text>` posé au-dessus : un lecteur d'écran
+             annonçait « champ de saisie » sans dire lequel, et une épreuve de
+             bout en bout devait deviner l'ordre des `input` dans le document.
+             Posée le 20 septembre 2026 en montant la suite Playwright — le
+             besoin du test a révélé un manque réel. React Native Web la rend
+             en `aria-label`. */
+          accessibilityLabel={etiquette}
           value={valeur}
           onChangeText={onChange}
           placeholder={placeholder}
