@@ -153,13 +153,19 @@ dès qu'on en trouve un autre, et il faut la considérer comme incomplète.**
 |---|---|---|
 | Mot de passe | `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` | `api/regles/motdepasse.json`, lu par `MotDePassePartageTest.php` **et** `motDePassePartage.test.ts` |
 | Rendement cru/cuit | les deux côtés, depuis le constat 04#7 | `api/regles/rendement.json`, lu par `RendementPartageTest.php` **et** `rendementPartage.test.ts` |
-| **Avancement d'une séance** | `api/src/Entity/Seance.php:138 getAvancement()`, `front/src/calcul/blocSeance.ts:52 avancementDe()` | **RIEN.** Relevé le 19 septembre 2026, jamais déclaré nulle part. Les deux tournent : `app/(onglets)/seances.tsx:51` lit le champ du serveur, `app/seance/[id].tsx:113` recalcule. Même règle écrite deux fois (« un exercice chrono ne compte que pour une série »), aucun test croisé |
+| Avancement d'une séance | `api/src/Entity/Seance.php` `getAvancement()`, `front/src/calcul/blocSeance.ts` `avancementDe()` | `api/regles/avancement.json`, lu par `AvancementPartageTest.php` **et** `avancementPartage.test.ts` — depuis le 20 septembre 2026. Les deux tournent vraiment : `app/(onglets)/seances.tsx` lit le champ du serveur, `app/seance/[id].tsx` recalcule à chaque case cochée |
 
-Ces deux-là ont la même raison d'exister — l'écran doit répondre pendant la
-frappe, sans aller-retour réseau, pendant que le serveur reste seul à décider —
+Tous les trois ont la même raison d'exister — l'écran doit répondre pendant le
+geste, sans aller-retour réseau, pendant que le serveur reste seul à décider —
 et le même dispositif : **un fichier de règles lu par les DEUX suites**. Le jour
 où l'un des juges change d'avis sans l'autre, une des deux suites tombe **en
 nommant le cas**.
+
+**Un fichier de règles ne suffit pas : il faut aussi que le test PUISSE
+tomber.** Chacun des trois porte donc un cas TÉMOIN qui vérifie que la liste
+éprouve encore ce qu'elle prétend éprouver — sans quoi vider la liste rendrait
+les deux suites vertes et muettes. Les trois verrous ont été éprouvés en
+sabotant volontairement chaque côté, et chacun est tombé en nommant le cas.
 
 ### Le 1RM : la duplication a été retirée, le 19 septembre 2026
 
