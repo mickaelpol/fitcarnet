@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\Aliment;
 use App\Entity\Utilisateur;
+use App\Service\CoherenceNutritionnelle;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
@@ -233,6 +234,39 @@ final class FrigoController extends AbstractController
                 ], 422);
             }
             $macros[$cle] = (float) $valeur;
+        }
+
+        /* LA MEME COHERENCE QUE SUR L'ENTITE — pose le 20 septembre 2026,
+           quelques heures apres le palier 1, et releve par le proprietaire du
+           projet SUR SON PROPRE ECRAN.
+
+           Le palier 1 avait mis la regle sur `Aliment`, via `Assert\Callback`.
+           Mais un compte en `sourceFrigo = grocy` n'emprunte JAMAIS cette
+           entite : il passe par ici. Les valeurs que l'API refusait en 422 une
+           heure plus tot — 130 kcal pour un riz qui gonfle — sont donc entrees
+           sans un mot, et l'ecran a meme affiche « Coherent ».
+
+           C'est le motif dominant du projet, et pour la DEUXIEME fois sur ce
+           controleur : le corollaire de la regle 2 dit « verifier sur CHAQUE
+           chemin d'ecriture », apres la faille de septembre ou le controle
+           etait present sur `/stock` et absent sur `/inventaire`.
+
+           La regle n'est pas reecrite : c'est la meme fonction que l'entite
+           appelle, donc le meme fichier de regles les verrouille tous les
+           deux. AVANT la creation, comme les controles au-dessus : un refus ne
+           doit pas laisser un produit nu dans Grocy. */
+        $incoherence = CoherenceNutritionnelle::motifDeRefus(
+            $categorie,
+            $kcal100,
+            $macros['prot100'],
+            $macros['gluc100'],
+            $macros['lip100'],
+            self::nombreOuNull($donnees['fibres100'] ?? null),
+            $ratio,
+        );
+
+        if (null !== $incoherence) {
+            return $this->json(['erreur' => $incoherence], 422);
         }
 
         /* Sans reference, c'est une CREATION : le produit n'existe pas encore

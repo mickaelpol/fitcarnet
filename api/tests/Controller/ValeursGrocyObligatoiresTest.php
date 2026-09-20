@@ -98,6 +98,80 @@ final class ValeursGrocyObligatoiresTest extends TestCase
         self::assertNotSame([], $appels, 'un corps complet doit atteindre Grocy');
     }
 
+    /**
+     * LE CHEMIN GROCY NE CONTROLAIT PAS LA COHERENCE — releve par le
+     * proprietaire du projet le 20 septembre 2026, sur son propre ecran.
+     *
+     * Le palier 1 avait pose la regle sur l'entite `Aliment`. Mais un compte
+     * en `sourceFrigo = grocy` n'emprunte JAMAIS cette entite : il passe par
+     * ici, et `#[Assert\Callback]` ne s'y declenche pas. Les valeurs exactes
+     * que l'API refusait en 422 une heure plus tot ont donc ete enregistrees
+     * sans un mot, et l'ecran a meme affiche « Coherent ».
+     *
+     * C'est le motif dominant du projet dans sa forme la plus pure, et pour la
+     * DEUXIEME fois sur ce meme controleur : le corollaire de la regle 2 dit
+     * « verifier sur CHAQUE chemin d'ecriture », apres une faille de septembre
+     * ou le controle etait present sur `/stock` et absent sur son jumeau
+     * `/inventaire`.
+     *
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function incoherences(): iterable
+    {
+        yield 'du riz saisi CUIT' => [
+            ['categorie' => 'fec', 'kcal100' => 130, 'prot100' => 2.7,
+                'gluc100' => 28, 'lip100' => 0.3, 'ratio' => 2.26],
+            'grain sec',
+        ];
+        yield 'des kilojoules recopies' => [
+            ['categorie' => 'fec', 'kcal100' => 1465, 'prot100' => 7,
+                'gluc100' => 78, 'lip100' => 0.6, 'ratio' => 2.26],
+            'kilojoules',
+        ];
+        yield 'plus de matiere que de produit' => [
+            ['categorie' => 'autre', 'kcal100' => 400, 'prot100' => 40,
+                'gluc100' => 40, 'lip100' => 30, 'ratio' => 1],
+            'nutriments',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $valeurs
+     */
+    #[DataProvider('incoherences')]
+    public function testUnAlimentIncoherentNePartPasDansGrocy(array $valeurs, string $attendu): void
+    {
+        $appels = [];
+        $corps = ['reference' => 'grocy:12'] + $valeurs;
+
+        $reponse = self::controleur($appels)->enregistrerAliment(self::envoi($corps));
+
+        self::assertSame(422, $reponse->getStatusCode(),
+            'le chemin Grocy doit refuser ce que le chemin base refuse deja');
+        $erreur = \json_decode((string) $reponse->getContent(), true, flags: \JSON_THROW_ON_ERROR)['erreur'] ?? '';
+        self::assertStringContainsString($attendu, (string) $erreur,
+            'et dire POURQUOI, comme le fait l\'entite');
+        self::assertSame([], $appels, 'rien ne doit partir vers Grocy');
+    }
+
+    /**
+     * LE TEMOIN : du riz SEC passe, et il part bien dans Grocy.
+     *
+     * Sans ce cas, un refus systematique passerait les trois tests ci-dessus
+     * tout en rendant l'application inutilisable pour un compte Grocy.
+     */
+    public function testDuRizSecPartBienDansGrocy(): void
+    {
+        $appels = [];
+        $corps = ['reference' => 'grocy:12', 'categorie' => 'fec', 'kcal100' => 350,
+            'prot100' => 7, 'gluc100' => 78, 'lip100' => 0.6, 'ratio' => 2.26];
+
+        $reponse = self::controleur($appels)->enregistrerAliment(self::envoi($corps));
+
+        self::assertSame(200, $reponse->getStatusCode());
+        self::assertNotSame([], $appels, 'le riz sec doit bien etre ecrit dans Grocy');
+    }
+
     /** @return array<string, mixed> */
     private static function corpsComplet(): array
     {
