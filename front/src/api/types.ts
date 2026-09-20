@@ -1,3 +1,5 @@
+import type { Repas } from '@/solveur/repasVocabulaire';
+
 /** Reflets des ressources exposées par l'API. */
 
 export interface Aliment {
@@ -37,7 +39,7 @@ export interface LigneStock {
 export interface Cible {
   '@id': string;
   id: number;
-  repas: 'R1' | 'R2' | 'R3' | 'R4';
+  repas: Repas;
   kcal: number;
   prot: number;
   gluc: number;
@@ -200,7 +202,7 @@ export interface Complement {
   /* En chaîne : c'est un DECIMAL côté API, et il refuse un nombre. */
   quantite: string;
   unite: string;
-  repas: 'R1' | 'R2' | 'R3' | 'R4';
+  repas: Repas;
 }
 
 export interface Utilisateur {

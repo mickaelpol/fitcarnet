@@ -155,10 +155,19 @@ export const couleurRole = (categorie: string): string => {
  * par `ChampNombre`, jamais par `nb` : la panne du 15 septembre 2026 — « 42,5 »
  * tapé, 425 kg enregistrés — vivait dans les champs et reste hors d'atteinte.
  *
- * Ne pas « simplifier » en `toLocaleString('fr-FR')` : le projet s'est déjà
- * fait mordre par une API que Hermes n'embarque pas partout (`normalize`, d'où
- * la table manuelle de `cleDHabitude`). Un séparateur suspendu à la présence
- * des données de locale sur le téléphone n'est pas un séparateur sûr.
+ * Ne pas « simplifier » en `toLocaleString('fr-FR')` — LA CONSIGNE TIENT, SA
+ * RAISON ÉTAIT FAUSSE. Elle invoquait « une API que Hermes n'embarque pas
+ * partout » : mesuré le 20 septembre 2026 sur le moteur réel, `Intl.NumberFormat`
+ * est bien là, et `toLocaleString('fr-FR')` fonctionne. Mais il ne fait pas la
+ * même chose :
+ *
+ *     (1234.5).toLocaleString('fr-FR')  →  "1 234,5"
+ *     nb(1234.5)                        →  "1234,5"
+ *
+ * et l'espace de la première est un U+202F, espace fine insécable. `nb` ne
+ * groupe pas les milliers et arrondit à une décimale : ce sont deux formats
+ * différents, pas deux écritures du même. C'est cela qui interdit la
+ * substitution, pas une crainte sur le moteur.
  *
  * @see charte.test.ts — « nb, le formatage court »
  */

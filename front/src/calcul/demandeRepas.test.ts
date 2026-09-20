@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  FIBRES_DIGNES_D_ETRE_DITES, ROLES, TOLERANCE, alimentsAjoutables, demandePour, ecartTenu, fibresDuRepas, grammesSaisis, imposePour, saisieIllisible, type Compose, vers,
+  FIBRES_DIGNES_D_ETRE_DITES, ROLES, TOLERANCE, alimentsAjoutables, demandePour, ecartTenu, fibresDuRepas, grammesSaisis, imposePour, renfortsDuRole, saisieIllisible, type Compose, vers,
 } from './demandeRepas';
 import type { Aliment } from '@/solveur/types';
 import { LEGUME_PAR_PORTION } from '../solveur/composer';
@@ -382,5 +382,45 @@ describe('les fibres d\'un repas', () => {
   it('un demi-gramme ne mérite pas qu\'on en parle', () => {
     /* Le seuil était écrit `fibres > 0.5` dans le JSX, sans nom. */
     assert.equal(FIBRES_DIGNES_D_ETRE_DITES, 0.5);
+  });
+});
+
+describe('les renforts d\'un role', () => {
+  const q = (id: number) => ({ aliment: { id } });
+
+  it('remonte ce qu\'un plafonnement a fait entrer sous CE role', () => {
+    assert.deepEqual(
+      renfortsDuRole('proteine', [q(1), q(2)],
+        [{ role: 'proteine', releve: { id: 2 } }], [], new Set([1])),
+      [q(2)]);
+  });
+
+  it('remonte aussi ce qu\'un echange a mis', () => {
+    assert.deepEqual(
+      renfortsDuRole('glucide', [q(3)], [],
+        [{ role: 'glucide', mis: { id: 3 } }], new Set()),
+      [q(3)]);
+  });
+
+  it('ignore ce qui concerne un AUTRE role', () => {
+    /* Les renforts s'affichent sous la ligne qu'ils completent : les poser
+       sous la mauvaise ferait chercher au mauvais endroit. */
+    assert.deepEqual(
+      renfortsDuRole('proteine', [q(2)],
+        [{ role: 'glucide', releve: { id: 2 } }], [], new Set()),
+      []);
+  });
+
+  it('LE BUG REEL : un aliment qui tient deja sa ligne n\'est pas reaffiche', () => {
+    /* Quand l'huile prend en charge les lipides, elle apparaissait DEUX fois
+       avec la meme quantite — et on la pesait deux fois. */
+    assert.deepEqual(
+      renfortsDuRole('lipide', [q(5)],
+        [{ role: 'lipide', releve: { id: 5 } }], [], new Set([5])),
+      []);
+  });
+
+  it('sans plafonnement ni echange, il n\'y a pas de renfort', () => {
+    assert.deepEqual(renfortsDuRole('proteine', [q(1), q(2)], [], [], new Set()), []);
   });
 });

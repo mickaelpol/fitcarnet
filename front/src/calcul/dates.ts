@@ -4,9 +4,33 @@
  * `toISOString()` rend l'heure UTC : en France, entre minuit et 1 h (2 h
  * l'été), il donne le jour d'avant. Voir `dates.test.ts` et le constat 04#9.
  *
- * Construite à la main, sans `toLocaleDateString` : Hermes n'embarque pas
- * toujours l'Intl complet — la même prudence que `cleDHabitude` avec
- * `normalize`.
+ * Construite à la main, sans `toLocaleDateString` — mais PAS pour la raison
+ * qui était écrite ici. Ce commentaire disait « Hermes n'embarque pas toujours
+ * l'Intl complet », et c'était faux. Mesuré le 20 septembre 2026 sur
+ * l'émulateur, moteur Hermes réel (`HermesInternal.getRuntimeProperties()`
+ * → « OSS Release Version: for RN 0.81.5 »), Android 14 et Android 16 :
+ *
+ *     Object.keys(Intl)
+ *       → ["getCanonicalLocales","Collator","DateTimeFormat","NumberFormat"]
+ *     new Date(…).toLocaleDateString('fr-FR', { weekday: 'long', … })
+ *       → "dimanche 20/09"
+ *
+ * `HERMES_ENABLE_INTL=True` est en dur dans React Native lui-même
+ * (`ReactAndroid/hermes-engine/build.gradle.kts:267`) : aucun réglage de ce
+ * dépôt ne peut l'éteindre. La confusion venait de `normalize`, qui n'est PAS
+ * une API `Intl` mais de l'ECMAScript de base — un incident généralisé à tort.
+ *
+ * LA VRAIE RAISON DE NE PAS L'UTILISER ICI : `dateLocale` produit une CLÉ,
+ * « AAAA-MM-JJ », pas un affichage. Une clé qui dépend de la locale de
+ * l'appareil n'est pas une clé. Les fonctions d'affichage plus bas, elles,
+ * appellent `toLocaleDateString` sans réserve, et c'est correct.
+ *
+ * CE QUI MANQUE VRAIMENT À CET `Intl`, et qui reste un piège : `PluralRules`,
+ * `RelativeTimeFormat`, `ListFormat`, `DisplayNames`, `Locale`, `Segmenter`
+ * sont ABSENTS. Les utiliser lèverait un `TypeError` sur téléphone et pas sur
+ * le poste — exactement le motif `normalize`. Et les données venant de l'ICU
+ * du système, l'orthographe exacte peut varier d'un Android à l'autre : ne
+ * jamais éprouver une sortie `toLocaleDateString` caractère par caractère.
  */
 const deuxChiffres = (n: number): string => String(n).padStart(2, '0');
 

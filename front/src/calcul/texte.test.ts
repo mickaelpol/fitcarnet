@@ -71,10 +71,19 @@ describe('sansAccent', () => {
   /*
    * LE TEST QUI DIT POURQUOI CE MODULE EXISTE.
    *
-   * Il retire `normalize` du prototype le temps de l'appel, exactement comme
-   * un Hermes sans Intl complet. Une réécriture en `normalize('NFD')` — la
-   * ligne « plus propre » qu'on a envie d'écrire — le fait tomber ici, sur le
-   * poste de développement, au lieu de tomber sur un téléphone.
+   * Il retire `normalize` du prototype le temps de l'appel. Une réécriture en
+   * `normalize('NFD')` — la ligne « plus propre » qu'on a envie d'écrire — le
+   * fait tomber ici, sur le poste de développement, au lieu de tomber sur un
+   * téléphone.
+   *
+   * CE COMMENTAIRE DISAIT « comme un Hermes sans Intl complet », et c'était un
+   * raccourci faux : `String.prototype.normalize` n'est PAS une API `Intl`,
+   * c'est de l'ECMAScript de base. Mesuré le 20 septembre 2026 sur le moteur
+   * réel, `normalize` répond et `'é'.normalize('NFD').length` vaut 2. Ce qui
+   * ne veut pas dire que ce test est inutile : il fige une garantie qui ne
+   * coûte rien, sur un moteur dont la surface a déjà surpris. Mais il ne
+   * fallait pas en tirer, comme trois fichiers l'ont fait, qu'`Intl` est
+   * indisponible — il est là, avec quatre constructeurs sur dix.
    *
    * `node --test` isole chaque fichier dans son propre processus ; la
    * restauration en `finally` protège quand même les tests d'à côté.

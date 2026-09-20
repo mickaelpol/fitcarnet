@@ -6,6 +6,7 @@ import { DetailComplements, RappelComplements } from './complements';
 import { SR } from './stylesRepas';
 import {
   type Compose, FIBRES_DIGNES_D_ETRE_DITES, ROLES, ecartTenu, fibresDuRepas,
+  renfortsDuRole,
   imposePour, saisieIllisible,
 } from '@/calcul/demandeRepas';
 import { type ChoixDeCuisson, poidsDeLaLigne } from '@/calcul/poidsServi';
@@ -307,23 +308,25 @@ export function CarteRepas({
           </Discret>
 
           {ROLES.map(({ cle, titre, cat }) => {
+            /* Ceux qui tiennent deja une ligne a eux. Calcule ici plutot que
+               reparcouru dans le filtre : c'est la meme reponse pour les cinq
+               roles. */
+            const dejaAffiches = new Set<number | string>(
+              ROLES.map(({ cle: autre }) => compose.roles[autre]?.id)
+                .filter((id): id is number | string => id !== undefined));
+
             const aliment = compose.roles[cle];
             const fixe = imposePour(repas, cle);
 
-            /* Les renforts de CE rôle : ce que le plafonnement du stock ou un
-               échange automatique a fait entrer. Ils s'affichent juste sous
-               la ligne qu'ils complètent, pas en bas de la carte — c'est là
-               qu'on les cherche. */
-            const renforts = (resultat?.resultat.quantites ?? []).filter(
-              (q) => q.aliment.id !== aliment?.id
-                /* Un aliment qui tient déjà sa propre ligne n'est pas
-                   réaffiché ici : quand l'huile prend en charge les lipides,
-                   elle apparaissait deux fois, avec la même quantité. */
-                && !ROLES.some(({ cle: autre }) => compose.roles[autre]?.id === q.aliment.id)
-                && ((resultat?.plafonnes ?? []).some(
-                  (pl) => pl.role === cle && pl.releve?.id === q.aliment.id)
-                  || (resultat?.echanges ?? []).some(
-                    (e) => e.role === cle && e.mis.id === q.aliment.id)));
+            /* La regle vit dans `calcul/demandeRepas.ts` depuis le
+               20 septembre 2026 : elle etait ecrite ici, dans le corps d'un
+               `.map` de rendu, donc sans test et rejouee a chaque frappe. */
+            const renforts = renfortsDuRole(
+              cle,
+              resultat?.resultat.quantites ?? [],
+              resultat?.plafonnes ?? [],
+              resultat?.echanges ?? [],
+              dejaAffiches);
 
             const notes = (resultat?.plafonnes ?? []).filter((pl) => pl.role === cle);
             const echange = (resultat?.echanges ?? []).find((e) => e.role === cle);

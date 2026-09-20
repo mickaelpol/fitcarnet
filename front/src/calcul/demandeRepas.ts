@@ -327,3 +327,36 @@ export const vers = (a: AlimentDisponible): Aliment => ({
 export const alimentsAjoutables = (stock: readonly Aliment[], compose: Compose): Aliment[] =>
   stock.filter((a) => !ROLES.some(({ cle }) => compose.roles[cle]?.id === a.id)
     && !compose.ajouts.some((x) => x.id === a.id));
+
+/**
+ * LES RENFORTS D'UN ROLE : ce que le plafonnement du stock ou un echange
+ * automatique a fait entrer sous une ligne.
+ *
+ * DESCENDU LE 20 SEPTEMBRE 2026 (palier 0) depuis `composants/carteRepas.tsx`,
+ * ou ces dix lignes de regle vivaient dans le corps d'un `.map` de rendu —
+ * donc sans test, et rejouees a chaque frappe.
+ *
+ * L'EXCLUSION EST NEE D'UN BUG REEL : quand l'huile prend en charge les
+ * lipides, elle tient deja sa propre ligne. Sans cette condition, elle
+ * apparaissait DEUX FOIS, avec la meme quantite — et on la pesait deux fois.
+ *
+ * Ils s'affichent juste sous la ligne qu'ils completent, pas en bas de la
+ * carte : c'est la qu'on les cherche.
+ */
+export function renfortsDuRole<
+  Q extends { aliment: { id: number | string } },
+  P extends { role: string; releve?: { id: number | string } | null },
+  E extends { role: string; mis: { id: number | string } },
+>(
+  role: string,
+  quantites: readonly Q[],
+  plafonnes: readonly P[],
+  echanges: readonly E[],
+  /* Les aliments qui tiennent deja une ligne a eux : ceux des roles du repas,
+     porteur de CE role compris. */
+  dejaAffiches: ReadonlySet<number | string>,
+): Q[] {
+  return quantites.filter((q) => !dejaAffiches.has(q.aliment.id)
+    && (plafonnes.some((pl) => pl.role === role && pl.releve?.id === q.aliment.id)
+      || echanges.some((e) => e.role === role && e.mis.id === q.aliment.id)));
+}
