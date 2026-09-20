@@ -218,7 +218,7 @@ numérique d'Android, atteignable au collage sur le web.
 
 | Quoi | Comment |
 |---|---|
-| **Les seuils envoyés par le serveur** | Une route qui rend les bornes (100,5 g, 300 kcal, 4,184, la longueur du mot de passe) pour qu'elles ne soient plus écrites en dur des deux côtés. Voir §5 bis : gain partiel et honnête — les conditions restent doublées, les nombres non |
+| **La route de vérification** | L'écran envoie ce qui est saisi, le serveur rend le verdict et les messages. Le front n'évalue plus rien : ni les seuils, ni les conditions. C'est ce qui fait disparaître les quatre fichiers de règles et leurs huit suites jumelles — voir §5 bis |
 | 1RM, paliers, volume | Epley en PHP + `api/regles/rm.json` lu par les DEUX suites. **Attention** : la formule n'a aujourd'hui qu'une écriture (`epleyUnique.test.ts` la garde) — la réintroduire côté PHP **rouvre** une duplication, donc le fichier de règles n'est pas optionnel |
 | `grammesDisponibles` | champ calculé sur `/api/mon-frigo`, tenant compte de `dejaPromis` |
 | Écarts d'inventaire | le serveur reçoit déjà les quantités visées |
@@ -442,65 +442,49 @@ de plus, écrit par `assurerLesChamps()`. Les briques de recherche existent déj
 Le solveur garde les grammes. Ce qui change est **uniquement** le `[0]` de
 `composer.ts:63`, remplacé par « celui qui va avec le reste, à ce créneau ».
 
-## 5 bis. Les fichiers de règles : ce qu'ils sont, et pourquoi ils RESTENT
+## 5 bis. Les fichiers de règles disparaissent — décision du 20 septembre 2026
 
-*Question posée le 20 septembre 2026 : « pourquoi les règles sont dans un
-fichier JSON ? on est censé tout faire passer par le back ».* Elle est juste, et
-la réponse n'était écrite nulle part.
+*« tout doit passer par le serveur car le métier doit être sur le serveur et
+puis c'est tout, comme ça je peux changer le front quand bon me semble ».*
 
-### Ce qu'ils ne sont pas
+**C'est la décision, et elle clôt le sujet.** Une version antérieure de cette
+section défendait de garder quatre doubles juges — mot de passe, cohérence d'un
+aliment, rendement, avancement — au motif que l'écran doit répondre pendant la
+frappe. **Cet arbitrage n'était pas le mien à rendre**, et il contredisait le §0.
 
-**Aucune ligne de l'application ne les lit.** Mesuré : pas un
-`file_get_contents`, pas un `readFileSync` dans `api/src`, `front/src` ou
-`front/app`. Les seules occurrences y sont des commentaires qui les citent.
-Les fichiers sont lus par **neuf fichiers de test**, et par eux seuls.
+Le raisonnement qui le renverse est celui du propriétaire du projet, et il est
+juste : *« si je veux demain passer de React à Vite, je dois réécrire ces
+parties-là et potentiellement les oublier »*. Un contrat écrit dans un fichier
+de règles suppose qu'on pense à le lire. Le métier sur le serveur ne le suppose
+pas.
 
-Ce ne sont donc ni un moteur de règles, ni une configuration, ni un début de
-« back autoritaire ». Ce sont des **jeux de cas partagés entre deux langages**.
+### Ce que ça veut dire concrètement
 
-### Ce qu'ils sont
+**Le front n'évalue plus rien. Il affiche ce que le serveur lui répond.**
 
-**L'aveu d'une duplication, rendu visible et vérifiable.** Un fichier de règles
-n'apparaît que lorsqu'une règle est écrite DEUX fois. Il ne supprime pas la
-duplication : il l'empêche de diverger en silence. Il est né d'un dégât réel —
-Epley écrit trois fois, dont une version fausse dans une vue SQL que personne
-ne lisait, produisant un « record » sur une série de 93 répétitions.
+| Aujourd'hui | Après |
+|---|---|
+| L'écran calcule la force du mot de passe | Il affiche la jauge que le serveur lui rend |
+| L'écran juge la cohérence d'un aliment | Il affiche le refus que le serveur lui rend |
+| L'écran recalcule l'avancement d'une séance | Il affiche celui que le serveur lui rend |
+| Les seuils sont écrits des deux côtés | Ils n'existent que côté serveur |
 
-### Est-ce que la refonte les fait disparaître ? Non, et voici pourquoi
+Le mécanisme : **une route de vérification** que l'écran appelle pendant la
+saisie, avec anti-rebond. Ce n'est pas un appel par caractère — c'est un appel
+par pause de frappe, et l'écran garde le dernier verdict en attendant.
 
-| Double juge | Disparaît ? | Raison |
-|---|---|---|
-| Mot de passe | **Non** | La jauge doit bouger pendant la frappe. Un aller-retour réseau par caractère est impensable. |
-| Cohérence d'un aliment | **Non** | Le refus doit s'afficher dès les calories, avant l'envoi — demandé explicitement le 20 septembre. |
-| Rendement cru/cuit | **Non** | Même raison. |
-| Avancement d'une séance | **Techniquement oui** | Le serveur le calcule déjà. Mais cocher une série ne bougerait plus le compteur sans réseau, ni hors ligne. Arbitré pour les deux juges le 20 septembre. |
+### Ce qui disparaît
 
-**Il y a donc un plancher, et il faut le dire en face : quatre règles resteront
-connues des deux côtés.** Ce n'est pas un échec du chantier, c'est sa limite
-physique — un écran qui attend le réseau pour réagir à une frappe est
-inutilisable, quelle que soit la technologie.
+`api/regles/motdepasse.json`, `rendement.json`, `avancement.json`,
+`coherence.json` — et avec eux les huit suites jumelles qui les lisent. Ils
+n'auront plus rien à verrouiller : il n'y aura plus qu'une écriture.
 
-### Et c'est précisément ce qui rend le front REMPLAÇABLE
+### La seule conséquence à connaître
 
-L'objectif du §0 est : *« si un jour je change le front, je ne veux pas être
-dépendant du front »*. Ces quatre règles devront être connues de **tout** front,
-en Flutter, en Svelte ou en natif.
-
-Le fichier de règles est **le contrat écrit** de ces quatre-là. Un nouveau front
-les implémente et fait tourner les mêmes cas ; s'il diverge du serveur, sa suite
-tombe **en nommant le cas**. Sans ce fichier, il divergerait en silence — c'est
-exactement le scénario que le §0 cherche à éviter.
-
-### Ce qui peut être amélioré, et qui ne l'est pas encore
-
-**Le serveur pourrait ENVOYER les seuils** — 100,5 g, 300 kcal, 4,184, les
-douze caractères du mot de passe — au lieu qu'ils soient écrits en dur des deux
-côtés. Il resterait deux implémentations des *conditions*, mais plus un seul
-*nombre* en double.
-
-C'est un vrai gain, partiel, à faire au palier 2. Il ne supprime pas le double
-juge ; il supprime la moitié de ce qui peut diverger. **Ne pas le présenter
-comme la fin de la duplication.**
+**Hors ligne, il n'y a plus de vérification pendant la frappe.** C'est cohérent
+avec le mode hors ligne déjà arbitré (§4) : lecture, écritures mises en file, et
+**aucun calcul nouveau hors ligne**. Une saisie faite hors ligne part en file et
+se fait refuser — ou accepter — au moment où elle passe.
 
 ## 6. Ce qui reste au front, et pourquoi ce n'est pas du calcul métier
 
