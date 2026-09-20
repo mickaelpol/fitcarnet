@@ -60,6 +60,17 @@ export interface SaisieAliment {
   ratio: string;
   /** Le rendement issu des deux pesees en cours, s'il y en a. */
   ratioCandidat?: string;
+  /**
+   * CE QUE LA FICHE PORTAIT DEJA, sur une correction.
+   *
+   * Un aliment incoherent deja en base — migre avant que la regle existe —
+   * doit pouvoir etre renomme. Le serveur ne le lit PAS en base : l'ecran le
+   * declare. Cette route n'a donc rien a lire, et la regle 2 n'a pas de
+   * nouveau chemin a garder.
+   *
+   * Absent sur une creation : tout y est nouveau, ce qui est exactement juste.
+   */
+  origine?: Omit<SaisieAliment, 'origine' | 'ratioCandidat'>;
 }
 
 /**
@@ -74,7 +85,7 @@ export interface SaisieAliment {
  * ne doit pas interroger le serveur pour lui dire qu'elle est vide.
  */
 export function useVerdictAliment(saisie: SaisieAliment | null) {
-  return useQuery({
+  const requete = useQuery({
     queryKey: ['verdict-aliment', saisie],
     enabled: saisie !== null,
     /* Le verdict ne vieillit pas : pour une saisie donnee, la reponse est
@@ -85,6 +96,29 @@ export function useVerdictAliment(saisie: SaisieAliment | null) {
     queryFn: () => api<VerdictAliment>(
       '/verification/aliment', { methode: 'POST', corps: saisie }),
   });
+
+  /* CE QU'ON REND EST-IL LE VERDICT DE CETTE SAISIE, OU DE LA PRECEDENTE ?
+     
+     RELEVE PAR `revue-pile` LE 20 SEPTEMBRE 2026. `placeholderData` garde la
+     reponse precedente pendant l'attente — c'est ce qui evite le
+     clignotement — mais l'ecran l'affichait comme si elle etait courante.
+     Deux scenarios, tous deux visibles :
+     
+       - on ferme un riz refuse, on ouvre une huile saine : pendant
+         l'anti-rebond ET l'aller-retour, l'huile porte le refus du riz ;
+       - on tape « 350 » (accepte) puis on efface un chiffre : le bandeau dit
+         encore « cohérent » en vert sur une valeur que le serveur refuserait.
+     
+     C'est la regle 7 prise a revers — un chiffre faux affiche — et l'ancien
+     code, synchrone, ne pouvait pas le produire. L'ecran doit donc savoir
+     distinguer les deux, et c'est ce que la documentation de TanStack Query
+     nomme `isPlaceholderData`. */
+  return {
+    ...requete,
+    verdict: requete.data,
+    /** Vrai quand ce qui est rendu decrit une saisie PRECEDENTE. */
+    perime: requete.isPlaceholderData,
+  };
 }
 
 /**

@@ -71,8 +71,8 @@ final class CoherenceNutritionnelle
     /**
      * EN DECA DE CETTE ENERGIE CALCULEE, ON NE REFUSE RIEN.
      *
-     * MESURE LE 20 SEPTEMBRE 2026 SUR LES 2 944 ENTREES CIQUAL de la base :
-     * sans plancher, cette regle refuse du vin doux (148 kcal pour 40,6 par
+     * MESURE LE 20 SEPTEMBRE 2026 SUR LES ENTREES CIQUAL de la base : sans
+     * plancher, cette regle refuse du vin doux (148 kcal pour 40,6 par
      * Atwater, rapport 3,64), du cidre traditionnel (4,34), du vinaigre (4,63)
      * et un kir royal (3,69).
      *
@@ -87,16 +87,6 @@ final class CoherenceNutritionnelle
      * de 348.
      */
     private const ATWATER_MINIMUM_POUR_REFUSER = 50.0;
-
-    /**
-     * Convention EUROPEENNE : les fibres comptent 2 kcal/g, a part des
-     * glucides (regle 4). L'Atwater americain declarerait incoherents des
-     * aliments riches en fibres dont les valeurs sont pourtant justes.
-     */
-    private const KCAL_PROT = 4.0;
-    private const KCAL_GLUC = 4.0;
-    private const KCAL_LIP = 9.0;
-    private const KCAL_FIBRES = 2.0;
 
     /**
      * Le motif du refus, ou `null` si l'aliment se tient.
@@ -124,8 +114,7 @@ final class CoherenceNutritionnelle
             );
         }
 
-        $atwater = self::KCAL_PROT * $prot100 + self::KCAL_GLUC * $gluc100
-            + self::KCAL_LIP * $lip100 + self::KCAL_FIBRES * $fibres;
+        $atwater = Atwater::kcal($prot100, $gluc100, $lip100, $fibres);
 
         if (self::ressembleADesKilojoules($kcal100, $atwater)) {
             return \sprintf(
@@ -176,7 +165,7 @@ final class CoherenceNutritionnelle
         float $gluc,
         float $lip,
     ): ?string {
-        $atwater = self::KCAL_PROT * $prot + self::KCAL_GLUC * $gluc + self::KCAL_LIP * $lip;
+        $atwater = Atwater::kcal($prot, $gluc, $lip);
 
         if (!self::ressembleADesKilojoules($kcal, $atwater)) {
             return null;

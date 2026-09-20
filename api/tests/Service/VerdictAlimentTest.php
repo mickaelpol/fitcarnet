@@ -210,8 +210,13 @@ final class VerdictAlimentTest extends TestCase
             'lip100' => '0.6', 'fibres100' => '1.4', 'categorie' => 'fec', 'ratio' => '0.8']);
 
         self::assertFalse($v['enregistrable']);
-        self::assertSame('ratio', $v['refus'][0]['champ'],
-            'le champ fautif est le rendement, pas les calories');
+        /* DEUX REFUS PARLENT ICI, et c'est juste : `AnomaliesAliment` dit
+           « un feculent absorbe de l'eau » sur les valeurs, et
+           `RendementPlausible` refuse l'ECRITURE de ce rendement. On verifie
+           que le champ `ratio` est bien nomme — l'ecran doit pouvoir le
+           souligner — sans exiger qu'il parle en premier. */
+        self::assertContains('ratio', \array_column($v['refus'], 'champ'),
+            'le rendement doit etre nomme comme champ fautif');
     }
 
     public function testLE_TEMOIN_UN_RENDEMENT_NORMAL_PASSE(): void
@@ -224,6 +229,70 @@ final class VerdictAlimentTest extends TestCase
 
         self::assertSame([], $v['refus']);
         self::assertTrue($v['enregistrable']);
+    }
+
+    public function testON_PEUT_RENOMMER_UN_ALIMENT_DEJA_INCOHERENT(): void
+    {
+        /* RELEVE PAR `revue-pile` LE 20 SEPTEMBRE 2026, et c'est une
+           REGRESSION que j'avais introduite le jour meme.
+           
+           L'entite laisse passer un `PATCH` sur un aliment deja incoherent en
+           base — migre avant que la regle existe — pour qu'on puisse au moins
+           le renommer. La route de verdict, elle, ne recevait que les champs
+           TAPES : elle n'avait aucun moyen de savoir « ce qui etait deja la »,
+           repondait `enregistrable: false`, et l'ecran eteignait le bouton.
+           
+           Le serveur autorisait donc l'ecriture que l'ecran interdisait. Le
+           jumeau oublie, entre deux portes du MEME serveur.
+           
+           LA SAISIE PORTE DESORMAIS SON ORIGINE. Pas d'identifiant, pas de
+           lecture en base : l'ecran dit « voila ce qui etait stocke, voila ce
+           que je tape ». La route n'a toujours rien a lire, et la regle 2 n'a
+           pas de nouveau chemin a garder. Un client qui mentirait sur son
+           origine n'obtiendrait qu'un bouton allume, puis un 422 — l'entite
+           reste la seule vraie porte. */
+        $incoherent = ['categorie' => 'fec', 'kcal100' => '130', 'prot100' => '2.7',
+            'gluc100' => '28', 'lip100' => '0.3', 'ratio' => '2.26'];
+
+        self::assertFalse(VerdictAliment::pour($incoherent)['enregistrable'],
+            'une CREATION incoherente reste refusee');
+
+        $avecOrigine = $incoherent + ['origine' => $incoherent];
+
+        self::assertTrue(VerdictAliment::pour($avecOrigine)['enregistrable'],
+            'la meme fiche, deja en base ainsi, doit pouvoir etre renommee');
+        self::assertSame([], VerdictAliment::pour($avecOrigine)['refus'],
+            'et sans reproche : on ne l\'a pas aggravee');
+    }
+
+    public function testMAIS_AGGRAVER_RESTE_REFUSE(): void
+    {
+        /* LE TEMOIN. Sans lui, porter son origine deviendrait un permis de
+           tout ecrire — il suffirait d'envoyer n'importe quoi en origine. */
+        $origine = ['categorie' => 'fec', 'kcal100' => '130', 'prot100' => '2.7',
+            'gluc100' => '28', 'lip100' => '0.3', 'ratio' => '2.26'];
+
+        /* Meme fiche, mais on ajoute une matiere impossible : motif NOUVEAU. */
+        $pire = ['categorie' => 'fec', 'kcal100' => '130', 'prot100' => '60',
+            'gluc100' => '60', 'lip100' => '0.3', 'ratio' => '2.26',
+            'origine' => $origine];
+
+        self::assertFalse(VerdictAliment::pour($pire)['enregistrable']);
+        self::assertNotSame([], VerdictAliment::pour($pire)['refus']);
+    }
+
+    public function testCORRIGER_RESTE_POSSIBLE(): void
+    {
+        /* Le cas le plus important des trois : la correction doit passer,
+           sinon la regle enfermerait les lignes qu'elle denonce. */
+        $origine = ['categorie' => 'fec', 'kcal100' => '130', 'prot100' => '2.7',
+            'gluc100' => '28', 'lip100' => '0.3', 'ratio' => '2.26'];
+
+        $corrige = ['categorie' => 'fec', 'kcal100' => '350', 'prot100' => '7',
+            'gluc100' => '78', 'lip100' => '0.6', 'ratio' => '2.26',
+            'origine' => $origine];
+
+        self::assertTrue(VerdictAliment::pour($corrige)['enregistrable']);
     }
 
     // ----------------------------------------------------------------- outils

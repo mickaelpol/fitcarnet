@@ -130,7 +130,7 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
   quantite, onQuantiteChange, nomModifiable = true, nomImpose,
-  rattachement, verdict, onSaisie,
+  rattachement, verdict, verdictPerime, onSaisie,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -186,6 +186,15 @@ export function EditeurAliment({
    * la deuxième écriture qu'on vient de retirer.
    */
   verdict?: VerdictAliment;
+  /**
+   * Vrai quand `verdict` décrit une saisie PRÉCÉDENTE.
+   *
+   * On le garde à l'écran plutôt que de vider le bandeau — sinon il
+   * clignoterait à chaque frappe — mais on l'ATTÉNUE et on n'agit pas dessus :
+   * un bouton éteint par un verdict périmé refuserait une saisie que le
+   * serveur accepte.
+   */
+  verdictPerime?: boolean;
   /** Appelé à chaque frappe, avec les champs TELS QU'ILS SONT TAPÉS. */
   onSaisie?: (s: SaisieAliment) => void;
 }) {
@@ -293,6 +302,17 @@ export function EditeurAliment({
     /* Le rendement en cours de mesure part avec le reste : c'est le serveur
        qui dira s'il est acceptable, pas cet ecran. */
     ratioCandidat: ratioMesure === null ? '' : String(ratioMesure),
+    /* CE QUE LA FICHE PORTAIT EN ARRIVANT. Sur une création il n'y a pas
+       d'aliment, donc pas d'origine : tout y est nouveau. */
+    origine: aliment === undefined ? undefined : {
+      categorie: aliment.categorie,
+      kcal100: String(aliment.kcal100),
+      prot100: String(aliment.prot100),
+      gluc100: String(aliment.gluc100),
+      lip100: String(aliment.lip100),
+      fibres100: aliment.fibres100 === null ? '' : String(aliment.fibres100),
+      ratio: String(aliment.ratio),
+    },
   };
   const signature = JSON.stringify(saisie);
 
@@ -313,7 +333,9 @@ export function EditeurAliment({
        l'écran ne le recalcule pas. Tant qu'aucune réponse n'est arrivée, on
        laisse le bouton actif — c'est l'API qui tranchera, et un bouton éteint
        par défaut ferait croire à un formulaire cassé. */
-    && (verdict?.enregistrable ?? true);
+    /* PAS SUR UN VERDICT PÉRIMÉ : il décrit la saisie d'avant. Éteindre le
+       bouton là-dessus refuserait une valeur que le serveur accepte. */
+    && (verdictPerime === true || (verdict?.enregistrable ?? true));
 
   /* La teinte traduit la décision du serveur ; elle ne la prend plus. */
   const couleurVerdict = {
@@ -494,7 +516,8 @@ export function EditeurAliment({
                 /* LE REFUS PASSE DEVANT. Afficher « cohérent » au-dessus de
                    « le serveur va refuser » serait deux réponses à la même
                    question. */
-                <View style={[s.controle, { borderColor: C.erreur }]}>
+                <View style={[s.controle, { borderColor: C.erreur },
+                  verdictPerime === true && { opacity: 0.45 }]}>
                   {refus.map((x) => (
                     <Discret key={x.champ + x.message}
                       style={{ color: C.erreur, fontSize: T.normal, lineHeight: 18 }}>
@@ -503,7 +526,8 @@ export function EditeurAliment({
                   ))}
                 </View>
               ) : (a.kcal100 > 0 || a.prot100 > 0) && (
-                <View style={[s.controle, { borderColor: couleurVerdict }]}>
+                <View style={[s.controle, { borderColor: couleurVerdict },
+                  verdictPerime === true && { opacity: 0.45 }]}>
                   <Discret style={{ color: couleurVerdict, fontSize: T.normal, lineHeight: 18 }}>
                     {verdict?.resume ?? ''}
                   </Discret>

@@ -150,6 +150,40 @@ final class CoherenceRefuseeParLApiTest extends TestCase
         self::assertNotEmpty(self::motifsSurLesCalories(self::riz(kcal100: 130)));
     }
 
+    /**
+     * LE SEUL MECANISME DE CE DEPOT QUE DOCTRINE PEUT IGNORER EN SILENCE.
+     *
+     * RELEVE PAR `revue-pile` LE 20 SEPTEMBRE 2026, et c'est le motif 4 : les
+     * quatre tests ci-dessus appellent `memoriserLesValeursChargees()` A LA
+     * MAIN. Aucun ne fait charger un `Aliment` par Doctrine. Ils resteraient
+     * donc VERTS si le rappel cessait de se declencher.
+     *
+     * Or la documentation Doctrine est explicite : « Using `#[PostLoad]`
+     * without this marker attribute will make Doctrine ignore the callbacks. »
+     * Le marqueur est sur la classe, et `Aliment` est la SEULE entite du
+     * projet a le porter — donc la seule que quelqu'un puisse retirer en
+     * refactorant sans que rien d'autre ne tombe.
+     *
+     * Ce qui arriverait alors : `$motifDejaLa` vaudrait toujours `null`, et
+     * tout `PATCH` sur un aliment deja incoherent serait refuse — exactement
+     * le faux refus qu'on vient de corriger.
+     *
+     * Ce test ne demande ni base ni conteneur : il lit les attributs.
+     */
+    public function testLeRappelDeChargementEstBIEN_DECLARE(): void
+    {
+        $classe = new \ReflectionClass(Aliment::class);
+
+        self::assertNotSame([], $classe->getAttributes(\Doctrine\ORM\Mapping\HasLifecycleCallbacks::class),
+            'sans `#[ORM\HasLifecycleCallbacks]` sur la CLASSE, Doctrine ignore '
+            . 'le rappel — et il l\'ignore en silence');
+
+        $methode = $classe->getMethod('memoriserLesValeursChargees');
+
+        self::assertNotSame([], $methode->getAttributes(\Doctrine\ORM\Mapping\PostLoad::class),
+            'et sans `#[ORM\PostLoad]` sur la methode, elle n\'est jamais appelee');
+    }
+
     // ----------------------------------------------------------------- outils
 
     private static function riz(float $kcal100): Aliment

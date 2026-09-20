@@ -30,15 +30,6 @@ namespace App\Service;
  */
 final class VerdictAliment
 {
-    /**
-     * Convention EUROPEENNE : fibres a 2 kcal/g, comptees a part (regle 4).
-     * Les memes coefficients que `CoherenceNutritionnelle`, et pour cause :
-     * c'est la seule somme d'Atwater du projet cote serveur.
-     */
-    private const KCAL_PROT = 4.0;
-    private const KCAL_GLUC = 4.0;
-    private const KCAL_LIP = 9.0;
-    private const KCAL_FIBRES = 2.0;
 
     /** Ecart tolere entre les calories annoncees et ce que les macros donnent. */
     private const TOLERANCE = 0.08;
@@ -117,7 +108,25 @@ final class VerdictAliment
            matiere vaut alors 0 g et l'Atwater 0, sous le plancher du soupcon
            de kilojoules. */
         if (null !== ($lus['kcal100'] ?? null) && [] === $refus) {
-            $motif = CoherenceNutritionnelle::motifDeRefus(
+            /* LES PHRASES VIENNENT D'`AnomaliesAliment`, ET C'EST TOUT
+               L'INTERET — corrige le 20 septembre 2026, apres que
+               `revue-fitcarnet` a mesure la regression.
+
+               J'avais branche l'ecran sur `CoherenceNutritionnelle`, dont les
+               messages sont ecrits SANS ACCENTS : c'est la convention des
+               commentaires PHP de ce projet, jamais celle des phrases lues par
+               quelqu'un. L'ecran s'est donc mis a afficher « un feculent qui
+               gonfle » et « les valeurs decrivent le produit tel qu'on le
+               PESE ». Il a perdu en meme temps le nom de l'aliment en prefixe
+               et, surtout, LA CORRECTION CHIFFREE — « Multiplie tout par le
+               rendement : 294 kcal, 63,3 g de glucides… » — qui etait l'aide
+               la plus utile de cet ecran, et que la regle 7 reclame.
+
+               `AnomaliesAliment` porte les phrases d'origine, accents compris,
+               et `AnomaliesPortageTest` prouve qu'elles sont identiques a celles
+               d'avant la refonte, sur 4 409 cas. */
+            $motif = self::motifLisible(
+                (string) ($saisie['nom'] ?? ''),
                 $categorie,
                 $lus['kcal100'],
                 $lus['prot100'] ?? 0.0,
@@ -127,7 +136,20 @@ final class VerdictAliment
                 $ratio,
             );
 
-            if (null !== $motif) {
+            /* ON NE REPROCHE PAS CE QUI ETAIT DEJA LA. L'entite fait pareil
+               (`Aliment::memoriserLesValeursChargees`) : un aliment incoherent
+               deja en base — migre avant que la regle existe — doit pouvoir
+               etre renomme. Sans cette exemption, le serveur AUTORISAIT
+               l'ecriture que l'ecran interdisait : le jumeau oublie entre deux
+               portes du meme serveur. Releve par `revue-pile` le 20 septembre
+               2026, le jour meme ou je l'avais introduit.
+
+               L'ORIGINE EST DECLAREE PAR L'APPELANT, elle ne se lit pas en
+               base : cette route n'a rien a lire, et la regle 2 n'a donc pas de
+               nouveau chemin a garder. Un client qui mentirait n'obtiendrait
+               qu'un bouton allume, puis un 422 — l'entite reste la seule vraie
+               porte. */
+            if (null !== $motif && $motif !== self::motifDeLOrigine($saisie)) {
                 $refus[] = ['champ' => 'kcal100', 'message' => $motif];
             }
         }
@@ -178,7 +200,14 @@ final class VerdictAliment
                Sans elle, l'ecran aurait garde un juge local pour ce seul
                bouton — et la duplication serait revenue par la fenetre. */
             'candidat' => self::jugerLeCandidat($saisie, $categorie),
-            'enregistrable' => [] === $refus && $complet,
+            /* `incoherent` EMPECHE D'ENREGISTRER, comme avant la refonte.
+               L'ancien `valide` de l'ecran portait `controle.verdict !==
+               'incoherent'` ; je l'avais laisse tomber, et un aliment a 100 kcal
+               pour 50 g de proteines s'enregistrait sous un bandeau rouge qui
+               disait « une valeur semble erronee ». Mesure par
+               `revue-fitcarnet` le 20 septembre 2026. */
+            'enregistrable' => [] === $refus && $complet
+                && 'incoherent' !== $controle['verdict'],
         ];
     }
 
@@ -200,10 +229,8 @@ final class VerdictAliment
         $kcal = $lus['kcal100'] ?? null;
         $fibresConnues = null !== ($lus['fibres100'] ?? null);
 
-        $calculees = self::KCAL_PROT * ($lus['prot100'] ?? 0.0)
-            + self::KCAL_GLUC * ($lus['gluc100'] ?? 0.0)
-            + self::KCAL_LIP * ($lus['lip100'] ?? 0.0)
-            + self::KCAL_FIBRES * ($lus['fibres100'] ?? 0.0);
+        $calculees = Atwater::kcal($lus['prot100'] ?? 0.0, $lus['gluc100'] ?? 0.0,
+            $lus['lip100'] ?? 0.0, $lus['fibres100'] ?? null);
 
         if (null === $kcal || $kcal <= 0.0) {
             return [
@@ -277,6 +304,75 @@ final class VerdictAliment
     }
 
     /**
+     * LA PHRASE QUE L'UTILISATEUR LIRA, ou `null` si la fiche se tient.
+     *
+     * Elle vient d'`AnomaliesAliment`, dont `AnomaliesPortageTest` prouve
+     * qu'elle est identique, au caractere pres, a celle d'avant la refonte.
+     * `CoherenceNutritionnelle` repond a la meme question mais SANS ACCENTS :
+     * c'est la convention des commentaires PHP de ce projet, jamais celle des
+     * phrases lues par quelqu'un.
+     */
+    private static function motifLisible(
+        string $nom,
+        string $categorie,
+        float $kcal100,
+        float $prot100,
+        float $gluc100,
+        float $lip100,
+        ?float $fibres100,
+        float $ratio,
+    ): ?string {
+        foreach (AnomaliesAliment::pour($nom, $categorie, $kcal100, $prot100,
+            $gluc100, $lip100, $fibres100, $ratio) as $anomalie) {
+            if ('blocage' === $anomalie['gravite']) {
+                return $anomalie['message'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Le motif que cette fiche portait DEJA, ou `null`.
+     *
+     * Meme motif inchange = rien n'a ete aggrave. Motif DIFFERENT = c'est
+     * nouveau, et une ligne abimee n'est pas un permis de tout ecrire.
+     *
+     * @param array<string, mixed> $saisie
+     */
+    private static function motifDeLOrigine(array $saisie): ?string
+    {
+        $origine = $saisie['origine'] ?? null;
+        if (!\is_array($origine)) {
+            return null;
+        }
+
+        $lu = static function (string $champ) use ($origine): ?float {
+            $brut = $origine[$champ] ?? null;
+
+            return null === $brut || '' === \trim((string) $brut)
+                ? null
+                : self::nombreSaisi(\trim((string) $brut));
+        };
+
+        $kcal = $lu('kcal100');
+        if (null === $kcal) {
+            return null;
+        }
+
+        return self::motifLisible(
+            (string) ($saisie['nom'] ?? ''),
+            \trim((string) ($origine['categorie'] ?? '')),
+            $kcal,
+            $lu('prot100') ?? 0.0,
+            $lu('gluc100') ?? 0.0,
+            $lu('lip100') ?? 0.0,
+            $lu('fibres100'),
+            $lu('ratio') ?? 1.0,
+        );
+    }
+
+    /**
      * Le rendement mesure a l'instant est-il acceptable ?
      *
      * `null` quand il n'y a pas de candidat — aucune pesee en cours. Sinon,
@@ -336,10 +432,8 @@ final class VerdictAliment
             return ['saisi' => $kcal, 'converti' => $converti, 'motif' => 'plafond'];
         }
 
-        $calculees = self::KCAL_PROT * ($lus['prot100'] ?? 0.0)
-            + self::KCAL_GLUC * ($lus['gluc100'] ?? 0.0)
-            + self::KCAL_LIP * ($lus['lip100'] ?? 0.0)
-            + self::KCAL_FIBRES * ($lus['fibres100'] ?? 0.0);
+        $calculees = Atwater::kcal($lus['prot100'] ?? 0.0, $lus['gluc100'] ?? 0.0,
+            $lus['lip100'] ?? 0.0, $lus['fibres100'] ?? null);
 
         if ($calculees <= 0.0) {
             return null;

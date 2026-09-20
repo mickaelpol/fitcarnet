@@ -57,10 +57,6 @@ final class AnomaliesAliment
         'leg' => ['mini' => 0.3, 'maxi' => 1.05],
     ];
 
-    private const KCAL_PROT = 4.0;
-    private const KCAL_GLUC = 4.0;
-    private const KCAL_LIP = 9.0;
-    private const KCAL_FIBRES = 2.0;
 
     /**
      * @return list<array{gravite: string, code: string, message: string}>
@@ -115,8 +111,7 @@ final class AnomaliesAliment
 
         // ---------------------------------------------------------- energetique
 
-        $atwater = self::KCAL_PROT * $prot100 + self::KCAL_GLUC * $gluc100
-            + self::KCAL_LIP * $lip100 + self::KCAL_FIBRES * ($fibres100 ?? 0.0);
+        $atwater = Atwater::kcal($prot100, $gluc100, $lip100, $fibres100);
 
         if (CoherenceNutritionnelle::ressembleVraimentADesKilojoules($kcal100, $atwater)) {
             $dire('blocage', 'kilojoules_recopies', \sprintf(

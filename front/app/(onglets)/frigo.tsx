@@ -71,7 +71,7 @@ export default function MonFrigo() {
      hook par convention — c'est ce qui lui permet d'être monté dans un test
      sans client HTTP. */
   const [saisie, setSaisie] = useState<SaisieAliment | null>(null);
-  const verdict = useVerdictAliment(useRetarde(saisie)).data;
+  const { verdict, perime } = useVerdictAliment(useRetarde(saisie));
   const [quantiteNouvelle, setQuantiteNouvelle] = useState('');
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
   /* Le produit Grocy dont on renseigne les valeurs pour la PREMIÈRE fois. Un
@@ -369,6 +369,7 @@ export default function MonFrigo() {
       <EditeurAlimentConnecte
         source={frigo.data?.source}
         verdict={verdict}
+        verdictPerime={perime}
         onSaisie={setSaisie}
         creation={creation}
         edite={edite}
@@ -392,6 +393,12 @@ export default function MonFrigo() {
         onQuantiteChange={setQuantiteNouvelle}
         onFermer={() => {
           setCreation(false); setEdite(null); setACompleter(null); setQuantiteNouvelle('');
+          /* LA SAISIE SE VIDE AVEC L'ÉCRAN — relevé par `revue-pile` le
+             20 septembre 2026. Sans cette ligne, elle gardait le contenu de
+             l'aliment précédent : on fermait un riz refusé, on ouvrait une
+             huile saine, et l'huile portait le refus du riz le temps de
+             l'aller-retour. */
+          setSaisie(null);
         }}
         onCreationEnvoyee={() => { setCreation(false); setQuantiteNouvelle(''); }}
         onEditionFaite={() => { setEdite(null); setACompleter(null); }}
