@@ -230,6 +230,97 @@ qu'un par geste, un anti-rebond, l'annulation de la requête en vol, et la
 résolution rendue **avec** tous les chiffres d'affichage (fibres, écarts, par
 personne) pour ne pas ajouter d'aller-retour derrière.
 
+### Palier 4 — de vrais repas, par une base de connaissance (décidé le 19 septembre 2026)
+
+**Le besoin, dans les mots du propriétaire du projet** : *« la composition des
+repas c'est un peu aléatoire […] je veux que l'application propose de vrais
+repas pour le petit déjeuner quand c'est le petit déj qui est choisi, un repas
+de midi quand c'est midi, pareil pour la collation de 16 h et le repas du
+soir »*.
+
+**CE N'EST PAS DE L'ALÉATOIRE, ET LE DÉFAUT EST PIRE.**
+`front/src/solveur/composer.ts:63` prend **le premier aliment qui remplit le
+rôle** :
+
+```ts
+return (neufs.length > 0 ? neufs : candidats)[0];
+```
+
+Une protéine, un glucide, un lipide — et rien, nulle part, ne sait que le blanc
+de poulet ne va pas avec les flocons d'avoine au petit-déjeuner. Ce n'est pas un
+manque d'intelligence, c'est **un manque de connaissance** : le code ignore ce
+qu'un cuisinier sait.
+
+#### La solution retenue : distiller l'IA dans une table, une seule fois
+
+**Écarté : un LLM appelé en production.** Mesuré le 19 septembre — la charge
+réelle est modeste (~1 200 jetons par génération, dont 301 pour un frigo de
+37 aliments, puisqu'on n'envoie que des noms et des rôles). Le coût n'est donc
+pas l'obstacle. L'obstacle est double : une dépendance à un fournisseur pour une
+fonctionnalité centrale, et une intelligence **qu'on ne peut ni relire ni
+réparer**, qui change le jour où le modèle est mis à jour.
+
+**Écarté aussi : un modèle local sur le NAS.** DS718+, Celeron J3455 (Apollo
+Lake, pas d'AVX2), 6 Go partagés avec Grocy, PostgreSQL et FrankenPHP. Grocy met
+déjà 1 à 5 s à répondre sur une lecture ; ajouter un modèle sur la même machine
+dégraderait tout. *(À revérifier si le NAS change : `grep -o 'avx[0-9_]*'
+/proc/cpuinfo`.)*
+
+**Retenu : une base de connaissance versionnée, générée une fois.** Trois
+niveaux, et c'est le troisième point qui la rend finie :
+
+| Niveau | Quoi | Taille | Stabilité |
+|---|---|---|---|
+| 1. Sous-groupes CIQUAL | quel sous-groupe va à quel créneau, avec quoi, salé ou sucré | ~45 | permanente |
+| 2. Patrons de repas | « R1 = céréale + laitage + fruit + oléagineux » | ~100 à 300 | permanente |
+| 3. Exceptions nommées | les aliments dont le sous-groupe ment : flageolet (protéine ET féculent), avocat, olive | quelques centaines | rare |
+
+**L'HÉRITAGE PAR SOUS-GROUPE EST CE QUI COUVRE « TOUS LES ALIMENTS ».** On
+n'énumère pas les paires — 3 200 aliments CIQUAL feraient dix millions de
+combinaisons, ingénérables et irrelisables. Chaque aliment hérite des
+associations de son sous-groupe (`alim_ssgrp_nom_fr`, déjà lu par
+`ciqual_vers_grocy.py`). Un aliment ajouté par un utilisateur demain est couvert
+**le jour même**, sans que personne touche à la table.
+
+#### Les sources publiques — licences À VÉRIFIER avant usage
+
+CIQUAL (Anses, déjà l'ancrage du projet) ; Wikidata et Wikipédia pour les plats
+et leurs ingrédients ; Wikilivres « Livre de cuisine » ; PNNS / Santé publique
+France pour la structure d'un repas par créneau ; Open Food Facts (ODbL) pour
+les catégories de produits. **L'IA ne crée pas la connaissance, elle met ces
+sources en forme** — c'est autrement plus fiable que de lui demander d'inventer.
+
+#### Ce qui garantit que la table est bonne
+
+La même chose que partout ailleurs ici : **on ne fait pas confiance, on
+éprouve.** C'est tout l'avantage d'une table sur un appel en production — elle
+se lit, se corrige, ne change jamais toute seule, et une erreur y est
+reproductible.
+
+Les gardes à écrire, qui doivent pouvoir TOMBER :
+
+- aucun patron de petit-déjeuner ne propose une protéine salée sans étiquette
+  explicite ;
+- **tout aliment du catalogue a ses étiquettes** — un aliment non étiqueté fait
+  échouer la suite, sur le modèle de `ModeleExposeTest` qui refuse une entité
+  absente de sa liste ;
+- chaque patron est réalisable sur les frigos d'essai du dépôt
+  (`front/src/solveur/frigos.test-data.ts`) ;
+- **un témoin** : un patron volontairement absurde doit être rejeté, sinon les
+  gardes ne gardent rien.
+
+Et le défaut par défaut est un REFUS, jamais un hasard : un aliment dont on ne
+sait rien ne sert que dans les patrons de sa catégorie, ou ne sert pas. Règle 7.
+
+**Le coût honnête** : la première génération sera médiocre et demandera une
+relecture humaine — celle du propriétaire du projet, une soirée. C'est le prix
+de quelque chose qu'on possède au lieu de le louer.
+
+#### Ce que ça ne change pas
+
+Le solveur garde les grammes. Ce qui change est **uniquement** le `[0]` de
+`composer.ts:63`, remplacé par « celui qui va avec le reste, à ce créneau ».
+
 ## 6. Ce qui reste au front, et pourquoi ce n'est pas du calcul métier
 
 Ces trois-là ne partiront jamais, et c'est juste :
@@ -253,6 +344,9 @@ Palier 1  le serveur refuse les chiffres faux   petit, fermé, gain immédiat
    ↓      (mesurer ici le coût réel de Gauss en PHP)
 Palier 2  le serveur rend les chiffres dérivés
 Palier 3  le solveur passe au serveur — ou est déclaré double juge et verrouillé
+Palier 4  la base de connaissance culinaire     après le 3 : elle nourrit le
+                                                 choix des aliments, que le
+                                                 serveur fera alors
 Hors ligne : à brancher AVEC le palier 1, pas après. C'est ce qui prouve que le
              front sait afficher sans calculer.
 ```
