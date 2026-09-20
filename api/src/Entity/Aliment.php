@@ -115,6 +115,38 @@ class Aliment implements ProprieteUtilisateur
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
     private string $categorie = 'autre';
 
+    /**
+     * CE QUE CET ALIMENT EST, au sens du catalogue CIQUAL — 20 septembre 2026.
+     *
+     * Le code Anses, jamais le nom : renommer « Poulet » en « poulets », ou
+     * corriger une faute de frappe, ne casse pas le lien. C'est ce qui
+     * distingue un rattachement CHOISI d'une correspondance devinee, laquelle
+     * rapprocherait un jour « pate » de « pates » sans que personne le voie.
+     *
+     * IL NE DIT RIEN DES VALEURS CI-DESSOUS. Les macros restent celles lues
+     * sur le paquet : « un riz basmati achete par l'utilisateur A peut ne pas
+     * avoir les memes macros que celui de l'utilisateur B » (proprietaire du
+     * projet, 20 septembre 2026). Ce lien sert a savoir a quel repas l'aliment
+     * convient et avec quoi il va — et a AVERTIR quand une saisie s'ecarte
+     * tres fortement de la moyenne de son type, jamais a la remplacer.
+     *
+     * NULLABLE, et ca compte : les aliments d'avant cette date n'en ont pas, et
+     * un produit du commerce peut n'avoir aucun equivalent generique — mesure
+     * le jour meme, « Orangina » ne trouve rien dans CIQUAL, qui ne porte que
+     * des aliments generiques. Un aliment non rattache reste pesable et
+     * mangeable ; il n'est simplement pas propose dans un repas.
+     *
+     * PAS DE RELATION DOCTRINE VERS `aliment_reference` : c'est une colonne
+     * TEXTE, et la cle etrangere vit en base (migration 41). `aliment_reference`
+     * n'a pas d'entite — comme `invitation` et `inventaire_lot`, elle se lit en
+     * SQL par `App\Repository\AlimentsReference`. Lui en donner une obligerait
+     * a la charger pour rien a chaque lecture d'aliment.
+     */
+    #[ORM\Column(name: 'reference_ciqual', type: Types::TEXT, nullable: true)]
+    #[Assert\Length(max: 20)]
+    #[Groups(['aliment:lire', 'aliment:ecrire'])]
+    private ?string $referenceCiqual = null;
+
     /* LES QUATRE MACROS SONT OBLIGATOIRES, ET UN ZÉRO SE DIT — 17 SEPTEMBRE 2026.
        Elles valaient `'0'` par défaut : une clé absente du corps de
        `POST /api/aliments` devenait un zéro enregistré, sans un mot (règle 6).
@@ -206,6 +238,18 @@ class Aliment implements ProprieteUtilisateur
     public function getId(): ?int { return $this->id; }
     public function getNom(): string { return $this->nom; }
     public function setNom(string $v): self { $this->nom = $v; return $this; }
+    public function getReferenceCiqual(): ?string { return $this->referenceCiqual; }
+
+    public function setReferenceCiqual(?string $v): self
+    {
+        /* Une chaine vide n'est pas un rattachement : c'est une absence.
+           Regle 6, et sans cela un formulaire vide poserait `''`, que la cle
+           etrangere refuserait en parlant de contrainte plutot que de sens. */
+        $this->referenceCiqual = '' === $v ? null : $v;
+
+        return $this;
+    }
+
     public function getCategorie(): string { return $this->categorie; }
     public function setCategorie(string $v): self { $this->categorie = $v; return $this; }
     #[Groups(['aliment:lire', 'aliment:ecrire'])]
