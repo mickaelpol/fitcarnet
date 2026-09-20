@@ -316,6 +316,64 @@ sait rien ne sert que dans les patrons de sa catégorie, ou ne sert pas. Règle 
 relecture humaine — celle du propriétaire du projet, une soirée. C'est le prix
 de quelque chose qu'on possède au lieu de le louer.
 
+#### Rattacher un aliment à la table : le nom est libre, le LIEN ne l'est pas
+
+**La crainte, dans les mots du propriétaire du projet** (20 septembre 2026) :
+*« si l'utilisateur crée un aliment "Poulet" ou "poulets" et qu'on a "poulet"
+dans la table, est-ce que ça va faire le lien ? »*
+
+**ON NE DEVINE JAMAIS APRÈS COUP.** Rapprocher « poulets » de « poulet » par
+ressemblance, c'est choisir à la place de quelqu'un, en silence — et un jour
+rattacher « pâté » à « pâtes » sans que personne le voie. C'est le chiffre
+plausible et faux de la règle 7, appliqué à un rattachement. La ressemblance
+sert à **proposer**, jamais à **décider**.
+
+**CE QU'ON STOCKE EST LE CODE CIQUAL, PAS LE NOM.** Une fois rattaché, l'aliment
+peut s'appeler « Blanc de poulet Lidl », « poulets » ou « PLT » : le lien tient.
+Renommer ne casse rien, une faute de frappe ne casse rien — le nom ne sert plus
+à retrouver quoi que ce soit.
+
+**DEUX CHAMPS, ET C'EST LE POINT DE CONCEPTION.** La demande initiale était de
+n'autoriser QUE les noms de la table. À ne pas faire tel quel, et la raison est
+dans le frigo réel du projet : `Blancs d'oeufs pasteurisés (bouteille, frais)`,
+`Oasis sorbet`, `Skyr nature Milbona` (le placeholder de l'écran lui-même).
+CIQUAL est une table d'aliments **génériques** — elle a « Yaourt nature », pas la
+marque. Interdire le reste ne produit pas un rattachement juste : l'utilisateur
+bloqué **choisit le plus proche pour avancer**, et la base de connaissance croit
+ensuite ce faux sur parole. Pire qu'un aliment non rattaché, parce qu'invisible.
+
+| Champ | Qui décide | Obligatoire |
+|---|---|---|
+| **Nom** | l'utilisateur, texte libre | oui |
+| **« Ça ressemble à… »** | **sélecteur, uniquement la table** | **oui** — pas d'enregistrement sans |
+
+La garantie demandée est donc tenue — *aucun aliment ne peut exister sans un lien
+issu de la table* — sans bloquer les produits du commerce, qui font la majorité
+d'un vrai frigo. Et quand la frappe correspond, le sélecteur se pré-remplit :
+« poule » propose « Poulet, blanc, cru », on tape dessus, c'est fini.
+
+*Témoin réel : le produit `Colomiers` du frigo de production est un Coulommiers
+mal orthographié. Avec un champ libre seul, personne ne l'a vu depuis des mois.
+Avec le sélecteur obligatoire, le nom fautif n'aurait eu aucune conséquence.*
+
+#### La dégradation, en trois crans — jamais « au hasard »
+
+| Ce qu'on sait de l'aliment | Ce que le compositeur en fait |
+|---|---|
+| rattaché à un sous-groupe CIQUAL | tous les patrons — connaissance complète |
+| seulement une catégorie (`prot`, `fec`…) | uniquement les patrons génériques de sa catégorie |
+| rien | **il n'est pas proposé**, et l'écran le signale |
+
+Le troisième cran est le plus important : un aliment dont on ne sait rien reste
+dans le frigo, se pèse et se mange — mais le compositeur ne l'invite pas. Une
+absence reste une absence (règles 6 et 7).
+
+**À prévoir le moment venu** : une colonne de plus sur `aliment`, donc règle 1 —
+`db/01-schema.sql` **et** une migration numérotée ; et côté Grocy un `userfield`
+de plus, écrit par `assurerLesChamps()`. Les briques de recherche existent déjà :
+`sansAccent` (`front/src/calcul/texte.ts`) et la correspondance par mots-clés sur
+`alim_nom_fr` de `ciqual_vers_grocy.py`.
+
 #### Ce que ça ne change pas
 
 Le solveur garde les grammes. Ce qui change est **uniquement** le `[0]` de
