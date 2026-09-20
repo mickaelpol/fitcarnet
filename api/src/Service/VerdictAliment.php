@@ -125,7 +125,8 @@ final class VerdictAliment
         /* ENREGISTRABLE : aucun refus, ET les quatre valeurs obligatoires
            lisibles. Une absence n'est pas une faute — on ne la reproche pas —
            mais elle empeche d'enregistrer (regle 6). */
-        $complet = null !== ($lus['kcal100'] ?? null) && ($lus['kcal100'] ?? 0.0) > 0
+        $kcal = $lus['kcal100'] ?? null;
+        $complet = null !== $kcal && $kcal > 0.0
             && null !== ($lus['prot100'] ?? null)
             && null !== ($lus['gluc100'] ?? null)
             && null !== ($lus['lip100'] ?? null)
