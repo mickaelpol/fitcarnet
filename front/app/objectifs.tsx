@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useCibles, useEnregistrerCible } from '@/api/hooks';
 import type { Cible } from '@/api/types';
@@ -51,8 +51,24 @@ export default function Objectifs() {
      Le panneau de recopie se vide AUSSI, et se referme : il gardait les
      chiffres du repas précédent, si bien qu'on croyait saisir le midi en
      regardant ceux du matin. Un formulaire qui garde des valeurs d'un autre
-     contexte ne prête pas à confusion, il la garantit. */
-  useEffect(() => {
+     contexte ne prête pas à confusion, il la garantit.
+
+     PENDANT LE RENDU, ET NON DANS UN `useEffect` — corrigé le 20 septembre
+     2026. Un effet ne s'exécute qu'APRÈS le commit : React affichait donc une
+     image des quatre champs avec les chiffres du MATIN sous l'intitulé
+     « Midi », puis une seconde passe posait les bons. Exactement le mensonge
+     que le paragraphe ci-dessus dit vouloir éviter, et une règle 7 en
+     miniature — un chiffre faux affiché, même un instant, sera lu.
+
+     React documente ce motif (« adjusting state when a prop changes ») : on
+     garde la valeur précédente et on remet à jour pendant le rendu. React
+     relance alors le rendu immédiatement, sans rien commiter entre les deux. */
+  const [repasAffiche, setRepasAffiche] = useState(repas);
+  const [cibleAffichee, setCibleAffichee] = useState(existante?.id);
+
+  if (repas !== repasAffiche || existante?.id !== cibleAffichee) {
+    setRepasAffiche(repas);
+    setCibleAffichee(existante?.id);
     setSaisie(existante
       ? {
           prot: String(existante.prot), gluc: String(existante.gluc),
@@ -62,7 +78,7 @@ export default function Objectifs() {
     setTotaux(existante?.glucidesTotaux === true);
     setPlan(planVide);
     setConvertisseur(false);
-  }, [repas, existante?.id]);
+  }
 
   if (cibles.isLoading) return <Chargement />;
   if (cibles.isError) {

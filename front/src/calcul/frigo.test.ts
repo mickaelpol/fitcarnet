@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import {
-  SEUIL_ECART, ecartsInventaire, estIncomplet, filtrerFrigo,
-  grouperParEmplacement, poidsConnu, stockEnGrammes,
+  SEUIL_ECART, ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement, poidsConnu, resultatEncoreFrais, stockEnGrammes,
 } from './frigo';
 
 const aliment = (
@@ -216,5 +215,45 @@ describe('« le poids de cette unité est-il connu ? »', () => {
 
   it('un facteur négatif non plus', () => {
     assert.equal(poidsConnu({ grammesParUnite: -5 }), false);
+  });
+});
+
+describe('la fraicheur du resultat d\'inventaire', () => {
+  const FINI = '2026-09-20T12:00:00Z';
+  const instant = (minutes: number) => Date.parse(FINI) + minutes * 60 * 1000;
+
+  it('un lot termine a l\'instant est frais', () => {
+    assert.equal(resultatEncoreFrais({ statut: 'termine', finiLe: FINI }, instant(0)), true);
+  });
+
+  it('LE DEFAUT REEL : au-dela du quart d\'heure, il ne l\'est plus', () => {
+    /* La borne vivait dans un `useMemo` sans dependance de temps : une fois
+       `true`, elle le restait. Le bandeau « 12 corrections appliquees »
+       s'affichait des heures apres, alors que son propre commentaire disait
+       le contraire. Un garde qui ne pouvait pas se declencher. */
+    assert.equal(resultatEncoreFrais({ statut: 'termine', finiLe: FINI }, instant(16)), false);
+    assert.equal(resultatEncoreFrais({ statut: 'termine', finiLe: FINI }, instant(14)), true);
+  });
+
+  it('un echec s\'affiche aussi : c\'est une information, pas un silence', () => {
+    assert.equal(resultatEncoreFrais({ statut: 'echoue', finiLe: FINI }, instant(1)), true);
+  });
+
+  it('un lot encore en cours n\'est pas un resultat', () => {
+    assert.equal(resultatEncoreFrais({ statut: 'en_cours', finiLe: null }, instant(0)), false);
+    assert.equal(resultatEncoreFrais({ statut: 'en_attente', finiLe: null }, instant(0)), false);
+  });
+
+  it('pas de suivi, pas de banniere', () => {
+    assert.equal(resultatEncoreFrais(null, instant(0)), false);
+    assert.equal(resultatEncoreFrais(undefined, instant(0)), false);
+  });
+
+  it('une date illisible ne vaut pas « frais »', () => {
+    /* `Date.parse('')` rend NaN, et `NaN < 15 min` est faux — mais par
+       accident. On le fige : une date qu'on ne sait pas lire n'autorise
+       rien. */
+    assert.equal(resultatEncoreFrais({ statut: 'termine', finiLe: 'hier' }, instant(0)), false);
+    assert.equal(resultatEncoreFrais({ statut: 'termine', finiLe: null }, instant(0)), false);
   });
 });

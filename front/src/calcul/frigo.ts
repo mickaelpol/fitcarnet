@@ -155,3 +155,40 @@ export function ecartsInventaire(
 
   return lignes;
 }
+
+/**
+ * COMBIEN DE TEMPS LE RESULTAT D'UN INVENTAIRE RESTE AFFICHE.
+ *
+ * Un quart d'heure : on envoie, on va faire autre chose, on revient voir. Le
+ * serveur garde le dernier lot trente jours — sans borne, « 12 corrections
+ * appliquees » resterait affiche des semaines, et une banniere permanente ne
+ * se lit plus.
+ */
+export const FRAICHEUR_RESULTAT = 15 * 60 * 1000;
+
+/**
+ * Ce resultat d'inventaire est-il encore d'actualite ?
+ *
+ * `maintenant` EST UN PARAMETRE, ET C'EST TOUT LE CORRECTIF DU 20 SEPTEMBRE
+ * 2026. La borne vivait dans un `useMemo` de `app/(onglets)/frigo.tsx` dont
+ * aucune dependance n'etait le temps :
+ *
+ *     }, [suivi.data?.statut, suivi.data?.finiLe]);
+ *
+ * `Date.now()` n'y etait lu qu'au moment ou l'une de ces deux valeurs
+ * changeait. Une fois `true`, la reponse le restait — et le partage de
+ * structure de React Query preserve justement ces references quand la reponse
+ * est identique. Le bandeau restait donc affiche bien au-dela du quart
+ * d'heure, c'est-a-dire exactement ce que le commentaire disait empecher. Un
+ * garde qui ne pouvait pas se declencher.
+ */
+export const resultatEncoreFrais = (
+  suivi: { statut?: string; finiLe?: string | null } | null | undefined,
+  maintenant: number,
+): boolean => {
+  if (suivi?.statut !== 'termine' && suivi?.statut !== 'echoue') return false;
+
+  const fini = Date.parse(suivi.finiLe ?? '');
+
+  return Number.isFinite(fini) && maintenant - fini < FRAICHEUR_RESULTAT;
+};

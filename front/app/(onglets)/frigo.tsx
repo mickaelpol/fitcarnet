@@ -17,7 +17,8 @@ import {
   reinitialiserInventaire, saisirQuantite, saisiesInventaire, vusInventaire,
 } from '@/composants/etatInventaire';
 import {
-  ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement, poidsConnu,
+  FRAICHEUR_RESULTAT, ecartsInventaire, estIncomplet, filtrerFrigo,
+  grouperParEmplacement, poidsConnu, resultatEncoreFrais,
 } from '@/calcul/frigo';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
@@ -131,14 +132,27 @@ export default function MonFrigo() {
      corrections appliquées » resterait affiché des semaines après, et une
      bannière permanente ne se lit plus. Un quart d'heure couvre le cas réel —
      on envoie, on va faire autre chose, on revient voir. */
-  const inventaireFini = useMemo(() => {
-    const s = suivi.data?.statut;
-    if (s !== 'termine' && s !== 'echoue') return false;
+  /* IL FAUT UN REVEIL, ET C'EST TOUT LE CORRECTIF DU 20 SEPTEMBRE 2026. La
+     borne etait calculee dans un `useMemo` dont aucune dependance n'etait le
+     temps : `Date.now()` n'y etait lu qu'au changement de `statut` ou de
+     `finiLe`. Une fois vrai, le bandeau le restait — et le partage de
+     structure de React Query preserve justement ces references quand la
+     reponse ne bouge pas. Un garde qui ne pouvait pas se declencher.
 
-    const fini = Date.parse(suivi.data?.finiLe ?? '');
+     On programme donc un unique reveil a l'instant exact ou le quart d'heure
+     tombe. Pas de minuterie qui tourne : un seul `setTimeout`, arme seulement
+     quand il y a quelque chose a effacer. */
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+  const inventaireFini = resultatEncoreFrais(suivi.data, maintenant);
 
-    return Number.isFinite(fini) && Date.now() - fini < 15 * 60 * 1000;
-  }, [suivi.data?.statut, suivi.data?.finiLe]);
+  useEffect(() => {
+    if (!inventaireFini) return undefined;
+
+    const reste = Date.parse(suivi.data?.finiLe ?? '') + FRAICHEUR_RESULTAT - Date.now();
+    const minuterie = setTimeout(() => setMaintenant(Date.now()), Math.max(0, reste) + 1000);
+
+    return () => clearTimeout(minuterie);
+  }, [inventaireFini, suivi.data?.finiLe]);
 
   /* Les macros sont données pour 100 g. Une autre unité ne pose problème que
      si son poids est inconnu : le kilogramme et la pièce se convertissent dès
