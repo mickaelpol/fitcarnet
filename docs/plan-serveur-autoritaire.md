@@ -166,7 +166,7 @@ qu'elles sont là. Les plus lourdes :
 | `composants/disqueRM.tsx:21-29` | `SEUIL = 0.03` et `tendanceDe` — hausse/stable/baisse du 1RM, **sans aucun test** |
 | `app/admin-fusion.tsx:12-31` | **un Levenshtein complet** + seuils 0,9 / 0,45, qui décide quels exercices sont proposés à une fusion définitive |
 | `composants/editeurAliment.tsx:470-471` | `parseFloat` pour **enregistrer** les deux pesées, alors que le même fichier écrit plus haut « `nombreSaisi` ET NON `parseFloat` » (`:226`). **Risque dormant, pas défaut actif** — vérifié sur douze saisies le 19 septembre 2026 : chaque cas où les deux divergent (`4,2,1`, `1 000`, `100abc`, `-5`) est un cas où `ratioMesure` vaut `null` et où le bouton n'est pas rendu. Le garde les fait coïncider **par accident** ; déplacer ce garde réveille le défaut |
-| `composants/planRelu.tsx:163` | recopie exacte de `etapeBatch.tsx:161` |
+| `composants/planRelu.tsx:163` | ~~recopie exacte~~ de `etapeBatch.tsx:161` — **quasi-copie : `etapeBatch` porte un troisième terme (« à ajouter après ») que `planRelu` n'a pas, et c'est délibéré. Fusionner sur la foi du mot « exacte » aurait fait compter les crus deux fois** |
 
 `formuleUnique.test.ts` ne les voit pas : son motif ne cible que `KCAL_… *`,
 jamais un `/100`, un seuil ou une somme.
@@ -180,11 +180,39 @@ Aucun aller-retour ajouté : tout se greffe sur le `POST`/`PATCH` qui existe dé
 | Cohérence kcal ↔ macros d'un aliment | `#[Assert\Callback]` sur `Aliment`, sur le modèle de celui du rendement | ~40 l. PHP |
 | Idem sur une cible | `#[Assert\Callback]` sur `Cible` | ~30 l. |
 | Soupçon de kilojoules | même endroit | ~15 l. |
-| Matière > 100,5 g pour 100 g | **la clé existe déjà** dans `rendement.json`, aucun test ne la lit | ~10 l. |
-| Avancement d'une séance | **le serveur le calcule déjà** : `seance/[id].tsx:113` doit lire `seance.avancement` au lieu de recalculer | ~5 l. |
+| Matière > 100,5 g pour 100 g | ~~la clé existe déjà dans `rendement.json`, aucun test ne la lit~~ | **FAIT, et l'affirmation était FAUSSE** |
+| Avancement d'une séance | ~~`seance/[id].tsx:113` doit lire `seance.avancement`~~ | **À NE PAS FAIRE** |
 
-C'est ici que la règle 7 gagne le plus : aujourd'hui l'API accepte 90 kcal pour
-un riz qui en fait 350.
+**DEUX LIGNES DE CE TABLEAU ÉTAIENT FAUSSES, relevées le 20 septembre 2026 par
+`verite-documentaire`.**
+
+*« Aucun test ne lit la clé »* : **deux** la lisent, un par langage, et depuis le
+commit qui a créé `rendement.json` — `RendementPartageTest::testLeSeuilDeMatiereEstCeluiDeLaListe`
+et son jumeau `rendementPartage.test.ts`. Le comportement est même posé aux
+**trois** étages : `AlimentDisponible.php`, `plausibilite.ts`, et la contrainte
+SQL `aliment_matiere_plausible`. Il ne restait qu'à transformer l'erreur SQL en
+refus **nommé**, ce que fait `CoherenceNutritionnelle`.
+
+*« Le front doit lire `seance.avancement` »* : **le 20 septembre, on a tranché
+dans l'autre sens.** Les deux juges sont assumés et verrouillés par
+`api/regles/avancement.json`, parce que cocher une série doit bouger le compteur
+**immédiatement, hors ligne compris**. Lire le champ du serveur imposerait un
+aller-retour réseau à chaque case — c'est-à-dire exactement ce que le §3 de ce
+document cherche à éviter. **Appliquer cette ligne serait une régression.**
+
+C'est ici que la règle 7 gagne le plus : avant le 20 septembre 2026, l'API
+acceptait 90 kcal pour un riz qui en fait 350. **Fait** : `CoherenceNutritionnelle`
++ `api/regles/coherence.json`, quatrième double juge du projet, avec trois refus
+(matière impossible, grain sec sous 300 kcal, kilojoules recopiés) et leurs
+témoins — dont le plancher sur l'Atwater, sans lequel la règle refusait du vin
+et du cidre publiés par l'Anses.
+
+**Ce qui reste du palier 1** : `editeurAliment.tsx` enregistre encore les deux
+pesées par `parseFloat`, sous un commentaire qui l'interdit 263 lignes plus haut.
+Le garde les fait coïncider **par accident** — et `verite-documentaire` a trouvé
+trois notations qui divergent en passant le garde : `0x10`, `0b101`, `0o17`, où
+`Number` rend 16, 5 et 15 quand `parseFloat` rend 0. Inatteignable au clavier
+numérique d'Android, atteignable au collage sur le web.
 
 ### Palier 2 — le serveur rend les chiffres dérivés
 

@@ -141,6 +141,65 @@ final class CoherencePartageTest extends TestCase
             'et autant de temoins, sans quoi un refus systematique passerait');
     }
 
+    /** @return array<string, array{array<string, mixed>, bool, string}> */
+    public static function casDeCibles(): array
+    {
+        $cas = [];
+
+        /** @var list<array<string, mixed>> $liste */
+        $liste = self::regles()['cas_cibles'];
+        foreach ($liste as $c) {
+            $cas[(string) $c['nom']] = [$c, (bool) $c['refuse'], (string) $c['pourquoi']];
+        }
+
+        return $cas;
+    }
+
+    /**
+     * @param array<string, mixed> $cible
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('casDeCibles')]
+    public function testChaqueCibleEstJugeeCommeLaListeLeDit(
+        array $cible,
+        bool $refuse,
+        string $pourquoi,
+    ): void {
+        $motif = CoherenceNutritionnelle::motifDeRefusDUneCible(
+            (float) $cible['kcal'],
+            (float) $cible['prot'],
+            (float) $cible['gluc'],
+            (float) $cible['lip'],
+        );
+
+        self::assertSame(
+            $refuse, null !== $motif,
+            \sprintf(
+                "api/regles/coherence.json dit que cette cible %s (%s), l'API dit le contraire%s",
+                $refuse ? 'est refusee' : 'passe',
+                $pourquoi,
+                null === $motif ? '' : ' : ' . $motif,
+            ),
+        );
+    }
+
+    /**
+     * LE TEMOIN QUI PROTEGE UN PARCOURS QUI MARCHE.
+     *
+     * Une cible seulement INCOHERENTE doit passer. L'ecran le dit deja — « l'app
+     * respecte les grammes ; les calories suivent » — et laisse enregistrer. Si
+     * quelqu'un durcit un jour cette regle, ce test tombe et rappelle pourquoi.
+     */
+    public function testUneCibleSeulementIncoherenteNEstPasRefusee(): void
+    {
+        /* 100 g de proteines, 100 de glucides, 50 de lipides = 1250 kcal.
+           La cible en annonce 2100 : c'est faux arithmetiquement, et pourtant
+           c'est une saisie legitime. */
+        self::assertNull(
+            CoherenceNutritionnelle::motifDeRefusDUneCible(2100.0, 100.0, 100.0, 50.0),
+            'une cible incoherente doit passer : refuser casserait la recopie '
+            . "d'un plan de coach, que l'ecran autorise explicitement");
+    }
+
     // ----------------------------------------------------------------- outils
 
     private static function motif(

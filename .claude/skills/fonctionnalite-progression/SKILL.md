@@ -207,17 +207,24 @@ pourquoi, se distingue de toutes celles qui affichent 79,96 kg sans broncher.
 
 ## Limites connues
 
-- **L'API publie son propre 1RM, seconde écriture assumée de la formule.**
-  `SeanceExercice::getRmEstime()` (`api/src/Entity/SeanceExercice.php:152-173`)
-  recalcule Epley côté serveur, avec **les deux mêmes garde-fous** depuis le
-  16 septembre 2026 : les séries de plus de 15 répétitions sont écartées
-  (`:162-164`), une série d'une répétition vaut sa charge (`:166`). Avant ce
-  correctif, une série de 93 répétitions à 32 kg y donnait 131 kg
-  (`:129-151`). PHP ne pouvant importer `performance.ts`, la règle 5 est tenue
-  par un test : `api/tests/Entity/RmEstimeTest.php` aligne les deux écritures,
-  et tombe si l'une évolue sans l'autre. Le champ est exposé dans le groupe
-  `seance:lire` ; **le front ne l'utilise pas**, l'écran de séance recalcule
-  depuis les séries via `performance.ts` (`exerciceSeance.tsx:59`).
+- **L'API ne publie PLUS son propre 1RM — ce paragraphe disait le contraire
+  jusqu'au 20 septembre 2026.** Il décrivait `SeanceExercice::getRmEstime()`,
+  ses deux garde-fous et un test `api/tests/Entity/RmEstimeTest.php` censé
+  aligner les deux écritures. **Le code et le test ont été supprimés le
+  19 septembre** : Epley était écrit trois fois — `performance.ts`, cette
+  méthode PHP, et la vue SQL `v_performance` dont la version était déjà FAUSSE
+  (pas de plafond à 15 répétitions, d'où un « record » sur une série de
+  93 répétitions). Les deux copies sont parties, la vue avec la migration 39,
+  et `front/src/calcul/epleyUnique.test.ts` refuse désormais toute réécriture
+  du coefficient dans **tout** le dépôt — `.ts`, `.tsx`, `.php`, `.sql`, `.py`.
+
+  Pourquoi ce mensonge coûtait : le **palier 2** du chantier serveur autoritaire
+  prévoit de réintroduire Epley en PHP. Qui lisait cette page croyait qu'un
+  `RmEstimeTest` protégeait déjà les deux écritures, et rouvrait une
+  duplication que `CLAUDE.md` interdit de rouvrir sans décision explicite.
+  **S'il faut un jour un 1RM côté serveur, il faudra d'abord un
+  `api/regles/rm.json` lu par les DEUX suites**, comme pour le mot de passe et
+  le rendement. Relevé par `verite-documentaire`.
 - **`presentation/features.md:294` dit « zone 70–80 % »** : faux, c'est 70 à
   90 %. Déjà signalé par `presentation/demonstration.md` (partie V, point 4),
   toujours pas corrigé dans `features.md`.

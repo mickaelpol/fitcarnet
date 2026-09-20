@@ -124,9 +124,14 @@ oubliees=$(comm -23 <(printf '%s\n' "$attendus") <(printf '%s\n' "$couverts"))
 if [[ -n "$oubliees" ]]; then
     rouge "Ces migrations existent et ne sont jouées par AUCUN contrôle :"
     printf '%s\n' "$oubliees" | sed 's|.*/|      |'
-    rouge "Ajoute la dizaine manquante dans les QUATRE listes :"
+    rouge "Ajoute la dizaine manquante dans les CINQ listes :"
     rouge "  db/manuel/verifier-schema.sh, db/manuel/verifier-migrations.sh,"
-    rouge "  installer.sh, docker/entrypoint-prod.sh"
+    rouge "  db/manuel/rattraper-dev.sh, installer.sh, docker/entrypoint-prod.sh"
+    rouge ""
+    rouge "CINQ, ET NON QUATRE : ce message en annoncait quatre et oubliait"
+    rouge "rattraper-dev.sh, qui est justement celui qui est reste en arriere"
+    rouge "le 20 septembre 2026. Un second poste s'est retrouve sans CIQUAL,"
+    rouge "sans le moindre signal."
     exit 1
 fi
 

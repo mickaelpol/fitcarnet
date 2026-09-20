@@ -59,8 +59,34 @@ final class CoherenceNutritionnelle
     /** 1 kcal = 4,184 kJ. Les etiquettes europeennes portent les deux. */
     private const FACTEUR_KILOJOULE = 4.184;
 
-    /** Marge autour du facteur, pour absorber les arrondis d'etiquette. */
-    private const TOLERANCE_KILOJOULE = 0.15;
+    /**
+     * Marge autour du facteur.
+     *
+     * 0,10 et non 0,15 : c'est la valeur que `nutrition.ts` porte depuis
+     * toujours, et l'avoir fixee a 0,15 ici creait un cinquieme juge du meme
+     * fait a un autre seuil — le matin meme ou ce fichier naissait.
+     */
+    private const TOLERANCE_KILOJOULE = 0.10;
+
+    /**
+     * EN DECA DE CETTE ENERGIE CALCULEE, ON NE REFUSE RIEN.
+     *
+     * MESURE LE 20 SEPTEMBRE 2026 SUR LES 2 944 ENTREES CIQUAL de la base :
+     * sans plancher, cette regle refuse du vin doux (148 kcal pour 40,6 par
+     * Atwater, rapport 3,64), du cidre traditionnel (4,34), du vinaigre (4,63)
+     * et un kir royal (3,69).
+     *
+     * La cause est physique : L'ALCOOL FAIT 7 kcal/g ET N'ENTRE DANS AUCUNE
+     * DES QUATRE MACROS. Tout produit alcoolise a donc un rapport
+     * kcal/Atwater eleve, et il passe par 4,184 en chemin. Les refuser en
+     * accusant quelqu'un d'avoir recopie des kilojoules serait un faux
+     * reproche, sur des valeurs publiees par l'Anses.
+     *
+     * 50 : le plus dense des six mesures est a 40,6. Et le cas qui motive la
+     * regle n'en souffre pas — un riz recopie en kilojoules a un Atwater
+     * de 348.
+     */
+    private const ATWATER_MINIMUM_POUR_REFUSER = 50.0;
 
     /**
      * Convention EUROPEENNE : les fibres comptent 2 kcal/g, a part des
@@ -126,6 +152,46 @@ final class CoherenceNutritionnelle
     }
 
     /**
+     * UNE CIBLE NUTRITIONNELLE SE CONTREDIT-ELLE ?
+     *
+     * ON NE REFUSE PAS UNE CIBLE SEULEMENT INCOHERENTE, ET C'EST DELIBERE.
+     * L'ecran des objectifs affiche « tes grammes representent 1850 calories,
+     * pas 2100 » puis, en toutes lettres, « l'app respecte les grammes ; les
+     * calories suivent » — et laisse enregistrer. C'est une tolerance ecrite,
+     * pas un oubli : quelqu'un recopie un plan de coach qui ne tombe pas
+     * juste, et on ne lui interdit pas de le saisir. La refuser ici casserait
+     * un parcours qui marche.
+     *
+     * Le palier 1 dit « le serveur refuse les chiffres FAUX », pas « le
+     * serveur impose l'arithmetique ».
+     *
+     * CE QUI EST REFUSE : les kilojoules recopies a la place des kcal. Ce
+     * n'est pas une tolerance mais une erreur d'unite — la cible devient
+     * quatre fois trop haute et le calculateur vise une journee a
+     * 8 000 calories. Le rapport de 4,184 ne se produit pas par hasard.
+     */
+    public static function motifDeRefusDUneCible(
+        float $kcal,
+        float $prot,
+        float $gluc,
+        float $lip,
+    ): ?string {
+        $atwater = self::KCAL_PROT * $prot + self::KCAL_GLUC * $gluc + self::KCAL_LIP * $lip;
+
+        if (!self::ressembleADesKilojoules($kcal, $atwater)) {
+            return null;
+        }
+
+        return \sprintf(
+            '%s pour cette cible ressemble a des kilojoules : tes grammes en '
+            . 'font %s kcal. La ligne a saisir est celle en kcal, soit environ %s.',
+            \number_format($kcal, 0, ',', ' '),
+            \number_format($atwater, 0, ',', ' '),
+            \number_format($kcal / self::FACTEUR_KILOJOULE, 0, ',', ' '),
+        );
+    }
+
+    /**
      * Les kcal declarees sont-elles les kilojoules de l'etiquette ?
      *
      * ON NE REGARDE PAS LES KCAL SEULES. Une huile fait vraiment 900 kcal aux
@@ -134,7 +200,7 @@ final class CoherenceNutritionnelle
      */
     private static function ressembleADesKilojoules(float $kcal100, float $atwater): bool
     {
-        if ($atwater <= 0.0) {
+        if ($atwater < self::ATWATER_MINIMUM_POUR_REFUSER) {
             return false;
         }
 

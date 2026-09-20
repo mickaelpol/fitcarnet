@@ -50,20 +50,26 @@ docker ps --format '{{.Names}}' | grep -qx "$CONTENEUR" || {
 
 # ---------------------------------------------------------------- migrations
 #
-# LA MÊME LISTE QUE `installer.sh`, ET C'EST UN QUATRIÈME ENDROIT À TENIR.
+# LA MÊME LISTE QUE `installer.sh`, ET C'EST LE CINQUIÈME ENDROIT À TENIR.
 #
-# Le glob s'arrête à `3[0-9]` : une migration numérotée 40 ne serait jouée
-# nulle part. C'est déjà arrivé le 14 septembre — la migration 30 était absente
-# des quatre lanceurs, et `verifier-schema.sh` annonçait « identiques » sans
-# l'avoir jouée. Quand tu ajoutes une décennie, elle va dans QUATRE fichiers :
-# celui-ci, `installer.sh`, `docker/entrypoint-prod.sh`,
-# `db/manuel/verifier-migrations.sh`, plus `verifier-schema.sh`.
+# CINQ, PAS QUATRE — et ce fichier disait « QUATRE » en énumérant cinq noms.
+# Le 20 septembre 2026, ce décompte a coûté exactement ce qu'il annonçait : les
+# migrations 40, 41 et 42 sont arrivées, les quatre autres listes ont été
+# corrigées, et CELLE-CI est restée à `3[0-9]`. Un second poste qui fait
+# `git pull` puis `rattraper-dev.sh` n'aurait eu ni `aliment_reference`, ni les
+# 3 484 lignes CIQUAL, ni la recherche floue — SANS LE MOINDRE SIGNAL, parce
+# que le garde de `verifier-schema.sh` ne regarde que sa propre liste.
+#
+# Quand tu ajoutes une décennie, elle va dans CINQ fichiers :
+#   celui-ci, `installer.sh`, `docker/entrypoint-prod.sh`,
+#   `db/manuel/verifier-migrations.sh`, `db/manuel/verifier-schema.sh`.
 migrations=""
 for fichier in \
     "$RACINE"/db/manuel/aliment-fibres.sql \
     "$RACINE"/db/manuel/1[0-9]-*.sql \
     "$RACINE"/db/manuel/2[0-9]-*.sql \
-    "$RACINE"/db/manuel/3[0-9]-*.sql
+    "$RACINE"/db/manuel/3[0-9]-*.sql \
+    "$RACINE"/db/manuel/4[0-9]-*.sql
 do
     [[ -f "$fichier" ]] && migrations+="$fichier"$'\n'
 done

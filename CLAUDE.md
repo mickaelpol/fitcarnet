@@ -37,7 +37,7 @@ cd front && npm test          # eslint + tsc --noEmit + 801 tests, puis 42 de re
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 416 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 481 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -79,17 +79,30 @@ une clé étrangère `ON DELETE SET NULL` détacherait en silence les données d
 quelqu'un. Ça passait en développement parce que le contenu y avait été chargé
 **avant** la migration qui pose la clé : jamais dans l'ordre réel.
 
-**LES QUATRE LISTES DE MIGRATIONS SONT JUMELLES.** `db/manuel/verifier-schema.sh`,
-`db/manuel/verifier-migrations.sh`, `installer.sh` et `docker/entrypoint-prod.sh`
+**LES CINQ LISTES DE MIGRATIONS SONT JUMELLES — CINQ, PAS QUATRE.**
+`db/manuel/verifier-schema.sh`, `db/manuel/verifier-migrations.sh`,
+`db/manuel/rattraper-dev.sh`, `installer.sh` et `docker/entrypoint-prod.sh`
 énumèrent les fichiers à la main (`3[0-9]-*.sql`, `4[0-9]-*.sql`…). Le jour où la
-40 est arrivée, **trois des quatre** s'arrêtaient encore à `3[0-9]`. Pire :
+40 est arrivée, **trois des cinq** s'arrêtaient encore à `3[0-9]`. Pire :
 `verifier-schema.sh` annonçait « identiques » quand même — les deux bases partent
 du même `01-schema.sql`, donc une migration jamais jouée ne fait diverger
 personne. Un vert qui ne pouvait pas devenir rouge.
 
-`verifier-schema.sh` compare désormais sa liste à ce qui existe vraiment et
-**refuse** ce qu'elle ne couvre pas, en nommant les quatre fichiers à corriger.
-En passant à une nouvelle dizaine, il criera avant la production.
+**ET LE DÉCOMPTE LUI-MÊME A COÛTÉ UNE SIXIÈME FOIS, le 20 septembre 2026.**
+Cette page disait « QUATRE », `rattraper-dev.sh` disait « QUATRE » en énumérant
+cinq noms, et le message d'erreur du garde en nommait quatre. Résultat :
+`rattraper-dev.sh` est le seul à être resté à `3[0-9]` après la correction des
+autres. Un second poste qui fait `git pull` puis `rattraper-dev.sh` — ce que
+cette page prescrit — se retrouvait sans `aliment_reference`, sans les
+3 484 lignes CIQUAL et sans la recherche floue, **sans le moindre signal** :
+le garde ne compare que sa propre liste à ce qui existe, il ne lit pas les
+quatre autres. Relevé par `verite-documentaire`, corrigé le même jour.
+
+`verifier-schema.sh` compare sa liste à ce qui existe vraiment et **refuse** ce
+qu'elle ne couvre pas, en nommant désormais les **cinq** fichiers à corriger.
+En passant à une nouvelle dizaine, il criera avant la production — mais il ne
+verra toujours pas une liste tierce restée en arrière. **Compter les listes de
+tête est précisément ce qui a échoué : les énumérer.**
 
 ### 2. Toute entité exposée en API est filtrée par propriétaire
 Une nouvelle entité `#[ApiResource]` avec des opérations implémente `App\Entity\ProprieteUtilisateur`,
@@ -159,8 +172,9 @@ dès qu'on en trouve un autre, et il faut la considérer comme incomplète.**
 | Mot de passe | `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` | `api/regles/motdepasse.json`, lu par `MotDePassePartageTest.php` **et** `motDePassePartage.test.ts` |
 | Rendement cru/cuit | les deux côtés, depuis le constat 04#7 | `api/regles/rendement.json`, lu par `RendementPartageTest.php` **et** `rendementPartage.test.ts` |
 | Avancement d'une séance | `api/src/Entity/Seance.php` `getAvancement()`, `front/src/calcul/blocSeance.ts` `avancementDe()` | `api/regles/avancement.json`, lu par `AvancementPartageTest.php` **et** `avancementPartage.test.ts` — depuis le 20 septembre 2026. Les deux tournent vraiment : `app/(onglets)/seances.tsx` lit le champ du serveur, `app/seance/[id].tsx` recalcule à chaque case cochée |
+| **Cohérence d'un aliment et d'une cible** | `api/src/Service/CoherenceNutritionnelle.php`, `front/src/calcul/plausibilite.ts` + `nutrition.ts` | `api/regles/coherence.json`, lu par `CoherencePartageTest.php` **et** `coherencePartage.test.ts` — depuis le 20 septembre 2026 (palier 1). Créé sciemment : jusque-là le front seul refusait 90 kcal pour un riz qui en fait 350, et l'API l'acceptait |
 
-Tous les trois ont la même raison d'exister — l'écran doit répondre pendant le
+Tous les quatre ont la même raison d'exister — l'écran doit répondre pendant le
 geste, sans aller-retour réseau, pendant que le serveur reste seul à décider —
 et le même dispositif : **un fichier de règles lu par les DEUX suites**. Le jour
 où l'un des juges change d'avis sans l'autre, une des deux suites tombe **en

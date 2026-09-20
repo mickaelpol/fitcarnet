@@ -155,6 +155,43 @@ export interface SoupconKilojoules {
  * Aucune n'est infaillible : un aliment sans macros et sous 900 passera entre
  * les mailles. C'est un garde-fou, pas une garantie.
  */
+/**
+ * EN DEÇÀ DE CETTE ÉNERGIE CALCULÉE, ON NE REFUSE RIEN.
+ *
+ * MESURÉ LE 20 SEPTEMBRE 2026 SUR LES 2 944 ENTRÉES CIQUAL, et c'est un
+ * garde-fou qui a failli manquer : sans plancher, la règle refuse du vin doux
+ * (148 kcal / 40,6 par Atwater, rapport 3,64), du cidre (4,34), du vinaigre
+ * (4,63) et un kir royal (3,69).
+ *
+ * La cause est physique : **l'alcool fait 7 kcal/g et n'entre dans aucune des
+ * quatre macros**. Tout produit alcoolisé a donc un rapport kcal/Atwater
+ * élevé — et il passe par 4,184 en chemin. Refuser ces six aliments en
+ * accusant quelqu'un d'avoir recopié des kilojoules serait un faux reproche
+ * sur des valeurs publiées par l'Anses.
+ *
+ * 50 : le plus dense des six est à 40,6. Et ça ne coûte rien au cas qui
+ * motive la règle — un riz recopié en kilojoules a un Atwater de 348.
+ */
+export const ATWATER_MINIMUM_POUR_REFUSER = 50;
+
+/**
+ * Est-on SÛR que cette énergie est en kilojoules ?
+ *
+ * PLUS STRICT QUE `soupconKilojoules`, et c'est délibéré : celui-là PROPOSE
+ * une conversion, celle-ci fait REFUSER l'enregistrement. On ne refuse que
+ * lorsqu'il ne reste pas de doute, d'où le plancher ci-dessus.
+ *
+ * Verrouillée sur son jumeau PHP par `api/regles/coherence.json` : la même
+ * question est posée côté serveur depuis le palier 1, et deux écritures qui
+ * divergeraient laisseraient l'écran accepter ce que l'API refuse.
+ */
+export const kilojoulesCertains = (energie: number, atwater: number): boolean =>
+  (atwater >= ATWATER_MINIMUM_POUR_REFUSER
+    && Math.abs(energie / atwater - KJ_PAR_KCAL) / KJ_PAR_KCAL <= TOLERANCE_RAPPORT);
+
+/** Au-delà, c'est une autre erreur de saisie, et proposer une conversion l'aggraverait. */
+const TOLERANCE_RAPPORT = 0.1;
+
 export function soupconKilojoules(m: Macros): SoupconKilojoules | null {
   if (!(m.kcal > 0)) return null;
 
@@ -170,7 +207,7 @@ export function soupconKilojoules(m: Macros): SoupconKilojoules | null {
   /* Le rapport doit serrer 4,184 de près. Au-delà de 10 % d'écart, c'est
      une autre erreur de saisie, et proposer une conversion l'aggraverait. */
   const rapport = m.kcal / calculees;
-  if (Math.abs(rapport - KJ_PAR_KCAL) / KJ_PAR_KCAL <= 0.1) {
+  if (Math.abs(rapport - KJ_PAR_KCAL) / KJ_PAR_KCAL <= TOLERANCE_RAPPORT) {
     return { saisi: m.kcal, converti, motif: 'rapport' };
   }
 

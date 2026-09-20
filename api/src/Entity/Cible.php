@@ -14,7 +14,9 @@ use App\State\ProprietaireProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use App\Service\CoherenceNutritionnelle;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /** Cibles macro d'UN repas pour UN utilisateur. R1 matin, R2 midi, R3 16h, R4 soir. */
 #[ORM\Entity]
@@ -106,4 +108,33 @@ class Cible implements ProprieteUtilisateur
     public function setGluc(float|string $v): self { $this->gluc = (string) $v; return $this; }
     public function getLip(): float { return (float) $this->lip; }
     public function setLip(float|string $v): self { $this->lip = (string) $v; return $this; }
+
+    /**
+     * CETTE CIBLE EST-ELLE SAISIE EN KILOJOULES ?
+     *
+     * Palier 1, 20 septembre 2026. C'est la SEULE chose qu'on refuse sur une
+     * cible, et le reste est delibere : l'ecran des objectifs affiche « tes
+     * grammes representent 1850 calories, pas 2100 » puis, en toutes lettres,
+     * « l'app respecte les grammes ; les calories suivent » — et laisse
+     * enregistrer. Quelqu'un recopie un plan de coach qui ne tombe pas juste,
+     * et on ne lui interdit pas de le saisir. Refuser ici casserait ce
+     * parcours.
+     *
+     * Les kilojoules, eux, ne sont pas une tolerance mais une erreur d'unite :
+     * la cible devient quatre fois trop haute et le calculateur vise une
+     * journee a 8 000 calories. Le rapport de 4,184 ne se produit pas par
+     * hasard.
+     *
+     * La regle n'est pas reecrite ici, elle est appelee.
+     */
+    #[Assert\Callback]
+    public function verifierLUniteDesCalories(ExecutionContextInterface $contexte): void
+    {
+        $motif = CoherenceNutritionnelle::motifDeRefusDUneCible(
+            $this->getKcal(), $this->getProt(), $this->getGluc(), $this->getLip());
+
+        if (null !== $motif) {
+            $contexte->buildViolation($motif)->atPath('kcal')->addViolation();
+        }
+    }
 }

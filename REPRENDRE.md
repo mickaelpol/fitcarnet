@@ -16,11 +16,15 @@ d'une ligne de code, pas ce qui reste à faire.
 
 ### Ce qui s'est passé aujourd'hui
 
-- **Grocy est quitté.** Les 62 produits sont passés en base — 44 avec du stock,
-  18 à zéro, ce qui correspond exactement à ce que Grocy portait (mesuré). Le
-  frigo lit désormais la base (`utilisateur.source_frigo = 'base'`). **Grocy
-  n'est pas éteint** : on le garde quelques jours comme filet, l'aller-retour
-  est un simple appel à `POST /migration-grocy/terminer`.
+- **Grocy est quitté EN PRODUCTION, et en production seulement.** Les
+  62 produits y sont passés en base — 44 avec du stock, 18 à zéro, ce qui
+  correspond exactement à ce que Grocy portait (mesuré). Le frigo de production
+  lit désormais la base (`utilisateur.source_frigo = 'base'`).
+  **LA BASE DE DÉV EST TOUJOURS EN `grocy`, avec 2 aliments** — donc
+  `FrigoGrocy.php` reste le chemin servi en développement, contrairement à ce
+  que le plan affirmait. Ne pas croire travailler sur un frigo en mode base.
+  **Grocy n'est pas éteint** : on le garde quelques jours comme filet,
+  l'aller-retour est un simple appel à `POST /migration-grocy/terminer`.
 - **Un défaut vécu en migration réelle** : « Oasis sorbet » revenait
   indéfiniment dans la liste à traiter. Le nom portait une espace finale que le
   serveur coupe à l'écriture, et l'écran comparait les deux chaînes telles
@@ -326,7 +330,7 @@ mettre à jour son statut dans le rapport et dans le README de l'audit.
 | **Table des paliers du 1RM** | Tranchée le 15 septembre (zone 70-90 %, pas de 2,5 %), mais trois points restent à ton avis : 95 % et 100 % retirés ; échauffement à 60/50/40 sans granularité fine ; sous 10 kg de 1RM, une ligne fusionnée peut perdre une prédiction juste à cause d'un voisin hors domaine. | à trancher |
 | **Publier un exercice depuis l'administration** | `Exercice.public` n'est écrit par personne : aucun mécanisme de publication n'existe. L'ouvrir aux seuls administrateurs est la proposition « C » de la revue. | à trancher |
 | **`choixRatio.tsx`** | dernier morceau du lot 6 ; il appartient à `editeurAliment.tsx`. | 1 h |
-| **QUITTER GROCY** | Direction donnée le 19 septembre 2026 : *« mon but à la finalité c'est de migrer de Grocy vers la base de données de l'application car je ne veux plus utiliser Grocy, mais pas de suite »*. Premier pas fait le jour même : les produits Grocy sans valeurs apparaissent dans le frigo **et se renseignent depuis l'application** (`aCompleter`), au lieu d'obliger à ouvrir Grocy. Ce qui reste : un transfert `grocy → base` par compte, et la bascule de `source_frigo`. **Ne rien supprimer côté Grocy** tant que ce transfert n'existe pas. | à cadrer |
+| **QUITTER GROCY** | Direction donnée le 19 septembre 2026 : *« mon but à la finalité c'est de migrer de Grocy vers la base de données de l'application car je ne veux plus utiliser Grocy, mais pas de suite »*. Premier pas fait le jour même : les produits Grocy sans valeurs apparaissent dans le frigo **et se renseignent depuis l'application** (`aCompleter`), au lieu d'obliger à ouvrir Grocy. **FAIT le 20 septembre 2026** : écran de migration produit par produit avec rattachement assisté, 62 produits passés en production, `source_frigo` basculé sur `base`. **Ne rien supprimer côté Grocy** — on le garde quelques jours comme filet, et l'aller-retour est un simple appel. *(Cette ligne disait encore « à cadrer » alors que le haut du document disait « fait » : deux affirmations contraires dans le même fichier, relevées par `verite-documentaire`.)* | **fait** |
 | **LE CHANTIER : le serveur calcule, le front lit** | Décidé le 19 septembre 2026, **à commencer après l'APK**. Aujourd'hui le front porte **4 893 lignes** de calcul métier et l'API **396 sur 9 682** — dont quatre lignes d'arithmétique réelle. Le serveur accepte un aliment à 90 kcal quand Atwater en calcule 350. La carte complète, les quatre paliers, le mécanisme hors ligne et ce qui n'a pas été vérifié : **`docs/plan-serveur-autoritaire.md`**. | plusieurs jours, par paliers |
 | **Ouvrir `exhaustive-deps` et le reste d'`eslint-config-expo`** | `front/eslint.config.mjs` n'active qu'une règle, `react-hooks/rules-of-hooks`, et c'est assumé : elle rend **zéro** sur les 188 fichiers, donc toute sortie est un vrai défaut. Ouvrir le reste d'un coup rendrait des centaines d'avertissements que personne ne traiterait. À faire quand on aura le temps de les traiter, pas avant. | ~4 h |
 | **Le câblage des hooks React** | reste du lot 7 ; `@testing-library/react` est installé, la porte est ouverte. | ~4 h |

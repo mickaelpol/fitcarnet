@@ -1,5 +1,5 @@
 import type { Aliment, Gravite } from '@/solveur/types';
-import { kcalDesGrammes } from './nutrition';
+import { KJ_PAR_KCAL, kcalDesGrammes, kilojoulesCertains } from './nutrition';
 
 /**
  * LES DONNÉES NE PEUVENT PAS MENTIR SANS QU'ON LE VOIE.
@@ -79,15 +79,6 @@ const SEC_MAXI = 400;
  * pas 350 kcal — la bande des grains secs ne la concerne pas.
  */
 const GONFLE = 1.3;
-
-/**
- * 1 kcal = 4,184 kJ, et les étiquettes portent les deux.
- *
- * La tolérance absorbe les arrondis de l'étiquette : « 1465 kJ / 350 kcal »
- * donne un rapport de 4,19, pas de 4,184 pile.
- */
-const KCAL_PAR_KJ = 4.184;
-const TOLERANCE_KJ = 0.15;
 
 /**
  * Les rendements de cuisson observables. Au-delà, ce n'est plus une cuisson :
@@ -243,17 +234,14 @@ export function verifierAliment(a: Aliment): Anomalie[] {
      ON NE REGARDE PAS LES KCAL SEULES : une huile fait vraiment 900 kcal aux
      100 g. C'est leur DÉSACCORD avec les macros, dans ce rapport précis, qui
      trahit l'unité. */
-  if (atwater > 0) {
-    const rapport = a.kcal100 / atwater;
-    if (Math.abs(rapport - KCAL_PAR_KJ) / KCAL_PAR_KJ <= TOLERANCE_KJ) {
-      dire('blocage', 'kilojoules_recopies',
-        `${a.kcal100.toFixed(0)} pour 100 g ressemble à des kilojoules : ses `
-        + `macros en font ${atwater.toFixed(0)} kcal. L'étiquette porte les deux `
-        + `unités côte à côte — la ligne à recopier est celle en kcal, soit `
-        + `environ ${(a.kcal100 / KCAL_PAR_KJ).toFixed(0)}.`);
+  if (kilojoulesCertains(a.kcal100, atwater)) {
+    dire('blocage', 'kilojoules_recopies',
+      `${a.kcal100.toFixed(0)} pour 100 g ressemble à des kilojoules : ses `
+      + `macros en font ${atwater.toFixed(0)} kcal. L'étiquette porte les deux `
+      + `unités côte à côte — la ligne à recopier est celle en kcal, soit `
+      + `environ ${(a.kcal100 / KJ_PAR_KCAL).toFixed(0)}.`);
 
-      return out;
-    }
+    return out;
   }
 
   const ecart = a.kcal100 - atwater;
