@@ -12,6 +12,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Service\CoherenceNutritionnelle;
 use App\Service\RendementPlausible;
 use App\State\AlimentProcessor;
 use App\State\AlimentSuppressionProcessor;
@@ -314,6 +315,50 @@ class Aliment implements ProprieteUtilisateur
 
         if (null !== $motif) {
             $contexte->buildViolation($motif)->atPath('ratio')->addViolation();
+        }
+    }
+
+    /**
+     * CET ALIMENT SE CONTREDIT-IL LUI-MEME ?
+     *
+     * Palier 1 du chantier serveur autoritaire, 20 septembre 2026. Jusqu'ici
+     * le front seul jugeait : il refusait 90 kcal pour un riz qui en fait 350,
+     * et cette entite l'acceptait sans un mot. Un appel direct a l'API, un bug
+     * d'ecran, un autre client demain — et la donnee entrait.
+     *
+     * LA REGLE N'EST PAS REECRITE ICI, ELLE EST APPELEE — comme celle du
+     * rendement juste au-dessus. `CoherenceNutritionnelle` la porte, et
+     * `api/regles/coherence.json` la verrouille sur son jumeau du front.
+     *
+     * ON NE VALIDE QUE SI LES MACROS SONT LA. Un `PATCH` partiel qui ne porte
+     * que le nom charge l'entite complete, donc les macros sont renseignees de
+     * toute facon ; mais un aliment en cours de construction, macros a `null`,
+     * releve d'`Assert\NotNull` et non d'ici. Repondre « incoherent » a une
+     * absence serait confondre « je ne sais pas » et « c'est faux » (regle 6).
+     *
+     * `atPath('kcal100')` designe le champ le plus souvent fautif : c'est
+     * celui qu'on recopie de travers sur une etiquette.
+     */
+    #[Assert\Callback]
+    public function verifierLaCoherenceNutritionnelle(ExecutionContextInterface $contexte): void
+    {
+        if (null === $this->kcal100 || null === $this->prot100
+            || null === $this->gluc100 || null === $this->lip100) {
+            return;
+        }
+
+        $motif = CoherenceNutritionnelle::motifDeRefus(
+            $this->categorie,
+            (float) $this->kcal100,
+            (float) $this->prot100,
+            (float) $this->gluc100,
+            (float) $this->lip100,
+            null === $this->fibres100 ? null : (float) $this->fibres100,
+            (float) $this->ratio,
+        );
+
+        if (null !== $motif) {
+            $contexte->buildViolation($motif)->atPath('kcal100')->addViolation();
         }
     }
 }

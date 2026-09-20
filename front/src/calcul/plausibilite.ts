@@ -81,6 +81,15 @@ const SEC_MAXI = 400;
 const GONFLE = 1.3;
 
 /**
+ * 1 kcal = 4,184 kJ, et les étiquettes portent les deux.
+ *
+ * La tolérance absorbe les arrondis de l'étiquette : « 1465 kJ / 350 kcal »
+ * donne un rapport de 4,19, pas de 4,184 pile.
+ */
+const KCAL_PAR_KJ = 4.184;
+const TOLERANCE_KJ = 0.15;
+
+/**
  * Les rendements de cuisson observables. Au-delà, ce n'est plus une cuisson :
  * un féculent quintuple de poids au plus, une viande en perd un quart.
  *
@@ -220,6 +229,33 @@ export function verifierAliment(a: Aliment): Anomalie[] {
   /* ---------------------------------------------------- énergétique */
 
   const atwater = kcalAtwater(a);
+
+  /* LES KILOJOULES RECOPIÉS À LA PLACE DES KCAL — ajouté le 20 septembre 2026
+     (palier 1), et ajouté ICI parce que le serveur venait de l'apprendre : le
+     verrou `coherencePartage.test.ts` a refusé que les deux juges divergent
+     dès le premier jour.
+
+     Les étiquettes européennes portent les deux unités côte à côte — 1465 kJ
+     et 350 kcal. Recopier la première ligne multiplie tout par 4,184, et
+     l'aliment devient quatre fois trop riche sans qu'une seule macro ne bouge.
+     Le calcul reste cohérent, et on mange le quart de ce qu'on croit.
+
+     ON NE REGARDE PAS LES KCAL SEULES : une huile fait vraiment 900 kcal aux
+     100 g. C'est leur DÉSACCORD avec les macros, dans ce rapport précis, qui
+     trahit l'unité. */
+  if (atwater > 0) {
+    const rapport = a.kcal100 / atwater;
+    if (Math.abs(rapport - KCAL_PAR_KJ) / KCAL_PAR_KJ <= TOLERANCE_KJ) {
+      dire('blocage', 'kilojoules_recopies',
+        `${a.kcal100.toFixed(0)} pour 100 g ressemble à des kilojoules : ses `
+        + `macros en font ${atwater.toFixed(0)} kcal. L'étiquette porte les deux `
+        + `unités côte à côte — la ligne à recopier est celle en kcal, soit `
+        + `environ ${(a.kcal100 / KCAL_PAR_KJ).toFixed(0)}.`);
+
+      return out;
+    }
+  }
+
   const ecart = a.kcal100 - atwater;
   /* 20 % de marge : les fibres, les polyols et les arrondis de table
      justifient un écart, pas un facteur deux. */
