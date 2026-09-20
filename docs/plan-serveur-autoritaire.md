@@ -271,15 +271,15 @@ niveaux, et c'est le troisième point qui la rend finie :
 
 | Niveau | Quoi | Taille | Stabilité |
 |---|---|---|---|
-| 1. Sous-groupes CIQUAL | quel sous-groupe va à quel créneau, avec quoi, salé ou sucré | ~45 | permanente |
+| 1. Sous-groupes CIQUAL | quel sous-groupe va à quel créneau, avec quoi, salé ou sucré | **65** | permanente |
 | 2. Patrons de repas | « R1 = céréale + laitage + fruit + oléagineux » | ~100 à 300 | permanente |
 | 3. Exceptions nommées | les aliments dont le sous-groupe ment : flageolet (protéine ET féculent), avocat, olive | quelques centaines | rare |
 
 **L'HÉRITAGE PAR SOUS-GROUPE EST CE QUI COUVRE « TOUS LES ALIMENTS ».** On
 n'énumère pas les paires — 3 200 aliments CIQUAL feraient dix millions de
 combinaisons, ingénérables et irrelisables. Chaque aliment hérite des
-associations de son sous-groupe (`alim_ssgrp_nom_fr`, déjà lu par
-`ciqual_vers_grocy.py`). Un aliment ajouté par un utilisateur demain est couvert
+associations de son sous-groupe (`alim_ssgrp_nom_fr` — **65 valeurs pour 3 484 aliments**, comptées le
+20 septembre 2026, pas estimées). Un aliment ajouté par un utilisateur demain est couvert
 **le jour même**, sans que personne touche à la table.
 
 #### Les sources publiques — licences À VÉRIFIER avant usage
@@ -355,6 +355,40 @@ d'un vrai frigo. Et quand la frappe correspond, le sélecteur se pré-remplit :
 *Témoin réel : le produit `Colomiers` du frigo de production est un Coulommiers
 mal orthographié. Avec un champ libre seul, personne ne l'a vu depuis des mois.
 Avec le sélecteur obligatoire, le nom fautif n'aurait eu aucune conséquence.*
+
+#### CIQUAL IDENTIFIE, IL NE CHIFFRE JAMAIS
+
+**Correction apportée par le propriétaire du projet le 20 septembre 2026**, et
+elle change la conception :
+
+> « ATTENTION la table CIQUAL ne doit en rien décider des macros des aliments,
+> les macros restent à renseigner par les utilisateurs car ils peuvent acheter
+> des aliments qui n'ont pas les mêmes macros […] un riz basmati acheté par
+> l'utilisateur A peut ne pas avoir les mêmes macros que le riz basmati de
+> l'utilisateur B. »
+
+C'est juste, et c'est la règle 7. **L'étiquette du paquet de quelqu'un est la
+vérité pour SON aliment** ; CIQUAL est une moyenne générique publiée par l'Anses.
+Pré-remplir les macros depuis CIQUAL produirait un chiffre plausible et faux —
+qui serait ensuite pesé et mangé.
+
+| CIQUAL sert à | CIQUAL ne sert JAMAIS à |
+|---|---|
+| **identifier** : quel sous-groupe, donc quelles associations culinaires | remplir les macros d'un aliment |
+| **alerter** : « tu as saisi 90 kcal, un aliment de ce type en fait ~350 — vérifie ton étiquette » | décider à la place de quelqu'un |
+
+Le second usage est celui qui manque aujourd'hui : mesuré le 19 septembre, le
+serveur accepte **90 kcal pour un riz qui en fait 350**. Mais c'est un
+AVERTISSEMENT, jamais une substitution, et jamais un refus — un produit allégé
+ou enrichi s'écarte légitimement de la table.
+
+**Conséquence pratique sur la migration** : l'écran ne pré-remplit rien. Pour les
+produits sans valeurs, la personne lit son paquet. C'est plus de travail, et
+c'est le prix d'un chiffre juste.
+
+Et la PROVENANCE se conserve : `Aliment.source` (`manuel`, `openfoodfacts`) côté
+base, `source_valeurs` côté Grocy — que `ciqual_vers_grocy.py` met à `moi` quand
+quelqu'un a recopié une étiquette, précisément pour qu'un import ne l'écrase pas.
 
 #### La dégradation, en trois crans — jamais « au hasard »
 

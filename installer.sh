@@ -162,12 +162,24 @@ titre "Migrations"
 #
 # Un tri alphabétique qui fait office d'ordre de dépendances marche jusqu'au
 # jour où un nom commence par une lettre. On liste donc à la main.
+#
+# ET UNE LISTE À LA MAIN S'OUBLIE : le 20 septembre 2026, la migration 40 est
+# arrivée et les deux chargeurs s'arrêtaient à `3[0-9]`. Elle n'aurait JAMAIS
+# été jouée, sans rien dire. **En passant à la dizaine suivante, ajouter la
+# ligne ICI ET dans `docker/entrypoint-prod.sh`** — les deux listes sont
+# jumelles, et une seule des deux corrigée est pire que zéro.
+#
+# `db/03-ciqual.sql` vient en DERNIER : il remplit `aliment_reference`, que la
+# migration 40 vient de créer. Il est idempotent (TRUNCATE puis INSERT) et se
+# rejoue donc sans dommage à chaque démarrage.
 migrations=""
 for fichier in \
     db/manuel/aliment-fibres.sql \
     db/manuel/1[0-9]-*.sql \
     db/manuel/2[0-9]-*.sql \
-    db/manuel/3[0-9]-*.sql
+    db/manuel/3[0-9]-*.sql \
+    db/manuel/4[0-9]-*.sql \
+    db/03-ciqual.sql
 do
     [[ -f "$fichier" ]] && migrations+="$fichier"$'\n'
 done

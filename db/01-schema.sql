@@ -381,6 +381,66 @@ CREATE INDEX modele_exercice_par_exercice ON modele_exercice (exercice_id);
 CREATE INDEX exercice_par_auteur ON exercice (cree_par) WHERE cree_par IS NOT NULL;
 
 -- ---------------------------------------------------------------------
+--  CIQUAL : la table de reference des aliments
+--
+--  Posee le 20 septembre 2026, premier pas du chantier « quitter Grocy ».
+--  3 484 aliments publies par l'Anses, charges depuis `db/03-ciqual.sql`
+--  (genere par `ciqual_vers_sql.py` ; le tableur source n'est pas versionne).
+--
+--  A QUOI ELLE SERT : RATTACHER, ET ALERTER. Un aliment cree par quelqu'un
+--  pointe vers une ligne d'ici, et c'est ce lien qui dit ce que l'aliment EST —
+--  donc a quel repas il convient et avec quoi il va. Le lien porte sur le CODE,
+--  jamais sur le nom : renommer « Poulet » en « poulets » ne casse rien.
+--
+--  A QUOI ELLE NE SERT PAS : remplir les valeurs d'un aliment. Decide par le
+--  proprietaire du projet le 20 septembre 2026 — « un riz basmati achete par
+--  l'utilisateur A peut ne pas avoir les memes macros que le riz basmati de
+--  l'utilisateur B ». L'etiquette d'un paquet est la verite pour CET aliment ;
+--  ceci n'est qu'une moyenne. Les valeurs ci-dessous servent a AVERTIR quand
+--  une saisie s'en ecarte tres fortement, jamais a la remplacer ni a la
+--  refuser : un produit allege ou enrichi s'ecarte legitimement.
+--
+--  LES VALEURS SONT NULLABLES, et c'est la regle 6 : CIQUAL ecrit « - » pour
+--  « non mesure » et « traces » pour « trop faible pour etre chiffre ». Aucun
+--  des deux ne vaut zero. 629 valeurs sont NULL sur les 3 484 lignes.
+--
+--  PAS DE `utilisateur_id` : c'est un CATALOGUE PARTAGE, comme les exercices
+--  publics, les emplacements et les modes de cuisson. Elle ne porte aucune
+--  donnee de personne, donc `ProprieteUtilisateur` ne s'applique pas (regle 2,
+--  derogation de meme nature que celles deja ecrites).
+-- ---------------------------------------------------------------------
+CREATE TABLE aliment_reference (
+    -- Le code Anses (« 20535 »), stable d'une edition a l'autre : c'est LUI
+    -- qu'un aliment reference, jamais le nom.
+    code            TEXT PRIMARY KEY,
+    nom             TEXT NOT NULL,
+    groupe_code     TEXT NOT NULL,
+    groupe          TEXT NOT NULL,
+    -- LE SOUS-GROUPE EST CE QUI PORTERA LES ASSOCIATIONS CULINAIRES (palier 4
+    -- de `docs/plan-serveur-autoritaire.md`). 65 valeurs pour 3 484 aliments,
+    -- comptees le 20 septembre 2026 et non estimees :
+    -- c'est ce qui rend la connaissance finie et relisable, la ou enumerer les
+    -- paires d'aliments en ferait dix millions.
+    sousgroupe_code TEXT NOT NULL,
+    sousgroupe      TEXT NOT NULL,
+    -- Pour 100 g du produit TEL QU'ON LE PESE (regle 3). L'energie vient de la
+    -- colonne « Reglement UE N° 1169/2011 », qui compte les fibres a 2 kcal/g
+    -- (regle 4) — pas de « N x facteur Jones », qui se trompe de convention.
+    kcal100         NUMERIC(8, 2),
+    prot100         NUMERIC(8, 2),
+    gluc100         NUMERIC(8, 2),
+    lip100          NUMERIC(8, 2),
+    fibres100       NUMERIC(8, 2)
+);
+
+-- La recherche du selecteur « ca ressemble a… » se fait sur le nom, sans
+-- accents ni casse : `unaccent` n'est pas installe, on indexe donc le nom
+-- en minuscules et on laisse le front retirer les accents comme il le fait
+-- deja (`front/src/calcul/texte.ts`).
+CREATE INDEX aliment_reference_par_nom ON aliment_reference (lower(nom));
+CREATE INDEX aliment_reference_par_sousgroupe ON aliment_reference (sousgroupe_code);
+
+-- ---------------------------------------------------------------------
 --  PAS DE VUE v_performance — retiree le 19 septembre 2026 (migration 39)
 --
 --  Elle calculait un 1RM : `MAX(sr.poids * (1 + 0.0333 * sr.reps))`, une

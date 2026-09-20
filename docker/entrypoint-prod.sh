@@ -127,7 +127,9 @@ if [ -d "$APP/db/manuel" ]; then
         "$APP"/db/manuel/aliment-fibres.sql \
         "$APP"/db/manuel/1[0-9]-*.sql \
         "$APP"/db/manuel/2[0-9]-*.sql \
-        "$APP"/db/manuel/3[0-9]-*.sql
+        "$APP"/db/manuel/3[0-9]-*.sql \
+        "$APP"/db/manuel/4[0-9]-*.sql \
+        "$APP"/db/03-ciqual.sql
     do
         [ -f "$f" ] || continue
         # ON MONTRE L'ERREUR, ON NE LA CACHE PAS.
