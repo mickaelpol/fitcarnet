@@ -4,6 +4,7 @@ import {
   useCreerModeCuisson, useMajModeCuisson, useModesCuisson, useMoi,
   useSupprimerModeCuisson,
 } from '@/api/hooks';
+import { echangeDeRangs, libelleDejaPris, prochainRang } from '@/calcul/listeOrdonnee';
 import type { ModeCuisson } from '@/calcul/cuisson';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { Confirmer } from '@/composants/confirmer';
@@ -60,26 +61,16 @@ export default function AdminCuissons() {
 
   const liste = modes.data ?? [];
 
-  /* Le prochain rang, dix crans après le dernier. Les pas de dix laissent la
-     place d'intercaler un mode entre deux existants sans avoir à renuméroter
-     toute la liste. */
-  const prochainOrdre = liste.length === 0
-    ? 10
-    : Math.max(...liste.map((m) => m.ordre)) + 10;
+  /* LES TROIS REGLES VIVENT DANS `calcul/listeOrdonnee`, depuis le
+     20 septembre 2026. Elles etaient ecrites ici, donc dans `app/`, donc hors
+     de portee de `tsconfig.tests.json` : trois regles reelles sans un seul
+     test, et rien pour le dire. */
+  const prochainOrdre = prochainRang(liste);
 
-  const deja = (v: string) => liste.some(
-    (m) => m.libelle.trim().toLowerCase() === v.trim().toLowerCase());
+  const deja = (v: string) => libelleDejaPris(liste, v);
 
   const decaler = (mode: ModeCuisson, sens: -1 | 1) => {
-    const index = liste.findIndex((m) => m.id === mode.id);
-    const voisin = liste[index + sens];
-    if (voisin === undefined) return;
-
-    /* On ÉCHANGE les deux rangs plutôt que d'incrémenter : incrémenter finit
-       par produire deux modes de même rang, et l'ordre devient celui de
-       l'alphabet — c'est-à-dire n'importe lequel. */
-    maj.mutate({ id: mode.id, ordre: voisin.ordre });
-    maj.mutate({ id: voisin.id, ordre: mode.ordre });
+    for (const ecriture of echangeDeRangs(liste, mode, sens)) maj.mutate(ecriture);
   };
 
   return (
