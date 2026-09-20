@@ -240,6 +240,8 @@ export interface AlimentDisponible {
   /** « grocy:12 » ou « base:47 » : la source est dans la référence */
   reference: string;
   nom: string;
+  /** code CIQUAL ; `null` quand l'aliment n'est rattaché à rien */
+  referenceCiqual?: string | null;
   categorie: 'prot' | 'fec' | 'leg' | 'ole' | 'huile' | 'lait' | 'fruit' | 'autre';
   kcal100: number;
   prot100: number;
@@ -286,6 +288,34 @@ export interface AlimentDisponible {
  * le calculateur de le voir par accident : il ne peut pas se glisser dans une
  * liste d'aliments, le compilateur le refuse.
  */
+/**
+ * Une entrée du catalogue CIQUAL publié par l'Anses.
+ *
+ * ELLE SERT À RATTACHER, PAS À CHIFFRER. Le lien qu'un aliment pose vers elle
+ * dit ce que l'aliment EST — donc à quel repas il convient et avec quoi il va.
+ * Les valeurs ci-dessous sont celles d'un aliment GÉNÉRIQUE : elles ne
+ * remplacent jamais celles lues sur un paquet. « Un riz basmati acheté par
+ * l'utilisateur A peut ne pas avoir les mêmes macros que celui de
+ * l'utilisateur B » (20 septembre 2026, règle 7). Elles ne servent qu'à
+ * avertir quand une saisie s'en écarte très fortement.
+ *
+ * Nullables, et c'est la règle 6 : CIQUAL écrit « - » pour « non mesuré » et
+ * « traces » pour « trop faible pour être chiffré ». Ni l'un ni l'autre ne
+ * vaut zéro.
+ */
+export interface AlimentReference {
+  code: string;
+  nom: string;
+  groupe: string;
+  sousgroupe: string;
+  sousgroupeCode: string;
+  kcal100: number | null;
+  prot100: number | null;
+  gluc100: number | null;
+  lip100: number | null;
+  fibres100: number | null;
+}
+
 export interface AlimentIncomplet {
   reference: string;
   nom: string;

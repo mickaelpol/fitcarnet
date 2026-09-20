@@ -3,6 +3,8 @@ import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View,
 } from 'react-native';
 import { Bouton, Champ, Discret, Texte } from './base';
+import { ChampRattachement } from './champRattachement';
+import type { AlimentReference } from '../api/types';
 import {
   CATEGORIES, RATIOS_GUIDES, controler, expliquerRatio,
   provenanceRatio, ratioDepuisPesees, soupconKilojoules,
@@ -29,6 +31,17 @@ export interface AlimentSaisi {
   /** pesées ayant servi à mesurer le ratio ; absentes s'il vient d'une liste */
   peseeAvant?: number | null;
   peseeApres?: number | null;
+  /**
+   * CE QUE CET ALIMENT EST, au sens du catalogue CIQUAL — le code Anses.
+   *
+   * `null` est légitime : un produit du commerce peut n'avoir aucun équivalent
+   * générique. Mesuré le 20 septembre 2026 — « Orangina » ne trouve rien dans
+   * CIQUAL, qui ne porte que des aliments génériques. L'aliment reste pesable
+   * et mangeable ; il n'est simplement pas proposé dans une composition.
+   *
+   * IL NE TOUCHE JAMAIS AUX VALEURS CI-DESSUS.
+   */
+  referenceCiqual?: string | null;
 }
 
 /**
@@ -118,6 +131,7 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
   quantite, onQuantiteChange, nomModifiable = true, nomImpose,
+  rattachement,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -146,6 +160,19 @@ export function EditeurAliment({
   onQuantiteChange?: (v: string) => void;
   /** faux quand le nom appartient à une source externe, Grocy par exemple */
   nomModifiable?: boolean;
+  /**
+   * DE QUOI RATTACHER L'ALIMENT AU CATALOGUE CIQUAL — fourni par l'appelant.
+   *
+   * Ce composant est PUR : il ne fait aucun appel réseau, et c'est ce qui
+   * permet de le monter dans un test sans client HTTP. La recherche vit donc
+   * chez `EditeurAlimentConnecte`. Absent, le champ n'apparaît pas — un écran
+   * qui n'a pas de quoi chercher ne propose pas de chercher.
+   */
+  rattachement?: {
+    recherche: string;
+    resultats: AlimentReference[];
+    onRecherche: (q: string) => void;
+  };
 }) {
   const [a, setA] = useState<AlimentSaisi>(aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' });
   const [mesurer, setMesurer] = useState(false);
@@ -279,6 +306,25 @@ export function EditeurAliment({
                     le modifier ici ne changerait rien.
                   </Discret>
                 </>
+              )}
+
+              {/* LE RATTACHEMENT VIENT JUSTE APRÈS LE NOM, et c'est voulu : les
+                  deux répondent à la même question — « qu'est-ce que c'est ? ».
+                  Le nom est celui du paquet, le rattachement celui du type.
+                  Les macros, plus bas, sont d'une autre nature : elles se
+                  lisent sur l'étiquette, jamais dans le catalogue. */}
+              {rattachement !== undefined && (
+                <View style={{ marginTop: E.m }}>
+                  <ChampRattachement
+                    valeur={a.referenceCiqual ?? null}
+                    nomAliment={a.nom}
+                    kcalSaisies={nombreSaisi(textes.kcal100)}
+                    recherche={rattachement.recherche}
+                    resultats={rattachement.resultats}
+                    onRecherche={rattachement.onRecherche}
+                    onChange={(code) => maj({ referenceCiqual: code })}
+                  />
+                </View>
               )}
 
               {onQuantiteChange !== undefined && (

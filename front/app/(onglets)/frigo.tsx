@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
+  useAlimentsReference, useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
   useEnregistrerAliment, useEnvoyerInventaire, useFrigoIncomplets, useMajAliment,
   useMonFrigo, useSuiviInventaire, useSupprimerAliment,
 } from '@/api/hooks';
@@ -77,6 +77,11 @@ export default function MonFrigo() {
      produit puis ecrit ses valeurs dans le meme appel. */
   const peutCreer = modifiable || surGrocy;
   const incomplets = useFrigoIncomplets(frigo.data?.source === 'grocy');
+
+  /* LA RECHERCHE DU RATTACHEMENT CIQUAL vit ici, avec les autres hooks : les
+     deux éditeurs ne font qu'assembler, et n'appellent rien eux-mêmes. */
+  const [rechercheReference, setRechercheReference] = useState('');
+  const references = useAlimentsReference(rechercheReference);
 
   /* Sans macros, l'aliment est écarté du frigo ; sans fibres, il y reste. Les
      deux listes n'appellent donc pas le même message. */
@@ -338,6 +343,11 @@ export default function MonFrigo() {
         creation={creation}
         edite={edite}
         aCompleter={aCompleter}
+        rattachement={{
+          recherche: rechercheReference,
+          resultats: references.data ?? [],
+          onRecherche: setRechercheReference,
+        }}
         quantite={quantiteNouvelle}
         onQuantiteChange={setQuantiteNouvelle}
         onFermer={() => {

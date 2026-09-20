@@ -20,7 +20,7 @@
  */
 
 import { EditeurAliment, type AlimentSaisi } from './editeurAliment';
-import type { AlimentDisponible, AlimentIncomplet } from '../api/types';
+import type { AlimentDisponible, AlimentIncomplet, AlimentReference } from '../api/types';
 import type {
   useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
   useEnregistrerAliment, useMajAliment,
@@ -29,6 +29,7 @@ import type {
 /** Un aliment du frigo tel que l'éditeur l'attend. */
 const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
   nom: a.nom,
+  referenceCiqual: a.referenceCiqual ?? null,
   categorie: a.categorie,
   kcal100: a.kcal100,
   prot100: a.prot100,
@@ -41,7 +42,7 @@ const versSaisie = (a: AlimentDisponible): AlimentSaisi => ({
 });
 
 export function EditeurAlimentConnecte({
-  source, creation, edite, aCompleter, quantite,
+  source, creation, edite, aCompleter, quantite, rattachement,
   onQuantiteChange, onFermer, onCreationEnvoyee, onEditionFaite,
   creer, majAliment, definir, enregistrer, poserQuantite,
 }: {
@@ -75,6 +76,22 @@ export function EditeurAlimentConnecte({
    * zéros qui partiraient en base comme des valeurs (règle 6).
    */
   aCompleter: AlimentIncomplet | null;
+  /**
+   * DE QUOI RATTACHER L'ALIMENT AU CATALOGUE — fourni par l'écran.
+   *
+   * CE COMPOSANT N'APPELLE AUCUN HOOK, et c'est la convention du dossier :
+   * `creer`, `majAliment`, `enregistrer` et les autres arrivent tous en
+   * propriétés. Le 20 septembre 2026, avoir importé `useAlimentsReference`
+   * ici a fait tomber son test de rendu — le baril `api/hooks` tire
+   * `api/client.ts`, donc `expo-secure-store`, absent de l'environnement de
+   * test. Les hooks vivent dans l'écran ; ces deux composants ne font
+   * qu'assembler.
+   */
+  rattachement?: {
+    recherche: string;
+    resultats: AlimentReference[];
+    onRecherche: (q: string) => void;
+  };
   quantite: string;
   onQuantiteChange: (v: string) => void;
   onFermer: () => void;
@@ -106,6 +123,7 @@ export function EditeurAlimentConnecte({
          vides, et `nomImpose` pose le seul fait connu. */
       aliment={!creation && edite !== null ? versSaisie(edite) : undefined}
       nomImpose={aCompleter?.nom}
+      rattachement={rattachement}
       enCours={surGrocy
         ? enregistrer.isPending || poserQuantite.isPending
         : creer.isPending || majAliment.isPending || definir.isPending}
@@ -134,6 +152,11 @@ export function EditeurAlimentConnecte({
           ratio: v.ratio,
           peseeAvant: v.peseeAvant ?? null,
           peseeApres: v.peseeApres ?? null,
+          /* LE RATTACHEMENT CIQUAL — 20 septembre 2026. Il dit ce que
+             l'aliment EST, jamais ce qu'il vaut : les macros ci-dessus restent
+             celles lues sur le paquet. `null` est légitime, une marque n'a pas
+             toujours d'équivalent générique. */
+          referenceCiqual: v.referenceCiqual ?? null,
         };
 
         if (surGrocy) {

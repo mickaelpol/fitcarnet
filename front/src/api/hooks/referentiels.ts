@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, membres } from '../client';
-import type { Exercice } from '../types';
+import type { AlimentReference, Exercice } from '../types';
 
 /**
  * Les réglages de cache d'un référentiel.
@@ -99,3 +99,31 @@ export function useFusionExercices() {
     },
   });
 }
+
+/**
+ * LE SÉLECTEUR « ÇA RESSEMBLE À… » : rattacher un aliment au catalogue CIQUAL.
+ *
+ * Posé le 20 septembre 2026, premier pas du chantier « quitter Grocy ». Le
+ * rattachement dit ce que l'aliment EST — pas ce qu'il vaut : les macros
+ * restent celles lues sur le paquet.
+ *
+ * LA RECHERCHE VIT SUR LE SERVEUR, et pas ici. 3 484 aliments, une recherche
+ * par ressemblance (`pg_trgm`) pour rattraper les fautes de frappe : descendre
+ * la table dans l'application pour l'y parcourir coûterait des centaines de
+ * kilooctets et refuserait toujours « colomiers » pour « Coulommiers ».
+ *
+ * CE N'EST PAS UN RÉFÉRENTIEL au sens du cache ci-dessus. Une recherche est
+ * une question, pas une table : chaque saisie a sa propre clé, et les garder
+ * une journée entière remplirait le cache de questions qu'on ne repose jamais.
+ * Cinq minutes suffisent à rendre instantané un aller-retour dans le champ.
+ */
+export const useAlimentsReference = (recherche: string) =>
+  useQuery({
+    queryKey: ['aliments-reference', recherche.trim().toLowerCase()],
+    queryFn: async () => (await api<{ aliments: AlimentReference[] }>(
+      `/aliments-reference?q=${encodeURIComponent(recherche.trim())}`)).aliments,
+    /* Le serveur ne cherche pas en dessous de deux caractères — il rendrait
+       des centaines de lignes à chaque frappe. On ne l'appelle donc pas. */
+    enabled: recherche.trim().length >= 2,
+    staleTime: 5 * 60 * 1000,
+  });
