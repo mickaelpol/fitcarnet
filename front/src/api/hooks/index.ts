@@ -24,6 +24,7 @@ export {
   useAlimentsReference, useExercices, useExerciceDetail, useMajExercice, useFusionExercices,
 } from './referentiels';
 export * from './frigo';
+export * from './verification';
 export * from './migration';
 export * from './cuissons';
 export * from './plans';

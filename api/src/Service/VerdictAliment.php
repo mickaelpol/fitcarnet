@@ -55,13 +55,28 @@ final class VerdictAliment
     private const ECART_FRANC = 0.3;
 
     /**
+     * Plafond physique pour 100 g : rien n'est plus dense que la matiere
+     * grasse pure, a 9 kcal par gramme. Au-dela, la valeur saisie ne peut pas
+     * etre des calories.
+     */
+    private const KCAL_MAX_100G = 900.0;
+
+    /** 1 kcal = 4,184 kJ. Facteur du reglement INCO. */
+    private const KJ_PAR_KCAL = 4.184;
+
+    /** Le rapport doit serrer 4,184 de pres pour qu'on PROPOSE une conversion. */
+    private const TOLERANCE_RAPPORT = 0.10;
+
+    /**
      * Le verdict complet.
      *
      * @param array<string, mixed> $saisie les champs TELS QUE TAPES
      *
      * @return array{refus: list<array{champ: string, message: string}>,
      *               avertissements: list<array{champ: string, message: string}>,
-     *               resume: string, enregistrable: bool}
+     *               resume: string, verdict: string, enregistrable: bool,
+     *               conversion: array{saisi: float, converti: float, motif: string}|null,
+     *               candidat: array{acceptable: bool, motif: string|null}|null}
      */
     public static function pour(array $saisie): array
     {
@@ -117,6 +132,22 @@ final class VerdictAliment
             }
         }
 
+        /* LE SENS DU RENDEMENT EST JUGE ICI AUSSI. Il l'etait par l'ecran
+           (`rendementPossible`) ET par l'entite (`verifierLeSensDuRendement`) :
+           deux ecritures, tenues par `api/regles/rendement.json`. L'ecran cesse
+           de juger, le fichier n'aura plus rien a verrouiller.
+
+           La regle n'est pas reecrite : c'est la meme fonction que l'entite
+           appelle. Une viande ne grossit pas en cuisant, un feculent ne
+           retrecit pas — une pesee a l'envers inverse les deux colonnes de
+           l'ecran, et ca ne se rattrape pas. */
+        if (null !== ($lus['ratio'] ?? null) && '' !== $categorie) {
+            $sens = RendementPlausible::sens($categorie, $ratio);
+            if (null !== $sens) {
+                $refus[] = ['champ' => 'ratio', 'message' => $sens];
+            }
+        }
+
         $controle = self::controle($lus);
         if (null !== $controle['avertissement']) {
             $avertissements[] = ['champ' => 'kcal100', 'message' => $controle['avertissement']];
@@ -136,6 +167,17 @@ final class VerdictAliment
             'refus' => $refus,
             'avertissements' => $avertissements,
             'resume' => $controle['resume'],
+            /* LA COULEUR DU BANDEAU EST UNE DECISION, PAS UN STYLE : elle dit
+               si les valeurs se tiennent. L'ecran la traduit en teinte, il ne
+               la decide plus. */
+            'verdict' => $controle['verdict'],
+            'conversion' => self::conversionProposee($lus),
+            /* LE RENDEMENT QU'ON VIENT DE MESURER, juge a part. L'ecran propose
+               « utiliser ce resultat » apres deux pesees : c'est un CANDIDAT,
+               pas la valeur en cours, et il fallait donc une reponse distincte.
+               Sans elle, l'ecran aurait garde un juge local pour ce seul
+               bouton — et la duplication serait revenue par la fenetre. */
+            'candidat' => self::jugerLeCandidat($saisie, $categorie),
             'enregistrable' => [] === $refus && $complet,
         ];
     }
@@ -151,7 +193,7 @@ final class VerdictAliment
      *
      * @param array<string, float|null> $lus
      *
-     * @return array{resume: string, avertissement: string|null}
+     * @return array{resume: string, avertissement: string|null, verdict: string}
      */
     private static function controle(array $lus): array
     {
@@ -167,6 +209,7 @@ final class VerdictAliment
             return [
                 'resume' => \sprintf('Ces macros représentent %d calories.', (int) \round($calculees)),
                 'avertissement' => null,
+                'verdict' => 'indecidable',
             ];
         }
 
@@ -186,6 +229,7 @@ final class VerdictAliment
                 'resume' => 'Renseigne les protéines, les glucides et les lipides '
                     . 'pour que le contrôle soit possible.',
                 'avertissement' => null,
+                'verdict' => 'indecidable',
             ];
         }
 
@@ -198,6 +242,7 @@ final class VerdictAliment
                     ? 'Les valeurs sont cohérentes entre elles.'
                     : 'Cohérent, mais sans les fibres le contrôle reste approximatif.',
                 'avertissement' => null,
+                'verdict' => 'coherent',
             ];
         }
 
@@ -210,7 +255,7 @@ final class VerdictAliment
                 . 'l\'aliment contient des fibres — renseigne-les pour lever le doute.',
                 (int) \round($calculees), (int) \round($kcal));
 
-            return ['resume' => $dit, 'avertissement' => $dit];
+            return ['resume' => $dit, 'avertissement' => $dit, 'verdict' => 'ecart'];
         }
 
         $dit = \sprintf(
@@ -224,7 +269,87 @@ final class VerdictAliment
                 : 'Vérifie les glucides — les sucres en font partie, ils ne s\'ajoutent pas.',
         );
 
-        return ['resume' => $dit, 'avertissement' => $dit];
+        return [
+            'resume' => $dit,
+            'avertissement' => $dit,
+            'verdict' => \abs($ecart) > self::ECART_FRANC ? 'incoherent' : 'ecart',
+        ];
+    }
+
+    /**
+     * Le rendement mesure a l'instant est-il acceptable ?
+     *
+     * `null` quand il n'y a pas de candidat — aucune pesee en cours. Sinon,
+     * un motif de refus ou `null` dans `motif` : la MEME fonction que l'entite
+     * appelle, jamais une seconde ecriture.
+     *
+     * @param array<string, mixed> $saisie
+     *
+     * @return array{acceptable: bool, motif: string|null}|null
+     */
+    private static function jugerLeCandidat(array $saisie, string $categorie): ?array
+    {
+        $brut = $saisie['ratioCandidat'] ?? null;
+        if (null === $brut || '' === \trim((string) $brut) || '' === $categorie) {
+            return null;
+        }
+
+        $valeur = self::nombreSaisi(\trim((string) $brut));
+        if (null === $valeur) {
+            return ['acceptable' => false, 'motif' => 'Ce rendement n\'est pas un nombre lisible.'];
+        }
+
+        $motif = RendementPlausible::sens($categorie, $valeur);
+
+        return ['acceptable' => null === $motif, 'motif' => $motif];
+    }
+
+    /**
+     * PROPOSER de convertir des kilojoules en calories.
+     *
+     * A NE PAS CONFONDRE AVEC LE REFUS. `CoherenceNutritionnelle` REFUSE quand
+     * il n'y a plus de doute ; ceci PROPOSE un correctif quand il y en a un.
+     * Les deux peuvent parler en meme temps, et c'est le comportement d'avant
+     * le 20 septembre 2026 — l'ecran affichait la bande jaune avec son bouton
+     * « convertir », et cette refonte ne doit RIEN changer de visible.
+     *
+     * DEUX DETECTIONS COMPLEMENTAIRES, et aucune n'est infaillible :
+     *  - le PLAFOND fonctionne sans macros saisies, mais rate les aliments peu
+     *    caloriques : 50 kcal en kJ font 209, ce qui reste plausible ;
+     *  - le RAPPORT aux macros attrape n'importe quel niveau, mais exige
+     *    qu'elles soient renseignees.
+     *
+     * @param array<string, float|null> $lus
+     *
+     * @return array{saisi: float, converti: float, motif: string}|null
+     */
+    private static function conversionProposee(array $lus): ?array
+    {
+        $kcal = $lus['kcal100'] ?? null;
+        if (null === $kcal || $kcal <= 0.0) {
+            return null;
+        }
+
+        $converti = \round($kcal / self::KJ_PAR_KCAL, 1);
+
+        if ($kcal > self::KCAL_MAX_100G) {
+            return ['saisi' => $kcal, 'converti' => $converti, 'motif' => 'plafond'];
+        }
+
+        $calculees = self::KCAL_PROT * ($lus['prot100'] ?? 0.0)
+            + self::KCAL_GLUC * ($lus['gluc100'] ?? 0.0)
+            + self::KCAL_LIP * ($lus['lip100'] ?? 0.0)
+            + self::KCAL_FIBRES * ($lus['fibres100'] ?? 0.0);
+
+        if ($calculees <= 0.0) {
+            return null;
+        }
+
+        $ecart = \abs($kcal / $calculees - self::KJ_PAR_KCAL) / self::KJ_PAR_KCAL;
+
+        return $ecart <= self::TOLERANCE_RAPPORT
+            ? ['saisi' => $kcal, 'converti' => $converti, 'motif' => 'rapport']
+            : null;
     }
 
     /**

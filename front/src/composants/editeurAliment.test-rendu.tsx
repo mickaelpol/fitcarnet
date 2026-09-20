@@ -160,24 +160,19 @@ test('des lipides illisibles ne partent pas non plus', (t: TestContext) => {
   assert.equal(envoyes.length, 0);
 });
 
-describe('l\'éditeur dit ce que le SERVEUR refusera', () => {
+describe('l\'éditeur AFFICHE ce que le serveur répond', () => {
   /**
-   * RELEVÉ PAR LE PROPRIÉTAIRE DU PROJET, le 20 septembre 2026, sur son écran.
+   * LE CONTRAT A CHANGÉ LE 20 SEPTEMBRE 2026, et ces tests avec lui.
    *
-   * Il saisit un féculent à 130 kcal qui gonfle, et l'éditeur affiche en vert
-   * « Cohérent, mais sans les fibres le contrôle reste approximatif ». Puis le
-   * serveur refuse l'enregistrement.
+   * Ils vérifiaient que l'écran SAIT qu'un grain sec fait au moins 300 kcal.
+   * Il ne le sait plus, et c'est le but : « tout doit passer par le serveur
+   * car le métier doit être sur le serveur, comme ça je peux changer le front
+   * quand bon me semble ».
    *
-   * LES DEUX ONT RAISON, ET C'EST LE PROBLÈME. `controler()` ne compare que la
-   * somme d'Atwater aux calories déclarées : 130 contre 125,5, c'est cohérent.
-   * Mais `verifierAliment()` sait en plus qu'un grain sec fait au moins
-   * 300 kcal — et l'éditeur ne l'appelait PAS. L'écran jugeait avec la moitié
-   * de ce que l'application sait, et disait « cohérent » de ce que le serveur
-   * allait refuser.
-   *
-   * Ce n'est pas un juge de plus : `verifierAliment` existe déjà et est
-   * verrouillé sur le serveur par `api/regles/coherence.json`. L'éditeur cesse
-   * simplement de s'en priver.
+   * Ce qu'on éprouve désormais : l'écran affiche fidèlement ce qui lui arrive,
+   * et éteint son bouton quand le serveur le dit. La RÈGLE, elle, est éprouvée
+   * côté serveur par `VerdictAlimentTest`, et la chaîne entière par l'épreuve
+   * de bout en bout.
    */
   const SAISIE = {
     nom: 'Riz test', categorie: 'fec' as const,
@@ -185,58 +180,58 @@ describe('l\'éditeur dit ce que le SERVEUR refusera', () => {
     ratio: 2.26, peseeAvant: null, peseeApres: null,
   };
 
-  it('annonce le refus AVANT d\'envoyer', (t: TestContext) => {
+  const VERDICT_REFUS = {
+    refus: [{ champ: 'kcal100', message: '130 kcal pour 100 g d\u2019un féculent qui gonfle : un grain sec en fait au moins 300.' }],
+    avertissements: [],
+    resume: 'Les valeurs sont cohérentes entre elles.',
+    verdict: 'coherent' as const,
+    conversion: null,
+    candidat: null,
+    enregistrable: false,
+  };
+
+  it('affiche le refus du serveur, mot pour mot', (t: TestContext) => {
     t.after(cleanup);
-    render(<EditeurAliment visible aliment={SAISIE} onFermer={() => undefined}
-      onEnregistrer={() => undefined} />);
-
-    const texte = document.body.textContent ?? '';
-    assert.match(texte, /grain sec/,
-      'l\'écran doit dire ce que le serveur dira, pas « cohérent »');
-  });
-
-  it('le dit DÈS les calories, sans attendre les quatre macros', (t: TestContext) => {
-    t.after(cleanup);
-    /* RELEVÉ PAR LE PROPRIÉTAIRE DU PROJET le 20 septembre 2026 : « je
-       souhaite que l'avertissement soit affiché direct dès qu'on a renseigné
-       les macros et non pas à l'enregistrement ».
-
-       Le message attendait que les QUATRE macros soient lisibles. Or la règle
-       du grain sec n'a besoin que des calories, de la catégorie et du
-       rendement : faire patienter jusqu'au bout, c'est laisser saisir trois
-       champs de plus avant de dire que c'était perdu d'avance.
-
-       Les deux autres règles ne peuvent pas se tromper pour autant : à macros
-       vides la matière vaut 0 g, et l'Atwater 0 — sous le plancher du soupçon
-       de kilojoules. Aucune ne peut se déclencher à tort. */
-    /* UNE VRAIE CRÉATION : aucun `aliment`, donc tous les champs partent
-       VIDES. C'est le seul montage qui reproduit le geste réel — passer un
-       aliment aux macros à zéro remplit les champs de « 0 », qui sont
-       lisibles, et le cas ne prouve rien. */
-    render(<EditeurAliment visible nomImpose="Riz test"
+    render(<EditeurAliment visible aliment={SAISIE} verdict={VERDICT_REFUS}
       onFermer={() => undefined} onEnregistrer={() => undefined} />);
 
-    /* On tape les calories, on choisit la catégorie, on pose le rendement —
-       et rien d'autre. */
-    fireEvent.click(screen.getByText('Glucide'));
-    /* Les quatre macros partagent l'invite « à saisir » : la première est
-       celle des calories. */
-    fireEvent.change(screen.getAllByPlaceholderText('à saisir')[0]!,
-      { target: { value: '130' } });
-    fireEvent.click(screen.getByText(/Riz, pâtes, quinoa/));
-
     assert.match(document.body.textContent ?? '', /grain sec/,
-      'les calories, la catégorie et le rendement suffisent : ne pas attendre '
-      + 'trois champs de plus pour dire que c\'est perdu d\'avance');
+      'la phrase vient du serveur, l\'écran ne la fabrique pas');
   });
 
-  it('LE TÉMOIN : un riz SEC ne déclenche rien', (t: TestContext) => {
+  it('LE TÉMOIN : sans refus, il n\'invente rien', (t: TestContext) => {
     t.after(cleanup);
-    /* Sans ce cas, un avertissement permanent passerait le test ci-dessus tout
-       en criant sur chaque aliment juste — et on apprendrait à l'ignorer. */
-    render(<EditeurAliment visible aliment={{ ...SAISIE, kcal100: 350, gluc100: 78, prot100: 7, lip100: 0.6 }}
+    /* Sans ce cas, un écran qui afficherait toujours un refus passerait le
+       test ci-dessus tout en criant sur chaque aliment juste. Et surtout :
+       il ne doit PAS déduire le refus des valeurs — il ne les juge plus. */
+    render(<EditeurAliment visible aliment={SAISIE}
+      verdict={{ ...VERDICT_REFUS, refus: [], enregistrable: true }}
       onFermer={() => undefined} onEnregistrer={() => undefined} />);
 
     assert.doesNotMatch(document.body.textContent ?? '', /grain sec/);
+  });
+
+  it('remonte CE QUI EST TAPÉ, pour que le parent puisse demander', (t: TestContext) => {
+    t.after(cleanup);
+    /* L'écran ne fait pas l'appel lui-même : il reste pur, et c'est ce qui
+       permet de le monter ici sans client HTTP. */
+    const vues: string[] = [];
+    render(<EditeurAliment visible aliment={SAISIE}
+      onSaisie={(saisie) => vues.push(saisie.kcal100)}
+      onFermer={() => undefined} onEnregistrer={() => undefined} />);
+
+    assert.deepEqual(vues.at(-1), '130');
+  });
+
+  it('SANS RÉPONSE ENCORE, il n\'affiche aucun verdict', (t: TestContext) => {
+    t.after(cleanup);
+    /* Inventer un avis local le temps de l\'aller-retour, ce serait
+       réintroduire exactement la deuxième écriture qu\'on vient de retirer. */
+    render(<EditeurAliment visible aliment={SAISIE}
+      onFermer={() => undefined} onEnregistrer={() => undefined} />);
+
+    const texte = document.body.textContent ?? '';
+    assert.doesNotMatch(texte, /grain sec/);
+    assert.doesNotMatch(texte, /cohérent/i);
   });
 });

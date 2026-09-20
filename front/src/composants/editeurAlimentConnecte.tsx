@@ -21,6 +21,7 @@
 
 import { EditeurAliment, type AlimentSaisi } from './editeurAliment';
 import type { AlimentDisponible, AlimentIncomplet, AlimentReference } from '../api/types';
+import type { SaisieAliment, VerdictAliment } from '../api/hooks/verification';
 import type {
   useCreerAliment, useDefinirQuantiteGrocy, useDefinirStock,
   useEnregistrerAliment, useMajAliment,
@@ -45,6 +46,7 @@ export function EditeurAlimentConnecte({
   source, creation, edite, aCompleter, quantite, rattachement,
   onQuantiteChange, onFermer, onCreationEnvoyee, onEditionFaite,
   creer, majAliment, definir, enregistrer, poserQuantite,
+  verdict, onSaisie,
 }: {
   /** qui tient la fiche : Grocy pour l'administrateur, la base pour les autres */
   source?: 'grocy' | 'base';
@@ -104,6 +106,17 @@ export function EditeurAlimentConnecte({
   definir: ReturnType<typeof useDefinirStock>;
   enregistrer: ReturnType<typeof useEnregistrerAliment>;
   poserQuantite: ReturnType<typeof useDefinirQuantiteGrocy>;
+  /**
+   * LE VERDICT DU SERVEUR, ET CE QUI EST TAPÉ — tous deux de passage.
+   *
+   * Ce composant n'appelle aucun hook, c'est la convention du dossier :
+   * l'écran demande le verdict et le fait descendre. Le 20 septembre 2026,
+   * avoir importé un hook ici a fait tomber un test de rendu — le baril
+   * `api/hooks` tire `api/client.ts`, donc `expo-secure-store`, absent de
+   * l'environnement de test.
+   */
+  verdict?: VerdictAliment;
+  onSaisie?: (s: SaisieAliment) => void;
 }) {
   const surGrocy = source === 'grocy';
 
@@ -116,6 +129,8 @@ export function EditeurAlimentConnecte({
 
   return (
     <EditeurAliment
+      verdict={verdict}
+      onSaisie={onSaisie}
       visible={(surGrocy || source === 'base')
         && (creation || edite !== null || aCompleter !== null)}
       titre={aCompleter?.nom ?? (creation ? 'Nouvel aliment' : (edite?.nom ?? 'Aliment'))}

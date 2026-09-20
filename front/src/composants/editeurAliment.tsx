@@ -5,18 +5,15 @@ import {
 import { Bouton, Champ, Discret, Texte } from './base';
 import { ChampRattachement } from './champRattachement';
 import type { AlimentReference } from '../api/types';
+import type { SaisieAliment, VerdictAliment } from '../api/hooks/verification';
 import {
-  CATEGORIES, RATIOS_GUIDES, controler, expliquerRatio,
-  provenanceRatio, ratioDepuisPesees, soupconKilojoules,
+  CATEGORIES, RATIOS_GUIDES, expliquerRatio, provenanceRatio, ratioDepuisPesees,
 } from '@/calcul/nutrition';
-/* `rendementPossible` et non plus `ratioVraisemblable` : celui-ci répondait
-   « 0,4 à 5 » sans regarder la catégorie, si bien qu'il refusait une vraie
-   mesure d'épinard (0,32) et laissait passer un féculent à 0,8 que la base
-   rejette — l'utilisateur recevait alors un 500 avec le SQL brut. Voir
-   `plausibilite.ts`, qui porte désormais la règle, la même que l'API et la base. */
-import { rendementPossible, verifierAliment } from '@/calcul/plausibilite';
-import type { Anomalie } from '@/calcul/plausibilite';
-import type { Aliment } from '@/solveur/types';
+/* CET ÉCRAN NE JUGE PLUS RIEN — 20 septembre 2026. Il importait
+   `rendementPossible`, `controler`, `soupconKilojoules` et `verifierAliment` :
+   quatre jugements qu'il refaisait après le serveur. Ils sont partis avec le
+   reste du métier, et `api/regles/rendement.json` n'a plus rien à verrouiller
+   pour ce qui le concerne. */
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 import { nombreSaisi } from '@/calcul/saisieNombre';
 
@@ -133,7 +130,7 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
   quantite, onQuantiteChange, nomModifiable = true, nomImpose,
-  rattachement,
+  rattachement, verdict, onSaisie,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -175,6 +172,22 @@ export function EditeurAliment({
     resultats: AlimentReference[];
     onRecherche: (q: string) => void;
   };
+  /**
+   * LE VERDICT, RENDU PAR LE SERVEUR — décision du 20 septembre 2026.
+   *
+   * Cet écran n'évalue plus rien : il affiche ce qui lui arrive. Le métier
+   * vit sur le serveur, pour qu'un front écrit demain dans une autre
+   * technologie n'ait rien à réimplémenter — et rien à oublier de
+   * réimplémenter, ce qui est le vrai sujet.
+   *
+   * `undefined` veut dire « pas encore de réponse » : on n'affiche alors NI
+   * refus NI résumé, plutôt qu'un avis fabriqué ici en attendant. Inventer un
+   * verdict local le temps de l'aller-retour, c'est réintroduire exactement
+   * la deuxième écriture qu'on vient de retirer.
+   */
+  verdict?: VerdictAliment;
+  /** Appelé à chaque frappe, avec les champs TELS QU'ILS SONT TAPÉS. */
+  onSaisie?: (s: SaisieAliment) => void;
 }) {
   const [a, setA] = useState<AlimentSaisi>(aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' });
   const [mesurer, setMesurer] = useState(false);
@@ -259,71 +272,53 @@ export function EditeurAliment({
     lip: a.lip100, fibres: a.fibres100,
   };
 
-  const controle = controler(macros);
-  const kilojoules = soupconKilojoules(macros);
 
 
   /* `nombreSaisi` ET NON `parseFloat` : « 4,2,1 » g se lisait 4,2 et proposait
      un ratio calculé sur une pesée qui n'existe pas. */
   const ratioMesure = ratioDepuisPesees(nombreSaisi(avant) ?? NaN, nombreSaisi(apres) ?? NaN);
 
+  /* CE QUI EST TAPÉ, ENVOYÉ AU PARENT. Il en fait un appel au serveur, avec
+     anti-rebond ; cet écran ne sait pas qu'il y a un réseau. On envoie les
+     TEXTES et non les nombres : lire « 12,5 » est aussi une règle métier, et
+     elle est partie sur le serveur avec le reste. */
+  const saisie: SaisieAliment = {
+    categorie: a.categorie,
+    kcal100: textes.kcal100,
+    prot100: textes.prot100,
+    gluc100: textes.gluc100,
+    lip100: textes.lip100,
+    fibres100: textes.fibres100,
+    ratio: String(a.ratio),
+    /* Le rendement en cours de mesure part avec le reste : c'est le serveur
+       qui dira s'il est acceptable, pas cet ecran. */
+    ratioCandidat: ratioMesure === null ? '' : String(ratioMesure),
+  };
+  const signature = JSON.stringify(saisie);
+
+  useEffect(() => { onSaisie?.(JSON.parse(signature) as SaisieAliment); }, [signature, onSaisie]);
+
   const OBLIGATOIRES = ['kcal100', 'prot100', 'gluc100', 'lip100'] as const;
   const macrosLisibles = OBLIGATOIRES.every((cle) => lisible(textes[cle]))
     && (textes.fibres100.trim() === '' || lisible(textes.fibres100));
   const illisible = (cle: CleNombre): boolean => textes[cle].trim() !== '' && !lisible(textes[cle]);
 
-  /* CE QUE LE SERVEUR REFUSERA, DIT AVANT D'ENVOYER — 20 septembre 2026,
-     relevé par le propriétaire du projet sur son écran.
-
-     Il saisit un féculent à 130 kcal qui gonfle, et l'éditeur affiche en vert
-     « Cohérent ». Puis le serveur refuse l'enregistrement.
-
-     LES DEUX AVAIENT RAISON, ET C'ÉTAIT LE PROBLÈME. `controler()` ne compare
-     que la somme d'Atwater aux calories déclarées : 130 contre 125,5, c'est
-     cohérent. Mais `verifierAliment()` sait en plus qu'un grain sec fait au
-     moins 300 kcal, qu'on ne met pas 110 g de nutriments dans 100 g, et qu'une
-     énergie peut être des kilojoules — et cet écran ne l'appelait PAS. Il
-     jugeait avec la moitié de ce que l'application sait.
-
-     CE N'EST PAS UN JUGE DE PLUS. `verifierAliment` existe déjà et est
-     verrouillé sur le serveur par `api/regles/coherence.json` : l'écran cesse
-     simplement de s'en priver. On ne montre que les BLOCAGES — ceux que le
-     serveur refusera vraiment ; ses avertissements restent des
-     avertissements. */
-  /* DÈS LES CALORIES, ET NON APRÈS LES QUATRE MACROS — 20 septembre 2026,
-     demandé par le propriétaire du projet : « je souhaite que l'avertissement
-     soit affiché direct dès qu'on a renseigné les macros et non pas à
-     l'enregistrement ».
-
-     Le message attendait `macrosLisibles`, c'est-à-dire les quatre champs.
-     Or la règle du grain sec n'a besoin que des calories, de la catégorie et
-     du rendement : faire patienter jusqu'au bout, c'est laisser saisir trois
-     champs de plus avant de dire que c'était perdu d'avance.
-
-     LES DEUX AUTRES RÈGLES NE PEUVENT PAS SE TROMPER POUR AUTANT, et c'est ce
-     qui rend l'avancement sûr : à macros vides la matière vaut 0 g — loin des
-     100,5 — et l'Atwater vaut 0, sous le plancher du soupçon de kilojoules.
-     Aucune des deux ne peut se déclencher à tort. */
-  const refus: Anomalie[] = lisible(textes.kcal100)
-    ? verifierAliment({
-        id: 0, nom: a.nom, categorie: a.categorie,
-        kcal100: a.kcal100, prot100: a.prot100, gluc100: a.gluc100,
-        lip100: a.lip100, fibres100: a.fibres100, ratio: a.ratio,
-      } as Aliment).filter((x: Anomalie) => x.gravite === 'blocage')
-    : [];
+  const refus = verdict?.refus ?? [];
 
   const valide = a.nom.trim() !== ''
     && macrosLisibles
     && a.kcal100 > 0
-    && rendementPossible(a.categorie, a.ratio)
-    && controle.verdict !== 'incoherent'
-    /* Le bouton s'éteint sur ce que le serveur refuserait : partir pour
-       revenir avec un 422 fait perdre la saisie de vue. */
-    && refus.length === 0;
+    /* LE DROIT D'ENREGISTRER VIENT DU SERVEUR. `enregistrable` porte à la fois
+       « aucun refus » et « les quatre valeurs obligatoires sont lisibles » :
+       l'écran ne le recalcule pas. Tant qu'aucune réponse n'est arrivée, on
+       laisse le bouton actif — c'est l'API qui tranchera, et un bouton éteint
+       par défaut ferait croire à un formulaire cassé. */
+    && (verdict?.enregistrable ?? true);
 
+  /* La teinte traduit la décision du serveur ; elle ne la prend plus. */
   const couleurVerdict = {
     coherent: C.ok, ecart: C.vif, incoherent: C.erreur, indecidable: C.attenue,
-  }[controle.verdict];
+  }[verdict?.verdict ?? 'indecidable'];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onFermer}>
@@ -459,21 +454,21 @@ export function EditeurAliment({
                 Idem pour les acides gras saturés, compris dans les lipides.
               </Discret>
 
-              {kilojoules !== null && (
+              {verdict?.conversion != null && (
                 <View style={[s.controle, { borderColor: C.vif }]}>
                   <Discret style={{ color: C.vif, fontSize: T.normal, lineHeight: 18 }}>
-                    {kilojoules.motif === 'plafond'
-                      ? `${nb(kilojoules.saisi)} kcal pour 100 g est impossible : rien ne dépasse `
+                    {verdict.conversion.motif === 'plafond'
+                      ? `${nb(verdict.conversion.saisi)} kcal pour 100 g est impossible : rien ne dépasse `
                         + '900 kcal, la densité de la matière grasse pure. '
-                      : `${nb(kilojoules.saisi)} est exactement 4,18 fois ce que donnent tes macros. `}
+                      : `${nb(verdict.conversion.saisi)} est exactement 4,18 fois ce que donnent tes macros. `}
                     Tu as probablement recopié les kilojoules.
                   </Discret>
                   <Bouton
                     variante="contour"
-                    onPress={() => majNombre('kcal100', String(kilojoules.converti))}
+                    onPress={() => majNombre('kcal100', String(verdict.conversion?.converti ?? ''))}
                     style={{ marginTop: E.s }}
                   >
-                    {`Convertir : ${nb(kilojoules.saisi)} kJ = ${nb(kilojoules.converti)} kcal`}
+                    {`Convertir : ${nb(verdict.conversion.saisi)} kJ = ${nb(verdict.conversion.converti)} kcal`}
                   </Bouton>
                 </View>
               )}
@@ -501,7 +496,7 @@ export function EditeurAliment({
                    question. */
                 <View style={[s.controle, { borderColor: C.erreur }]}>
                   {refus.map((x) => (
-                    <Discret key={x.code}
+                    <Discret key={x.champ + x.message}
                       style={{ color: C.erreur, fontSize: T.normal, lineHeight: 18 }}>
                       {x.message}
                     </Discret>
@@ -510,7 +505,7 @@ export function EditeurAliment({
               ) : (a.kcal100 > 0 || a.prot100 > 0) && (
                 <View style={[s.controle, { borderColor: couleurVerdict }]}>
                   <Discret style={{ color: couleurVerdict, fontSize: T.normal, lineHeight: 18 }}>
-                    {controle.message}
+                    {verdict?.resume ?? ''}
                   </Discret>
                 </View>
               )}
@@ -527,7 +522,7 @@ export function EditeurAliment({
                   au-dessus affichait tranquillement « 100 g avant cuisson
                   donnent 230 g une fois cuits ». Règle 7 : une déviation
                   s'explique à l'écran. Relevé par la revue le soir même. */}
-              {!rendementPossible(a.categorie, a.ratio) && (
+              {refus.some((x) => x.champ === 'ratio') && (
                 <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 16 }}>
                   {a.categorie === 'fec'
                     ? 'Un féculent absorbe de l\'eau : il ne peut pas peser moins cuit que cru. '
@@ -603,12 +598,12 @@ export function EditeurAliment({
                         });
                         setMesurer(false);
                       }}
-                      desactive={!rendementPossible(a.categorie, ratioMesure)}
+                      desactive={verdict?.candidat?.acceptable === false}
                       style={{ marginTop: E.s }}
                     >
-                      {rendementPossible(a.categorie, ratioMesure)
-                        ? `Utiliser ce résultat (${nb(ratioMesure)})`
-                        : 'Ces deux poids sont inversés : ce produit ne peut pas varier ainsi'}
+                      {verdict?.candidat?.acceptable === false
+                        ? 'Ces deux poids sont inversés : ce produit ne peut pas varier ainsi'
+                        : `Utiliser ce résultat (${nb(ratioMesure)})`}
                     </Bouton>
                   )}
                   <Bouton variante="discret" onPress={() => setMesurer(false)}>

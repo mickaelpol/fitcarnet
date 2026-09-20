@@ -6,6 +6,7 @@ import {
   useEnregistrerAliment, useEnvoyerInventaire, useFrigoIncomplets, useMajAliment,
   useMonFrigo, useSuiviInventaire, useSupprimerAliment,
 } from '@/api/hooks';
+import { useRetarde, useVerdictAliment, type SaisieAliment } from '@/api/hooks/verification';
 import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import { Bouton, Champ, Chargement, Discret, Erreur, Vide } from '@/composants/base';
 import { AlertesFrigo } from '@/composants/alertesFrigo';
@@ -60,6 +61,17 @@ export default function MonFrigo() {
 
   const [edite, setEdite] = useState<AlimentDisponible | null>(null);
   const [creation, setCreation] = useState(false);
+
+  /* LE VERDICT VIENT DU SERVEUR — 20 septembre 2026, décision du propriétaire
+     du projet : « tout doit passer par le serveur car le métier doit être sur
+     le serveur ». L'éditeur ne juge plus rien ; il remonte ce qui est tapé et
+     affiche ce qui revient.
+
+     L'appel vit ICI et non dans `EditeurAlimentConnecte`, qui n'appelle aucun
+     hook par convention — c'est ce qui lui permet d'être monté dans un test
+     sans client HTTP. */
+  const [saisie, setSaisie] = useState<SaisieAliment | null>(null);
+  const verdict = useVerdictAliment(useRetarde(saisie)).data;
   const [quantiteNouvelle, setQuantiteNouvelle] = useState('');
   const [aSupprimer, setASupprimer] = useState<AlimentDisponible | null>(null);
   /* Le produit Grocy dont on renseigne les valeurs pour la PREMIÈRE fois. Un
@@ -356,6 +368,8 @@ export default function MonFrigo() {
       {/* ---- création et correction des valeurs, quelle que soit la source ---- */}
       <EditeurAlimentConnecte
         source={frigo.data?.source}
+        verdict={verdict}
+        onSaisie={setSaisie}
         creation={creation}
         edite={edite}
         aCompleter={aCompleter}

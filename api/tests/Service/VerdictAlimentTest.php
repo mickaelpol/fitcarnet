@@ -149,6 +149,83 @@ final class VerdictAlimentTest extends TestCase
         self::assertNotSame([], $v['avertissements']);
     }
 
+    public function testLA_CONVERSION_DES_KILOJOULES_EST_PROPOSEE(): void
+    {
+        /* L'ecran offrait un bouton « convertir » dans une bande jaune. Cette
+           refonte ne doit RIEN changer de visible : le serveur rend donc la
+           valeur convertie, et l'ecran garde son bouton. */
+        /* SOUS LE PLAFOND DE 900, sinon c'est l'autre detection qui repond —
+           et c'est l'ordre du front, qu'on ne change pas. Macros a 158 kcal
+           par Atwater, annoncees 661 : soit 4,184 fois. */
+        $v = self::rendu(['kcal100' => '661', 'prot100' => '10', 'gluc100' => '25',
+            'lip100' => '2', 'fibres100' => '0', 'categorie' => 'autre', 'ratio' => '1']);
+
+        self::assertNotNull($v['conversion']);
+        self::assertSame('rapport', $v['conversion']['motif']);
+        self::assertEqualsWithDelta(158.0, $v['conversion']['converti'], 1.0);
+    }
+
+    public function testLE_PLAFOND_MARCHE_SANS_MACROS(): void
+    {
+        /* Rien n'est plus dense que la matiere grasse pure : 9 kcal/g. Cette
+           detection-la fonctionne avant meme que les macros soient saisies. */
+        $v = self::rendu(['kcal100' => '1465', 'categorie' => 'autre', 'ratio' => '1']);
+
+        self::assertNotNull($v['conversion']);
+        self::assertSame('plafond', $v['conversion']['motif']);
+    }
+
+    public function testLE_TEMOIN_UNE_HUILE_NE_DECLENCHE_RIEN(): void
+    {
+        /* 900 kcal pour 100 g d'huile est exact, et ses macros le confirment.
+           Sans ce cas, une proposition permanente passerait les deux tests
+           ci-dessus en criant sur chaque aliment juste. */
+        $v = self::rendu(['kcal100' => '900', 'prot100' => '0', 'gluc100' => '0',
+            'lip100' => '100', 'categorie' => 'huile', 'ratio' => '1']);
+
+        self::assertNull($v['conversion']);
+    }
+
+    public function testLE_VERDICT_NOMME_LA_COULEUR_DU_BANDEAU(): void
+    {
+        /* La teinte est une DECISION — « ces valeurs se tiennent-elles ? » —
+           pas un style. L'ecran la traduit, il ne la decide plus. */
+        self::assertSame('coherent', self::rendu(['kcal100' => '350', 'prot100' => '7',
+            'gluc100' => '78', 'lip100' => '0.6', 'fibres100' => '1.4',
+            'categorie' => 'fec', 'ratio' => '2.26'])['verdict']);
+
+        self::assertSame('indecidable', self::rendu(['categorie' => 'fec'])['verdict']);
+
+        self::assertSame('incoherent', self::rendu(['kcal100' => '100', 'prot100' => '50',
+            'gluc100' => '0', 'lip100' => '0', 'fibres100' => '0',
+            'categorie' => 'prot', 'ratio' => '1'])['verdict']);
+    }
+
+    public function testLE_SENS_DU_RENDEMENT_EST_JUGE_PAR_LE_SERVEUR(): void
+    {
+        /* Un feculent qui RETRECIT en cuisant : une pesee a l'envers. L'ecran
+           le jugeait lui-meme (`rendementPossible`), l'entite aussi — deux
+           ecritures tenues par `rendement.json`. L'ecran cesse de juger. */
+        $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
+            'lip100' => '0.6', 'fibres100' => '1.4', 'categorie' => 'fec', 'ratio' => '0.8']);
+
+        self::assertFalse($v['enregistrable']);
+        self::assertSame('ratio', $v['refus'][0]['champ'],
+            'le champ fautif est le rendement, pas les calories');
+    }
+
+    public function testLE_TEMOIN_UN_RENDEMENT_NORMAL_PASSE(): void
+    {
+        /* Sans ce cas, refuser tout rendement passerait le test ci-dessus en
+           rendant l'application inutilisable. L'epinard perd de l'eau : 0,32
+           est une vraie mesure, et elle doit entrer. */
+        $v = self::rendu(['kcal100' => '35', 'prot100' => '2.8', 'gluc100' => '3.6',
+            'lip100' => '0.4', 'fibres100' => '2.6', 'categorie' => 'leg', 'ratio' => '0.32']);
+
+        self::assertSame([], $v['refus']);
+        self::assertTrue($v['enregistrable']);
+    }
+
     // ----------------------------------------------------------------- outils
 
     /**
@@ -156,7 +233,9 @@ final class VerdictAlimentTest extends TestCase
      *
      * @return array{refus: list<array{champ: string, message: string}>,
      *               avertissements: list<array{champ: string, message: string}>,
-     *               resume: string, enregistrable: bool}
+     *               resume: string, verdict: string, enregistrable: bool,
+     *               conversion: array{saisi: float, converti: float, motif: string}|null,
+     *               candidat: array{acceptable: bool, motif: string|null}|null}
      */
     private static function rendu(array $saisie): array
     {
