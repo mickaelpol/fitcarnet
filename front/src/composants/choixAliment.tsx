@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Bouton, Champ, Discret, Texte } from './base';
 import { ChoixMuscle } from './choixMuscle';
@@ -24,8 +24,19 @@ interface Element {
 /**
  * Sélecteur avec recherche, insensible à la casse et aux accents.
  * Une liste déroulante native devient inutilisable au-delà de vingt entrées.
+ *
+ * ENVELOPPÉ DANS `memo` DEPUIS LE 20 SEPTEMBRE 2026, et ce n'est pas du
+ * confort. Son `useMemo` interne filtre jusqu'à 1338 exercices ; il ne sert à
+ * rien si le composant se re-rend à chaque frappe du parent, ce qui était le
+ * cas partout où `elements` était construit dans le corps du rendu. La
+ * documentation React 19 pose les DEUX pièces — `useMemo` chez le parent pour
+ * garder la même référence, `memo` ici pour que la comparaison serve à
+ * quelque chose — et le projet n'en posait qu'une, sur deux écrans sur trois.
+ *
+ * Le React Compiler n'est PAS activé dans ce dépôt (`app.json` ne porte pas
+ * `reactCompiler`) : rien n'est mémoïsé tout seul.
  */
-export function ChoixDansListe({
+function ChoixDansListeBrut({
   visible, titre, elements, onChoisir, onFermer,
 }: {
   visible: boolean;
@@ -140,6 +151,8 @@ export function ChoixDansListe({
     </Modal>
   );
 }
+
+export const ChoixDansListe = memo(ChoixDansListeBrut);
 
 const s = StyleSheet.create({
   fond: { flex: 1, backgroundColor: C.voile, justifyContent: 'flex-end' },
