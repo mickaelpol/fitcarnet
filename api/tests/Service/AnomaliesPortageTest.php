@@ -18,12 +18,19 @@ use PHPUnit\Framework\TestCase;
  * pas ca en se relisant — c'est exactement la methode qui produit une
  * divergence silencieuse, celle que ce depot passe son temps a rattraper.
  *
- * ON COMPARE DONC SUR UN CORPUS. Le front a tourne sur 7 936 combinaisons —
- * 50 aliments CIQUAL reels x 8 categories x 12 rendements, plus douze cas
- * fabriques pour les anomalies que des donnees propres ne declenchent jamais —
- * et sa reponse est figee dans `tests/corpus/anomalies-reference.json.gz`.
- * Ce test exige le MEME resultat : meme gravite, meme code, meme message, dans
- * le meme ordre.
+ * ON COMPARE DONC SUR UN CORPUS. Le front a tourne sur 7 936 combinaisons :
+ * 62 aliments x 8 categories x 16 rendements. Les 62 sont 50 entrees CIQUAL
+ * reelles plus 12 cas fabriques pour les anomalies que des donnees propres ne
+ * declenchent jamais. Sa reponse est figee dans
+ * `tests/corpus/anomalies-reference.json.gz`, et ce test exige le MEME
+ * resultat : meme gravite, meme code, meme message, dans le meme ordre.
+ *
+ * 6 133 cas portent une anomalie, 1 803 n'en portent AUCUNE. Les seconds
+ * comptent autant : sans eux, un faux positif du portage passerait inapercu —
+ * c'est ce que garde `testLeCorpusPORTE_AUSSI_DES_CAS_SANS_ANOMALIE`.
+ *
+ * (Ce paragraphe annoncait « 12 rendements », soit 4 800 cas et non 7 936. Les
+ * chiffres ci-dessus sont mesures sur le fichier, le 21 septembre 2026.)
  *
  * LE FICHIER EST UN ARTEFACT DE MIGRATION, pas un fichier de regles. Il fige ce
  * que l'ancien code repondait, le temps de prouver que le nouveau repond pareil.

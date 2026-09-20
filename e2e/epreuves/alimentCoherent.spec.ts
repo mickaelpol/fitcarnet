@@ -17,11 +17,15 @@ import { alimentsDe, creerCompte, seConnecter, supprimerCompte } from './compteJ
  * Aucun de ces trois ne se voit sans monter l'application entière. C'est la
  * raison d'être de ce fichier.
  *
- * CE QU'ON N'ÉPROUVE PAS ICI : les bornes elles-mêmes. Elles vivent dans
- * `api/regles/coherence.json`, lu par les deux suites unitaires, et les
- * rejouer ici les rendrait lentes sans rien garantir de plus. On éprouve
- * l'ASSEMBLAGE — que l'écran dise ce que le serveur fera, et que la base
- * contienne ce que l'écran a promis.
+ * CE QU'ON N'ÉPROUVE PAS ICI : les bornes elles-mêmes. Elles vivent sur le
+ * serveur (`CoherenceNutritionnelle`, `AnomaliesAliment`) et y sont éprouvées
+ * par PHPUnit, dont un corpus de 7 936 cas ; les rejouer ici les rendrait
+ * lentes sans rien garantir de plus. On éprouve l'ASSEMBLAGE — que l'écran
+ * dise ce que le serveur fera, et que la base contienne ce que l'écran a
+ * promis.
+ *
+ * (Ce paragraphe citait `api/regles/coherence.json`, supprimé le 21 septembre
+ * 2026 avec les trois autres fichiers de règles.)
  */
 
 /* Les valeurs du riz, telles qu'on les pèse (règle 3) : 350 kcal pour du cru.

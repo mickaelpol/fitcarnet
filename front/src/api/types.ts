@@ -123,6 +123,15 @@ export const iriDe = (v: Exercice | string): string =>
   typeof v === 'string' ? v : v['@id'];
 
 export interface Serie {
+  /**
+   * CE QUE CETTE SÉRIE PÈSE DANS L'AVANCEMENT : 1, ou 0.
+   *
+   * Rendu par le serveur depuis le 21 septembre 2026. L'écran additionne ces
+   * poids au lieu d'appliquer la règle « un chrono ne compte que pour une
+   * série » — qui ne vit plus que sur le serveur. Absent sur une série qu'on
+   * vient d'ajouter et qui n'a pas encore été enregistrée.
+   */
+  poidsDansLAvancement?: number;
   id?: number;
   ordre: number;
   reps: number | null;
@@ -136,6 +145,16 @@ export interface Serie {
 
 export interface SeanceExercice {
   id?: number;
+  /**
+   * CE QUE PÈSERAIT UNE SÉRIE AJOUTÉE MAINTENANT DANS CE BLOC.
+   *
+   * L'écran garde un état local avec sauvegarde automatique : une série qu'on
+   * vient d'ajouter n'a pas encore de poids rendu par le serveur, et le
+   * compteur doit pourtant bouger tout de suite. Sans ce champ, l'écran
+   * devrait le DÉDUIRE — donc réécrire la règle du chrono, et le double juge
+   * reviendrait par la fenêtre.
+   */
+  poidsDUneNouvelleSerie?: number;
   exercice: Exercice | string;
   ordre: number;
   mode: 'charge' | 'iso' | 'chrono' | null;

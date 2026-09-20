@@ -8,6 +8,7 @@ use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -48,6 +49,22 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(OrderFilter::class, properties: ['date'])]
 class Seance implements ProprieteUtilisateur
 {
+    /**
+     * La forme de `avancement`, pour les deux generateurs de schema.
+     *
+     * Ecrite une fois et citee deux fois plutot que recopiee : c'est la regle 5
+     * du projet appliquee a un bout de schema. Deux litteraux identiques dans
+     * le meme attribut, c'est deja un jumeau a oublier.
+     */
+    private const array SCHEMA_AVANCEMENT = [
+        'type' => 'object',
+        'properties' => [
+            'faites' => ['type' => 'integer', 'minimum' => 0],
+            'total' => ['type' => 'integer', 'minimum' => 0],
+        ],
+        'required' => ['faites', 'total'],
+    ];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::BIGINT)]
@@ -133,24 +150,40 @@ class Seance implements ProprieteUtilisateur
      *
      * Un exercice « for time » (mode chrono) ne compte que pour UNE serie :
      * il n'a qu'un temps total, meme si des lignes vides subsistent.
+     *
+     * IL ADDITIONNE LES POIDS, IL NE REECRIT PAS LA REGLE — 21 septembre 2026.
+     * Elle vit dans `SeanceExercice::compteUneSeuleSerie()`, et
+     * `Serie::getPoidsDansLAvancement()` s'y ramene comme cette methode. Les
+     * trois ne peuvent donc plus se contredire, et c'est exactement ce que
+     * `PoidsDansLAvancementTest` verifie : la somme des poids DOIT redonner ce
+     * que rend cette methode.
+     *
+     * LE SCHEMA EST ECRIT A LA MAIN parce que PHP ne sait pas le dire. Le type
+     * de retour est `array`, et API Platform en deduisait « tableau de
+     * string|null » — mesure le 21 septembre 2026 sur `api:openapi:export`.
+     * Un client genere depuis ce schema attendait donc une liste de chaines la
+     * ou il recoit `{"faites": 3, "total": 4}`. Le PHPDoc `array{}` ne suffit
+     * pas : c'est `jsonSchemaContext` que lit le generateur.
+     *
+     * @return array{faites: int, total: int}
      */
     #[Groups(['seance:lire'])]
+    #[ApiProperty(
+        description: 'Series faites sur le total. Un exercice chrono ne compte que pour une serie.',
+        jsonSchemaContext: self::SCHEMA_AVANCEMENT,
+        openapiContext: self::SCHEMA_AVANCEMENT,
+    )]
     public function getAvancement(): array
     {
         $total = 0;
         $faites = 0;
 
         foreach ($this->exercices as $exercice) {
-            $mode = $exercice->getMode() ?? $exercice->getExercice()?->getModeDefaut() ?? 'charge';
-            $series = $exercice->getSeries()->toArray();
-            if ('chrono' === $mode) {
-                $series = \array_slice($series, 0, 1);
-            }
-
-            foreach ($series as $serie) {
-                ++$total;
+            foreach ($exercice->getSeries() as $serie) {
+                $poids = $serie->getPoidsDansLAvancement();
+                $total += $poids;
                 if ($serie->isFaite()) {
-                    ++$faites;
+                    $faites += $poids;
                 }
             }
         }

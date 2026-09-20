@@ -16,9 +16,11 @@ namespace App\Service;
  * messages que l'utilisateur lit.
  *
  * COMMENT ON SAIT QUE LA TRADUCTION EST FIDELE : pas en se relisant. Le front a
- * tourne sur un corpus de 7 936 combinaisons — 50 aliments CIQUAL reels x
- * 8 categories x 16 rendements, plus douze cas fabriques pour les anomalies que
- * des donnees propres ne declenchent jamais — et sa reponse est figee dans
+ * tourne sur un corpus de 7 936 cas — 50 aliments CIQUAL reels x 8 categories x
+ * 16 rendements font 6 400, plus 12 cas fabriques x 8 x 16 = 1 536 pour les
+ * anomalies que des donnees propres ne declenchent jamais. 6 133 portent une
+ * anomalie, 1 803 n'en portent AUCUNE — et ces derniers comptent autant : sans
+ * eux, un faux positif du portage passerait inapercu. Sa reponse est figee dans
  * `tests/corpus/anomalies-reference.json.gz`. `AnomaliesPortageTest` exige le
  * MEME resultat, message par message. Porter « a l'oeil » et se relire, c'est
  * exactement la methode qui produit une divergence silencieuse.

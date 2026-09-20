@@ -64,6 +64,61 @@ class Serie
     #[Groups(['seance:lire', 'seance:ecrire'])]
     private ?int $secondesCible = null;
 
+    /**
+     * CE QUE CETTE SERIE PESE DANS L'AVANCEMENT : 1, ou 0.
+     *
+     * POURQUOI CE CHAMP EXISTE — 21 septembre 2026, dernier double juge du
+     * projet. « 7 series faites sur 12 » etait calcule DEUX fois : ici pour la
+     * liste des seances, et dans le front pour l'ecran d'une seance, qui le
+     * refait a chaque case cochee. La regle du chrono vivait des deux cotes,
+     * tenue par `api/regles/avancement.json`.
+     *
+     * CE QUI EMPECHAIT DE SIMPLEMENT LIRE LE CHAMP DU SERVEUR : cocher une
+     * serie doit bouger le compteur IMMEDIATEMENT, sans aller-retour, hors
+     * ligne compris. Lire `avancement` l'aurait fige jusqu'au retour de la
+     * requete.
+     *
+     * AVEC CE POIDS, L'ECRAN NE FAIT PLUS QU'UNE ADDITION sur des donnees
+     * fournies. Ce n'est plus une regle metier, c'est de l'arithmetique : la
+     * regle du chrono ne vit que sur le serveur, et le compteur reste
+     * instantane.
+     *
+     * LECTURE SEULE PAR OMISSION, PAS PAR GARDE. Il n'est pas dans
+     * `seance:ecrire` : le denormaliseur l'ignore, donc le renvoyer en ecriture
+     * n'ecrit rien. C'est tout ce qui le protege.
+     *
+     * IL N'EST PAS REFUSE, ET C'EST HEUREUX. La premiere version de ce
+     * commentaire — ecrite le jour meme du champ — affirmait que
+     * `RefuserLesChampsInconnus` le rendrait en 400, « ce qui est la bonne
+     * reponse ». Les deux moities sont fausses, mesurees le 21 septembre 2026 :
+     *
+     *   - `POST /api/seances` avec `poidsDansLAvancement` dans une serie rend
+     *     **201**, parce que `ChampsInconnus::nomsConnus()` tient pour connu
+     *     tout `getX()` public sans parametre — un accesseur calcule en est un.
+     *     Le garde marche par ailleurs : le meme corps avec `charge` rend 400.
+     *   - Et si ce 400 existait, il casserait l'enregistrement de toute seance
+     *     relue du serveur : `seanceEnEcriture`
+     *     (`front/src/api/hooks/decimales.ts:84`) renvoie chaque bloc par
+     *     `...s`, champs calcules compris.
+     *
+     * Motif 3 du projet — le commentaire qui ment — sur du code de la veille.
+     */
+    #[Groups(['seance:lire'])]
+    public function getPoidsDansLAvancement(): int
+    {
+        $bloc = $this->seanceExercice;
+        if (null === $bloc || !$bloc->compteUneSeuleSerie()) {
+            return 1;
+        }
+
+        /* Seule la PREMIERE ligne d'un chrono pese. On compare par identite
+           plutot que par ordre : deux series peuvent porter le meme `ordre`
+           sur une fiche abimee, et l'identite, elle, ne ment pas. */
+        $premiere = $bloc->getSeries()->first();
+
+        return false !== $premiere && $premiere === $this ? 1 : 0;
+    }
+
     public function getId(): ?int { return $this->id; }
     public function getSeanceExercice(): ?SeanceExercice { return $this->seanceExercice; }
     public function setSeanceExercice(?SeanceExercice $se): self { $this->seanceExercice = $se; return $this; }

@@ -47,26 +47,41 @@ export interface FormatPrescrit {
 /**
  * Combien de séries sont cochées, sur combien.
  *
- * Un exercice « for time » n'a qu'un temps total : ses lignes
- * supplémentaires ne comptent pas comme des séries.
+ * ELLE N'APPLIQUE PLUS AUCUNE RÈGLE : ELLE ADDITIONNE — 21 septembre 2026,
+ * dernier double juge du projet supprimé.
  *
- * `parId` sert à retrouver le mode par défaut d'un exercice que le bloc ne
- * précise pas. Un exercice absent du catalogue — il peut ne pas avoir chargé —
- * retombe sur « charge », donc sur le décompte complet.
+ * Elle résolvait le mode elle-même (`b.mode ?? parId.get(…)?.modeDefaut ??
+ * 'charge'`) puis tranchait « un chrono ne compte que pour une série ». La
+ * même règle vivait dans `Seance::getAvancement()`, et `api/regles/avancement.json`
+ * les tenait alignées.
+ *
+ * LE SERVEUR DONNE DÉSORMAIS SON POIDS À CHAQUE SÉRIE — 1, ou 0 pour les
+ * lignes d'un chrono au-delà de la première — et, pour chaque bloc, ce que
+ * pèserait une série ajoutée maintenant. Additionner des nombres fournis n'est
+ * pas une règle métier : c'est de l'arithmétique.
+ *
+ * POURQUOI ON N'A PAS SIMPLEMENT LU `seance.avancement` : cocher une série doit
+ * bouger le compteur immédiatement, sans aller-retour, hors ligne compris.
+ * Lire le champ du serveur l'aurait figé jusqu'au retour de la requête, et
+ * l'application n'aurait plus été la même.
+ *
+ * `poidsDUneNouvelleSerie` COUVRE LA SÉRIE QU'ON VIENT D'AJOUTER, qui n'a pas
+ * encore de poids : sans lui, cet écran devrait le déduire — donc réécrire la
+ * règle du chrono, et le double juge reviendrait par la fenêtre.
  */
 export function avancementDe(
   exercices: readonly SeanceExercice[],
-  parId: ReadonlyMap<number, Exercice>,
 ): { faites: number; total: number } {
   return exercices.reduce(
-    (acc, b) => {
-      const mode = b.mode ?? parId.get(idDe(b.exercice))?.modeDefaut ?? 'charge';
-      const series = mode === 'chrono' ? b.series.slice(0, 1) : b.series;
+    (acc, bloc) => {
+      for (const serie of bloc.series) {
+        const poids = serie.poidsDansLAvancement ?? bloc.poidsDUneNouvelleSerie ?? 1;
 
-      return {
-        faites: acc.faites + series.filter((s) => s.faite).length,
-        total: acc.total + series.length,
-      };
+        acc.total += poids;
+        if (serie.faite) acc.faites += poids;
+      }
+
+      return acc;
     },
     { faites: 0, total: 0 },
   );

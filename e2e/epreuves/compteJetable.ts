@@ -93,6 +93,61 @@ export const alimentsDe = (email: string): { nom: string; kcal: number; ratio: n
   });
 };
 
+/** Où répond l'API — la même adresse que le navigateur des épreuves. */
+const BASE = process.env.FITCARNET_URL ?? 'http://localhost:8080';
+
+/** Un jeton, pour préparer une situation sans passer par l'écran. */
+export async function jetonDe(email: string): Promise<string> {
+  const reponse = await fetch(`${BASE}/api/connexion`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, motDePasse: MOT_DE_PASSE }),
+  });
+
+  if (!reponse.ok) {
+    throw new Error(`connexion refusée pour ${email} : ${reponse.status}`);
+  }
+
+  return (await reponse.json() as { token: string }).token;
+}
+
+/**
+ * Monte une séance par l'API et rend son identifiant.
+ *
+ * PAR L'API ET NON EN SQL : une séance posée à la main pourrait violer une
+ * règle que le serveur applique, et l'épreuve éprouverait alors une situation
+ * qui ne peut pas arriver. C'est du *montage*, pas ce qu'on éprouve — ce qu'on
+ * éprouve vient après, à l'écran.
+ */
+export async function creerSeance(email: string, corps: unknown): Promise<string> {
+  const reponse = await fetch(`${BASE}/api/seances`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/ld+json',
+      Authorization: `Bearer ${await jetonDe(email)}`,
+    },
+    body: JSON.stringify(corps),
+  });
+
+  if (!reponse.ok) {
+    throw new Error(`séance refusée (${reponse.status}) : ${await reponse.text()}`);
+  }
+
+  return String((await reponse.json() as { id: number | string }).id);
+}
+
+/** Ce que le SERVEUR dit de l'avancement — l'autre compteur de l'application. */
+export async function avancementServeur(
+  email: string,
+  id: string,
+): Promise<{ faites: number; total: number }> {
+  const reponse = await fetch(`${BASE}/api/seances/${id}`, {
+    headers: { Authorization: `Bearer ${await jetonDe(email)}` },
+  });
+
+  return (await reponse.json() as { avancement: { faites: number; total: number } }).avancement;
+}
+
 /**
  * Ouvre l'application et se connecte, par l'écran.
  *

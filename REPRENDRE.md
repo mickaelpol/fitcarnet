@@ -12,6 +12,77 @@ d'une ligne de code, pas ce qui reste à faire.
 
 ---
 
+## L'état, au 21 septembre 2026
+
+### Le serveur est autoritaire : les quatre doubles juges ont disparu
+
+Demande du propriétaire, le 20 septembre : *« tout doit passer par le serveur à
+quel moment tu prends des décisions contraires à ce que je te demande ? […] le
+métier doit être sur le serveur et puis c'est tout, comme ça je peux changer le
+front quand bon me semble »* — et la contrainte qui borne tout le chantier :
+*« je veux la même application qu'au départ mais avec le serveur autoritaire »*.
+
+| Double juge | Ce qui le remplace |
+|---|---|
+| Cohérence d'un aliment | `POST /api/verification/aliment` → `VerdictAliment` |
+| Rendement cru/cuit | la même route |
+| Force d'un mot de passe | `POST /api/verification/mot-de-passe` (publique) |
+| Avancement d'une séance | un **poids par série** rendu en `seance:lire` |
+
+**`api/regles/` est vide** : les quatre fichiers de règles et leurs huit suites
+jumelles sont supprimés. Le dispositif « un fichier lu par les deux suites »
+est abandonné — il *gardait* la duplication au lieu de la supprimer.
+
+**Ce qui a débloqué l'avancement**, le dernier et le plus coriace : cocher une
+série doit bouger le compteur *immédiatement*, hors ligne compris, donc lire
+`seance.avancement` était exclu. La sortie n'a pas été de partager la règle,
+mais de **déplacer ce qui est transmis** — chaque série porte son poids (1, ou
+0 au-delà de la première ligne d'un chrono), et le front ne fait plus qu'une
+addition. Motif à reprendre la prochaine fois qu'un « il faut que l'écran
+réponde pendant le geste » semble imposer un second juge.
+
+**Comment la fidélité a été prouvée**, puisque l'application doit rester la
+même :
+
+- les 14 anomalies, comparées à l'ancien front sur **7 936 cas** (1 803 sans
+  anomalie, pour qu'un faux positif tombe) ;
+- la jauge de mot de passe, sur **3 605 cas** ;
+- l'avancement, sur les 10 cas de l'ancien `avancement.json`, désormais
+  écrits dans `api/tests/Entity/AvancementTest.php` ;
+- l'ordre des séries après la jointure, **mesuré sur la vraie route** avec les
+  lignes écrites à l'envers en base : `#[ORM\OrderBy]` traverse bien le
+  fetch-join, donc le poids tombe sur la bonne ligne.
+
+### Ce qu'une revue a trouvé sur ce code le jour même
+
+Trois défauts, sur du code écrit la veille — et c'est la raison d'être des
+agents de revue :
+
+1. **Un commentaire qui ment** (`api/src/Entity/Serie.php`) : il affirmait que
+   `RefuserLesChampsInconnus` refuserait `poidsDansLAvancement` en écriture.
+   Mesuré : **201**, parce que `ChampsInconnus` tient pour connu tout `getX()`
+   public. Et si ce 400 existait, il **casserait** l'enregistrement de toute
+   séance relue du serveur, `seanceEnEcriture` renvoyant chaque bloc par `...s`.
+2. **Un test qui ne pouvait pas échouer** : il additionnait les poids à la main
+   et comparait à `getAvancement()` — donc il réécrivait la boucle qu'il
+   prétendait garder, et passait au vert avec les deux côtés à zéro. Les
+   nombres attendus y sont désormais écrits.
+3. **Le schéma OpenAPI d'`avancement`** annonçait un *tableau de `string|null`*
+   pour un objet `{faites, total}`. Corrigé par `#[ApiProperty]`, et mesuré sur
+   `api:openapi:export`.
+
+### Ce qui reste ouvert sur cette refonte
+
+- `client.ts` accepte des options sans jamais consommer d'`AbortSignal` : une
+  requête de vérification abandonnée continue.
+- `VerdictAliment::nombreSaisi` dit « n'est pas un nombre lisible » pour `-2`,
+  alors que le problème est le signe.
+- Le commentaire `enabled` de `verification.ts` est faux : l'éditeur étant
+  toujours monté, un POST part à chaque ouverture du frigo.
+- Les routes de vérification sont absentes d'OpenAPI et sans limiteur de débit.
+
+---
+
 ## L'état, au 20 septembre 2026
 
 ### Ce qui s'est passé aujourd'hui
@@ -50,7 +121,10 @@ pouvaient pas se déclencher, et trois raisons écrites fausses :
 
 Et le troisième **double juge** du projet est verrouillé : l'avancement d'une
 séance, calculé à la fois par `Seance::getAvancement()` et `avancementDe()`,
-tient maintenant à `api/regles/avancement.json` lu par les deux suites.
+tient alors à `api/regles/avancement.json` lu par les deux suites.
+*(Ce verrou n'a vécu qu'un jour : le 21 septembre, le double juge a été
+**supprimé** au lieu d'être tenu d'accord, et le fichier avec. Voir l'état du
+21 septembre, plus haut.)*
 
 **Chaque correctif a été éprouvé en sabotant le code**, pour vérifier que le
 test pouvait tomber. Le plus parlant : en retirant le passage par minuit de

@@ -86,6 +86,48 @@ class SeanceExercice
     public function setNotes(?string $v): self { $this->notes = $v; return $this; }
 
     /** @return Collection<int, Serie> */
+    /**
+     * COMBIEN DE SERIES CE BLOC COMPTE-T-IL DANS L'AVANCEMENT ?
+     *
+     * C'EST LE SEUL ENDROIT OU LA REGLE DU CHRONO EST ECRITE, depuis le
+     * 21 septembre 2026. Un exercice « for time » n'a qu'UN temps total : ses
+     * lignes supplementaires ne sont pas des series a faire, meme si elles
+     * subsistent a l'ecran.
+     *
+     * `Seance::getAvancement()` et `Serie::getPoidsDansLAvancement()` s'y
+     * ramenent tous les deux — et le second est ce qui permet a l'ecran
+     * d'additionner sans connaitre la regle.
+     *
+     * LE MODE DE LA LIGNE L'EMPORTE sur celui du catalogue : faire un exercice
+     * chrono a la charge un jour donne est un choix, et il se respecte. Sans
+     * mode nulle part, le repli est « charge », donc le decompte complet —
+     * mieux vaut annoncer trop a faire que trop peu.
+     */
+    public function compteUneSeuleSerie(): bool
+    {
+        $mode = $this->mode ?? $this->exercice?->getModeDefaut() ?? 'charge';
+
+        return 'chrono' === $mode;
+    }
+
+    /**
+     * CE QUE PESERAIT UNE SERIE AJOUTEE MAINTENANT DANS CE BLOC.
+     *
+     * L'ECRAN GARDE UN ETAT LOCAL, avec sauvegarde automatique : une serie
+     * qu'on vient d'ajouter n'a pas encore de poids rendu par le serveur, et
+     * le compteur doit pourtant bouger tout de suite.
+     *
+     * Sans ce champ, l'ecran devrait DEDUIRE le poids — c'est-a-dire
+     * reecrire la regle du chrono, et le double juge reviendrait par la
+     * fenetre. Ici il lit un nombre : zero si ce bloc compte deja sa seule
+     * serie, un sinon.
+     */
+    #[Groups(['seance:lire'])]
+    public function getPoidsDUneNouvelleSerie(): int
+    {
+        return $this->compteUneSeuleSerie() && !$this->series->isEmpty() ? 0 : 1;
+    }
+
     public function getSeries(): Collection { return $this->series; }
 
     /**

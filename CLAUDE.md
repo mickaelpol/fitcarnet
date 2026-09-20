@@ -63,9 +63,9 @@ chemin d'écriture non gardé, un écran qui disait « Cohérent » de ce que le
 serveur allait refuser, et un message qui attendait trois champs de trop.
 
 Elles montent l'application ENTIÈRE dans Chromium. Elles n'éprouvent **pas** les
-bornes — `api/regles/*.json` s'en charge, et les rejouer ici les rendrait lentes
-sans rien garantir de plus. Elles éprouvent que **l'écran dit ce que le serveur
-fera**, et que **la base contient ce que l'écran a promis**.
+bornes — les suites PHPUnit du serveur s'en chargent, et les rejouer ici les
+rendrait lentes sans rien garantir de plus. Elles éprouvent que **l'écran dit ce
+que le serveur fera**, et que **la base contient ce que l'écran a promis**.
 
 **Elles n'écrivent jamais sur une donnée qu'elles n'ont pas créée** : un compte
 jetable en `@e2e.local` par épreuve, et le ménage final **échoue** s'il en reste
@@ -180,42 +180,75 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Proximité de deux noms (fusion d'exercices) | `front/src/calcul/proximite.ts` |
 | Composer plusieurs jours d'un coup | `front/src/calcul/composerLaPeriode.ts` |
 
-**LES DOUBLES JUGES SONT EN VOIE DE DISPARITION — décision du 20 septembre
-2026.** « Tout doit passer par le serveur car le métier doit être sur le
-serveur, comme ça je peux changer le front quand bon me semble. » Deux sont
-déjà partis le jour même : la **cohérence d'un aliment** et le **rendement
-cru/cuit**, avec `coherence.json`, `rendement.json` et leurs quatre suites
-jumelles. Le front ne les juge plus — il affiche ce que
-`POST /api/verification/aliment` lui répond, et les anomalies du frigo
-arrivent avec `GET /api/mon-frigo`. **Trois sont partis** : la cohérence d'un aliment, le rendement cru/cuit et
-**le mot de passe** — avec `coherence.json`, `rendement.json`,
-`motdepasse.json` et leurs six suites jumelles. Le front n'évalue plus rien de
-tout cela : `POST /api/verification/aliment` et
-`POST /api/verification/mot-de-passe` rendent les verdicts, les phrases et
-jusqu'aux couleurs. **Reste l'avancement d'une séance**, seul survivant.
+**Depuis la refonte des 20 et 21 septembre 2026, une partie du métier a quitté
+le front pour de bon.** Ces modules-là sont sur le serveur, et le front se
+contente d'afficher ce qu'ils répondent :
 
-**NE COMPTE PAS LES DOUBLES JUGES DE TÊTE — CETTE PAGE S'EST TROMPÉE QUATRE
-FOIS.** Successivement : « le mot de passe est le seul cas », « deux cas et deux
-seulement », « trois cas », puis de nouveau « deux ». Chaque correction a été
-écrite par quelqu'un qui croyait vérifier. **La liste ci-dessous est à compléter
-dès qu'on en trouve un autre, et il faut la considérer comme incomplète.**
+| Domaine | Module de référence, côté serveur |
+|---|---|
+| Verdict d'un aliment en cours de saisie (refus, avertissements, couleur, conversion) | `api/src/Service/VerdictAliment.php` — servi par `POST /api/verification/aliment` |
+| Les quatorze anomalies nutritionnelles | `api/src/Service/AnomaliesAliment.php` |
+| Cohérence des kilocalories déclarées | `api/src/Service/CoherenceNutritionnelle.php` |
+| Somme d'Atwater, côté serveur | `api/src/Service/Atwater.php` — **seule écriture PHP**, elle l'était cinq fois |
+| Force d'un mot de passe | `api/src/Service/MotDePasse.php` — servi par `POST /api/verification/mot-de-passe`, **route publique** (l'écran d'invitation n'a pas encore de compte) |
+| « Un chrono ne compte que pour une série » | `api/src/Entity/SeanceExercice.php` `compteUneSeuleSerie()` — lue par `Serie::getPoidsDansLAvancement()` et `Seance::getAvancement()`, qui ne la réécrivent pas |
 
-| Ce qui est jugé deux fois | Les deux écritures | Ce qui les tient alignées |
+### Les doubles juges : il n'y en a plus, et `api/regles/` n'existe plus
+
+**Décision du 20 septembre 2026**, dans les mots du propriétaire : « *tout doit
+passer par le serveur car le métier doit être sur le serveur et puis c'est tout,
+comme ça je peux changer le front quand bon me semble* ». Les **quatre** sont
+partis en deux jours, et avec eux les quatre fichiers de règles :
+
+| Ce qui était jugé deux fois | Parti le | Ce qui le décide aujourd'hui |
 |---|---|---|
-| Mot de passe | `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` | `api/regles/motdepasse.json`, lu par `MotDePassePartageTest.php` **et** `motDePassePartage.test.ts` |
-| Avancement d'une séance | `api/src/Entity/Seance.php` `getAvancement()`, `front/src/calcul/blocSeance.ts` `avancementDe()` | `api/regles/avancement.json`, lu par `AvancementPartageTest.php` **et** `avancementPartage.test.ts` — depuis le 20 septembre 2026. Les deux tournent vraiment : `app/(onglets)/seances.tsx` lit le champ du serveur, `app/seance/[id].tsx` recalcule à chaque case cochée |
+| Cohérence d'un aliment | 20 sept. 2026 | `POST /api/verification/aliment` → `VerdictAliment` |
+| Rendement cru/cuit | 20 sept. 2026 | la même route |
+| Force d'un mot de passe | 20 sept. 2026 | `POST /api/verification/mot-de-passe` → `MotDePasse` |
+| **Avancement d'une séance** | **21 sept. 2026** | `Serie::getPoidsDansLAvancement()` et `SeanceExercice::getPoidsDUneNouvelleSerie()`, exposés en `seance:lire` |
 
-Le dernier a la même raison d'exister — l'écran doit répondre pendant le
-geste, sans aller-retour réseau, pendant que le serveur reste seul à décider —
-et le même dispositif : **un fichier de règles lu par les DEUX suites**. Le jour
-où l'un des juges change d'avis sans l'autre, une des deux suites tombe **en
-nommant le cas**.
+`api/regles/coherence.json`, `rendement.json`, `motdepasse.json` et
+`avancement.json` sont supprimés, ainsi que leurs huit suites jumelles.
+**Le dossier `api/regles/` est vide et n'a plus de raison d'être : ne pas en
+recréer un.**
 
-**Un fichier de règles ne suffit pas : il faut aussi que le test PUISSE
-tomber.** Chacun des trois porte donc un cas TÉMOIN qui vérifie que la liste
-éprouve encore ce qu'elle prétend éprouver — sans quoi vider la liste rendrait
-les deux suites vertes et muettes. Les trois verrous ont été éprouvés en
-sabotant volontairement chaque côté, et chacun est tombé en nommant le cas.
+**POURQUOI UNE ROUTE, ET NON UN FICHIER DE RÈGLES.** Un fichier de règles est un
+*contrat* : il suppose qu'un futur front pense à le lire, donc il **garde** la
+duplication au lieu de la supprimer. Une route ne le suppose pas — un écran qui
+ne l'appelle pas n'affiche rien, et ça se voit tout de suite.
+
+**CE QUI A DÉBLOQUÉ L'AVANCEMENT, le dernier et le plus coriace.** Cocher une
+série doit bouger le compteur *immédiatement*, hors ligne compris : lire
+`seance.avancement` l'aurait figé jusqu'au retour de la requête. La sortie n'est
+pas de partager la règle, c'est de **déplacer ce qui est transmis** — le serveur
+donne à chaque série son *poids* (1, ou 0 pour les lignes d'un chrono au-delà de
+la première), et le front ne fait plus qu'une **addition**. Ce n'est plus une
+règle métier, c'est de l'arithmétique. Motif réutilisable la prochaine fois que
+« l'écran doit répondre pendant le geste » semble imposer un second juge.
+
+**NE COMPTE PAS LES DOUBLES JUGES DE TÊTE — CETTE PAGE S'EST TROMPÉE CINQ
+FOIS.** Successivement : « le mot de passe est le seul cas », « deux cas et deux
+seulement », « trois cas », « deux » de nouveau, puis — le 21 septembre — elle
+annonçait « deux » et « trois » **dans le même paragraphe** en citant quatre
+fichiers déjà supprimés. Chaque correction a été écrite par quelqu'un qui
+croyait vérifier. **Si tu lis cette page pour savoir combien il y en a, va
+d'abord regarder `api/regles/` et la liste des routes de vérification.**
+
+**CE QUI EMPÊCHE MAINTENANT QU'ILS REVIENNENT**, faute de fichier de règles à
+tenir d'accord — deux gardes qui lisent **tout le dépôt**, et non une suite de
+chaque côté :
+
+| Garde | Ce qu'il refuse |
+|---|---|
+| `front/src/calcul/epleyUnique.test.ts` | le coefficient d'Epley hors de `performance.ts`, dans `.ts`, `.tsx`, `.php`, `.sql`, `.py` |
+| `front/src/calcul/avancementUnique.test.ts` | le mot « chrono » dans le module d'avancement, et tout décompte partiel des séries (`slice(0, 1)`) dans le front |
+| `front/src/calcul/formuleUnique.test.ts` | toute multiplication par un coefficient `KCAL_…` hors de `nutrition.ts` |
+
+**Un garde ne suffit pas : il faut qu'il PUISSE tomber.** Chacun porte donc un
+cas TÉMOIN qui vérifie qu'il reconnaît encore sa référence — sans quoi un motif
+devenu obsolète laisserait la suite verte et muette. Les trois ont été éprouvés
+en sabotant volontairement le code gardé, et chacun est tombé **en nommant le
+défaut**.
 
 ### Le 1RM : la duplication a été retirée, le 19 septembre 2026
 
@@ -233,8 +266,10 @@ réécriture du coefficient **dans tout le dépôt** — `.ts`, `.tsx`, `.php`, 
 divergence entre deux langages : aucun des deux côtés ne peut la voir seul.
 
 **Ne pas réintroduire `rmEstime` dans l'API sans décision explicite.** Si un
-autre lecteur doit un jour obtenir ce chiffre du serveur, il faudra alors un
-`api/regles/rm.json` lu par les deux suites, comme pour les deux cas ci-dessus.
+autre lecteur doit un jour obtenir ce chiffre du serveur, il faudra le lui faire
+**calculer par le serveur** et l'afficher, comme pour l'aliment et le mot de
+passe — surtout pas un second juge tenu par un fichier de règles, dispositif
+abandonné le 21 septembre 2026.
 
 Un hook qui recalcule un 1RM importe `performance.ts`. Trois copies d'Epley aux bornes divergentes
 ont produit un « record » de 79,96 kg que la formule elle-même déclare invalide.

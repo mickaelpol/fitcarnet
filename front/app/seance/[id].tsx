@@ -110,7 +110,7 @@ export default function DetailSeance() {
   }
   if (!seance) return <Chargement />;
 
-  const avancement = avancementDe(seance.exercices, parId);
+  const avancement = avancementDe(seance.exercices);
 
   const ajouterExercice = (idExercice: number) => {
     const ex = parId.get(idExercice);

@@ -142,53 +142,87 @@ const catalogue = (...ex: Exercice[]): Map<number, Exercice> =>
 
 /* ---- avancementDe ---- */
 
-test('l\'avancement compte les séries faites sur le total', () => {
-  const a = avancementDe(
-    [bloc(7, [{ faite: true }, { faite: false }, { faite: true }])],
-    catalogue(exercice(7)),
-  );
+/**
+ * CE QU'ON ÉPROUVE ICI A CHANGÉ LE 21 SEPTEMBRE 2026, et c'est le but.
+ *
+ * Ces cas vérifiaient que le front SAIT qu'un chrono ne compte que pour une
+ * série. Il ne le sait plus : le serveur donne à chaque série son POIDS, et
+ * cette fonction ne fait plus qu'additionner. La règle, elle, est éprouvée
+ * côté serveur par `api/tests/Entity/PoidsDansLAvancementTest.php`, dont un
+ * verrou exige que la somme des poids redonne exactement l'avancement.
+ *
+ * Ce qui reste à vérifier ici est donc l'arithmétique, et un seul cas de bon
+ * sens : une série jamais enregistrée n'a pas encore de poids.
+ */
+
+const avecPoids = (
+  series: { faite: boolean; poids?: number }[],
+  poidsDUneNouvelleSerie?: number,
+): SeanceExercice => ({
+  exercice: '/api/exercices/7',
+  ordre: 0,
+  mode: null,
+  notes: null,
+  secondesTotal: null,
+  poidsDUneNouvelleSerie,
+  series: series.map((x, i) => ({
+    ordre: i, reps: null, poids: null, secondes: null, faite: x.faite,
+    repsCible: null, poidsCible: null, secondesCible: null,
+    poidsDansLAvancement: x.poids,
+  })),
+} as unknown as SeanceExercice);
+
+test('l\'avancement additionne les poids rendus par le serveur', () => {
+  const a = avancementDe([avecPoids([
+    { faite: true, poids: 1 }, { faite: false, poids: 1 }, { faite: true, poids: 1 },
+  ])]);
 
   assert.deepEqual(a, { faites: 2, total: 3 });
 });
 
-test('un « for time » ne compte que pour UNE série, quel que soit le nombre de lignes', () => {
-  /* Un exercice chronométré n'a qu'un temps total : ses lignes
-     supplémentaires détaillent l'effort, elles ne sont pas des séries. */
-  const a = avancementDe(
-    [bloc(7, [{ faite: true }, { faite: true }, { faite: true }], 'chrono')],
-    catalogue(exercice(7)),
-  );
+test('une série à POIDS ZÉRO ne compte ni au total ni aux faites', () => {
+  /* C'est ainsi qu'un « for time » ne vaut qu'une série : le serveur met 0 aux
+     lignes au-delà de la première. Cet écran n'a pas à savoir pourquoi. */
+  const a = avancementDe([avecPoids([
+    { faite: true, poids: 1 }, { faite: true, poids: 0 }, { faite: true, poids: 0 },
+  ])]);
 
   assert.deepEqual(a, { faites: 1, total: 1 });
 });
 
-test('le mode du bloc l\'emporte, et à défaut celui du catalogue', () => {
-  /* Bloc sans mode + exercice « chrono » au catalogue : on retombe sur le
-     catalogue, donc une seule série. */
-  const parCatalogue = avancementDe(
-    [bloc(7, [{ faite: true }, { faite: true }])],
-    catalogue(exercice(7, 'chrono')),
-  );
-  assert.deepEqual(parCatalogue, { faites: 1, total: 1 });
+test('plusieurs blocs s\'additionnent', () => {
+  const a = avancementDe([
+    avecPoids([{ faite: true, poids: 1 }, { faite: false, poids: 0 }]),
+    avecPoids([{ faite: true, poids: 1 }, { faite: true, poids: 1 }]),
+  ]);
 
-  /* Le bloc dit « charge » : il gagne, malgré le catalogue. */
-  const parBloc = avancementDe(
-    [bloc(7, [{ faite: true }, { faite: true }], 'charge')],
-    catalogue(exercice(7, 'chrono')),
-  );
-  assert.deepEqual(parBloc, { faites: 2, total: 2 });
+  assert.deepEqual(a, { faites: 3, total: 3 });
 });
 
-test('un exercice absent du catalogue retombe sur « charge »', () => {
-  /* Le catalogue peut ne pas avoir chargé : la jauge doit rester juste
-     plutôt que de traiter la séance comme une suite de chronos. */
-  const a = avancementDe([bloc(99, [{ faite: true }, { faite: false }])], catalogue());
+test('une série JAMAIS ENREGISTRÉE prend le poids que le bloc annonce', () => {
+  /* L'écran garde un état local : une série qu'on vient d'ajouter n'a pas
+     encore de poids, et le compteur doit pourtant bouger tout de suite. Le
+     serveur dit ce que pèserait une nouvelle série dans ce bloc — l'écran ne
+     le DÉDUIT pas, sinon il réécrirait la règle du chrono. */
+  const surUnChronoDejaServi = avancementDe([avecPoids(
+    [{ faite: true, poids: 1 }, { faite: false }], 0)]);
+  assert.deepEqual(surUnChronoDejaServi, { faites: 1, total: 1 });
 
-  assert.deepEqual(a, { faites: 1, total: 2 });
+  const surUnBlocOrdinaire = avancementDe([avecPoids(
+    [{ faite: true, poids: 1 }, { faite: false }], 1)]);
+  assert.deepEqual(surUnBlocOrdinaire, { faites: 1, total: 2 });
+});
+
+test('sans aucune indication, une série compte pour une', () => {
+  /* LE TÉMOIN DU REPLI. Le catalogue peut ne pas avoir chargé, la réponse peut
+     dater d'avant ce champ : mieux vaut annoncer trop à faire que trop peu —
+     un compteur qui sous-estime laisse croire une séance finie. */
+  assert.deepEqual(avancementDe([avecPoids([{ faite: true }, { faite: false }])]),
+    { faites: 1, total: 2 });
 });
 
 test('une séance vide donne un avancement nul, sans division à venir', () => {
-  assert.deepEqual(avancementDe([], catalogue()), { faites: 0, total: 0 });
+  assert.deepEqual(avancementDe([]), { faites: 0, total: 0 });
 });
 
 /* ---- blocDepuisExercice ---- */
