@@ -33,11 +33,11 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 801 tests, puis 42 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 804 tests, puis 45 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 481 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 489 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -49,7 +49,27 @@ db/manuel/verifier-migrations.sh       # les migrations passent sur de vraies do
 db/manuel/verifier-jeux.sh             # jeu d'essai et jeu de démonstration, garde-fou compris
 python3 test_import_carnet.py          # l'import du carnet (exige psycopg2)
 python3 test_ciqual.py                 # l'import CIQUAL, sans dépendance
+# ÉPREUVES DE BOUT EN BOUT : vrai navigateur, vraie API, vraie base.
+# Exigent l'environnement de dev debout ET un `front/dist` à jour.
+cd e2e && npm install                  # une seule fois
+cd e2e && npm test                     # ~11 s pour trois épreuves
 ```
+
+### Les épreuves de bout en bout — `e2e/`
+
+Posées le 20 septembre 2026, après que **trois défauts d'assemblage** se soient
+succédé en une heure sans qu'aucun des 1 293 tests unitaires ne les voie : un
+chemin d'écriture non gardé, un écran qui disait « Cohérent » de ce que le
+serveur allait refuser, et un message qui attendait trois champs de trop.
+
+Elles montent l'application ENTIÈRE dans Chromium. Elles n'éprouvent **pas** les
+bornes — `api/regles/*.json` s'en charge, et les rejouer ici les rendrait lentes
+sans rien garantir de plus. Elles éprouvent que **l'écran dit ce que le serveur
+fera**, et que **la base contient ce que l'écran a promis**.
+
+**Elles n'écrivent jamais sur une donnée qu'elles n'ont pas créée** : un compte
+jetable en `@e2e.local` par épreuve, et le ménage final **échoue** s'il en reste
+un. Les cinq règles pour en écrire une sont dans `e2e/LISEZMOI.md`.
 
 ## Règles non négociables
 
