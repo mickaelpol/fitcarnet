@@ -57,9 +57,50 @@ test pouvait tomber. Le plus parlant : en retirant le passage par minuit de
 `rangDepuisAujourdhui`, le test nomme le **dimanche 29 mars 2026** — la nuit du
 passage à l'heure d'été, ce bug « qui ne se voit que deux fois par an ».
 
+### Le palier 1 est fait — le serveur refuse les chiffres faux
+
+Trois refus sur un aliment, un sur une cible, **et aucun ne consulte une
+table** : ils ne comparent l'aliment qu'à lui-même. Deux personnes peuvent
+acheter deux riz basmati aux macros différentes, et les deux ont raison.
+
+| Refusé | Éprouvé par HTTP |
+|---|---|
+| 130 kcal pour un féculent qui gonfle (valeurs du produit **cuit**) | `422 kcal100: … un grain sec en fait au moins 300` |
+| 1465 kcal, c'est-à-dire les **kilojoules** de l'étiquette | `422 … ressemble a des kilojoules : ses macros en font 348` |
+| 110 g de nutriments dans 100 g de produit | `422 110,0 g de nutriments dans 100 g` |
+| Riz sec 350 · huile 900 · pain 260 | `201` — les trois témoins passent |
+
+**Ce que le serveur NE refuse PAS, et c'est écrit** : une cible seulement
+incohérente. L'écran dit « l'app respecte les grammes ; les calories suivent »
+et laisse enregistrer — quelqu'un recopie un plan de coach qui ne tombe pas
+juste. Le plan prescrivait de la refuser ; c'était une régression.
+
+**Quatrième double juge**, assumé et verrouillé par `api/regles/coherence.json`.
+Il a servi le jour même : le front ne connaissait pas la règle des kilojoules,
+le test jumeau est tombé en nommant le cas.
+
+**Deux défauts trouvés dans ce que je venais d'écrire.** La règle des
+kilojoules refusait du **vin, du cidre et du vinaigre** — l'alcool fait 7 kcal/g
+et n'entre dans aucune macro, donc tout produit alcoolisé passe par 4,184 en
+chemin. Mesuré sur 3 006 entrées CIQUAL : 2 refus à tort sans plancher, 0 avec.
+Et j'avais écrit une **deuxième** règle kilojoule dans `nutrition.ts` alors que
+`soupconKilojoules` existait déjà, avec une autre tolérance.
+
+### Un défaut critique trouvé en chemin, sans rapport avec le palier
+
+`db/manuel/rattraper-dev.sh` est une **cinquième** liste de migrations jumelle,
+restée à `3[0-9]` quand les quatre autres passaient à `4[0-9]`. Un second poste
+qui fait `git pull` puis `rattraper-dev.sh` — ce que `CLAUDE.md` prescrit — se
+retrouvait **sans CIQUAL et sans la recherche floue, sans le moindre signal** :
+le garde ne compare que sa propre liste à ce qui existe.
+
+La cause était le décompte lui-même : trois endroits disaient « QUATRE », dont
+`rattraper-dev.sh` qui énumérait cinq noms sous le mot « quatre ». Le seul
+oublié est celui qui n'apparaissait dans aucune énumération.
+
 ### Ce qui reste, connu et non corrigé
 
-- `modele/[id].tsx:199` : `key={j}` sur des séries qu'on peut supprimer au
+- `modele/[id].tsx:198` : `key={j}` sur des séries qu'on peut supprimer au
   milieu. `ChampNombre` se resynchronise, donc le risque est marginal — mais il
   existe pour un texte en cours de frappe.
 - Quatre listes de modale dans `repas.tsx` et une dans `seance/[id].tsx`
