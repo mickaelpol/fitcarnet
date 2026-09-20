@@ -349,6 +349,14 @@ export interface AlimentAMigrer {
   manquants?: string[];
 }
 
+/** Une anomalie du catalogue, telle que le serveur la formule. */
+export interface Anomalie {
+  /** `blocage` refuse la donnée, `avertissement` la signale, `info` la nuance. */
+  gravite: 'blocage' | 'avertissement' | 'info';
+  code: string;
+  message: string;
+}
+
 export interface AlimentIncomplet {
   reference: string;
   nom: string;
@@ -364,6 +372,15 @@ export interface MonFrigo {
   aliments: AlimentDisponible[];
   /** Grocy seulement : visibles à l'écran, invisibles au calculateur. */
   incomplets?: AlimentIncomplet[];
+  /**
+   * CE QUI CLOCHE DANS LE FRIGO, DIT PAR LE SERVEUR — 20 septembre 2026.
+   *
+   * Le front les déduisait lui-même (`verifierCatalogue`), c'est-à-dire qu'il
+   * portait quatorze règles métier que tout autre front aurait dû réécrire.
+   * Elles arrivent avec le frigo, sans aller-retour de plus : les données
+   * étaient déjà là.
+   */
+  anomalies?: Anomalie[];
   /** message expliquant pourquoi la liste est vide, le cas échéant */
   probleme: string | null;
 }

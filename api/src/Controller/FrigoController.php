@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\Aliment;
 use App\Entity\Utilisateur;
+use App\Service\AnomaliesAliment;
 use App\Service\CoherenceNutritionnelle;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
@@ -67,6 +68,7 @@ final class FrigoController extends AbstractController
                 'source' => $this->frigo->source($utilisateur),
                 'aliments' => [],
                 'incomplets' => [],
+                'anomalies' => [],
                 'probleme' => $probleme,
             ]);
         }
@@ -80,6 +82,7 @@ final class FrigoController extends AbstractController
                 'source' => $this->frigo->source($utilisateur),
                 'aliments' => [],
                 'incomplets' => [],
+                'anomalies' => [],
                 'probleme' => $e->getMessage(),
             ]);
         }
@@ -91,11 +94,33 @@ final class FrigoController extends AbstractController
 
            Ils sont SEPARES des aliments parce qu'ils n'ont pas de macros :
            l'ecran les affiche, le calculateur ne les voit pas. */
+        $aliments = \array_map(static fn ($a) => $a->versTableau(), $tout['aliments']);
+
+        /* LES ANOMALIES PARTENT AVEC LE FRIGO, pas par une route a part — et
+           c'est le meme argument que pour `incomplets` juste au-dessus : les
+           donnees sont deja la, les redemander couterait un aller-retour pour
+           rien.
+
+           ELLES SONT CALCULEES ICI DEPUIS LE 20 SEPTEMBRE 2026. Le front les
+           deduisait lui-meme (`verifierCatalogue`), c'est-a-dire qu'il portait
+           quatorze regles metier que tout autre front aurait du reecrire. Le
+           serveur les rend ; l'ecran affiche. */
         return $this->json([
             'source' => $this->frigo->source($utilisateur),
-            'aliments' => \array_map(
-                static fn ($a) => $a->versTableau(), $tout['aliments']),
+            'aliments' => $aliments,
             'incomplets' => $tout['incomplets'],
+            'anomalies' => AnomaliesAliment::pourLeCatalogue(\array_map(
+                static fn (array $a): array => [
+                    'nom' => (string) $a['nom'],
+                    'categorie' => (string) $a['categorie'],
+                    'kcal100' => (float) $a['kcal100'],
+                    'prot100' => (float) $a['prot100'],
+                    'gluc100' => (float) $a['gluc100'],
+                    'lip100' => (float) $a['lip100'],
+                    'fibres100' => null === $a['fibres100'] ? null : (float) $a['fibres100'],
+                    'ratio' => (float) $a['ratio'],
+                ],
+                $aliments)),
             'probleme' => null,
         ]);
     }

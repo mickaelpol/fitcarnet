@@ -29,7 +29,6 @@ import {
   alimentsCalculables, alimentsSansFibresConnues, cibleDuRepas,
   fibresPar100, grammesDisponibles, grammesEnStock,
 } from '../calcul/planCalcule';
-import { verifierCatalogue } from '../calcul/plausibilite';
 
 export function useFrigoCalculable() {
   const frigo = useMonFrigo();
@@ -75,7 +74,19 @@ export function useFrigoCalculable() {
      mentent. Des valeurs de riz CUIT posées sur un riz qu'on pèse sec se
      calculent parfaitement — et font peser trois fois trop. On le dit AVANT
      de composer, pas après avoir mangé. */
-  const anomalies = useMemo(() => verifierCatalogue(stock), [stock]);
+  /* LES ANOMALIES VIENNENT DU SERVEUR — 20 septembre 2026. Elles étaient
+     déduites ici par `verifierCatalogue`, c'est-à-dire que ce front portait
+     quatorze règles métier que tout autre front aurait dû réécrire, et
+     potentiellement oublier.
+
+     Elles arrivent avec le frigo, sans aller-retour de plus : les données
+     étaient déjà là, et les redemander aurait coûté un appel pour rien —
+     le même argument que pour `incomplets`.
+
+     `?? []` et non un calcul de repli : pendant le chargement il n'y a pas
+     « aucune anomalie », il n'y a pas encore de réponse. Un repli local
+     réintroduirait exactement le juge qu'on vient de retirer. */
+  const anomalies = frigo.data?.anomalies ?? [];
 
   /* La dépendance est `cibles.data` et non le seul booléen « la cible
      compte-t-elle les fibres ». L'écran dépendait du booléen : correct
