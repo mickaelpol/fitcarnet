@@ -195,6 +195,41 @@ describe('l\'éditeur dit ce que le SERVEUR refusera', () => {
       'l\'écran doit dire ce que le serveur dira, pas « cohérent »');
   });
 
+  it('le dit DÈS les calories, sans attendre les quatre macros', (t: TestContext) => {
+    t.after(cleanup);
+    /* RELEVÉ PAR LE PROPRIÉTAIRE DU PROJET le 20 septembre 2026 : « je
+       souhaite que l'avertissement soit affiché direct dès qu'on a renseigné
+       les macros et non pas à l'enregistrement ».
+
+       Le message attendait que les QUATRE macros soient lisibles. Or la règle
+       du grain sec n'a besoin que des calories, de la catégorie et du
+       rendement : faire patienter jusqu'au bout, c'est laisser saisir trois
+       champs de plus avant de dire que c'était perdu d'avance.
+
+       Les deux autres règles ne peuvent pas se tromper pour autant : à macros
+       vides la matière vaut 0 g, et l'Atwater 0 — sous le plancher du soupçon
+       de kilojoules. Aucune ne peut se déclencher à tort. */
+    /* UNE VRAIE CRÉATION : aucun `aliment`, donc tous les champs partent
+       VIDES. C'est le seul montage qui reproduit le geste réel — passer un
+       aliment aux macros à zéro remplit les champs de « 0 », qui sont
+       lisibles, et le cas ne prouve rien. */
+    render(<EditeurAliment visible nomImpose="Riz test"
+      onFermer={() => undefined} onEnregistrer={() => undefined} />);
+
+    /* On tape les calories, on choisit la catégorie, on pose le rendement —
+       et rien d'autre. */
+    fireEvent.click(screen.getByText('Glucide'));
+    /* Les quatre macros partagent l'invite « à saisir » : la première est
+       celle des calories. */
+    fireEvent.change(screen.getAllByPlaceholderText('à saisir')[0]!,
+      { target: { value: '130' } });
+    fireEvent.click(screen.getByText(/Riz, pâtes, quinoa/));
+
+    assert.match(document.body.textContent ?? '', /grain sec/,
+      'les calories, la catégorie et le rendement suffisent : ne pas attendre '
+      + 'trois champs de plus pour dire que c\'est perdu d\'avance');
+  });
+
   it('LE TÉMOIN : un riz SEC ne déclenche rien', (t: TestContext) => {
     t.after(cleanup);
     /* Sans ce cas, un avertissement permanent passerait le test ci-dessus tout

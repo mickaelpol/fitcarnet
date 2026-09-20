@@ -290,7 +290,21 @@ export function EditeurAliment({
      simplement de s'en priver. On ne montre que les BLOCAGES — ceux que le
      serveur refusera vraiment ; ses avertissements restent des
      avertissements. */
-  const refus: Anomalie[] = macrosLisibles
+  /* DÈS LES CALORIES, ET NON APRÈS LES QUATRE MACROS — 20 septembre 2026,
+     demandé par le propriétaire du projet : « je souhaite que l'avertissement
+     soit affiché direct dès qu'on a renseigné les macros et non pas à
+     l'enregistrement ».
+
+     Le message attendait `macrosLisibles`, c'est-à-dire les quatre champs.
+     Or la règle du grain sec n'a besoin que des calories, de la catégorie et
+     du rendement : faire patienter jusqu'au bout, c'est laisser saisir trois
+     champs de plus avant de dire que c'était perdu d'avance.
+
+     LES DEUX AUTRES RÈGLES NE PEUVENT PAS SE TROMPER POUR AUTANT, et c'est ce
+     qui rend l'avancement sûr : à macros vides la matière vaut 0 g — loin des
+     100,5 — et l'Atwater vaut 0, sous le plancher du soupçon de kilojoules.
+     Aucune des deux ne peut se déclencher à tort. */
+  const refus: Anomalie[] = lisible(textes.kcal100)
     ? verifierAliment({
         id: 0, nom: a.nom, categorie: a.categorie,
         kcal100: a.kcal100, prot100: a.prot100, gluc100: a.gluc100,
