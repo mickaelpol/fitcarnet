@@ -1,13 +1,10 @@
 import { useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { couleurDuType } from '@/calcul/typesSeance';
 import { useSeances } from '@/api/hooks';
 import type { Seance } from '@/api/types';
 import { Bouton, Carte, Chargement, Chiffre, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { C, E, N, P, R, T } from '@/theme';
-
-const COULEUR_TYPE: Record<string, string> = {
-  Push: C.prot, Pull: C.fec, Legs: C.leg,
-};
 
 /** L'API renvoie soit « 2026-08-02 », soit un ISO complet : on ne garde que la date. */
 const jour = (iso: string) => {
@@ -50,7 +47,7 @@ export default function Seances() {
 function Ligne({ seance, onPress }: { seance: Seance; onPress: () => void }) {
   const av = seance.avancement ?? { faites: 0, total: 0 };
   const fini = av.total > 0 && av.faites === av.total;
-  const couleur = COULEUR_TYPE[seance.type ?? ''] ?? C.ligne;
+  const couleur = couleurDuType(seance.type);
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.75 }]}>

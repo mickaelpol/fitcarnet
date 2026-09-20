@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import {
   useAppliquerOrdre, useEnregistrerModele, useExercices, useModeles, useSupprimerModele,
 } from '@/api/hooks';
+import { TYPES_SEANCE, couleurDuType } from '@/calcul/typesSeance';
 import type { Exercice, Modele, ModeleExercice } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { premiereErreur } from '@/composants/etatRequetes';
@@ -16,8 +17,6 @@ import { ListeDeplacable } from '@/composants/listeDeplacable';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 import { idDe } from '@/api/types';
 
-const TYPES = ['Push', 'Pull', 'Legs'] as const;
-const COULEUR: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
 
 export default function DetailModele() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,7 +72,7 @@ export default function DetailModele() {
         || e.groupes.length === 0 || e.groupes.includes(modele.type))
       .map((e) => ({
         id: e.id, nom: e.nomFr ?? e.nom, detail: e.formatPrescrit ?? '',
-        couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
+        couleur: couleurDuType(e.groupes[0]),
         /* Voir l'écran de séance : c'est ce champ qui fait apparaître les
            vignettes de muscles. `?? null` pour que les exercices sans muscle
            renseigné restent atteignables sous « Autre ». */
@@ -241,13 +240,13 @@ export default function DetailModele() {
         placeholder="Push lourd, Pull volume…"
       />
       <View style={s.types}>
-        {TYPES.map((t) => (
+        {TYPES_SEANCE.map((t) => (
           <Pressable
             key={t}
             onPress={() => setModele({ ...modele, type: t })}
             style={[
               s.type,
-              modele.type === t && { backgroundColor: COULEUR[t], borderColor: COULEUR[t] },
+              modele.type === t && { backgroundColor: couleurDuType(t), borderColor: couleurDuType(t) },
             ]}
           >
             <Texte style={[s.typeTexte, modele.type === t && { color: C.fond }]}>{t}</Texte>

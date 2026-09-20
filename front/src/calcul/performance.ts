@@ -335,3 +335,41 @@ export function paliersPour(rm: number, pas = 2.5): LignePalier[] {
 
   return lignes;
 }
+
+/**
+ * CE QU'EST UNE PROGRESSION, et ce qui n'est que du bruit.
+ *
+ * DESCENDU LE 20 SEPTEMBRE 2026 (palier 0) depuis `composants/disqueRM.tsx`.
+ * « 1RM, volume, paliers » designe ce module comme domicile de ces regles, et
+ * la table des paliers en etait deja redescendue le 15 septembre : le voisin
+ * etait parti, le seuil etait reste — dans un `.tsx`, donc sans test.
+ *
+ * Ce n'est pas un detail d'affichage : ce seuil decide de la COULEUR sous
+ * chaque 1RM, c'est-a-dire de ce qu'on lit comme « je progresse » ou « je
+ * recule ».
+ *
+ * TROIS POUR CENT. En deca, l'ecart releve du bruit — une repetition de moins
+ * sur douze fait deja 2,4 %, et une nuit courte suffit a l'expliquer. Au-dela,
+ * c'est un vrai mouvement : 2,5 kg de plus sur une barre a 40 kg font 6 %.
+ */
+export const SEUIL_PROGRESSION = 0.03;
+
+export type Tendance = 'hausse' | 'stable' | 'baisse' | 'inconnue';
+
+/**
+ * La tendance entre deux 1RM.
+ *
+ * SANS PRECEDENT, C'EST « INCONNUE » ET NON « STABLE ». Une premiere seance
+ * n'est ni une progression ni un recul, et l'annoncer stable serait un chiffre
+ * invente (regle 7). Un precedent a zero ou negatif est traite pareil : on ne
+ * divise pas par lui.
+ */
+export function tendanceDe(actuel: number, precedent: number | null): Tendance {
+  if (precedent === null || precedent <= 0) return 'inconnue';
+
+  const ecart = (actuel - precedent) / precedent;
+  if (ecart > SEUIL_PROGRESSION) return 'hausse';
+  if (ecart < -SEUIL_PROGRESSION) return 'baisse';
+
+  return 'stable';
+}

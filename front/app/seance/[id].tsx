@@ -5,6 +5,7 @@ import {
   useDerniereFois, useExercices, useHistorique, useModeles,
   useRecordsAnterieurs, useSeanceVersModele, useSupprimerSeance,
 } from '@/api/hooks';
+import { TYPES_SEANCE, couleurDuType } from '@/calcul/typesSeance';
 import type { Exercice } from '@/api/types';
 import { avancementDe, blocDepuisExercice, blocsDepuisModele } from '@/calcul/blocSeance';
 import { Bouton, Carte, Chargement, Discret, Erreur, Texte } from '@/composants/base';
@@ -20,8 +21,6 @@ import { useSeanceEditable } from '@/composants/useSeanceEditable';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 import { idDe } from '@/api/types';
 
-const TYPES = ['Push', 'Pull', 'Legs'] as const;
-const COULEUR: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
 
 export default function DetailSeance() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -71,7 +70,7 @@ export default function DetailSeance() {
            l'application dit « Developpe incline a la barre » — et on cherchait
            l'exercice sous un nom que plus personne n'employait ailleurs. */
         id: e.id, nom: e.nomFr ?? e.nom, detail: e.formatPrescrit ?? '',
-        couleur: COULEUR[e.groupes[0] ?? ''] ?? C.ligne,
+        couleur: couleurDuType(e.groupes[0]),
         /* Le muscle visé, tel que la base l'écrit. Sa présence suffit à faire
            apparaître la rangée de vignettes dans le sélecteur — un aliment,
            lui, n'en porte pas. `?? null` et non `undefined` : un exercice sans
@@ -156,13 +155,13 @@ export default function DetailSeance() {
         {/* ---- type et avancement ---- */}
             <Carte style={{ gap: E.m }}>
               <View style={s.types}>
-                {TYPES.map((t) => (
+                {TYPES_SEANCE.map((t) => (
                   <Pressable
                     key={t}
                     onPress={() => setSeance({ ...seance, type: t })}
                     style={[
                       s.type,
-                      seance.type === t && { backgroundColor: COULEUR[t], borderColor: COULEUR[t] },
+                      seance.type === t && { backgroundColor: couleurDuType(t), borderColor: couleurDuType(t) },
                     ]}
                   >
                     <Texte style={[
@@ -313,7 +312,7 @@ export default function DetailSeance() {
         elements={(modeles.data ?? []).map((m) => ({
           id: m.id!, nom: m.nom ?? m.type ?? 'Modèle',
           detail: `${m.exercices.length} exercice${m.exercices.length > 1 ? 's' : ''}`,
-          couleur: COULEUR[m.type ?? ''] ?? C.ligne,
+          couleur: couleurDuType(m.type),
         }))}
         onChoisir={partirDuModele}
         onFermer={() => setChoixModele(false)}

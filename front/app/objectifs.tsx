@@ -1,6 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  NOM_LONG_REPAS, NOM_REPAS, REPAS as LISTE_REPAS,
+} from '@/solveur/repasVocabulaire';
 import { useCibles, useEnregistrerCible } from '@/api/hooks';
 import type { Cible } from '@/api/types';
 import { nombreSaisi } from '@/calcul/saisieNombre';
@@ -14,12 +17,14 @@ import {
 } from '@/solveur/solveur';
 import { C, E, P, R, T, TOUCHE, nb } from '@/theme';
 
-const REPAS = [
-  { cle: 'R1' as const, court: 'Matin', long: 'Petit-déjeuner' },
-  { cle: 'R2' as const, court: 'Midi', long: 'Déjeuner' },
-  { cle: 'R3' as const, court: '16 h', long: 'Collation' },
-  { cle: 'R4' as const, court: 'Soir', long: 'Dîner' },
-];
+/* LES NOMS VIENNENT DU VOCABULAIRE, ILS NE SE REECRIVENT PAS. Cette table
+   portait ses propres libelles, dont la colonne courte recopiait `NOM_REPAS`
+   mot pour mot : renommer « 16 h » en « Collation » dans le calculateur aurait
+   donne deux noms pour le meme repas dans la meme application. Rassembles le
+   20 septembre 2026. */
+const REPAS = LISTE_REPAS.map((cle) => ({
+  cle, court: NOM_REPAS[cle], long: NOM_LONG_REPAS[cle],
+}));
 
 type Saisie = { prot: string; gluc: string; lip: string; kcal: string };
 const vide: Saisie = { prot: '', gluc: '', lip: '', kcal: '' };

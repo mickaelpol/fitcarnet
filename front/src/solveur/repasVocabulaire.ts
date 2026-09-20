@@ -21,6 +21,19 @@ export const NOM_REPAS: Record<Repas, string> = {
 };
 
 /**
+ * Le nom long, celui qu'on lit quand il y a la place.
+ *
+ * RASSEMBLE ICI LE 20 SEPTEMBRE 2026 (palier 0). `app/objectifs.tsx` portait
+ * sa propre table, dont la colonne courte recopiait `NOM_REPAS` mot pour mot :
+ * renommer « 16 h » en « Collation » ici aurait donne DEUX noms pour le meme
+ * repas dans la meme application — le calculateur disant l'un, les objectifs
+ * l'autre.
+ */
+export const NOM_LONG_REPAS: Record<Repas, string> = {
+  R1: 'Petit-déjeuner', R2: 'Déjeuner', R3: 'Collation', R4: 'Dîner',
+};
+
+/**
  * Le rôle d'un aliment dans un repas, déduit de sa catégorie.
  *
  * C'est la SEULE règle automatique du calculateur, et elle ne dit rien du

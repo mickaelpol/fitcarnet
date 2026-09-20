@@ -1,33 +1,24 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import {
-  paliersPour, pasConseille, REPS_MAX_POUR_1RM, type LignePalier,
+  paliersPour, pasConseille, REPS_MAX_POUR_1RM, tendanceDe,
+  type LignePalier, type Tendance,
 } from '@/calcul/performance';
 import { Chiffre, Discret, Texte } from './base';
 import { C, E, N, P, R, T, nb } from '@/theme';
-
-export type Tendance = 'hausse' | 'stable' | 'baisse' | 'inconnue';
 
 /**
  * La couleur du disque dit la PROGRESSION, pas la charge absolue.
  * Une échelle par paliers de poids ne veut rien dire d'un utilisateur à
  * l'autre : 20 kg est lourd sur des écartés, léger sur un squat.
  *
- * Seuil de 3 % : en deçà, l'écart relève du bruit — une répétition de moins
- * sur douze fait déjà 2,4 %, et une nuit courte suffit à l'expliquer.
- * Au-delà, c'est un vrai mouvement : 2,5 kg de plus sur une barre à 40 kg
- * représente 6 %.
+ * LE SEUIL ET LA RÈGLE VIVENT DANS `calcul/performance.ts` depuis le
+ * 20 septembre 2026. `CLAUDE.md` désigne ce module pour « 1RM, volume,
+ * paliers », et la table des paliers en était déjà redescendue le
+ * 15 septembre : le voisin était parti, le seuil était resté ici — dans un
+ * `.tsx`, donc sans test, alors qu'il décide de la couleur affichée sous
+ * chaque 1RM.
  */
-export const SEUIL = 0.03;
-
-export function tendanceDe(actuel: number, precedent: number | null): Tendance {
-  if (precedent === null || precedent <= 0) return 'inconnue';
-  const ecart = (actuel - precedent) / precedent;
-  if (ecart > SEUIL) return 'hausse';
-  if (ecart < -SEUIL) return 'baisse';
-
-  return 'stable';
-}
 
 export const COULEUR_TENDANCE: Record<Tendance, string> = {
   hausse: C.ok,    // vert : tu progresses

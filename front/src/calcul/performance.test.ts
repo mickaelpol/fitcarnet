@@ -1,11 +1,9 @@
-import { test } from 'node:test';
+import { describe, it, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Serie } from '@/api/types';
 import {
-  arrondirCharge, epley, estimerDepuisEssai, PALIERS, paliersPour, pasConseille,
-  PAS_DISPONIBLES, predictionValide, MIN_CHARGES_TRAVAIL, repsAu, REPS_MAX_POUR_1RM, rmDesSeries,
-  tempsTotal, volumeDesSeries,
+  MIN_CHARGES_TRAVAIL, PALIERS, PAS_DISPONIBLES, REPS_MAX_POUR_1RM, SEUIL_PROGRESSION, arrondirCharge, epley, estimerDepuisEssai, paliersPour, pasConseille, predictionValide, repsAu, rmDesSeries, tempsTotal, tendanceDe, volumeDesSeries,
 } from './performance';
 
 /**
@@ -328,4 +326,38 @@ test('et sans rien nulle part, on ne répond pas', () => {
      lancé (règles 6 et 7). */
   assert.equal(tempsTotal(bloc(null, [null, null])), null);
   assert.equal(tempsTotal(bloc(null, [])), null);
+});
+
+describe('la tendance entre deux 1RM', () => {
+  it('une hausse franche est une hausse', () => {
+    assert.equal(tendanceDe(110, 100), 'hausse');
+  });
+
+  it('une baisse franche est une baisse', () => {
+    assert.equal(tendanceDe(90, 100), 'baisse');
+  });
+
+  it('LE BRUIT N\'EST PAS UNE PROGRESSION', () => {
+    /* Une repetition de moins sur douze fait 2,4 % : sous le seuil, on dit
+       « stable ». Colorer en rouge pour ca apprendrait a ignorer la couleur. */
+    assert.equal(tendanceDe(102, 100), 'stable');
+    assert.equal(tendanceDe(98, 100), 'stable');
+  });
+
+  it('le seuil lui-meme est encore stable, juste au-dela non', () => {
+    /* La borne se verifie des deux cotes de son bord, sinon un deplacement de
+       3 % a 30 % passerait tous les cas ci-dessus. */
+    assert.equal(tendanceDe(100 * (1 + SEUIL_PROGRESSION), 100), 'stable');
+    assert.equal(tendanceDe(100 * (1 + SEUIL_PROGRESSION) + 0.1, 100), 'hausse');
+    assert.equal(tendanceDe(100 * (1 - SEUIL_PROGRESSION), 100), 'stable');
+    assert.equal(tendanceDe(100 * (1 - SEUIL_PROGRESSION) - 0.1, 100), 'baisse');
+  });
+
+  it('SANS PRECEDENT, C\'EST « INCONNUE » — jamais « stable »', () => {
+    /* Une premiere seance n'est ni une progression ni un recul. L'annoncer
+       stable serait un chiffre invente (regle 7). */
+    assert.equal(tendanceDe(100, null), 'inconnue');
+    assert.equal(tendanceDe(100, 0), 'inconnue');
+    assert.equal(tendanceDe(100, -5), 'inconnue');
+  });
 });

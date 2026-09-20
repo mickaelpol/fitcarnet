@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { couleurDuType } from '@/calcul/typesSeance';
 import { useModeles } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Erreur, Texte, Vide } from '@/composants/base';
 import { C, E, P, T } from '@/theme';
 
-const COULEUR_TYPE: Record<string, string> = { Push: C.prot, Pull: C.fec, Legs: C.leg };
 
 export default function Modeles() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function Modeles() {
       renderItem={({ item }) => (
         <Pressable onPress={() => router.push(`/modele/${item.id}`)}>
           <Carte style={s.carte}>
-            <View style={[s.pastille, { backgroundColor: COULEUR_TYPE[item.type ?? ''] ?? C.ligne }]} />
+            <View style={[s.pastille, { backgroundColor: couleurDuType(item.type) }]} />
             <View style={{ flex: 1 }}>
               <Texte style={{ fontFamily: P.fort }}>{item.nom ?? item.type ?? 'Modèle'}</Texte>
               <Discret style={{ fontSize: T.normal }}>
