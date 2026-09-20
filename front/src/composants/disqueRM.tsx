@@ -74,15 +74,21 @@ export function DisqueRM({
       accessibilityLabel={`1RM ${valeur} kg, ${libelle}`}
     >
       <View style={[s.disque, { borderColor: couleur }]}>
-        <Chiffre taille={N.petit} couleur={C.encre}>{
-          Math.abs(valeur - Math.round(valeur)) < 0.05 ? Math.round(valeur) : valeur.toFixed(1)
-        }</Chiffre>
+        {/* `nb` ET NON UNE COPIE — palier 0, 20 septembre 2026. La même règle
+            était réécrite ici, à un détail près : `nb` remplace le point par
+            une VIRGULE, cette copie ne le faisait pas. Le disque affichait donc
+            « 102.5 » quand le reste de l'écran écrivait « 102,5 ». Une
+            divergence qui se voyait, dans un fichier qui importait déjà `nb`
+            deux lignes plus bas. */}
+        <Chiffre taille={N.petit} couleur={C.encre}>{nb(valeur)}</Chiffre>
         <Discret style={s.unite}>{unite}</Discret>
       </View>
 
       {ecart !== null && Math.abs(ecart) >= 0.05 && (
         <Discret style={[s.ecart, { color: couleur }]}>
-          {SIGNE[tendance]} {ecart > 0 ? '+' : ''}{Math.abs(ecart) < 10 ? ecart.toFixed(1) : Math.round(ecart)} kg
+          {/* Au-delà de dix kilos, la décimale n'apprend rien : on arrondit.
+              En dessous, elle compte — et elle porte désormais sa virgule. */}
+          {SIGNE[tendance]} {ecart > 0 ? '+' : ''}{Math.abs(ecart) < 10 ? nb(ecart) : Math.round(ecart)} kg
         </Discret>
       )}
       {tendance === 'inconnue' && <Discret style={s.ecart}>1re fois</Discret>}

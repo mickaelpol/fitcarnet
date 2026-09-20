@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  type Compose, ROLES, alimentsAjoutables, demandePour, grammesSaisis,
-  imposePour, saisieIllisible, vers,
+  FIBRES_DIGNES_D_ETRE_DITES, ROLES, TOLERANCE, alimentsAjoutables, demandePour, ecartTenu, fibresDuRepas, grammesSaisis, imposePour, saisieIllisible, type Compose, vers,
 } from './demandeRepas';
 import type { Aliment } from '@/solveur/types';
 import { LEGUME_PAR_PORTION } from '../solveur/composer';
@@ -323,5 +322,65 @@ describe('le vocabulaire des rôles', () => {
   it('imposePour ne rend une quantité que pour un rôle imposé', () => {
     assert.equal(imposePour('R2', 'legume'), 200);
     assert.equal(imposePour('R2', 'glucide'), undefined);
+  });
+});
+
+
+/* --------------------------------------- ce que l'écran de repas décidait
+ *
+ * Trois règles rapatriées de `composants/carteRepas.tsx` le 20 septembre 2026
+ * (palier 0). Elles vivaient dans le JSX — l'une dans un `style`, l'autre dans
+ * une condition d'affichage — et aucune n'était testée.
+ * ----------------------------------------------------------------------- */
+
+describe('l\'écart d\'une macro se juge PAR PERSONNE', () => {
+  it('un repas pour trois n\'est pas jugé sur son total', () => {
+    /* 120 kcal d'écart sur un repas pour trois, c'est 40 par assiette — sous
+       la tolérance de 45. Comparer le total déclarerait raté un repas juste,
+       et cette couleur est ce qui dit s'il faut corriger. */
+    assert.equal(ecartTenu(120, 3, 'kcal'), true);
+    assert.equal(ecartTenu(120, 1, 'kcal'), false);
+  });
+
+  it('le signe ne compte pas : trop est aussi faux que pas assez', () => {
+    assert.equal(ecartTenu(-46, 1, 'kcal'), false);
+    assert.equal(ecartTenu(46, 1, 'kcal'), false);
+  });
+
+  it('la borne elle-même passe', () => {
+    assert.equal(ecartTenu(TOLERANCE.prot, 1, 'prot'), true);
+  });
+
+  it('zéro portion ne divise pas par zéro', () => {
+    /* Un écran peut passer 0 le temps d'un rendu. Rendre Infinity y peindrait
+       tout en rouge sans qu'on sache pourquoi. */
+    assert.equal(ecartTenu(10, 0, 'kcal'), true);
+  });
+});
+
+describe('les fibres d\'un repas', () => {
+  const fibresDe = (a: { id: number | string }) => (a.id === 1 ? 7 : 1.4);
+
+  it('se comptent sur le poids PESÉ, jamais sur le poids servi', () => {
+    /* 200 g de riz sec à 1,4 g de fibres pour 100 g = 2,8 g. Le même riz cuit
+       pèse 452 g : compter l'assiette donnerait 6,3 g — plus du double, pour
+       de l'eau. C'est la règle 3 appliquée aux fibres. */
+    assert.equal(fibresDuRepas([{ aliment: { id: 2 }, aCuire: 200 }], fibresDe), 2.8);
+  });
+
+  it('s\'additionnent sur tout le repas', () => {
+    const somme = fibresDuRepas(
+      [{ aliment: { id: 1 }, aCuire: 100 }, { aliment: { id: 2 }, aCuire: 200 }], fibresDe);
+
+    assert.equal(Math.round(somme * 100) / 100, 9.8);
+  });
+
+  it('valent zéro sur un repas vide, pas NaN', () => {
+    assert.equal(fibresDuRepas([], fibresDe), 0);
+  });
+
+  it('un demi-gramme ne mérite pas qu\'on en parle', () => {
+    /* Le seuil était écrit `fibres > 0.5` dans le JSX, sans nom. */
+    assert.equal(FIBRES_DIGNES_D_ETRE_DITES, 0.5);
   });
 });

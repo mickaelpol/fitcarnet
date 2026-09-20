@@ -18,6 +18,7 @@
  * TRADUIT et REGROUPE, il ne calcule pas un gramme.
  */
 
+import { stockEnGrammes } from './frigo';
 import type { AlimentDisponible, Cible } from '@/api/types';
 import type { Aliment } from '@/solveur/types';
 import type { AuMieux, DemandeDatee, Repas as Creneau } from '@/solveur/composer';
@@ -62,7 +63,10 @@ export function grammesEnStock(
 ): Map<Aliment['id'], number> {
   const m = new Map<Aliment['id'], number>();
   for (const a of aliments) {
-    if (a.grammesParUnite !== null) m.set(a.reference, a.stock * a.grammesParUnite);
+    /* `stockEnGrammes` ET NON LA FORMULE : la garde du serveur refuse un
+       facteur nul, celle-ci l'acceptait et posait « 0 g » en stock. */
+    const g = stockEnGrammes(a);
+    if (g !== null) m.set(a.reference, g);
   }
 
   return m;

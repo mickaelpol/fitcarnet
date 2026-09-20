@@ -144,7 +144,11 @@ const macrosAffichees = (quantites: Quantite[], glucidesTotaux: boolean): Macros
     };
   }, { kcal: 0, prot: 0, gluc: 0, lip: 0 });
 
-const TOLERANCE = { prot: 1.5, gluc: 2.5, lip: 1.2 };
+/* LE SEUIL VIENT DU SOLVEUR, il ne se réécrit pas ici — palier 0, 20 septembre
+   2026. Un test qui reproduit la valeur qu'il garantit reste vert quand la
+   valeur change : c'est le motif 4 du projet, dans le fichier qui s'appelle
+   « garanties ». */
+import { TOLERANCE_DEFAUT as TOLERANCE } from './solveur';
 
 /** Un seul aliment ajustable, pour isoler l'effet du rendement. */
 const calculerPour = (cibles: Cibles, glucide: Aliment) =>

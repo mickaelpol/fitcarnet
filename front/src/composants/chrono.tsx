@@ -12,7 +12,10 @@ import { jouerSonnerie } from './sonnerie';
 import { C, E, N, P, R, T, TOUCHE } from '@/theme';
 
 const PRESETS = [60, 90, 120, 180];
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+/* `mmss` VIENT DE `chronoSerie`, il n'est plus réécrit ici — palier 0,
+   20 septembre 2026. Les deux écritures étaient identiques ; c'est justement
+   ce qui les rendait faciles à laisser diverger. */
+import { mmss } from './chronoSerie';
 
 /**
  * Chrono de repos. L'écran reste allumé pendant le décompte : sans ça, le

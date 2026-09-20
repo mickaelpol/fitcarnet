@@ -5,7 +5,7 @@ import type { Serie } from '@/api/types';
 import {
   arrondirCharge, epley, estimerDepuisEssai, PALIERS, paliersPour, pasConseille,
   PAS_DISPONIBLES, predictionValide, MIN_CHARGES_TRAVAIL, repsAu, REPS_MAX_POUR_1RM, rmDesSeries,
-  volumeDesSeries,
+  tempsTotal, volumeDesSeries,
 } from './performance';
 
 /**
@@ -278,4 +278,54 @@ test('à 20 kg de maximum, la zone de progression garde cinq charges distinctes'
   const travail = paliersPour(20, pasConseille(20)).filter((l) => l.nature === 'travail');
   assert.deepEqual(travail.map((l) => l.charge), [18, 17, 16, 15, 14]);
   assert.ok(travail.every((l) => l.reps !== null));
+});
+
+
+/* ------------------------------------------------- le temps d'un exercice
+ *
+ * `tempsTotal` était exporté, n'avait AUCUN test, et n'était appelé que depuis
+ * son propre fichier — pendant que `composants/exerciceSeance.tsx:62`
+ * réécrivait sa somme de son côté (palier 0, 20 septembre 2026). Une formule
+ * qu'aucun test ne tient et que personne n'utilise finit recopiée : c'est
+ * exactement ce qui s'est passé.
+ * ------------------------------------------------------------------------ */
+
+const bloc = (secondesTotal: number | null, secondesDesSeries: (number | null)[]) => ({
+  ordre: 0,
+  exercice: '/api/exercices/1',
+  mode: 'iso' as const,
+  notes: null,
+  secondesTotal,
+  series: secondesDesSeries.map((secondes, i) => ({
+    ordre: i, reps: null, poids: null, secondes, faite: true,
+  })) as Serie[],
+});
+
+test('le temps global gagne sur la somme des séries', () => {
+  assert.equal(tempsTotal(bloc(90, [30, 30])), 90);
+});
+
+test('à défaut, on somme les séries — c\'est l\'ancien enregistrement', () => {
+  /* Le chrono était stocké sur chaque série avant que le temps global existe.
+     Ne pas sommer perdrait les séances d'avant. */
+  assert.equal(tempsTotal(bloc(null, [30, 45, null])), 75);
+});
+
+test('ZÉRO N\'EST PAS UN TEMPS, et c\'est une décision', () => {
+  /* La base autorise `secondes_total >= 0` : un zéro peut exister. Aucun bloc
+     n'en porte aujourd'hui (mesuré le 20 septembre 2026, 40 lignes toutes à
+     NULL), mais la question devait être tranchée quelque part plutôt que dans
+     deux endroits qui répondaient différemment.
+
+     `exerciceSeance.tsx` écrivait `secondesTotal ?? somme` : un zéro y gagnait
+     et affichait « 0 s ». Ici, zéro veut dire « pas de temps global », et on
+     retombe sur les séries. C'est ce module qui fait foi (règle 5). */
+  assert.equal(tempsTotal(bloc(0, [30, 30])), 60);
+});
+
+test('et sans rien nulle part, on ne répond pas', () => {
+  /* Pas zéro : `null`. Un « 0 s » affiché serait un chrono qu'on n'a jamais
+     lancé (règles 6 et 7). */
+  assert.equal(tempsTotal(bloc(null, [null, null])), null);
+  assert.equal(tempsTotal(bloc(null, [])), null);
 });

@@ -9,7 +9,7 @@ import { ModaleExercice } from './modaleExercice';
 import { Sparkline } from './sparkline';
 import { ChoixMode } from './choixMode';
 import { LigneSerie } from './serie';
-import { performanceDe } from '@/calcul/performance';
+import { performanceDe, REPS_MAX_POUR_1RM, tempsTotal } from '@/calcul/performance';
 import { apercuDerniereFois } from '@/calcul/blocSeance';
 import { C, E, N, P, R, T, TOUCHE, nb } from '@/theme';
 
@@ -57,9 +57,6 @@ export function CarteExercice({
   const aDesNotes = (bloc.notes ?? '').trim() !== '';
   const mode = bloc.mode ?? exercice?.modeDefaut ?? 'charge';
   const perf = performanceDe(bloc, mode);
-  /* Avant l'introduction du temps global, le chrono était stocké sur la
-     première série : on le récupère pour ne rien perdre. */
-  const tempsHerite = bloc.series.reduce((n, x) => n + (x.secondes ?? 0), 0) || null;
   const rm = perf.rm;
   const visibles = bloc.series;
 
@@ -182,7 +179,7 @@ export function CarteExercice({
             <View style={s.total}>
               <ChronoEffort
                 cible={{ ...cibleBase, serieOrdre: null }}
-                secondes={bloc.secondesTotal ?? tempsHerite}
+                secondes={tempsTotal(bloc)}
                 onEffacer={() => onChange({ ...bloc, secondesTotal: null })}
                 etiquette="Temps total de l'exercice"
               />
@@ -237,8 +234,14 @@ export function CarteExercice({
 
           {perf.seriesLongues > 0 && (
             <Discret style={{ fontSize: T.petit, lineHeight: 16 }}>
+              {/* LE PLAFOND VIENT DE `performance.ts`, il ne se retape pas —
+                  palier 0, 20 septembre 2026. C'est exactement le motif
+                  « douze caractères » de la règle 5 : le jour où le plafond
+                  bouge, cette phrase continuerait d'annoncer 15 pendant que
+                  le calcul écarterait à un autre seuil. `disqueRM.tsx:196`
+                  faisait déjà bien, ici non. */}
               {perf.seriesLongues} série{perf.seriesLongues > 1 ? 's' : ''} de plus de
-              15 répétitions : comptée{perf.seriesLongues > 1 ? 's' : ''} dans le volume,
+              {' '}{REPS_MAX_POUR_1RM} répétitions : comptée{perf.seriesLongues > 1 ? 's' : ''} dans le volume,
               mais écartée{perf.seriesLongues > 1 ? 's' : ''} du 1RM — au-delà, on mesure
               l'endurance et non la force.
             </Discret>

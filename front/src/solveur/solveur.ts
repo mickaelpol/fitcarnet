@@ -7,7 +7,25 @@ import type {
   Aliment, Cibles, Diagnostic, Fixe, Macros, Options, Quantite, Resultat, Variables,
 } from './types';
 
-const TOLERANCE_DEFAUT: Macros = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 };
+/**
+ * CE QUE LE SOLVEUR ACCEPTE COMME « ASSEZ PROCHE ».
+ *
+ * EXPORTÉE ET NON PLUS PRIVÉE — 20 septembre 2026, palier 0. Ces quatre
+ * nombres étaient écrits TROIS fois : ici, dans `calcul/demandeRepas.ts` — dont
+ * le commentaire disait « mêmes seuils que le solveur » sans les importer — et
+ * dans `solveur/garanties.test.ts`, un test qui réimplémentait le seuil qu'il
+ * garantit (motif 4 du projet).
+ *
+ * C'est le SOLVEUR qui décide : la tolérance est ce qu'il s'autorise à manquer
+ * quand il rend des grammes. L'écran ne fait que relire ce jugement pour
+ * colorer un chiffre — il ne peut pas en avoir un autre sans mentir.
+ *
+ * `as const` pour qu'on ne puisse pas la muter : c'est un objet de portée
+ * module, lu pendant le rendu. La documentation React nomme ce cas —
+ * « Mutating a variable declared outside the component scope retains state
+ * across renders ». Le typage l'interdit, gratuitement.
+ */
+export const TOLERANCE_DEFAUT = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 } as const;
 const ARRONDI_DEFAUT = { proteine: 1, glucide: 5, lipide: 0.5 };
 
 /** Au-delà, l'écart entre les kcal annoncées et les grammes n'est plus un arrondi. */

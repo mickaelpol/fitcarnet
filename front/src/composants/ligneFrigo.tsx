@@ -13,6 +13,7 @@ import { controler } from '../calcul/nutrition';
 import type { AlimentDisponible, AlimentIncomplet } from '../api/types';
 import { C, E, N, P, T, couleurRole, nb } from '../theme';
 import { nombreSaisi } from '@/calcul/saisieNombre';
+import { stockEnGrammes } from '@/calcul/frigo';
 
 /**
  * LA LIGNE D'UN PRODUIT GROCY QU'ON NE PEUT PAS CALCULER.
@@ -94,9 +95,12 @@ export function LigneStock({
           <Chiffre taille={N.petit} couleur={aliment.stock > 0 ? C.vif : C.discret}>
             {nb(aliment.stock)} {aliment.unite}
           </Chiffre>
-          {aliment.unite !== 'g' && aliment.grammesParUnite !== null && (
+          {/* LA CONVERSION VIENT DE `calcul/frigo`, avec la garde du serveur.
+              Écrite ici, elle acceptait un facteur nul et affichait « soit
+              0 g » là où l'API répond « conversion inconnue ». */}
+          {aliment.unite !== 'g' && stockEnGrammes(aliment) !== null && (
             <Discret style={{ fontSize: T.minuscule }}>
-              soit {nb(aliment.stock * aliment.grammesParUnite)} g
+              soit {nb(stockEnGrammes(aliment) ?? 0)} g
             </Discret>
           )}
           {aliment.unite === 'g' && aliment.ratio !== 1 && (

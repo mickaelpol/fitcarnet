@@ -4,6 +4,7 @@ import type { AlimentDisponible } from '@/api/types';
 import type { AlimentIncomplet } from '@/api/types';
 import {
   SEUIL_ECART, ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement,
+  stockEnGrammes,
 } from './frigo';
 
 const aliment = (
@@ -155,5 +156,34 @@ describe('les produits Grocy incomplets sont dans la MÊME liste', () => {
        l'eau, le café noir. */
     assert.equal(estIncomplet(flageolet), true);
     assert.equal(estIncomplet(aliment('base:1', 'Eau', 1000)), false);
+  });
+});
+
+describe('le stock ramené au gramme', () => {
+  /* Cette règle était écrite TROIS fois, avec trois gardes différentes — dont
+     une seule refusait un facteur nul, côté serveur (palier 0, 20 septembre
+     2026). C'est celle-là qui fait foi. */
+
+  it('multiplie quand la conversion est connue', () => {
+    assert.equal(stockEnGrammes({ stock: 3, grammesParUnite: 55 }), 165);
+  });
+
+  it('UN FACTEUR NUL N\'EST PAS UNE CONVERSION : on ne sait pas', () => {
+    /* C'est le cœur du correctif. `0` acceptait de multiplier et donnait
+       « soit 0 g » à l'écran — un « je ne sais pas » rendu en zéro, ce que la
+       règle 6 interdit. Le serveur, lui, répondait `null` depuis toujours. */
+    assert.equal(stockEnGrammes({ stock: 12, grammesParUnite: 0 }), null);
+  });
+
+  it('une conversion absente reste absente', () => {
+    /* Un litre de lait, un pack : pas de poids connu. Le calculateur doit
+       les écarter, jamais supposer une densité. */
+    assert.equal(stockEnGrammes({ stock: 2, grammesParUnite: null }), null);
+  });
+
+  it('un stock à zéro reste un zéro, lui', () => {
+    /* Zéro EN STOCK est une information — « je n'en ai plus ». Ne pas le
+       confondre avec zéro DE CONVERSION, qui est une ignorance. */
+    assert.equal(stockEnGrammes({ stock: 0, grammesParUnite: 55 }), 0);
   });
 });

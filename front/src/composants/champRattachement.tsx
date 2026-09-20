@@ -87,9 +87,20 @@ export function ChampRattachement({
         onChange={onRecherche}
         placeholder="poulet, riz, yaourt…"
       />
+      {/* « CRU » ET « SEC », ET CE N'EST PAS UN DÉTAIL DE VOCABULAIRE.
+          CIQUAL porte souvent deux entrées pour le même aliment — « Riz blanc,
+          cru » à 350 kcal et « Riz blanc, cuit » à 155. La règle 3 du projet
+          impose le produit TEL QU'ON LE PÈSE, donc le cru.
+
+          Mesuré le 20 septembre 2026 : rattacher un riz sec à l'entrée cuite
+          donne un rapport de 2,26 — au-dessus du seuil de 2 — et déclenche
+          l'avertissement d'écart sur CHAQUE féculent. On apprend alors à
+          l'ignorer, et il ne sert plus à rien le jour où il a raison. */}
       <Discret style={s.aide}>
-        Ce que c'est, en général — pas la marque. Ça sert à savoir à quel repas
-        l'aliment convient. Tes valeurs, elles, restent celles de ton paquet.
+        Ce que c'est, en général — pas la marque. Choisis la version{' '}
+        <Texte style={s.aide}>crue ou sèche</Texte> quand les deux existent :
+        c'est ainsi que tu le pèses. Tes valeurs, elles, restent celles de ton
+        paquet.
       </Discret>
 
       {/* PARTIR DU NOM DÉJÀ TAPÉ, MAIS EN LE DEMANDANT.

@@ -5,7 +5,8 @@ import { Bouton, Carte, Champ, Discret, Texte } from './base';
 import { DetailComplements, RappelComplements } from './complements';
 import { SR } from './stylesRepas';
 import {
-  type Compose, ROLES, TOLERANCE, imposePour, saisieIllisible,
+  type Compose, FIBRES_DIGNES_D_ETRE_DITES, ROLES, ecartTenu, fibresDuRepas,
+  imposePour, saisieIllisible,
 } from '@/calcul/demandeRepas';
 import { type ChoixDeCuisson, poidsDeLaLigne } from '@/calcul/poidsServi';
 import {
@@ -215,13 +216,13 @@ export function CarteRepas({
   /* Les fibres du repas, et ce qu'elles pèsent. C'est ce qui explique qu'un
      repas juste en protéines, glucides et lipides affiche plus de calories
      que ne le donne le calcul 4/4/9 : la convention européenne les compte à
-     part, à 2 kcal le gramme. */
-  const fibres = (resultat?.resultat.quantites ?? []).reduce((n, q) => {
-    /* Les macros valent pour le poids PESÉ, jamais pour le poids servi : la
-       cuisson n'ajoute que de l'eau. C'est donc toujours la colonne « à
-       cuire ». Prendre l'assiette fausserait les fibres du rendement. */
-    return n + (fibresDe(q.aliment) * q.aCuire) / 100;
-  }, 0);
+     part, à 2 kcal le gramme.
+
+     LA SOMME VIT DANS `calcul/demandeRepas`, depuis le 20 septembre 2026.
+     Elle était écrite ici, et aucun module ne la portait — alors qu'elle décide
+     d'un texte affiché sous chaque repas. Le piège qu'elle contient (compter
+     le poids PESÉ et non le poids servi) est désormais tenu par un test. */
+  const fibres = fibresDuRepas(resultat?.resultat.quantites ?? [], fibresDe);
 
   return (
     <Carte style={{ gap: E.s }}>
@@ -250,10 +251,9 @@ export function CarteRepas({
                   key={cle}
                   style={{
                     fontSize: T.petit,
-                    /* L'écart est celui du repas entier : on le ramène à la
-                       personne avant de le comparer à une tolérance qui,
-                       elle, vaut pour une assiette. */
-                    color: Math.abs(resultat.resultat.ecarts[cle]) / portions <= TOLERANCE[cle]
+                    /* L'écart est celui du repas entier, la tolérance vaut
+                       pour une assiette : `ecartTenu` ramène l'un à l'autre. */
+                    color: ecartTenu(resultat.resultat.ecarts[cle], portions, cle)
                       ? C.ok : C.vif,
                   }}
                 >
@@ -268,7 +268,7 @@ export function CarteRepas({
 
           {/* Quand la cible est exprimée en glucides TOTAUX, les fibres sont
               DANS la cible : les annoncer « hors cible » serait faux. */}
-          {fibres > 0.5 && (
+          {fibres > FIBRES_DIGNES_D_ETRE_DITES && (
             <Discret style={{ fontSize: T.minuscule }}>
               dont {nb(fibres / portions)} g de fibres
               {cible.glucidesTotaux === true

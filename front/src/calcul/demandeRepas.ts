@@ -1,7 +1,7 @@
 import { nombreSaisi } from './saisieNombre';
 import type { AlimentDisponible } from '@/api/types';
 import { MODELE, type DemandeRepas, type Repas, type Role } from '../solveur/composer';
-import { convertir, versReference } from '../solveur/solveur';
+import { convertir, TOLERANCE_DEFAUT, versReference } from '../solveur/solveur';
 import type { Aliment, Fixe } from '@/solveur/types';
 
 /**
@@ -22,8 +22,69 @@ import type { Aliment, Fixe } from '@/solveur/types';
 
 /* L'ordre d'affichage. `fixe` dit la quantité par personne quand le rôle
    n'est pas une variable du solveur — l'huile et le légume. */
-/* Mêmes seuils que le solveur : au-delà, l'écart n'est plus de l'arrondi. */
-export const TOLERANCE = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 };
+/**
+ * Les seuils du solveur, RÉEXPORTÉS et non recopiés.
+ *
+ * Le commentaire d'ici disait « mêmes seuils que le solveur » et les réécrivait
+ * juste en dessous — trois copies au total dans le dépôt, dont une dans un test
+ * (palier 0, 20 septembre 2026). « Mêmes que » est une promesse ; un import est
+ * un fait.
+ */
+export { TOLERANCE_DEFAUT as TOLERANCE } from '../solveur/solveur';
+
+/**
+ * L'ÉCART D'UNE MACRO TIENT-IL DANS SA TOLÉRANCE ?
+ *
+ * Rapatriée de `composants/carteRepas.tsx` le 20 septembre 2026 (palier 0).
+ * Elle y était écrite dans le `style` d'un `<Discret>`, au milieu du JSX :
+ *
+ *     color: Math.abs(resultat.resultat.ecarts[cle]) / portions <= TOLERANCE[cle]
+ *
+ * LA DIVISION PAR LES PORTIONS EST LE CŒUR DE LA RÈGLE, pas un détail
+ * d'affichage. L'écart rendu par le solveur vaut pour le repas ENTIER ;
+ * `TOLERANCE`, elle, vaut pour une assiette. Comparer les deux sans ramener à
+ * la personne déclarerait raté un repas pour trois qui est juste — et c'est
+ * cette couleur qui dit s'il faut corriger quelque chose.
+ */
+export const ecartTenu = (
+  ecart: number, portions: number, cle: keyof typeof TOLERANCE_DEFAUT,
+): boolean => Math.abs(ecart) / Math.max(1, portions) <= TOLERANCE_DEFAUT[cle];
+
+/**
+ * LES FIBRES D'UN REPAS, en grammes.
+ *
+ * Rapatriée du même endroit, et c'est celle qui manquait le plus : AUCUN module
+ * ne portait cette somme, alors qu'elle décide d'un texte affiché sous chaque
+ * repas — « dont 7 g de fibres, soit 14 kcal hors cible ».
+ *
+ * LES MACROS VALENT POUR LE POIDS PESÉ, JAMAIS POUR LE POIDS SERVI. La cuisson
+ * n'ajoute que de l'eau : c'est toujours la colonne « à cuire ». Prendre le
+ * poids de l'assiette gonflerait les fibres du rendement — un riz à 2,26
+ * afficherait deux fois trop.
+ *
+ * `fibresDe` est fourni par l'appelant : le frigo sait ce que chaque aliment
+ * contient, ce module non. Il rend 0 pour un aliment dont les fibres sont
+ * inconnues — et c'est `useFrigoCalculable` qui les signale à part.
+ *
+ * GÉNÉRIQUE SUR L'ALIMENT, ET C'EST VOULU. Ce module n'a pas à connaître la
+ * forme d'un aliment du solveur : il lui suffit qu'on sache en lire les
+ * fibres. Fixer le type ici ferait remonter `solveur/types` dans `calcul/`,
+ * et le premier appelant qui porte un autre type serait refusé — ce qui est
+ * arrivé au premier essai.
+ */
+export const fibresDuRepas = <A,>(
+  quantites: readonly { aliment: A; aCuire: number }[],
+  fibresDe: (a: A) => number,
+): number => quantites.reduce((n, q) => n + (fibresDe(q.aliment) * q.aCuire) / 100, 0);
+
+/**
+ * En dessous, on n'en parle pas.
+ *
+ * Un demi-gramme de fibres sur un repas entier n'explique rien : l'annoncer
+ * ajouterait une ligne à chaque repas pour une quantité qui ne change aucune
+ * décision. Le seuil était écrit `fibres > 0.5` dans le JSX, sans nom.
+ */
+export const FIBRES_DIGNES_D_ETRE_DITES = 0.5;
 
 /* Ordre d'affichage. La quantité d'un rôle imposé ne vit plus ici mais dans
    le modèle du repas : elle change d'un repas à l'autre. */

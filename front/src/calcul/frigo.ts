@@ -10,6 +10,37 @@ import { nombreSaisi } from './saisieNombre';
 import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import { sansAccent } from './texte';
 
+/**
+ * LE STOCK RAMENÉ AU GRAMME, ou `null` si la conversion est inconnue.
+ *
+ * Rapatriée le 20 septembre 2026 (palier 0). Cette règle était écrite TROIS
+ * fois, dans deux langages, **avec trois gardes différentes** :
+ *
+ *     api/src/Service/AlimentDisponible.php:167   null !== $g && $g > 0   ← refuse 0
+ *     front/src/calcul/planCalcule.ts:65          a.grammesParUnite !== null
+ *     front/src/composants/ligneFrigo.tsx:97      … !== null
+ *
+ * Un produit Grocy dont le facteur de conversion vaut `0` — `FrigoGrocy.php`
+ * le lit tel quel — donnait donc trois réponses : le serveur « je ne sais
+ * pas », le solveur « zéro gramme », et l'écran du frigo **« soit 0 g »**.
+ * Un « je ne sais pas » rendu en zéro, ce que la règle 6 interdit
+ * explicitement.
+ *
+ * C'EST LA GARDE DU SERVEUR QUI FAIT FOI, et c'est la plus stricte : un
+ * facteur nul n'est pas une conversion, c'est une conversion absente. Un
+ * litre de lait ou un pack n'ont pas de poids connu — le calculateur doit
+ * les écarter, pas supposer.
+ *
+ * *(Aucune instance Grocy n'a été trouvée avec un facteur à zéro : c'est un
+ * risque, pas un défaut constaté. Mais les trois écritures divergeaient
+ * VRAIMENT, et c'est cela qu'on corrige.)*
+ */
+export const stockEnGrammes = (
+  aliment: { stock: number; grammesParUnite: number | null },
+): number | null => (aliment.grammesParUnite !== null && aliment.grammesParUnite > 0
+  ? aliment.stock * aliment.grammesParUnite
+  : null);
+
 /** Ordre de parcours d'un inventaire réel : on descend du frais au sec. */
 export const ORDRE_EMPLACEMENTS = ['Frigo', 'Congélateur', 'Congelateur', 'Placard'];
 
