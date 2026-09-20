@@ -32,13 +32,30 @@ import { sansAccent } from './texte';
  * les écarter, pas supposer.
  *
  * *(Aucune instance Grocy n'a été trouvée avec un facteur à zéro : c'est un
- * risque, pas un défaut constaté. Mais les trois écritures divergeaient
- * VRAIMENT, et c'est cela qu'on corrige.)*
+ * risque, pas un défaut constaté. Mais les écritures divergeaient VRAIMENT, et
+ * c'est cela qu'on corrige.)*
+ *
+ * ELLES ÉTAIENT CINQ, ET NON TROIS. Ce commentaire annonçait trois sites le
+ * 20 septembre au matin ; la revue en a trouvé deux autres l'après-midi, qui
+ * posent la même question sans la même réponse :
+ *
+ *     app/(onglets)/frigo.tsx:144      grammesParUnite === null   ← le bandeau « sans poids connu »
+ *     calcul/planCalcule.ts:47         grammesParUnite !== null   ← les aliments calculables
+ *
+ * Le premier était le plus gênant : un produit au facteur nul était écarté du
+ * calculateur par `stockEnGrammes` ET absent du bandeau qui existe exprès pour
+ * expliquer son absence. L'aliment disparaissait sans que rien ne le nomme —
+ * la règle 7 dit le contraire. D'où `poidsConnu`, la question posée une fois
+ * pour les cinq.
  */
+export const poidsConnu = (
+  aliment: { grammesParUnite: number | null },
+): boolean => aliment.grammesParUnite !== null && aliment.grammesParUnite > 0;
+
 export const stockEnGrammes = (
   aliment: { stock: number; grammesParUnite: number | null },
-): number | null => (aliment.grammesParUnite !== null && aliment.grammesParUnite > 0
-  ? aliment.stock * aliment.grammesParUnite
+): number | null => (poidsConnu(aliment)
+  ? aliment.stock * aliment.grammesParUnite!
   : null);
 
 /** Ordre de parcours d'un inventaire réel : on descend du frais au sec. */

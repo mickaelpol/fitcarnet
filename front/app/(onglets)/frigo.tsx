@@ -16,7 +16,9 @@ import {
   abonnerInventaire, allerAuStock, basculerVu, cloreInventaire, modeFrigo, ouvrirInventaire,
   reinitialiserInventaire, saisirQuantite, saisiesInventaire, vusInventaire,
 } from '@/composants/etatInventaire';
-import { ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement } from '@/calcul/frigo';
+import {
+  ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement, poidsConnu,
+} from '@/calcul/frigo';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
 /**
@@ -141,7 +143,7 @@ export default function MonFrigo() {
   /* Les macros sont données pour 100 g. Une autre unité ne pose problème que
      si son poids est inconnu : le kilogramme et la pièce se convertissent dès
      que Grocy porte la conversion, le litre et le pack non. */
-  const sansPoids = useMemo(() => tous.filter((a) => a.grammesParUnite === null), [tous]);
+  const sansPoids = useMemo(() => tous.filter((a) => !poidsConnu(a)), [tous]);
 
   /* `ouvrirInventaire` décide seul s'il préremplit : une session déjà ouverte
      se poursuit, elle ne recommence pas. Le contournement qui regardait

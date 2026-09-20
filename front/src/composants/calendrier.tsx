@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import {
+  aMinuit, dateDuRang, grilleDuMois, libelleDuJour, rangDepuisAujourdhui,
+} from '@/calcul/dates';
 import { Discret, Texte } from './base';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
@@ -28,74 +31,13 @@ const MOIS = [
 /* La semaine commence le lundi, comme partout en France. */
 const JOURS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-const MILLISECONDES_PAR_JOUR = 24 * 60 * 60 * 1000;
-
-const aMinuit = (d: Date): Date => {
-  const c = new Date(d);
-  c.setHours(0, 0, 0, 0);
-
-  return c;
-};
-
-/**
- * Le nombre de jours entre aujourd'hui et cette date.
- *
- * On divise des dates ramenées à MINUIT, et on arrondit. Sans cela, la nuit
- * du changement d'heure fait 23 ou 25 heures et décale toute la grille d'un
- * jour — un bug qui ne se voit que deux fois par an, donc jamais en test.
- */
-export const rangDepuisAujourdhui = (jour: Date): number =>
-  Math.round((aMinuit(jour).getTime() - aMinuit(new Date()).getTime())
-    / MILLISECONDES_PAR_JOUR);
-
-export const dateDuRang = (rang: number): Date => {
-  const d = aMinuit(new Date());
-  d.setDate(d.getDate() + rang);
-
-  return d;
-};
-
-/** « Aujourd'hui », « Demain », puis « mardi 12/08 ». */
-export const libelleDuJour = (rang: number): string => {
-  if (rang === 0) return "Aujourd'hui";
-  if (rang === 1) return 'Demain';
-
-  const d = dateDuRang(rang);
-
-  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: '2-digit' });
-};
-
-/**
- * La forme courte, pour un résumé : « auj. », « dem. », « mar. 12/08 ».
- *
- * Sert quand plusieurs jours doivent tenir sur une ligne repliée. Écrire
- * « Aujourd'hui, Demain, mardi 12/08, mercredi 13/08 » déborderait, et un
- * résumé tronqué ne résume rien.
- */
-export const libelleCourt = (rang: number): string => {
-  if (rang === 0) return 'auj.';
-  if (rang === 1) return 'dem.';
-
-  const d = dateDuRang(rang);
-
-  return `${d.toLocaleDateString('fr-FR', { weekday: 'short' })} `
-    + `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`;
-};
-
-/** Les cases d'un mois, alignées sur une grille lundi → dimanche. */
-function grilleDuMois(annee: number, mois: number): (Date | null)[] {
-  const premier = new Date(annee, mois, 1);
-  /* getDay() rend 0 pour dimanche ; on veut 6, pour que lundi soit 0. */
-  const decalage = (premier.getDay() + 6) % 7;
-  const combien = new Date(annee, mois + 1, 0).getDate();
-
-  const cases: (Date | null)[] = Array.from({ length: decalage }, () => null);
-  for (let j = 1; j <= combien; j += 1) cases.push(new Date(annee, mois, j));
-  /* On complète la dernière semaine pour que la grille garde sa forme. */
-  while (cases.length % 7 !== 0) cases.push(null);
-
-  return cases;
-}
+/* LES SIX FONCTIONS DE DATE VIVENT DANS `calcul/dates.ts` DEPUIS LE
+   20 SEPTEMBRE 2026. Elles etaient ecrites ici, dans un `.tsx`, donc sans un
+   seul test et sans pouvoir en avoir. L'une d'elles portait ce commentaire :
+   « la nuit du changement d'heure fait 23 ou 25 heures et decale toute la
+   grille d'un jour — un bug qui ne se voit que deux fois par an, donc jamais
+   en test ». Elle a desormais son test, qui tombe en nommant le
+   dimanche 29 mars 2026. */
 
 export function Calendrier({ rangs, onBasculer }: {
   /** les rangs retenus, relatifs à aujourd'hui */

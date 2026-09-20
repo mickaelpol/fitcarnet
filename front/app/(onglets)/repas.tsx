@@ -6,7 +6,7 @@ import type { PlanRepas } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Erreur } from '@/composants/base';
 import { premiereErreur } from '@/composants/etatRequetes';
 import { ChoixDansListe } from '@/composants/choixAliment';
-import { libelleDuJour } from '@/composants/calendrier';
+import { libelleDuJour } from '@/calcul/dates';
 import { Etapes } from '@/composants/etapes';
 import { Pliant } from '@/composants/pliant';
 /* LES ÉCRANS DE CETTE ROUTE VIVENT DANS `src/composants/`.

@@ -18,6 +18,7 @@
  * TRADUIT et REGROUPE, il ne calcule pas un gramme.
  */
 
+import { poidsConnu } from './frigo';
 import { stockEnGrammes } from './frigo';
 import type { AlimentDisponible, Cible } from '@/api/types';
 import type { Aliment } from '@/solveur/types';
@@ -44,7 +45,7 @@ export function alimentsCalculables(
   aliments: readonly AlimentDisponible[],
 ): Aliment[] {
   return aliments
-    .filter((a) => a.grammesParUnite !== null && a.stock > 0 && a.kcal100 > 0)
+    .filter((a) => poidsConnu(a) && a.stock > 0 && a.kcal100 > 0)
     .map(vers);
 }
 

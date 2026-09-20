@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { AlimentDisponible } from '@/api/types';
-import type { AlimentIncomplet } from '@/api/types';
+import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import {
-  SEUIL_ECART, ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement,
-  stockEnGrammes,
+  SEUIL_ECART, ecartsInventaire, estIncomplet, filtrerFrigo,
+  grouperParEmplacement, poidsConnu, stockEnGrammes,
 } from './frigo';
 
 const aliment = (
@@ -185,5 +184,37 @@ describe('le stock ramené au gramme', () => {
     /* Zéro EN STOCK est une information — « je n'en ai plus ». Ne pas le
        confondre avec zéro DE CONVERSION, qui est une ignorance. */
     assert.equal(stockEnGrammes({ stock: 0, grammesParUnite: 55 }), 0);
+  });
+});
+
+describe('« le poids de cette unité est-il connu ? »', () => {
+  /* LA MÊME QUESTION POSÉE CINQ FOIS, ET PAS DE LA MÊME FAÇON. Trois sites
+     étaient fusionnés le 20 septembre au matin par `stockEnGrammes` ; la revue
+     en a trouvé deux autres l'après-midi :
+
+         app/(onglets)/frigo.tsx:144    grammesParUnite === null
+         calcul/planCalcule.ts:47       grammesParUnite !== null
+
+     Le premier est le plus gênant : un produit au facteur nul était écarté du
+     calculateur ET absent du bandeau qui existe pour expliquer son absence. */
+
+  it('un facteur renseigné et positif : oui', () => {
+    assert.equal(poidsConnu({ grammesParUnite: 250 }), true);
+  });
+
+  it('pas de facteur : non', () => {
+    assert.equal(poidsConnu({ grammesParUnite: null }), false);
+  });
+
+  it('LE CAS QUI SÉPARAIT LES CINQ : un facteur à zéro, c\'est « non »', () => {
+    /* Zéro n'est pas une conversion, c'est une conversion absente — la garde
+       du serveur, la plus stricte des cinq. Un litre de lait ou un pack n'ont
+       pas de poids connu : le calculateur doit les écarter, et le bandeau doit
+       les NOMMER. Les deux découlent de cette seule réponse. */
+    assert.equal(poidsConnu({ grammesParUnite: 0 }), false);
+  });
+
+  it('un facteur négatif non plus', () => {
+    assert.equal(poidsConnu({ grammesParUnite: -5 }), false);
   });
 });
