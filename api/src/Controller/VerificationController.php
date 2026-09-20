@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Service\MotDePasse;
 use App\Service\VerdictAliment;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -55,5 +56,44 @@ final class VerificationController extends AbstractController
         $saisie = (array) \json_decode((string) $requete->getContent(), true);
 
         return $this->json(VerdictAliment::pour($saisie));
+    }
+
+    /**
+     * La jauge d'un mot de passe en cours de frappe.
+     *
+     * PAS AUTHENTIFIEE, et il le faut : elle sert AUSSI a l'ecran
+     * d'invitation, ou personne n'a encore de compte. Le pare-feu
+     * `verification_publique` de `security.yaml` l'ouvre, comme il ouvre deja
+     * `invitation` et `etat`.
+     *
+     * ELLE NE JOURNALISE RIEN ET NE STOCKE RIEN. Le mot de passe passe par le
+     * corps d'un POST, sur le meme canal chiffre que l'envoi du formulaire —
+     * qui le transmet de toute facon. Ce n'est donc pas une exposition
+     * nouvelle ; mais c'est une raison de ne jamais mettre ce corps dans un
+     * journal.
+     */
+    #[Route('/verification/mot-de-passe', methods: ['POST'])]
+    public function motDePasse(Request $requete): JsonResponse
+    {
+        /** @var array<string, mixed> $corps */
+        $corps = (array) \json_decode((string) $requete->getContent(), true);
+        $clair = (string) ($corps['motDePasse'] ?? '');
+
+        $manquements = MotDePasse::manquements($clair);
+        $force = MotDePasse::force($clair);
+
+        return $this->json([
+            'manquements' => $manquements,
+            'exigences' => MotDePasse::exigences($clair),
+            /* LA PHRASE, PAS SEULEMENT LES CLES. L'ecran n'a plus a traduire
+               « longueur » en « douze caracteres » : c'est ce qui lui faisait
+               porter le chiffre, et c'est ainsi qu'un ecran a conseille « ni
+               majuscule ni chiffre imposes » le jour ou le serveur a commence
+               a les exiger. */
+            'dit' => MotDePasse::pourquoiRefuse($clair),
+            'acceptable' => [] === $manquements,
+            'force' => $force,
+            'motDeLaForce' => MotDePasse::motDeLaForce($force),
+        ]);
     }
 }

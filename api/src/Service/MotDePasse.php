@@ -95,6 +95,100 @@ final class MotDePasse
         return $manque;
     }
 
+    /**
+     * LES QUATRE NIVEAUX DE LA JAUGE, du plus faible au plus solide.
+     *
+     * Portes depuis `front/src/calcul/motDePasse.ts` le 20 septembre 2026 :
+     * « tout doit passer par le serveur car le metier doit etre sur le
+     * serveur, comme ca je peux changer le front quand bon me semble ».
+     *
+     * LA JAUGE NE PEUT PAS CONTREDIRE LE VERROU, et c'est sa seule contrainte
+     * serieuse. Beaucoup de sites affichent un « fort » vert sur un mot de
+     * passe que leur propre serveur refuse ensuite. On s'interdit ca en
+     * construisant la jauge SUR les exigences : tant qu'il en manque une, elle
+     * ne peut pas depasser « moyen ». « bon » veut dire « il passera », et
+     * rien d'autre.
+     *
+     * AU-DELA, C'EST LA LONGUEUR QUI PARLE, parce que c'est la seule chose qui
+     * augmente vraiment le cout d'une attaque une fois les familles presentes.
+     * Seize caracteres valent « solide » ; douze avec les quatre familles
+     * valent « bon », ce qui est la verite : ca passe, ce n'est pas un exploit.
+     *
+     * ON NE PROMET PAS D'ENTROPIE. Un « 94 bits » affiche a l'ecran serait
+     * faux — il supposerait un tirage au sort, alors que les gens tapent des
+     * mots. Quatre paliers nommes disent ce qu'on sait, et rien de plus
+     * (regle 7).
+     */
+    public static function force(string $motDePasse): string
+    {
+        if ('' === $motDePasse) {
+            return 'vide';
+        }
+
+        $manque = \count(self::manquements($motDePasse));
+        if ($manque >= 3) {
+            return 'faible';
+        }
+        if ($manque >= 1) {
+            return 'moyen';
+        }
+
+        /* LES CARACTERES, PAS LES OCTETS — meme piege que `manquements` :
+           `strlen` declarerait « Été… » plus long qu'il n'est. */
+        return \mb_strlen($motDePasse) >= self::LONGUEUR_MINIMALE + 4 ? 'solide' : 'bon';
+    }
+
+    /**
+     * LES CINQ EXIGENCES, DANS L'ORDRE OU L'ECRAN LES AFFICHE, avec leur
+     * libelle et si ce mot de passe les remplit.
+     *
+     * L'ECRAN NE PORTE PLUS LE CHIFFRE. Il traduisait « longueur » en « douze
+     * caracteres » depuis sa propre constante : c'est exactement ainsi qu'un
+     * ecran d'invitation a conseille « ni majuscule ni chiffre imposes » le
+     * jour ou le serveur a commence a les exiger. Le serveur dit la phrase.
+     *
+     * ON LES REND TOUTES LES CINQ, remplies ou non — et pas seulement ce qui
+     * manque. Une liste qui retrecit pendant qu'on tape fait bouger le reste
+     * de l'ecran sous les doigts ; et voir la liste complete avant de
+     * commencer, c'est savoir ou l'on va.
+     *
+     * @return list<array{cle: string, dit: string, remplie: bool}>
+     */
+    public static function exigences(string $motDePasse): array
+    {
+        $manque = self::manquements($motDePasse);
+        $dit = [
+            'longueur' => self::LONGUEUR_MINIMALE . ' caractères au minimum',
+            'minuscule' => 'une lettre minuscule',
+            'majuscule' => 'une lettre majuscule',
+            'chiffre' => 'un chiffre',
+            'special' => 'un caractère spécial',
+        ];
+
+        $out = [];
+        foreach ($dit as $cle => $phrase) {
+            $out[] = [
+                'cle' => $cle,
+                'dit' => $phrase,
+                'remplie' => !\in_array($cle, $manque, true),
+            ];
+        }
+
+        return $out;
+    }
+
+    /** Ce que la jauge affiche comme mot, a cote de la barre. */
+    public static function motDeLaForce(string $force): string
+    {
+        return [
+            'vide' => '',
+            'faible' => 'Trop faible',
+            'moyen' => 'Presque',
+            'bon' => 'Bon',
+            'solide' => 'Solide',
+        ][$force] ?? '';
+    }
+
     /** Rien ne manque. */
     public static function acceptable(string $motDePasse): bool
     {

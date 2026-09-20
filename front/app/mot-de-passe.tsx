@@ -4,7 +4,10 @@ import type { TextInput } from 'react-native';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 
 import { useChangerMotDePasse, useDeconnexion, useMoi } from '@/api/hooks';
-import { acceptable } from '@/calcul/motDePasse';
+/* LA JAUGE VIENT DU SERVEUR — 20 septembre 2026. `acceptable` etait le
+   dernier juge local du mot de passe, tenu par `api/regles/motdepasse.json` :
+   le fichier n'a plus rien a verrouiller. */
+import { useJaugeMotDePasse } from '@/api/hooks/verification';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Titre } from '@/composants/base';
 import { JaugeMotDePasse } from '@/composants/jaugeMotDePasse';
 import { C, E, T } from '@/theme';
@@ -28,13 +31,16 @@ import { C, E, T } from '@/theme';
  * un mot : être éjecté juste après avoir validé ressemble à un échec, et on
  * retape alors l'ancien mot de passe en croyant que rien n'a pris.
  *
- * AUCUNE RÈGLE DE MOT DE PASSE N'EST ÉCRITE ICI. `acceptable` et la jauge
- * viennent de `src/calcul/motDePasse.ts`, verrouillé sur
- * `api/regles/motdepasse.json` par un test partagé. Recopier « douze
- * caractères » dans un écran, c'est se préparer à le laisser derrière le jour
- * où le chiffre bouge — ce qui est précisément arrivé à l'écran d'invitation,
- * resté sur « 10 caractères, ni majuscule ni chiffre imposés » après le
- * durcissement du 18 septembre 2026.
+ * AUCUNE RÈGLE DE MOT DE PASSE N'EST ÉCRITE NI CALCULÉE ICI. La jauge et le
+ * droit d'envoyer viennent du SERVEUR depuis le 20 septembre 2026 : il rend
+ * les cinq exigences avec leurs phrases, le niveau de la barre et le mot qui
+ * l'accompagne. Il n'y a plus deux écritures tenues par un fichier de règles ;
+ * il n'y en a qu'une.
+ *
+ * Recopier « douze caractères » dans un écran, c'est se préparer à le laisser
+ * derrière le jour où le chiffre bouge — ce qui est précisément arrivé à
+ * l'écran d'invitation, resté sur « 10 caractères, ni majuscule ni chiffre
+ * imposés » après le durcissement du 18 septembre 2026.
  */
 export default function MotDePasse() {
   const router = useRouter();
@@ -44,6 +50,11 @@ export default function MotDePasse() {
 
   const [actuel, setActuel] = useState('');
   const [nouveau, setNouveau] = useState('');
+
+  /* LE SERVEUR JUGE LE MOT DE PASSE, cet écran l'affiche. La jauge et le
+     droit d'envoyer viennent de lui : il n'y a plus deux écritures de la
+     même règle, donc plus rien à tenir aligné. */
+  const { jauge, perime: jaugePerimee } = useJaugeMotDePasse(nouveau);
   const [confirmation, setConfirmation] = useState('');
 
   /* « Entrée » descend d'un champ, puis valide sur le dernier. Sur le web,
@@ -134,7 +145,7 @@ export default function MotDePasse() {
   const identique = nouveau !== '' && nouveau === actuel;
 
   const pret = actuel !== '' && nouveau !== '' && confirmation !== ''
-    && acceptable(nouveau)
+    && (jauge?.acceptable ?? false)
     && nouveau === confirmation
     && !identique;
 
@@ -173,7 +184,7 @@ export default function MotDePasse() {
             champRef={champNouveau}
             onSuivant={() => champConfirmation.current?.focus()}
           />
-          <JaugeMotDePasse valeur={nouveau} />
+          <JaugeMotDePasse valeur={nouveau} jauge={jauge} perime={jaugePerimee} />
 
           {identique && (
             <Discret style={[s.aide, { color: C.erreur }]}>

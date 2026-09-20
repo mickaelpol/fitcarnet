@@ -5,7 +5,10 @@ import {
 } from 'react-native';
 
 import { useAccepterInvitation, useInvitation } from '@/api/hooks';
-import { acceptable } from '@/calcul/motDePasse';
+/* LA JAUGE VIENT DU SERVEUR — 20 septembre 2026. `acceptable` etait le
+   dernier juge local du mot de passe, tenu par `api/regles/motdepasse.json` :
+   le fichier n'a plus rien a verrouiller. */
+import { useJaugeMotDePasse } from '@/api/hooks/verification';
 import { Bouton, Carte, Champ, Chargement, Discret, Texte, Titre } from '@/composants/base';
 import { JaugeMotDePasse } from '@/composants/jaugeMotDePasse';
 import { C, E, P, T } from '@/theme';
@@ -41,6 +44,11 @@ export default function AccepterInvitation() {
 
   const [nom, setNom] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
+
+  /* LE SERVEUR JUGE LE MOT DE PASSE, cet écran l'affiche. La jauge et le
+     droit d'envoyer viennent de lui : il n'y a plus deux écritures de la
+     même règle, donc plus rien à tenir aligné. */
+  const { jauge, perime: jaugePerimee } = useJaugeMotDePasse(motDePasse);
   const [confirmation, setConfirmation] = useState('');
 
   /* « ENTRÉE » NE FAISAIT PAS RIEN : ELLE PERDAIT LE CHAMP — relevé le
@@ -107,7 +115,7 @@ export default function AccepterInvitation() {
      donc la même des deux côtés : impossible que « Entrée » envoie ce que le
      bouton refuse, ou l'inverse. C'est ce que font déjà `connexion.tsx` et
      `mot-de-passe.tsx`. */
-  const pret = nom.trim() !== '' && acceptable(motDePasse) && confirmation === motDePasse;
+  const pret = nom.trim() !== '' && (jauge?.acceptable ?? false) && confirmation === motDePasse;
 
   const creer = () => {
     if (!pret || accepter.isPending) return;
@@ -145,9 +153,10 @@ export default function AccepterInvitation() {
               18 septembre 2026 sans que cette phrase bouge. Elle promettait
               donc, en toutes lettres, ce que l'API refuse — un écran qui donne
               un conseil faux est pire qu'un écran muet.
-              Plus une seule exigence n'est écrite ici : elles viennent de
-              `src/calcul/motDePasse.ts`, que `motDePassePartage.test.ts`
-              verrouille sur `api/regles/motdepasse.json`. Le jour où le chiffre
+              Plus une seule exigence n'est écrite ici, NI MÊME CALCULÉE :
+              depuis le 20 septembre 2026, c'est le serveur qui les rend, avec
+              leurs phrases. Il n'y a plus deux écritures à tenir alignées par
+              un fichier de règles — il n'y en a qu'une. Le jour où le chiffre
               rebouge, cet écran suit sans qu'on y pense. */}
           <Champ
             valeur={motDePasse}
@@ -158,7 +167,7 @@ export default function AccepterInvitation() {
             champRef={champMotDePasse}
             onSuivant={() => champConfirmation.current?.focus()}
           />
-          <JaugeMotDePasse valeur={motDePasse} />
+          <JaugeMotDePasse valeur={motDePasse} jauge={jauge} perime={jaugePerimee} />
 
           <Champ
             valeur={confirmation}

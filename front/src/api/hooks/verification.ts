@@ -178,3 +178,54 @@ export function useRetarde<T>(valeur: T, millisecondes = 250): T {
 
   return retarde;
 }
+
+/** Ce que le serveur dit d'un mot de passe en cours de frappe. */
+export interface VerdictMotDePasse {
+  manquements: string[];
+  /** Les cinq, dans l'ordre d'affichage, remplies ou non. */
+  exigences: { cle: string; dit: string; remplie: boolean }[];
+  /** La phrase complete, deja redigee : l'ecran n'a rien a traduire. */
+  dit: string | null;
+  acceptable: boolean;
+  force: 'vide' | 'faible' | 'moyen' | 'bon' | 'solide';
+  /** Le mot affiche a cote de la barre. */
+  motDeLaForce: string;
+}
+
+/**
+ * La jauge d'un mot de passe, rendue par le serveur.
+ *
+ * LE DERNIER DOUBLE JUGE DE CETTE FAMILLE — porte le 20 septembre 2026. La
+ * force etait calculee ici ET la-bas, tenue par `api/regles/motdepasse.json`.
+ * Le fichier n'a plus rien a verrouiller : il n'y a plus qu'une ecriture.
+ *
+ * L'ECRAN N'A MEME PLUS A TRADUIRE « longueur » EN « douze caracteres ». C'est
+ * ce qui lui faisait porter le chiffre, et c'est ainsi qu'un ecran a conseille
+ * « ni majuscule ni chiffre imposes » le jour ou le serveur a commence a les
+ * exiger. Le serveur rend la phrase.
+ *
+ * LA ROUTE EST PUBLIQUE, et il le faut : l'ecran d'invitation s'en sert, et
+ * personne n'y a encore de compte.
+ */
+export function useJaugeMotDePasse(motDePasse: string) {
+  const interroge = useRetarde(motDePasse);
+  const enRetard = motDePasse !== interroge;
+
+  const requete = useQuery({
+    queryKey: ['jauge-mot-de-passe', interroge],
+    staleTime: Infinity,
+    gcTime: 60_000,
+    placeholderData: (precedent: VerdictMotDePasse | undefined) => precedent,
+    queryFn: () => api<VerdictMotDePasse>(
+      '/verification/mot-de-passe',
+      { methode: 'POST', corps: { motDePasse: interroge }, sansJeton: true }),
+  });
+
+  return {
+    jauge: requete.data,
+    /* Les deux fenetres, comme pour l'aliment : l'anti-rebond que la
+       bibliotheque ne voit pas, et l'aller-retour qu'elle voit. */
+    perime: enRetard || requete.isPlaceholderData,
+    enPanne: requete.isError,
+  };
+}

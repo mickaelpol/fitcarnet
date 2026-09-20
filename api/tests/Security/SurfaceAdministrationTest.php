@@ -46,6 +46,15 @@ final class SurfaceAdministrationTest extends TestCase
      * un garde ne les protegerait pas — il les casserait.
      */
     private const SANS_GARDE = [
+        'VerificationController::motDePasse' => 'La jauge d\'un mot de passe en cours '
+            . 'de frappe. Ouverte parce que l\'ECRAN D\'INVITATION s\'en sert, et que '
+            . 'personne n\'y a encore de compte : un garde la casserait sans rien '
+            . 'proteger. Elle ne lit rien, n\'ecrit rien, ne journalise rien et ne '
+            . 'touche a aucune donnee — elle repond « voila ce qui manque a ce mot de '
+            . 'passe ». Le mot de passe passe par le corps d\'un POST, sur le meme '
+            . 'canal chiffre que l\'envoi du formulaire, qui le transmet de toute '
+            . 'facon. Pare-feu `verification_publique`, pose le 20 septembre 2026 '
+            . 'quand le metier de la jauge est passe au serveur.',
         'EtatController::etat' => 'La pastille verte ou rouge de l\'ecran. Hors pare-feu '
             . 'expres : un jeton perime dans l\'en-tete ferait repondre 401 avant le '
             . 'controleur, et la pastille dirait « hors ligne » sur un serveur sain.',

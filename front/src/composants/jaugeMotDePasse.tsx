@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 
-import {
-  DIT, EXIGENCES, MOT_DE_LA_FORCE, force, manquements, type Force,
-} from '@/calcul/motDePasse';
+import type { VerdictMotDePasse } from '@/api/hooks/verification';
+
+/** Les cinq niveaux, tels que le serveur les nomme. */
+type Force = VerdictMotDePasse['force'];
 import { C, E, P, R, T } from '@/theme';
 import { Discret, Texte } from './base';
 
@@ -22,47 +23,55 @@ import { Discret, Texte } from './base';
  * l'écran sous les doigts ; et voir la liste complète avant de commencer, c'est
  * savoir où l'on va.
  *
- * LA BARRE NE PEUT PAS MENTIR : `force()` est construite SUR les exigences —
- * tant qu'il en manque une, elle ne dépasse pas « Presque ». Le test partagé
- * `motDePassePartage.test.ts` refuse toute jauge qui encouragerait un mot de
- * passe que l'API rejette.
+ * LA BARRE NE PEUT PAS MENTIR, et depuis le 20 septembre 2026 c'est ACQUIS et
+ * non plus surveillé : le serveur construit la force SUR les exigences, et
+ * c'est lui qui la rend. Tant qu'il en manque une, elle ne dépasse pas
+ * « Presque ». Ce composant n'évalue plus rien — il affiche.
+ *
+ * Auparavant, deux jauges répondaient à la même question, tenues par
+ * `api/regles/motdepasse.json`. Il n'y a plus qu'une écriture ; le fichier
+ * n'a plus rien à verrouiller.
  *
  * RIEN NE S'AFFICHE SUR UN CHAMP VIDE. Accueillir quelqu'un par cinq croix
  * rouges avant qu'il ait tapé une lettre, c'est le gronder d'être arrivé.
  */
-export function JaugeMotDePasse({ valeur }: { valeur: string }) {
-  if (valeur === '') return null;
+export function JaugeMotDePasse({ valeur, jauge, perime }: {
+  valeur: string;
+  /** Le verdict du serveur ; absent tant qu'il n'a pas répondu. */
+  jauge?: VerdictMotDePasse;
+  /** Vrai quand `jauge` décrit une frappe PRÉCÉDENTE. */
+  perime?: boolean;
+}) {
+  /* RIEN SUR UN CHAMP VIDE, ni pendant qu'on attend la première réponse :
+     inventer un niveau local en attendant, ce serait réintroduire la deuxième
+     écriture qu'on vient de retirer. */
+  if (valeur === '' || jauge === undefined) return null;
 
-  const niveau = force(valeur);
-  const manque = new Set(manquements(valeur));
+  const niveau = jauge.force;
 
   return (
-    <View style={s.bloc}>
+    <View style={[s.bloc, perime === true && { opacity: 0.45 }]}>
       <View style={s.barre}>
         {[0, 1, 2, 3].map((i) => (
           <View
             key={i}
-            style={[s.segment, i < SEGMENTS[niveau] && { backgroundColor: COULEUR[niveau] }]}
+            style={[s.segment, i < (SEGMENTS[niveau] ?? 0) && { backgroundColor: COULEUR[niveau] }]}
           />
         ))}
       </View>
 
-      <Texte style={[s.mot, { color: COULEUR[niveau] }]}>{MOT_DE_LA_FORCE[niveau]}</Texte>
+      <Texte style={[s.mot, { color: COULEUR[niveau] }]}>{jauge.motDeLaForce}</Texte>
 
-      {EXIGENCES.map((exigence) => {
-        const remplie = !manque.has(exigence);
-
-        return (
-          <Discret
-            key={exigence}
-            style={[s.ligne, remplie ? { color: C.ok } : { color: C.attenue }]}
-          >
-            {/* Un caractère, pas une icône : aucune dépendance, lisible par un
-                lecteur d'écran, et identique sur les trois plateformes. */}
-            {remplie ? '✓' : '·'}  {DIT[exigence]}
-          </Discret>
-        );
-      })}
+      {jauge.exigences.map((exigence) => (
+        <Discret
+          key={exigence.cle}
+          style={[s.ligne, exigence.remplie ? { color: C.ok } : { color: C.attenue }]}
+        >
+          {/* Un caractère, pas une icône : aucune dépendance, lisible par un
+              lecteur d'écran, et identique sur les trois plateformes. */}
+          {exigence.remplie ? '✓' : '·'}  {exigence.dit}
+        </Discret>
+      ))}
     </View>
   );
 }

@@ -75,6 +75,18 @@ security:
         # deviendraient publics.
         #
         # Doit rester AVANT `api` : le premier motif qui correspond gagne.
+        # LA JAUGE DU MOT DE PASSE EST PUBLIQUE, ET IL LE FAUT : l'ecran
+        # d'invitation s'en sert, et personne n'y a encore de compte. Elle ne
+        # lit rien, n'ecrit rien, et ne journalise rien — elle repond « voila
+        # ce qui manque a ce mot de passe ». Posee le 20 septembre 2026, quand
+        # le metier de la jauge est passe au serveur.
+        #
+        # L'ORDRE DE CE FICHIER EST SIGNIFIANT : le premier motif qui
+        # correspond gagne. Celui-ci doit rester AVANT le pare-feu `api`.
+        verification_publique:
+            pattern: ^/api/verification/mot-de-passe$
+            security: false
+
         invitation:
             pattern: ^/api/invitation/
             security: false

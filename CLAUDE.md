@@ -33,11 +33,11 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 755 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 749 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 490 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 483 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -179,7 +179,6 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Bornes et plancher des convives | `front/src/calcul/convives.ts` |
 | Proximité de deux noms (fusion d'exercices) | `front/src/calcul/proximite.ts` |
 | Composer plusieurs jours d'un coup | `front/src/calcul/composerLaPeriode.ts` |
-| Force d'un mot de passe | `api/src/Service/MotDePasse.php` **et** `front/src/calcul/motDePasse.ts`, verrouillés l'un sur l'autre par `api/regles/motdepasse.json` — **le prochain à passer au serveur** |
 
 **LES DOUBLES JUGES SONT EN VOIE DE DISPARITION — décision du 20 septembre
 2026.** « Tout doit passer par le serveur car le métier doit être sur le
@@ -188,8 +187,12 @@ déjà partis le jour même : la **cohérence d'un aliment** et le **rendement
 cru/cuit**, avec `coherence.json`, `rendement.json` et leurs quatre suites
 jumelles. Le front ne les juge plus — il affiche ce que
 `POST /api/verification/aliment` lui répond, et les anomalies du frigo
-arrivent avec `GET /api/mon-frigo`. Restent le mot de passe et l'avancement
-d'une séance ; le plan (§5 bis) dit comment ils partiront.
+arrivent avec `GET /api/mon-frigo`. **Trois sont partis** : la cohérence d'un aliment, le rendement cru/cuit et
+**le mot de passe** — avec `coherence.json`, `rendement.json`,
+`motdepasse.json` et leurs six suites jumelles. Le front n'évalue plus rien de
+tout cela : `POST /api/verification/aliment` et
+`POST /api/verification/mot-de-passe` rendent les verdicts, les phrases et
+jusqu'aux couleurs. **Reste l'avancement d'une séance**, seul survivant.
 
 **NE COMPTE PAS LES DOUBLES JUGES DE TÊTE — CETTE PAGE S'EST TROMPÉE QUATRE
 FOIS.** Successivement : « le mot de passe est le seul cas », « deux cas et deux
@@ -202,7 +205,7 @@ dès qu'on en trouve un autre, et il faut la considérer comme incomplète.**
 | Mot de passe | `api/src/Service/MotDePasse.php`, `front/src/calcul/motDePasse.ts` | `api/regles/motdepasse.json`, lu par `MotDePassePartageTest.php` **et** `motDePassePartage.test.ts` |
 | Avancement d'une séance | `api/src/Entity/Seance.php` `getAvancement()`, `front/src/calcul/blocSeance.ts` `avancementDe()` | `api/regles/avancement.json`, lu par `AvancementPartageTest.php` **et** `avancementPartage.test.ts` — depuis le 20 septembre 2026. Les deux tournent vraiment : `app/(onglets)/seances.tsx` lit le champ du serveur, `app/seance/[id].tsx` recalcule à chaque case cochée |
 
-Les deux restants ont la même raison d'exister — l'écran doit répondre pendant le
+Le dernier a la même raison d'exister — l'écran doit répondre pendant le
 geste, sans aller-retour réseau, pendant que le serveur reste seul à décider —
 et le même dispositif : **un fichier de règles lu par les DEUX suites**. Le jour
 où l'un des juges change d'avis sans l'autre, une des deux suites tombe **en
