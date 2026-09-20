@@ -18,15 +18,6 @@ const serieVide = (ordre: number): Serie => ({
   repsCible: null, poidsCible: null, secondesCible: null,
 });
 
-/** « 4 s × 12 rép » -> { series: 4, reps: 12 } */
-export function lireFormat(f: string | null): { series: number; reps: number } | null {
-  if (!f) return null;
-  const m = /(\d+)\s*s\s*[×x]\s*(\d+)\s*r[ée]p/i.exec(f);
-
-  return m ? { series: Number(m[1]), reps: Number(m[2]) } : null;
-}
-
-export { rmDesSeries as rmEstime } from '@/calcul/performance';
 
 export function CarteExercice({
   bloc, exercice, poignee, recordAnterieur = null, derniereFois,

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, it, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Exercice, Modele, Seance, SeanceExercice } from '@/api/types';
@@ -19,8 +19,7 @@ import type { Exercice, Modele, Seance, SeanceExercice } from '@/api/types';
  */
 import { nb } from '../theme';
 import {
-  apercuDerniereFois, avancementDe, avecIdentifiantSeance, blocDepuisExercice,
-  blocsDepuisModele,
+  apercuDerniereFois, avancementDe, avecIdentifiantSeance, blocDepuisExercice, blocsDepuisModele, lireFormat,
 } from './blocSeance';
 
 /**
@@ -333,4 +332,33 @@ test('une séance qui a déjà un identifiant n\'est pas touchée', () => {
   const distante: Seance = { id: 99, date: '2026-09-15', type: 'Pull', exercices: [] };
 
   assert.equal(avecIdentifiantSeance(locale, distante), locale);
+});
+
+describe('lire un format prescrit', () => {
+  it('lit la forme canonique', () => {
+    assert.deepEqual(lireFormat('4 s × 12 rép'), { series: 4, reps: 12 });
+  });
+
+  it('accepte le x latin et les variantes d\'ecriture', () => {
+    /* Le format est saisi a la main par un administrateur : le « × »
+       typographique n'est pas sur un clavier. */
+    assert.deepEqual(lireFormat('4s x 12rep'), { series: 4, reps: 12 });
+    assert.deepEqual(lireFormat('3 S × 8 REP'), { series: 3, reps: 8 });
+    assert.deepEqual(lireFormat('5 s×5 rép'), { series: 5, reps: 5 });
+  });
+
+  it('CE QU\'ON NE RECONNAIT PAS REND null, jamais un format invente', () => {
+    /* Un administrateur peut ecrire « au feeling » ou « 3 x AMRAP ». Inventer
+       3 series de 10 remplirait l'ecran de chiffres que personne n'a
+       prescrits — regle 7. */
+    assert.equal(lireFormat('au feeling'), null);
+    assert.equal(lireFormat('3 x AMRAP'), null);
+    assert.equal(lireFormat('12 rep'), null);
+    assert.equal(lireFormat(''), null);
+    assert.equal(lireFormat(null), null);
+  });
+
+  it('lit les nombres a deux chiffres des deux cotes', () => {
+    assert.deepEqual(lireFormat('10 s × 15 rép'), { series: 10, reps: 15 });
+  });
 });

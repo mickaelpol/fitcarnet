@@ -16,12 +16,17 @@ import { idDe, iriDe } from '../api/types';
  * à comportement strictement identique.
  *
  * `blocDepuisExercice` reçoit le format déjà lu plutôt que d'appeler
- * `lireFormat` : celui-ci vit dans `composants/exerciceSeance.tsx`, et un
- * module de `src/` atteint par un test ne peut RIEN importer d'un `.tsx`,
- * même en `import type` — `tsconfig.tests.json` ne pose aucune option `jsx`,
- * et le compilateur doit tout de même ouvrir le fichier pour résoudre le type
- * (TS6142). Le jour où `lireFormat` descendra dans un `.ts`, ce paramètre
- * pourra redevenir un appel.
+ * `lireFormat`. LA RAISON ÉCRITE ICI ÉTAIT FAUSSE : elle affirmait que
+ * « `tsconfig.tests.json` ne pose aucune option `jsx` », alors que ce fichier
+ * porte `"jsx": "react-jsx"` depuis les tests de rendu — et le dit lui-même,
+ * en ajoutant que « plus rien n'empêche un .test.ts d'importer une VALEUR
+ * depuis un .tsx ». Un relecteur qui vérifiait l'affirmation voyait que ça
+ * compile et en concluait qu'il pouvait importer. Ce qu'il aurait découvert à
+ * l'exécution, pas au typage : c'est pire.
+ *
+ * Le point est sans objet depuis le 20 septembre 2026 : `lireFormat` vit dans
+ * CE fichier. Le paramètre reste pour l'instant, pour ne pas mélanger un
+ * déménagement et un changement d'interface dans le même commit.
  *
  * @see blocSeance.test.ts
  */
@@ -179,3 +184,29 @@ export function apercuDerniereFois(
  */
 export const avecIdentifiantSeance = (locale: Seance, distante: Seance): Seance =>
   (locale.id === undefined ? { ...locale, id: distante.id } : locale);
+
+/**
+ * « 4 s × 12 rép » → { series: 4, reps: 12 }
+ *
+ * DESCENDU LE 20 SEPTEMBRE 2026 (palier 0) depuis
+ * `composants/exerciceSeance.tsx`. C'est une regle metier — le format prescrit
+ * d'un exercice, tel qu'un administrateur l'ecrit — et elle vivait dans un
+ * `.tsx`, donc sans test.
+ *
+ * Elle forcait en plus un contournement dans ce module meme : `blocDepuisExercice`
+ * recevait le format DEJA LU en parametre, faute de pouvoir l'appeler. Ce
+ * parametre peut redevenir un appel le jour ou quelqu'un le decide ; en
+ * attendant, la signature ne bouge pas, pour que ce commit ne melange pas un
+ * demenagement et un changement d'interface.
+ *
+ * CE QUI NE RECONNAIT PAS LE FORMAT REND `null`, ET NON UN FORMAT PAR DEFAUT.
+ * Un administrateur peut ecrire « au feeling » ou « 3 x AMRAP » : inventer
+ * 3 series de 10 remplirait l'ecran de chiffres que personne n'a prescrits.
+ */
+export function lireFormat(f: string | null): FormatPrescrit | null {
+  if (!f) return null;
+
+  const m = /(\d+)\s*s\s*[×x]\s*(\d+)\s*r[ée]p/i.exec(f);
+
+  return m ? { series: Number(m[1]), reps: Number(m[2]) } : null;
+}

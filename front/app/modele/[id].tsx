@@ -12,7 +12,7 @@ import { SerieModele } from '@/composants/serieModele';
 import { ChoixMode, type ModeTravail } from '@/composants/choixMode';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
-import { lireFormat } from '@/composants/exerciceSeance';
+import { lireFormat } from '@/calcul/blocSeance';
 import { ListeDeplacable } from '@/composants/listeDeplacable';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 import { idDe } from '@/api/types';

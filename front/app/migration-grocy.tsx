@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import {
   useAlimentsReference, useMigrationGrocy, useMigrerAliment, useTerminerMigration,
 } from '@/api/hooks';
+import { categorieDepuisCiqual } from '@/calcul/categorieCiqual';
 import type { AlimentAMigrer } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Titre } from '@/composants/base';
 import { ChampRattachement } from '@/composants/champRattachement';
@@ -244,7 +245,7 @@ function LigneAMigrer({
                  celles d'un produit générique : les recopier écrirait un
                  chiffre que personne n'a lu sur un paquet. */
               if (choisi !== null && categorie.trim() === '') {
-                setCategorie(categorieDepuis(choisi.sousgroupeCode));
+                setCategorie(categorieDepuisCiqual(choisi.sousgroupeCode));
               }
             }}
           />
@@ -285,36 +286,6 @@ function LigneAMigrer({
       )}
     </Carte>
   );
-}
-
-/**
- * La catégorie du projet qui correspond à un sous-groupe CIQUAL.
- *
- * PROPOSITION, PAS DÉCISION : elle pré-remplit un champ que la personne peut
- * changer. Le code CIQUAL commence par le groupe (« 09 » = viandes), et c'est
- * assez pour une première approximation.
- *
- * Elle ne couvre volontairement pas tout : ce qu'on ne sait pas reste vide, et
- * le bouton d'envoi attend. Une catégorie devinée de travers classerait un
- * aliment dans le mauvais rôle du calculateur, en silence.
- */
-function categorieDepuis(sousgroupeCode: string): string {
-  const groupe = sousgroupeCode.slice(0, 2);
-
-  switch (groupe) {
-    case '01': return 'autre';   // entrées et plats composés
-    case '02': return 'prot';    // viandes, œufs, poissons
-    case '03': return 'fec';     // produits céréaliers
-    case '04': return 'lait';    // laits et produits laitiers
-    case '09': return 'prot';    // viandes et charcuteries
-    case '11': return 'prot';    // poissons et fruits de mer
-    case '12': return 'lait';
-    case '13': return 'huile';   // huiles et graisses
-    case '15': return 'ole';     // fruits à coque et graines
-    case '20': return 'leg';     // légumes
-    case '13000': return 'huile';
-    default: return '';
-  }
 }
 
 const s = StyleSheet.create({
