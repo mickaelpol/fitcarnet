@@ -227,9 +227,26 @@ export function provenanceRatio(
 const nombreCourt = (v: number): string =>
   Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1);
 
+/**
+ * EN DEÇÀ DE CET ÉCART, ON DIT QUE LE POIDS NE CHANGE PAS.
+ *
+ * Constante depuis le 20 septembre 2026 (palier 0), parce qu'elle était écrite
+ * deux fois avec DEUX VALEURS différentes : `0.01` ici, et une égalité stricte
+ * `ratio === 1` dans `composants/ligneFrigo.tsx`. Un aliment à 1,002 — ce
+ * qu'une vraie pesée donne très vite, 500 g avant et 501 g après — était donc
+ * « inchangé » dans l'éditeur et « 100 g → 100 g » dans le frigo : un
+ * changement affiché qui n'en était pas un.
+ *
+ * 1 % : en dessous, c'est la précision de la balance, pas la cuisson.
+ */
+export const POIDS_INCHANGE = 0.01;
+
+/** Le poids ne bouge-t-il pas assez pour qu'on en parle ? */
+const inchange = (ratio: number): boolean => Math.abs(ratio - 1) < POIDS_INCHANGE;
+
 /** Formulation en clair, pour que l'utilisateur vérifie la vraisemblance. */
 export function expliquerRatio(ratio: number): string {
-  if (Math.abs(ratio - 1) < 0.01) return 'Le poids ne change pas à la cuisson.';
+  if (inchange(ratio)) return 'Le poids ne change pas à la cuisson.';
   if (ratio > 1) {
     return `100 g avant cuisson donnent ${Math.round(ratio * 100)} g une fois cuits.`;
   }
@@ -237,6 +254,16 @@ export function expliquerRatio(ratio: number): string {
   return `100 g avant cuisson donnent ${Math.round(ratio * 100)} g une fois cuits `
     + `(perte d'eau).`;
 }
+
+/**
+ * La meme chose, en trois mots, pour une case de tableau.
+ *
+ * Le frigo déplie ses macros dans une grille où une phrase ne rentre pas. Ce
+ * qui compte : les deux basculent au MÊME seuil, et c'est ce que vérifie
+ * `ratioDit.test.ts` sur toute la plage que la base accepte.
+ */
+export const resumeRatio = (ratio: number): string =>
+  (inchange(ratio) ? 'poids inchangé' : `100 g → ${Math.round(ratio * 100)} g`);
 
 /* `ratioVraisemblable` VIVAIT ICI, et il répondait « 0,4 à 5 » — sans jamais
    regarder la catégorie de l'aliment. Deux conséquences, trouvées le même jour

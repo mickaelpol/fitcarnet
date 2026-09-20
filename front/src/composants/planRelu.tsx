@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { resumeDeBoite } from '@/calcul/resumeBoite';
 import type { PlanRepas } from '@/api/hooks';
 import { useMarquerCuisine } from '@/api/hooks';
 import { Bouton, Carte, Discret, Texte } from './base';
@@ -160,8 +161,12 @@ export function PlanRelu({
           <Pliant
             key={b.titre}
             titre={b.titre}
-            resume={`${nb(b.cuits.reduce((n, x) => n + x.assiette, 0))} g cuits`
-              + (b.convives > 1 ? `  ·  ${b.convives} personnes` : '')}
+            /* CRUS À ZÉRO, ET C'EST VOULU : ils sont déjà dans la liste
+               ci-dessous, les annoncer « à ajouter après » les compterait
+               deux fois. C'est la seule différence avec `etapeBatch`. */
+            resume={resumeDeBoite({
+              cuits: b.cuits, convives: b.convives, crusAAjouter: 0,
+            })}
             ouvert={boiteOuverte === b.titre}
             onBascule={() => setBoiteOuverte(boiteOuverte === b.titre ? null : b.titre)}
           >

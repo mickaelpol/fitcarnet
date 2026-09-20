@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import type { PlanRepas } from '@/api/hooks';
+import { CONVIVES_MIN, deplacerConvives } from '@/calcul/convives';
 import { Bouton, Carte, Chiffre, Discret, Texte } from './base';
 import { Calendrier, libelleCourt, libelleDuJour } from './calendrier';
 import { Confirmer } from './confirmer';
@@ -358,7 +359,7 @@ export function EtapeReglage({
                       <View style={s.pers}>
                         <Pressable
                           onPress={() => setPortions((p) => ({
-                            ...p, [cle]: Math.max(1, (p[cle] ?? 1) - 1),
+                            ...p, [cle]: deplacerConvives(p[cle] ?? CONVIVES_MIN, -1),
                           }))}
                           style={s.persBouton}
                           hitSlop={{ top: 3, bottom: 3, left: 5, right: 5 }}
@@ -369,7 +370,7 @@ export function EtapeReglage({
                         <Chiffre taille={N.petit}>{convives(rang, repas)}</Chiffre>
                         <Pressable
                           onPress={() => setPortions((p) => ({
-                            ...p, [cle]: Math.min(12, (p[cle] ?? 1) + 1),
+                            ...p, [cle]: deplacerConvives(p[cle] ?? CONVIVES_MIN, +1),
                           }))}
                           style={s.persBouton}
                           hitSlop={{ top: 3, bottom: 3, left: 5, right: 5 }}

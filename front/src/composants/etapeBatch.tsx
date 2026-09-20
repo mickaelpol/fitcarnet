@@ -1,5 +1,6 @@
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { resumeDeBoite } from '@/calcul/resumeBoite';
 import { useEnregistrerPlan } from '@/api/hooks';
 import { Bouton, Carte, Champ, Discret, Texte, Vide } from './base';
 import { LigneComplements } from './complements';
@@ -158,9 +159,9 @@ export function EtapeBatch({
           <Pliant
             key={b.cle}
             titre={nomDeLaBoite(b.cle)}
-            resume={`${nb(b.cuits.reduce((n, x) => n + x.assiette, 0))} g cuits`
-              + (b.convives > 1 ? `  ·  ${b.convives} personnes` : '')
-              + (b.crus.length > 0 ? `  ·  ${b.crus.length} à ajouter après` : '')}
+            resume={resumeDeBoite({
+              cuits: b.cuits, convives: b.convives, crusAAjouter: b.crus.length,
+            })}
             ouvert={boiteOuverte === b.cle}
             onBascule={() => onBasculerBoite(b.cle)}
           >

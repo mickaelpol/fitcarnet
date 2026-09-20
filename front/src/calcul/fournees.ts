@@ -1,3 +1,4 @@
+import { convivesRetenus } from './convives';
 import type { Aliment } from '@/solveur/types';
 
 /**
@@ -255,7 +256,7 @@ export function repartition(repas: readonly Repas[], choisi: Cuissons): Boite[] 
         /* Une portion vaut TES cibles, celles de ton compte. Cuisiner pour
            trois, c'est cuisiner trois fois la même portion — la famille n'a
            pas tes besoins, mais elle ne pèse rien. */
-        parPersonne: servi / Math.max(1, r.convives),
+        parPersonne: servi / convivesRetenus(r.convives),
       });
     }
 

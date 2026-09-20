@@ -1,3 +1,4 @@
+import { convivesRetenus } from './convives';
 import type { ModeCuisson } from './fournees';
 
 /**
@@ -66,12 +67,13 @@ export function poidsDeLaLigne(
      à sa place (règle 6), et `sansCuisson` le réclame déjà à l'écran. */
   const servi = cuisson === null ? q.aCuire : q.assiette;
 
-  /* `Math.max(1, …)` COMME `repartition`, ET C'EST LE POINT DE L'AFFAIRE.
-     On lisait ici `servi / portions`, quand `fournees.ts` écrit
+  /* LE MÊME PLANCHER QUE `repartition`, ET C'EST LE POINT DE L'AFFAIRE.
+     On lisait ici `servi / portions`, quand `fournees.ts` écrivait
      `servi / Math.max(1, r.convives)` : à zéro convive, la carte annonçait
      `Infinity` g par personne pendant que la boîte annonçait le poids entier.
      Deux écrans, deux réponses, pour le même aliment du même repas — la faute
      exacte que ce module existe pour fermer. Relevé par la revue le
-     15 septembre 2026 ; le test croisé plus bas couvre désormais ce cas. */
-  return { aPeser: q.aCuire, servi, parPersonne: servi / Math.max(1, portions) };
+     15 septembre 2026, aligné à la main ; les deux appellent la MÊME fonction
+     depuis le 20 septembre, parce qu'« aligné à la main » ne le reste pas. */
+  return { aPeser: q.aCuire, servi, parPersonne: servi / convivesRetenus(portions) };
 }

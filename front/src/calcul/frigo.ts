@@ -42,7 +42,8 @@ export const stockEnGrammes = (
   : null);
 
 /** Ordre de parcours d'un inventaire réel : on descend du frais au sec. */
-export const ORDRE_EMPLACEMENTS = ['Frigo', 'Congélateur', 'Congelateur', 'Placard'];
+export const ORDRE_EMPLACEMENTS: readonly string[] =
+  ['Frigo', 'Congélateur', 'Congelateur', 'Placard'] as const;
 
 /**
  * Une ligne du frigo : un aliment utilisable, OU un produit Grocy incomplet.

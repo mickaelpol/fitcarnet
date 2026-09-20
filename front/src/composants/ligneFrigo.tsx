@@ -9,7 +9,7 @@
 
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Bouton, Carte, Champ, Chiffre, Discret, Texte } from './base';
-import { controler } from '../calcul/nutrition';
+import { controler, resumeRatio } from '../calcul/nutrition';
 import type { AlimentDisponible, AlimentIncomplet } from '../api/types';
 import { C, E, N, P, T, couleurRole, nb } from '../theme';
 import { nombreSaisi } from '@/calcul/saisieNombre';
@@ -119,12 +119,7 @@ export function LigneStock({
             {aliment.fibres100 !== null && aliment.fibres100 !== undefined && (
               <Mesure cle="Fibres" valeur={`${nb(aliment.fibres100)} g`} />
             )}
-            <Mesure
-              cle="À la cuisson"
-              valeur={aliment.ratio === 1
-                ? 'poids inchangé'
-                : `100 g → ${Math.round(aliment.ratio * 100)} g`}
-            />
+            <Mesure cle="À la cuisson" valeur={resumeRatio(aliment.ratio)} />
           </View>
 
           {controle.verdict !== 'coherent' && (
