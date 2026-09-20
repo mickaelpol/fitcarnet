@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../client';
+import { ilYAQuelqueChoseAJuger } from './saisieAJuger';
 
 /**
  * CE QUE L'ECRAN DOIT DIRE, DEMANDE AU SERVEUR.
@@ -81,8 +82,8 @@ export interface SaisieAliment {
  * le bandeau. Sans elle, le message disparaitrait a chaque frappe et
  * reapparaitrait — ce qui serait pire que l'ancien calcul local.
  *
- * `enabled` coupe l'appel tant que rien n'est saisi : une modale qui s'ouvre
- * ne doit pas interroger le serveur pour lui dire qu'elle est vide.
+ * `enabled` coupe l'appel tant que RIEN N'EST TAPE — voir
+ * `ilYAQuelqueChoseAJuger`, et la panne qu'il corrige.
  */
 export function useVerdictAliment(saisie: SaisieAliment | null) {
   /* L'ANTI-REBOND VIT ICI, ET C'EST TOUT LE POINT DE LA CORRECTION.
@@ -105,14 +106,26 @@ export function useVerdictAliment(saisie: SaisieAliment | null) {
 
   const requete = useQuery({
     queryKey: ['verdict-aliment', interrogee],
-    enabled: interrogee !== null,
+    enabled: ilYAQuelqueChoseAJuger(interrogee),
     /* Le verdict ne vieillit pas : pour une saisie donnee, la reponse est
        toujours la meme. On ne redemande donc jamais la meme. */
     staleTime: Infinity,
     gcTime: 60_000,
-    placeholderData: (precedent: VerdictAliment | undefined) => precedent,
-    queryFn: () => api<VerdictAliment>(
-      '/verification/aliment', { methode: 'POST', corps: interrogee }),
+    /* L'AIDE DOCUMENTEE PLUTOT QUE LA FONCTION ECRITE A LA MAIN. Les deux
+       font la meme chose, mais la lambda `(precedent) => precedent` brouille
+       l'inference des le moment ou `queryFn` destructure son argument : TypeScript
+       rendait alors `requete.data` du TYPE DE LA LAMBDA, et quatre ecrans
+       cessaient de compiler. `keepPreviousData` est ce que nomme la
+       documentation de TanStack Query v5 — et ce que ce fichier annoncait
+       deja en commentaire sans l'employer. */
+    placeholderData: keepPreviousData,
+    /* LE SIGNAL DE TANSTACK QUERY EST TRANSMIS — 21 septembre 2026. Cette
+       route part a chaque PAUSE de frappe : sans lui, corriger une valeur
+       laissait la requete precedente courir jusqu'au bout, et sur un reseau
+       lent elles s'empilaient. `Options` ne portait pas de `signal`, et le
+       client l'ecrasait de toute facon par celui de son delai de garde. */
+    queryFn: ({ signal }) => api<VerdictAliment>(
+      '/verification/aliment', { methode: 'POST', corps: interrogee, signal }),
   });
 
   /* CE QU'ON REND EST-IL LE VERDICT DE CETTE SAISIE, OU DE LA PRECEDENTE ?
@@ -215,10 +228,12 @@ export function useJaugeMotDePasse(motDePasse: string) {
     queryKey: ['jauge-mot-de-passe', interroge],
     staleTime: Infinity,
     gcTime: 60_000,
-    placeholderData: (precedent: VerdictMotDePasse | undefined) => precedent,
-    queryFn: () => api<VerdictMotDePasse>(
+    placeholderData: keepPreviousData,
+    /* MEME RAISON QUE POUR L'ALIMENT : une jauge suit la frappe, donc elle
+       abandonne ce qu'une frappe plus recente a rendu inutile. */
+    queryFn: ({ signal }) => api<VerdictMotDePasse>(
       '/verification/mot-de-passe',
-      { methode: 'POST', corps: { motDePasse: interroge }, sansJeton: true }),
+      { methode: 'POST', corps: { motDePasse: interroge }, sansJeton: true, signal }),
   });
 
   return {

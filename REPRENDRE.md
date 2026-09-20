@@ -71,15 +71,34 @@ agents de revue :
    pour un objet `{faites, total}`. Corrigé par `#[ApiProperty]`, et mesuré sur
    `api:openapi:export`.
 
-### Ce qui reste ouvert sur cette refonte
+### Les quatre restes de la refonte, réglés le 21 septembre
 
-- `client.ts` accepte des options sans jamais consommer d'`AbortSignal` : une
-  requête de vérification abandonnée continue.
-- `VerdictAliment::nombreSaisi` dit « n'est pas un nombre lisible » pour `-2`,
-  alors que le problème est le signe.
-- Le commentaire `enabled` de `verification.ts` est faux : l'éditeur étant
-  toujours monté, un POST part à chaque ouverture du frigo.
-- Les routes de vérification sont absentes d'OpenAPI et sans limiteur de débit.
+Tous relevés par `revue-pile` (le code contre la documentation de sa pile), et
+tous mesurés avant correction :
+
+| Ce qui n'allait pas | Ce qui a été mesuré | Réglé par |
+|---|---|---|
+| `-2` refusé par « n'est pas un nombre lisible » | il **est** lisible ; c'est le signe qui gêne | `refusDuSigne()`, et le zéro reste accepté (règle 6) |
+| Le commentaire `enabled` promettait ce que le code ne faisait pas | **1 POST à chaque ouverture du frigo**, éditeur fermé, tous champs vides | `ilYAQuelqueChoseAJuger()` — mesuré après : **0** |
+| `AbortSignal` jamais consommé | `Options` n'avait pas de `signal`, et le client l'écrasait par celui de son délai de garde | relais vers le contrôleur interne, en distinguant « abandon » de « délai dépassé » |
+| Routes de vérification invisibles et non bornées | absentes d'OpenAPI ; aucune limite sur la seule route publique | `VerificationDansOpenApi` (27 chemins au lieu de 25) et un limiteur à 120/min — **premier 429 au 121ᵉ appel** |
+
+**Le piège de la journée, et il vaut d'être retenu.** Le test qui gardait
+l'abandon de requête passait *malgré* le sabotage : c'est le **chien de garde du
+test** (2 000 ms) qui rejetait, pas le signal, et son message ne contenait pas
+non plus la phrase interdite. Un test vert sur un défaut présent. Il mesure
+désormais le temps écoulé et exige moins de 500 ms.
+
+### Ce qui reste ouvert
+
+- **La famille `/api/mon-frigo/*` n'est pas dans OpenAPI** : ce sont des
+  contrôleurs Symfony, qu'API Platform ne documente pas. `VerificationDansOpenApi`
+  montre le procédé, il reste à l'appliquer.
+- La route `/api/verification/aliment` (authentifiée) n'a pas de limiteur : un
+  compte peut la marteler. Jugé secondaire — il faut déjà un compte.
+- `front/src/calcul/blocSeance.ts` garde le mot « chrono » dans ses
+  commentaires ; le garde retire les commentaires avant de chercher, et c'est
+  volontaire — mais c'est une subtilité à connaître avant de le modifier.
 
 ---
 

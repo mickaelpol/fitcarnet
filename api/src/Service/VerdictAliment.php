@@ -83,6 +83,15 @@ final class VerdictAliment
                 continue;
             }
 
+            /* LU, MAIS PAS FORCEMENT ACCEPTABLE. Le signe se juge apres la
+               lecture, et il se dit avec ses propres mots. */
+            $signe = self::refusDuSigne($champ, $valeur);
+            if (null !== $signe) {
+                $refus[] = $signe;
+                $lus[$champ] = null;
+                continue;
+            }
+
             $lus[$champ] = $valeur;
         }
 
@@ -349,23 +358,48 @@ final class VerdictAliment
     }
 
     /**
-     * Lire un nombre TEL QU'IL A ETE TAPE.
+     * Lire un nombre TEL QU'IL A ETE TAPE, signe compris.
      *
      * LA VIRGULE FRANCAISE EST UN SEPARATEUR DECIMAL, et « 4,2,1 » n'est pas
      * un nombre. `parseFloat` le lisait 4,2 sans broncher, et une pesee qui
      * n'existe pas partait en base — releve le 15 septembre 2026. Un espace
      * ne fait pas un millier non plus : on ne devine pas.
+     *
+     * ELLE REND LES NEGATIFS, et c'est voulu : « -2 » EST un nombre lisible.
+     * Cette methode refusait le signe en rendant `null`, si bien que l'ecran
+     * annoncait « n'est pas un nombre lisible » pour une saisie parfaitement
+     * lisible — et l'utilisateur cherchait une faute de frappe inexistante.
+     * Lire et juger sont deux gestes : `refusDuSigne()` fait le second.
+     * Corrige le 21 septembre 2026.
      */
     private static function nombreSaisi(string $texte): ?float
     {
         $normalise = \str_replace(',', '.', $texte);
 
-        if (1 !== \preg_match('/^-?\d+(\.\d+)?$/', $normalise)) {
-            return null;
-        }
+        return 1 === \preg_match('/^-?\d+(\.\d+)?$/', $normalise)
+            ? (float) $normalise
+            : null;
+    }
 
-        $valeur = (float) $normalise;
+    /**
+     * Le refus qu'appelle un nombre negatif, ou `null` s'il n'y a rien a dire.
+     *
+     * LE ZERO PASSE : « zero gramme de lipides » est une reponse, pas une
+     * absence de reponse (regle 6). Un garde ecrit `<= 0` interdirait de
+     * saisir un aliment sans lipides.
+     */
+    private static function refusDuSigne(string $champ, float $valeur): ?array
+    {
+        return $valeur < 0.0
+            ? ['champ' => $champ, 'message' => \sprintf(
+                'Une valeur négative n\'a pas de sens ici : « %s » est un nombre, mais il est négatif.',
+                self::texteDuNombre($valeur))]
+            : null;
+    }
 
-        return $valeur < 0.0 ? null : $valeur;
+    /** Le nombre tel qu'on le remontre a celui qui l'a tape : virgule comprise. */
+    private static function texteDuNombre(float $valeur): string
+    {
+        return \str_replace('.', ',', (string) $valeur);
     }
 }

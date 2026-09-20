@@ -101,6 +101,38 @@ final class VerdictAlimentTest extends TestCase
         self::assertStringContainsString('lisible', \implode(' ', \array_column($v['refus'], 'message')));
     }
 
+    public function testUN_NOMBRE_NEGATIF_EST_REFUSE_POUR_LA_BONNE_RAISON(): void
+    {
+        /* « -2 » EST parfaitement lisible : ce qui ne va pas, c'est le signe.
+           Le serveur repondait pourtant « n'est pas un nombre lisible », et
+           l'utilisateur cherchait une faute de frappe qui n'existait pas.
+           Regle 7 du projet : un chiffre faux est pire qu'un refus, mais un
+           refus doit dire la VRAIE raison. Releve le 21 septembre 2026. */
+        $v = self::rendu(['kcal100' => '-2', 'categorie' => 'fec', 'ratio' => '1']);
+
+        self::assertFalse($v['enregistrable']);
+
+        /* AVEC L'ACCENT : c'est une phrase lue par quelqu'un, pas un
+           commentaire PHP. La confusion entre les deux conventions a deja
+           fait afficher « un feculent qui gonfle » a l'ecran. */
+        $messages = \implode(' ', \array_column($v['refus'], 'message'));
+        self::assertStringContainsString('négatif', $messages);
+        self::assertStringNotContainsString('lisible', $messages,
+            'le nombre est lisible : dire le contraire envoie chercher une '
+            . 'faute de frappe inexistante');
+    }
+
+    public function testLE_ZERO_RESTE_ACCEPTE(): void
+    {
+        /* LE TEMOIN du cas ci-dessus. Un garde ecrit `<= 0` refuserait le zero,
+           et « zero gramme de lipides » est une reponse parfaitement valide —
+           regle 6 du projet : vide n'est pas zero, mais zero est un chiffre. */
+        $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
+            'lip100' => '0', 'categorie' => 'fec', 'ratio' => '2.26']);
+
+        self::assertSame([], $v['refus']);
+    }
+
     public function testLA_VIRGULE_FRANCAISE_EST_UN_NOMBRE(): void
     {
         /* LE TEMOIN. Sans lui, un serveur qui refuserait toute virgule

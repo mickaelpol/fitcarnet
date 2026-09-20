@@ -1,0 +1,39 @@
+framework:
+    rate_limiter:
+        # ------------------------------------------------------------------
+        #  LA SEULE ROUTE DE VERIFICATION OUVERTE SANS COMPTE.
+        #
+        #  `POST /api/verification/mot-de-passe` est publique, et il le faut :
+        #  l'ecran d'invitation juge la force d'un mot de passe alors que
+        #  personne n'a encore de compte (`security.yaml`, pare-feu
+        #  `verification_publique`). Toute route ouverte doit etre bornee.
+        #
+        #  ELLE NE LIT NI N'ECRIT RIEN, et ne hache aucun mot de passe : le
+        #  cout d'un appel est celui de quelques comparaisons de chaines. Ce
+        #  limiteur ne protege donc pas d'un calcul couteux, il borne
+        #  simplement ce qu'un inconnu peut demander.
+        #
+        #  CENT VINGT PAR MINUTE, ET PAS CINQ. Cette route part a chaque PAUSE
+        #  DE FRAPPE : quelqu'un qui choisit son mot de passe en produit
+        #  facilement vingt ou trente d'affilee, et deux personnes peuvent
+        #  partager une adresse IP derriere la meme connexion. Un garde-fou qui
+        #  gene l'usage normal finit desactive — c'est la raison ecrite a cote
+        #  de `login_throttling: max_attempts: 5`, qui protege lui un geste
+        #  rare et couteux. Les deux chiffres different parce que les deux
+        #  gestes different.
+        #
+        #  `sliding_window` PLUTOT QUE `fixed_window` : une fenetre fixe laisse
+        #  passer deux fois la limite a cheval sur sa frontiere, et se rouvre
+        #  d'un coup — ce qui, sur une frappe continue, produit un refus
+        #  inexplicable suivi d'une permission tout aussi inexplicable.
+        #
+        #  L'IP EST FIABLE ICI, et ca ne va pas de soi : sans les
+        #  `trusted_proxies` poses dans `framework.yaml` le 18 septembre 2026,
+        #  `getClientIp()` rendait l'adresse du proxy DSM pour TOUT LE MONDE.
+        #  Un limiteur par IP serait alors devenu un verrou du site entier,
+        #  exactement comme l'etait devenu `login_throttling`.
+        # ------------------------------------------------------------------
+        verification_publique:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 minute'

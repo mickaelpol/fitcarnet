@@ -984,3 +984,76 @@ describe('amorcerSession : une coupure n\'est pas un refus', () => {
       + 'rouges plein la console de l\'écran de connexion');
   });
 });
+
+describe('l\'écran peut abandonner une requête', () => {
+  /* POURQUOI CE BESOIN. `useVerdictAliment` part à chaque PAUSE de frappe.
+     Sans signal transmis, une saisie corrigée laisse la requête précédente
+     courir jusqu'au bout : sur un réseau lent, elles s'empilent. TanStack
+     Query fournit un `signal` par requête — `Options` ne le lisait pas, et
+     `fetchAvecDelai` l'écrasait par le sien. Relevé par `revue-pile` le
+     21 septembre 2026. */
+
+  it('un signal déjà abandonné n\'atteint même pas le réseau', async () => {
+    await sessionOuverte();
+    let appels = 0;
+    brancherFetchQuiPend(() => { appels += 1; return true; }, () => json({}));
+
+    const controleur = new AbortController();
+    controleur.abort();
+
+    await assert.rejects(avantDe(2000, client.api('/seances', { signal: controleur.signal })));
+    assert.equal(appels, 0,
+      'abandonner avant de partir doit épargner l\'appel, pas seulement sa réponse');
+  });
+
+  it('abandonner en cours de route coupe la requête', async () => {
+    await sessionOuverte();
+    /* Le délai de garde reste LONG : c'est bien l'abandon qui doit couper,
+       et non le minuteur — sans quoi ce test passerait sans rien prouver. */
+    client.definirDelaiDeGarde(10_000);
+
+    try {
+      brancherFetchQuiPend(() => true, () => json({}));
+
+      const controleur = new AbortController();
+      const debut = Date.now();
+      const promesse = client.api('/seances', { signal: controleur.signal });
+      setTimeout(() => { controleur.abort(); }, 20);
+
+      await assert.rejects(avantDe(2000, promesse), (e: Error) => {
+        /* IL DOIT COUPER VITE, ET C'EST LA SEULE ASSERTION QUI PROUVE QUELQUE
+           CHOSE ICI. Première écriture de ce test : elle vérifiait seulement
+           que le message ne disait pas « ne répond pas ». Sabotage fait, signal
+           non transmis — elle passait quand même, parce que c'est le CHIEN DE
+           GARDE du test qui rejetait au bout de 2 000 ms, avec un message qui
+           ne contient pas cette phrase non plus. Un test vert sur un défaut
+           présent : motif 4 du projet, dans son propre garde-fou, le
+           21 septembre 2026. */
+        const ecoule = Date.now() - debut;
+        assert.ok(ecoule < 500,
+          `l'abandon doit couper tout de suite : ${ecoule} ms écoulées, c'est le `
+          + 'chien de garde du test qui a rejeté, pas le signal');
+
+        /* ET IL NE DOIT PAS MENTIR. `fetchAvecDelai` traduit tout abandon en
+           « le serveur ne répond pas » : dire cela d'une requête que l'écran
+           a lui-même annulée enverrait chercher une panne réseau inexistante.
+           Règle 7 du projet, appliquée aux messages d'erreur. */
+        assert.ok(!/ne répond pas/.test(e.message),
+          `l'écran a abandonné, le serveur n'y est pour rien. Il dit : « ${e.message} »`);
+
+        return true;
+      });
+    } finally {
+      client.definirDelaiDeGarde();
+    }
+  });
+
+  it('LE TÉMOIN : sans abandon, la requête aboutit normalement', async () => {
+    /* Sans ce cas, un client qui refuserait TOUTE requête passerait les deux
+       épreuves ci-dessus en cassant l'application entière. */
+    await sessionOuverte();
+    brancherFetch(async () => json({ membre: 'ok' }));
+
+    assert.deepEqual(await client.api('/seances'), { membre: 'ok' });
+  });
+});

@@ -354,9 +354,46 @@ export function definirDelaiDeGarde(ms: number = DELAI_DE_GARDE_MS): void {
 /** Le délai est dépassé : aucune réponse complète n'est arrivée à temps. */
 class DelaiDepasse extends Error {}
 
+/**
+ * L'APPELANT A ABANDONNÉ — ce n'est pas une panne, et ça ne se dit pas pareil.
+ *
+ * Une classe distincte de `DelaiDepasse` parce que les deux se traduisent
+ * autrement à l'écran : un délai dépassé nomme l'adresse et invite à réessayer,
+ * un abandon ne mérite aucun message. C'est la règle 7 appliquée aux erreurs —
+ * dire la vraie raison, ou se taire.
+ */
+class AbandonDemande extends Error {}
+
 async function fetchAvecDelai(url: string, options: RequestInit = {}): Promise<Response> {
   const controleur = new AbortController();
   const minuteur = setTimeout(() => { controleur.abort(); }, delaiDeGarde);
+
+  /* DEUX RAISONS D'ABANDONNER, UN SEUL CONTRÔLEUR.
+   *
+   * Le minuteur ci-dessus, et l'appelant qui n'a plus besoin de la réponse.
+   * On relaie le second dans le premier plutôt que d'employer
+   * `AbortSignal.any` : Hermes ne l'implémente pas partout, et ce fichier a
+   * déjà payé une fois le prix d'un `normalize()` absent du moteur.
+   *
+   * ON GARDE LES DEUX RAISONS DISTINCTES, parce que le `catch` en fait des
+   * messages différents : « le serveur ne répond pas » pour le minuteur, et
+   * rien du tout pour un abandon voulu — dire au propriétaire que le serveur
+   * est muet quand c'est son écran qui a changé d'avis l'enverrait chercher
+   * une panne inexistante. */
+  const externe = options.signal ?? undefined;
+  /* UN DRAPEAU PLUTÔT QUE DE RELIRE `externe.aborted` DANS LE `catch` :
+     TypeScript, ayant vu le garde ci-dessous, tient la propriété pour
+     définitivement fausse et refuse la seconde comparaison. Il a raison sur le
+     fond — rien dans le type ne dit qu'elle change entre-temps. Le drapeau dit
+     ce qu'on veut vraiment savoir : « est-ce le relais qui a coupé ? ». */
+  let abandonneParLAppelant = false;
+  const relais = (): void => { abandonneParLAppelant = true; controleur.abort(); };
+
+  if (externe?.aborted === true) {
+    /* DÉJÀ ABANDONNÉ AVANT DE PARTIR : on n'ouvre même pas la connexion. */
+    throw new AbandonDemande();
+  }
+  externe?.addEventListener('abort', relais);
 
   try {
     const reponse = await fetch(url, { ...options, signal: controleur.signal });
@@ -377,14 +414,19 @@ async function fetchAvecDelai(url: string, options: RequestInit = {}): Promise<R
     });
   } catch (e) {
     /* On ne croit pas le TYPE de l'erreur, qui varie d'un moteur à l'autre
-       (`AbortError` sur le web, message libre sous Hermes) : on regarde si
-       c'est NOTRE minuteur qui a coupé. */
+       (`AbortError` sur le web, message libre sous Hermes) : on regarde QUI a
+       coupé. L'ordre compte — l'appelant d'abord, sans quoi un abandon voulu
+       serait annoncé comme un serveur muet. */
+    if (abandonneParLAppelant) throw new AbandonDemande();
     if (controleur.signal.aborted) throw new DelaiDepasse();
     throw e;
   } finally {
     /* Sans ce `clearTimeout`, chaque requête réussie laisserait un minuteur
        de trente secondes vivant derrière elle. */
     clearTimeout(minuteur);
+    /* Et sans ce retrait, chaque requête laisserait un écouteur accroché au
+       signal de l'appelant — qui, lui, peut vivre bien plus longtemps. */
+    externe?.removeEventListener('abort', relais);
   }
 }
 
@@ -520,6 +562,22 @@ interface Options {
    * vaut pas le prix aujourd'hui, mais c'est la voie si on y revient.
    */
   avecCookieDeSession?: boolean;
+  /**
+   * DE QUOI ABANDONNER UNE REQUÊTE DEVENUE INUTILE.
+   *
+   * TanStack Query donne un `signal` à chaque `queryFn` : passé ici, une
+   * requête que sa requête a remplacée est coupée au lieu de courir jusqu'au
+   * bout. Ce champ N'EXISTAIT PAS, et `fetchAvecDelai` écrasait de toute façon
+   * `options.signal` par le sien — relevé par `revue-pile` le 21 septembre
+   * 2026.
+   *
+   * CE QUE ÇA CHANGE VRAIMENT. `useVerdictAliment` part à chaque PAUSE de
+   * frappe : sans abandon, corriger une valeur laisse la requête précédente
+   * vivre, et sur un réseau lent elles s'empilent. Aucun risque d'afficher la
+   * mauvaise réponse — la clé de requête s'en charge — mais du travail payé
+   * pour rien, au serveur comme au téléphone.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -561,7 +619,7 @@ interface Reponse<T> {
 }
 
 async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>> {
-  const { methode = 'GET', corps, sansJeton = false, avecCookieDeSession = false } = options;
+  const { methode = 'GET', corps, sansJeton = false, avecCookieDeSession = false, signal } = options;
 
   const entetes: Record<string, string> = {
     Accept: 'application/ld+json',
@@ -593,6 +651,7 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
       headers: entetes,
       credentials: avecCookieDeSession && sessionParCookie ? 'include' : 'same-origin',
       body: corps === undefined ? undefined : JSON.stringify(corps),
+      signal,
     });
   } catch (e) {
     /* CE MESSAGE NE DÉSIGNE PAS DE COUPABLE, et c'est voulu. Sur Android,

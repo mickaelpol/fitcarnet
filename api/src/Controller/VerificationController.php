@@ -9,6 +9,7 @@ use App\Service\VerdictAliment;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -73,8 +74,39 @@ final class VerificationController extends AbstractController
      * journal.
      */
     #[Route('/verification/mot-de-passe', methods: ['POST'])]
-    public function motDePasse(Request $requete): JsonResponse
-    {
+    public function motDePasse(
+        Request $requete,
+        /* LE NOM DE CET ARGUMENT EST LA CONFIGURATION. Symfony relie
+           `verification_publique` de `rate_limiter.yaml` a un argument nomme
+           « le nom en camelCase + Limiter ». Le renommer coupe le limiteur
+           SANS ERREUR au demarrage : c'est un lien par convention, et c'est le
+           genre de garde qui disparait sans bruit. */
+        RateLimiterFactoryInterface $verificationPubliqueLimiter,
+    ): JsonResponse {
+        /* TOUTE ROUTE OUVERTE EST BORNEE — 21 septembre 2026. Celle-ci est la
+           seule sans compte, parce que l'ecran d'invitation en a besoin. */
+        $limite = $verificationPubliqueLimiter->create($requete->getClientIp())->consume(1);
+
+        if (!$limite->isAccepted()) {
+            /* ON REPOND EN JSON PLUTOT QUE DE LEVER. `TooManyRequestsHttpException`
+               rend du HTML des que le client ne negocie rien — mesure le
+               21 septembre 2026 : `Content-Type: text/html` sur une route dont
+               TOUS les clients attendent du JSON. L'ecran aurait affiche une
+               page d'erreur Symfony dans son bandeau, ou rien du tout.
+
+               ET ON DIT QUAND REESSAYER, en en-tete comme dans le corps : un
+               refus qui ne dit pas combien de temps il dure se lit comme une
+               panne (regle 7). */
+            $secondes = \max(1, $limite->getRetryAfter()->getTimestamp() - \time());
+
+            return $this->json([
+                'dit' => \sprintf(
+                    'Trop de vérifications depuis cette adresse. Réessaie dans %d seconde%s.',
+                    $secondes, $secondes > 1 ? 's' : ''),
+                'reessayerDansSecondes' => $secondes,
+            ], 429, ['Retry-After' => (string) $secondes]);
+        }
+
         /** @var array<string, mixed> $corps */
         $corps = (array) \json_decode((string) $requete->getContent(), true);
         $clair = (string) ($corps['motDePasse'] ?? '');
