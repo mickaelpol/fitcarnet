@@ -521,10 +521,27 @@ export function EditeurAliment({
                   {ratioMesure !== null && (
                     <Bouton
                       onPress={() => {
+                        /* `nombreSaisi` ET NON `parseFloat` — corrigé le
+                           20 septembre 2026, palier 1. Ces deux lignes
+                           enregistraient les pesées par `parseFloat` sous un
+                           commentaire qui l'interdit 263 lignes plus haut, et
+                           qui explique pourquoi : « 4,2,1 » se lit 4,2.
+
+                           LE GARDE `ratioMesure !== null` LES FAISAIT
+                           COÏNCIDER PAR ACCIDENT, et c'est tout ce qui tenait.
+                           Trois notations lui échappaient : `Number('0x10')`
+                           vaut 16 quand `parseFloat('0x10')` vaut 0 — idem
+                           pour `0b101` et `0o17`. Le ratio se calculait sur
+                           16, la pesée s'enregistrait à 0. Inatteignable au
+                           clavier numérique d'Android, atteignable au collage
+                           sur le web. Relevé par `verite-documentaire`.
+
+                           `?? null` et non `?? 0` : une pesée illisible est
+                           une absence, pas un zéro (règle 6). */
                         maj({
                           ratio: ratioMesure,
-                          peseeAvant: parseFloat(avant.replace(',', '.')),
-                          peseeApres: parseFloat(apres.replace(',', '.')),
+                          peseeAvant: nombreSaisi(avant),
+                          peseeApres: nombreSaisi(apres),
                         });
                         setMesurer(false);
                       }}
