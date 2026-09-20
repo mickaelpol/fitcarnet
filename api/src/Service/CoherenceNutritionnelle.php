@@ -198,6 +198,11 @@ final class CoherenceNutritionnelle
      * 100 g : un simple plafond les refuserait toutes. C'est le DESACCORD avec
      * les macros, dans ce rapport precis, qui trahit l'unite.
      */
+    public static function ressembleVraimentADesKilojoules(float $kcal100, float $atwater): bool
+    {
+        return self::ressembleADesKilojoules($kcal100, $atwater);
+    }
+
     private static function ressembleADesKilojoules(float $kcal100, float $atwater): bool
     {
         if ($atwater < self::ATWATER_MINIMUM_POUR_REFUSER) {
