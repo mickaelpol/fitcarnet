@@ -42,6 +42,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
  * sont celles du produit que cette personne a achete.
  */
 #[ORM\Entity]
+#[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'aliment')]
 #[ApiResource(
     /* LE SEUL `#[ApiResource]` QUI N'AVAIT PAS DE `security:` DE CLASSE —
@@ -357,8 +358,57 @@ class Aliment implements ProprieteUtilisateur
             (float) $this->ratio,
         );
 
-        if (null !== $motif) {
-            $contexte->buildViolation($motif)->atPath('kcal100')->addViolation();
+        if (null === $motif || $motif === $this->motifDejaLa) {
+            return;
         }
+
+        $contexte->buildViolation($motif)->atPath('kcal100')->addViolation();
     }
+
+    /**
+     * CE QUE CETTE LIGNE DISAIT DEJA EN ARRIVANT.
+     *
+     * RELEVE PAR LE PROPRIETAIRE DU PROJET le 20 septembre 2026, et c'est le
+     * faux refus qu'il redoutait. Un `PATCH` revalide l'objet ENTIER : un
+     * aliment incoherent deja en base — migre avant que la regle existe —
+     * devenait impossible a RENOMMER, refuse sur un champ que personne n'avait
+     * touche. Il ne pouvait ni le corriger par petits pas, ni meme le
+     * rebaptiser.
+     *
+     * LA REGLE PORTE SUR CE QU'ON INTRODUIT, PAS SUR CE QU'ON TROUVE. On garde
+     * le motif tel qu'il etait AU CHARGEMENT : si le meme motif ressort
+     * inchange, c'est qu'on n'a rien aggrave — on laisse passer. Un motif
+     * DIFFERENT, lui, est nouveau : une ligne abimee n'est pas un permis de
+     * tout ecrire.
+     *
+     * `PostLoad` et non un service : un validateur a dependance casse les
+     * quatorze tests qui montent l'entite sans conteneur. Sur une creation, ce
+     * champ reste `null` et tout est nouveau — ce qui est exactement juste.
+     */
+    #[ORM\PostLoad]
+    public function memoriserLesValeursChargees(): void
+    {
+        if (null === $this->kcal100 || null === $this->prot100
+            || null === $this->gluc100 || null === $this->lip100) {
+            return;
+        }
+
+        $this->motifDejaLa = CoherenceNutritionnelle::motifDeRefus(
+            $this->categorie,
+            (float) $this->kcal100,
+            (float) $this->prot100,
+            (float) $this->gluc100,
+            (float) $this->lip100,
+            null === $this->fibres100 ? null : (float) $this->fibres100,
+            (float) $this->ratio,
+        );
+    }
+
+    /**
+     * Le motif que cette ligne portait DEJA, ou `null`.
+     *
+     * Hors colonne, donc jamais persiste : il ne decrit pas l'aliment mais
+     * l'etat dans lequel on l'a trouve.
+     */
+    private ?string $motifDejaLa = null;
 }

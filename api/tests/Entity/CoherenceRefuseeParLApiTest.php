@@ -94,6 +94,62 @@ final class CoherenceRefuseeParLApiTest extends TestCase
             'une cible incoherente doit passer');
     }
 
+    /**
+     * ON NE REFUSE PAS CE QUI ETAIT DEJA LA — releve par le proprietaire du
+     * projet le 20 septembre 2026, et c'est le faux refus qu'il redoutait.
+     *
+     * Un `PATCH` revalide l'objet ENTIER : un aliment incoherent deja en base
+     * — migre avant que la regle existe — devenait impossible a RENOMMER,
+     * refuse sur un champ que personne n'avait touche. L'utilisateur se
+     * retrouvait avec une ligne qu'il ne pouvait ni corriger par petits pas,
+     * ni meme renommer.
+     *
+     * La regle porte donc sur ce qu'on INTRODUIT, pas sur ce qu'on trouve.
+     */
+    public function testUneIncoherenceDEJA_EN_BASE_NEmpecheRienDAutre(): void
+    {
+        $a = self::riz(kcal100: 130);
+        /* Comme Doctrine le fait au chargement : la ligne existait ainsi. */
+        $a->memoriserLesValeursChargees();
+        $a->setNom('Un nouveau nom');
+
+        self::assertSame([], self::motifsSurLesCalories($a),
+            'renommer un aliment deja incoherent ne doit pas etre refuse');
+    }
+
+    public function testMAIS_ON_REFUSE_CE_QUI_AGGRAVE(): void
+    {
+        /* LE TEMOIN QUI EMPECHE DE TOUT LAISSER PASSER. Charge coherent, puis
+           rendu incoherent : c'est exactement le geste du proprietaire du
+           projet — il renseigne le rendement apres avoir cuisine. */
+        $a = self::riz(kcal100: 130)->setRatio(1.0);
+        $a->memoriserLesValeursChargees();
+        $a->setRatio(2.26);
+
+        self::assertNotEmpty(self::motifsSurLesCalories($a),
+            'introduire une incoherence doit rester refuse');
+    }
+
+    public function testUNE_AUTRE_INCOHERENCE_EST_REFUSEE_AUSSI(): void
+    {
+        /* Deja incoherent par le grain sec, on ajoute une matiere impossible :
+           c'est un motif NOUVEAU, il doit parler. Sans ce cas, une ligne
+           abimee deviendrait un permis de tout ecrire. */
+        $a = self::riz(kcal100: 130);
+        $a->memoriserLesValeursChargees();
+        $a->setProt100(60)->setGluc100(60);
+
+        self::assertNotEmpty(self::motifsSurLesCalories($a),
+            'un motif different doit etre refuse, meme sur une ligne deja abimee');
+    }
+
+    public function testUNE_CREATION_INCOHERENTE_RESTE_REFUSEE(): void
+    {
+        /* Sans valeurs chargees, il n'y a pas de « deja la » : tout est
+           nouveau. C'est le cas d'une creation. */
+        self::assertNotEmpty(self::motifsSurLesCalories(self::riz(kcal100: 130)));
+    }
+
     // ----------------------------------------------------------------- outils
 
     private static function riz(float $kcal100): Aliment
