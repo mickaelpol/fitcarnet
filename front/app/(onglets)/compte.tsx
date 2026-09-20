@@ -51,6 +51,23 @@ export default function Compte() {
             ? 'Synchronisés depuis Grocy'
             : 'Gérés dans l’onglet « Mon frigo »'}
         </Texte>
+
+        {/* L'ENTRÉE DE LA MIGRATION EST ICI, ET NULLE PART AILLEURS.
+            C'est un geste qu'on fait une fois, pas une fonctionnalité du
+            quotidien : la mettre dans l'onglet « Mon frigo » l'y laisserait
+            pour toujours. Elle ne s'affiche que pour un compte encore sur
+            Grocy — un compte déjà en base n'a rien à migrer. */}
+        {data?.sourceFrigo === 'grocy' && (
+          <>
+            <Discret style={s.aide}>
+              Tu peux amener ces aliments dans la base de l'application, un par
+              un. Rien n'est supprimé dans Grocy.
+            </Discret>
+            <Bouton variante="contour" onPress={() => router.push('/migration-grocy')}>
+              Quitter Grocy
+            </Bouton>
+          </>
+        )}
       </Carte>
 
       {/* PAS DE CARTE D'AVERTISSEMENT ICI, ET C'EST UN RETRAIT ASSUME.
@@ -119,5 +136,6 @@ const s = StyleSheet.create({
     fontSize: T.minuscule, letterSpacing: 1, textTransform: 'uppercase',
     color: C.discret, marginBottom: E.xs,
   },
+  aide: { fontSize: T.petit, lineHeight: 16, color: C.attenue, marginTop: E.s },
   separateur: { height: 1, backgroundColor: C.ligne, marginVertical: E.m },
 });

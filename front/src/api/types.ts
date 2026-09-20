@@ -316,6 +316,37 @@ export interface AlimentReference {
   fibres100: number | null;
 }
 
+/**
+ * Un produit Grocy tel que l'écran de migration le reçoit.
+ *
+ * Il réunit les deux formes que Grocy porte : les produits complets et ceux
+ * dont les valeurs n'ont jamais été renseignées. `valeursConnues` dit lequel
+ * des deux — et c'est ce qui décide du travail demandé : confirmer, ou lire
+ * l'étiquette du paquet.
+ *
+ * Les macros sont nullables parce qu'elles PEUVENT manquer. Les mettre à zéro
+ * ferait enregistrer des zéros que personne n'a saisis (règle 6).
+ */
+export interface AlimentAMigrer {
+  reference: string;
+  nom: string;
+  stock: number;
+  unite?: string;
+  emplacement: string | null;
+  valeursConnues: boolean;
+  categorie?: string;
+  kcal100?: number | null;
+  prot100?: number | null;
+  gluc100?: number | null;
+  lip100?: number | null;
+  fibres100?: number | null;
+  ratio?: number;
+  peseeAvant?: number | null;
+  peseeApres?: number | null;
+  /** ce qui manque, pour les produits jamais renseignés */
+  manquants?: string[];
+}
+
 export interface AlimentIncomplet {
   reference: string;
   nom: string;
