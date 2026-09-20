@@ -65,6 +65,32 @@ Les migrations sont **idempotentes** (rejouées à chaque démarrage par `entryp
 ordre est écrit à la main dans `installer.sh`. Une migration qui peut échouer empêche la production
 de redémarrer : ne jamais écrire `SET colonne = NULL` sur une colonne `NOT NULL`.
 
+**IDEMPOTENT NE VEUT PAS DIRE `TRUNCATE` PUIS `INSERT`.** Le 20 septembre 2026,
+`db/03-ciqual.sql` a mis la production à terre avec exactement ça :
+
+```
+ERROR: cannot truncate a table referenced in a foreign key constraint
+DETAIL: Table "aliment" references "aliment_reference".
+```
+
+Dès qu'une table est référencée, elle ne se vide plus. Un rechargement de
+référentiel s'écrit `INSERT … ON CONFLICT (cle) DO UPDATE`, **sans suppression** —
+une clé étrangère `ON DELETE SET NULL` détacherait en silence les données de
+quelqu'un. Ça passait en développement parce que le contenu y avait été chargé
+**avant** la migration qui pose la clé : jamais dans l'ordre réel.
+
+**LES QUATRE LISTES DE MIGRATIONS SONT JUMELLES.** `db/manuel/verifier-schema.sh`,
+`db/manuel/verifier-migrations.sh`, `installer.sh` et `docker/entrypoint-prod.sh`
+énumèrent les fichiers à la main (`3[0-9]-*.sql`, `4[0-9]-*.sql`…). Le jour où la
+40 est arrivée, **trois des quatre** s'arrêtaient encore à `3[0-9]`. Pire :
+`verifier-schema.sh` annonçait « identiques » quand même — les deux bases partent
+du même `01-schema.sql`, donc une migration jamais jouée ne fait diverger
+personne. Un vert qui ne pouvait pas devenir rouge.
+
+`verifier-schema.sh` compare désormais sa liste à ce qui existe vraiment et
+**refuse** ce qu'elle ne couvre pas, en nommant les quatre fichiers à corriger.
+En passant à une nouvelle dizaine, il criera avant la production.
+
 ### 2. Toute entité exposée en API est filtrée par propriétaire
 Une nouvelle entité `#[ApiResource]` avec des opérations implémente `App\Entity\ProprieteUtilisateur`,
 sans quoi `FiltreProprietaire` ne la filtre pas et **tous les comptes voient les données de tous**.

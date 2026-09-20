@@ -96,10 +96,39 @@ for fichier in \
     "$RACINE"/db/manuel/aliment-fibres.sql \
     "$RACINE"/db/manuel/1[0-9]-*.sql \
     "$RACINE"/db/manuel/2[0-9]-*.sql \
-    "$RACINE"/db/manuel/3[0-9]-*.sql
+    "$RACINE"/db/manuel/3[0-9]-*.sql \
+    "$RACINE"/db/manuel/4[0-9]-*.sql \
+    "$RACINE"/db/03-ciqual.sql
 do
     [[ -f "$fichier" ]] && migrations+="$fichier"$'\n'
 done
+
+# AUCUNE MIGRATION NE DOIT MANQUER A L'APPEL — pose le 20 septembre 2026, apres
+# une production a terre.
+#
+# Les QUATRE listes de migrations du depot sont jumelles : ici,
+# `verifier-migrations.sh`, `installer.sh` et `docker/entrypoint-prod.sh`. Trois
+# d'entre elles s'arretaient encore a `3[0-9]` le jour ou la 40 est arrivee.
+#
+# Le pire n'etait pas qu'elles la sautent : c'est que CE script annoncait
+# « identiques » quand meme. Les deux bases partent du meme `01-schema.sql`, qui
+# porte deja la table — une migration jamais jouee ne fait donc diverger
+# personne. Un vert qui ne pouvait pas devenir rouge.
+#
+# On compare donc la liste A CE QUI EXISTE, et on refuse ce qu'on ne couvre pas.
+attendus=$(ls "$RACINE"/db/manuel/*.sql 2>/dev/null \
+    | grep -vE '/(jeu-essai|jeu-demo|cibles)\.sql$' | sort)
+couverts=$(printf '%s' "$migrations" | grep -v '03-ciqual' | sort)
+oubliees=$(comm -23 <(printf '%s\n' "$attendus") <(printf '%s\n' "$couverts"))
+
+if [[ -n "$oubliees" ]]; then
+    rouge "Ces migrations existent et ne sont jouées par AUCUN contrôle :"
+    printf '%s\n' "$oubliees" | sed 's|.*/|      |'
+    rouge "Ajoute la dizaine manquante dans les QUATRE listes :"
+    rouge "  db/manuel/verifier-schema.sh, db/manuel/verifier-migrations.sh,"
+    rouge "  installer.sh, docker/entrypoint-prod.sh"
+    exit 1
+fi
 
 echec_migration=0
 while IFS= read -r fichier; do

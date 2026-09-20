@@ -169,7 +169,9 @@ for fichier in \
     "$RACINE"/db/manuel/aliment-fibres.sql \
     "$RACINE"/db/manuel/1[0-9]-*.sql \
     "$RACINE"/db/manuel/2[0-9]-*.sql \
-    "$RACINE"/db/manuel/3[0-9]-*.sql
+    "$RACINE"/db/manuel/3[0-9]-*.sql \
+    "$RACINE"/db/manuel/4[0-9]-*.sql \
+    "$RACINE"/db/03-ciqual.sql
 do
     [[ -f "$fichier" ]] && migrations+="$fichier"$'\n'
 done
