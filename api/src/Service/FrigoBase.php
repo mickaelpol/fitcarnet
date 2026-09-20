@@ -29,7 +29,7 @@ final readonly class FrigoBase
             // les quantités et on retient l'emplacement principal
             'SELECT a.id, a.nom, a.categorie, a.kcal_100, a.prot_100, a.gluc_100,
                     a.lip_100, a.fibres_100, a.ratio,
-                    a.pesee_avant, a.pesee_apres,
+                    a.pesee_avant, a.pesee_apres, a.reference_ciqual,
                     coalesce(sum(s.quantite), 0) AS quantite,
                     min(e.libelle)               AS emplacement
              FROM   aliment a
@@ -66,6 +66,7 @@ final readonly class FrigoBase
             // la colonne stock.quantite est en grammes, par construction du schema
             unite: 'g',
             grammesParUnite: 1.0,
+            referenceCiqual: null !== $l['reference_ciqual'] ? (string) $l['reference_ciqual'] : null,
         ), $lignes);
     }
 

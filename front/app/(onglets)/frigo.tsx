@@ -343,11 +343,21 @@ export default function MonFrigo() {
         creation={creation}
         edite={edite}
         aCompleter={aCompleter}
-        rattachement={{
+        /* PAS DE RATTACHEMENT SUR UN FRIGO GROCY, et c'est un refus assumé.
+           La colonne `reference_ciqual` vit dans la base ; l'écriture d'un
+           compte Grocy passe par `POST /mon-frigo/aliment`, qui écrit des
+           `userfields` et ignore ce champ. Proposer le sélecteur là-bas
+           laisserait quelqu'un rattacher soixante aliments un par un, et tout
+           perdre en silence — relevé le 20 septembre 2026 avant que ça arrive.
+
+           Il reviendra avec la migration vers la base (`docs/plan-serveur-
+           autoritaire.md`), qui est précisément le moment où ces aliments
+           cesseront de vivre dans Grocy. */
+        rattachement={modifiable ? {
           recherche: rechercheReference,
           resultats: references.data ?? [],
           onRecherche: setRechercheReference,
-        }}
+        } : undefined}
         quantite={quantiteNouvelle}
         onQuantiteChange={setQuantiteNouvelle}
         onFermer={() => {

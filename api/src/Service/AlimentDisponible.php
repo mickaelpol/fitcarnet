@@ -80,6 +80,20 @@ final readonly class AlimentDisponible
          * diete sans que rien ne le signale.
          */
         public ?float $grammesParUnite = 1.0,
+        /**
+         * CE QUE CET ALIMENT EST, au sens du catalogue CIQUAL — ou `null`.
+         *
+         * Transporte depuis le 20 septembre 2026, et il a fallu une panne pour
+         * y penser : sans lui, l'ecran de correction ouvrait le champ VIDE sur
+         * un aliment deja rattache, et l'enregistrement effacait le lien. Un
+         * champ absent d'une lecture ne se contente pas de manquer a
+         * l'affichage — il repart en ecriture comme une absence voulue.
+         *
+         * Toujours `null` cote Grocy : le rattachement vit dans la base, et
+         * Grocy n'en sait rien. C'est un fait, pas un oubli, et l'ecran le
+         * traduit en n'y proposant pas le champ.
+         */
+        public ?string $referenceCiqual = null,
     ) {
         $mesure = self::rendementMesure($peseeAvant, $peseeApres);
         $retenu = null !== $mesure
@@ -179,6 +193,7 @@ final readonly class AlimentDisponible
             'emplacement' => $this->emplacement,
             'peseeAvant' => $this->peseeAvant,
             'peseeApres' => $this->peseeApres,
+            'referenceCiqual' => $this->referenceCiqual,
         ];
     }
 }
