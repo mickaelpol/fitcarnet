@@ -12,6 +12,65 @@ d'une ligne de code, pas ce qui reste à faire.
 
 ---
 
+## L'état, au 20 septembre 2026
+
+### Ce qui s'est passé aujourd'hui
+
+- **Grocy est quitté.** Les 62 produits sont passés en base — 44 avec du stock,
+  18 à zéro, ce qui correspond exactement à ce que Grocy portait (mesuré). Le
+  frigo lit désormais la base (`utilisateur.source_frigo = 'base'`). **Grocy
+  n'est pas éteint** : on le garde quelques jours comme filet, l'aller-retour
+  est un simple appel à `POST /migration-grocy/terminer`.
+- **Un défaut vécu en migration réelle** : « Oasis sorbet » revenait
+  indéfiniment dans la liste à traiter. Le nom portait une espace finale que le
+  serveur coupe à l'écriture, et l'écran comparait les deux chaînes telles
+  quelles. Le compteur mentait aussi — il additionnait les lignes du catalogue
+  au lieu des correspondances. Corrigé dans `calcul/migrationGrocy.ts`.
+- **Le palier 0 est TERMINÉ** (voir le détail plus bas). 801 tests front,
+  0 échec.
+
+### Le palier 0, ce qu'il a réellement trouvé
+
+Ce n'était pas un rangement. Trois défauts de comportement, deux gardes qui ne
+pouvaient pas se déclencher, et trois raisons écrites fausses :
+
+| Ce qui était cassé | Où |
+|---|---|
+| L'écran de fusion comparait le nom **anglais** au nom **français** — donc ne proposait que du bruit sur 1314 exercices | `app/admin-fusion.tsx` |
+| Le bandeau d'inventaire ne s'effaçait **jamais**, alors que son commentaire promettait un quart d'heure | `app/(onglets)/frigo.tsx` |
+| L'écran des objectifs affichait une image avec les chiffres **d'un autre repas** | `app/objectifs.tsx` |
+| Un aliment au facteur de conversion nul disparaissait du calculateur **et** du bandeau qui existe pour l'expliquer | cinq écritures de la même garde |
+| « Le poids ne change pas » était jugé à deux seuils différents (`< 0.01` et `=== 1`) | éditeur contre frigo |
+| `mmss(-5)` rendait « -1:-5 » ; `nombreLisible('')` rendait « 0 » | deux `.tsx` |
+| Du code **mort** : `case '13000'` sur un découpage de deux caractères | `app/migration-grocy.tsx` |
+
+Et le troisième **double juge** du projet est verrouillé : l'avancement d'une
+séance, calculé à la fois par `Seance::getAvancement()` et `avancementDe()`,
+tient maintenant à `api/regles/avancement.json` lu par les deux suites.
+
+**Chaque correctif a été éprouvé en sabotant le code**, pour vérifier que le
+test pouvait tomber. Le plus parlant : en retirant le passage par minuit de
+`rangDepuisAujourdhui`, le test nomme le **dimanche 29 mars 2026** — la nuit du
+passage à l'heure d'été, ce bug « qui ne se voit que deux fois par an ».
+
+### Ce qui reste, connu et non corrigé
+
+- `modele/[id].tsx:199` : `key={j}` sur des séries qu'on peut supprimer au
+  milieu. `ChampNombre` se resynchronise, donc le risque est marginal — mais il
+  existe pour un texte en cours de frappe.
+- Quatre listes de modale dans `repas.tsx` et une dans `seance/[id].tsx`
+  construisent leur tableau en ligne. Quelques dizaines d'entrées : coût
+  négligeable, mais c'est la même ligne que le cas à 1338.
+- **PHPStan : 5 erreurs**, toutes antérieures au palier 0 et dans des fichiers
+  qu'il n'a pas touchés (vérifié par `git diff 73f4282 HEAD`).
+- `_layout.tsx` navigue par `useEffect` + `replace` là où expo-router documente
+  `<Redirect>` — l'idiome est déjà posé dans `index.tsx`. À arbitrer, le
+  comportement visible est correct.
+- `session.ts` s'abonne à un état hors React par `useState` + `useEffect` plutôt
+  que `useSyncExternalStore`. Aucune désynchronisation constatée.
+
+---
+
 ## L'état, au 19 septembre 2026
 
 - **Tout est poussé sur Gitea**, et donc déployé : la tâche planifiée du NAS

@@ -33,7 +33,7 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 652 tests, puis 33 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 801 tests, puis 42 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
@@ -141,6 +141,11 @@ Les modules de référence font foi et sont les seuls à porter la formule :
 | Composition de repas | `front/src/solveur/` |
 | Suppression des accents | `front/src/calcul/texte.ts` |
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `front/src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
+| Jours du calendrier, changement d'heure | `front/src/calcul/dates.ts` |
+| Types de séance et leurs couleurs | `front/src/calcul/typesSeance.ts` |
+| Bornes et plancher des convives | `front/src/calcul/convives.ts` |
+| Proximité de deux noms (fusion d'exercices) | `front/src/calcul/proximite.ts` |
+| Composer plusieurs jours d'un coup | `front/src/calcul/composerLaPeriode.ts` |
 | Force d'un mot de passe | `api/src/Service/MotDePasse.php` **et** `front/src/calcul/motDePasse.ts`, verrouillés l'un sur l'autre par `api/regles/motdepasse.json` |
 
 **NE COMPTE PAS LES DOUBLES JUGES DE TÊTE — CETTE PAGE S'EST TROMPÉE QUATRE
@@ -272,6 +277,27 @@ déviation par rapport à la cible doit être expliquée à l'écran.
   `inventaire_lot` n'ont aucune entité — Doctrine propose donc de les SUPPRIMER, avec les index
   et les CHECK faits à la main. Le schéma évolue par `db/01-schema.sql` **et** une migration
   numérotée, jamais par l'ORM. Détail dans la skill `schema-base`.
+- **L'ALIAS `@/` NE SURVIT PAS À `npm test`.** La suite compile `src/` vers
+  `dist-tests/` et lance Node dessus, sans réécrire `@/` : un module de calcul
+  qui l'utilise pour une **valeur** tombe sur `Cannot find module '@/theme'`.
+  Les imports de **type** y survivent, eux, parce qu'ils s'effacent à la
+  compilation — d'où un piège asymétrique : `npm run verif` passe, `npm test`
+  tombe, et le message ne parle pas du vrai sujet. Il a mordu deux fois le
+  20 septembre 2026 ; `front/src/calcul/aliasInterdit.test.ts` l'interdit
+  désormais dans `src/calcul` et `src/solveur`. Dans un `.tsx`, l'alias reste
+  parfaitement correct.
+- **`Intl` EST DISPONIBLE SOUS HERMES, et trois fichiers disaient le
+  contraire.** Mesuré le 20 septembre 2026 sur l'émulateur, moteur réel,
+  Android 14 et 16 : `toLocaleDateString('fr-FR', { weekday: 'long' })` rend
+  « dimanche 20/09 », et `HERMES_ENABLE_INTL=True` est en dur dans React Native
+  (`ReactAndroid/hermes-engine/build.gradle.kts:267`) — aucun réglage de ce
+  dépôt ne peut l'éteindre. La croyance venait de `normalize`, qui n'est **pas**
+  une API `Intl`. **Ce qui reste vrai** : seuls quatre constructeurs sont là —
+  `getCanonicalLocales`, `Collator`, `DateTimeFormat`, `NumberFormat`.
+  `PluralRules`, `RelativeTimeFormat`, `ListFormat`, `DisplayNames`, `Locale`
+  et `Segmenter` sont **absents**, donc un `TypeError` en puissance. Et les
+  données venant de l'ICU du système, ne jamais éprouver une sortie
+  `toLocaleDateString` caractère par caractère.
 - `tsconfig.tests.json` n'inclut plus une liste écrite à la main mais **un motif**,
   `src/**/*.test.ts` — la liste manuelle avait laissé `performance.ts` sans test
   pendant des mois. Le piège qui reste : le motif ne couvre que `src/`, donc un
