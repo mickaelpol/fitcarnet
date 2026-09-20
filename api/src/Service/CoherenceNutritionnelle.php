@@ -19,16 +19,18 @@ namespace App\Service;
  * differentes, et les deux ont raison. Ce qu'on refuse, c'est un aliment qui
  * se contredit — pas un aliment qui s'ecarte.
  *
- * ELLE NE REFUSE QUE CE QUE LE FRONT BLOQUE DEJA, et rien de plus. Le front
- * porte en plus des avertissements — « ce chiffre est inhabituel », « verifie
- * la ligne du paquet » — qui affichent un doute sans rien empecher ; ils
- * restent la-bas. Le serveur decide ce qui entre en base, l'ecran aide a
- * saisir.
+ * ELLE REFUSE, ELLE N'AVERTIT PAS. Les avertissements — « ce chiffre est
+ * inhabituel », « verifie la ligne du paquet » — affichent un doute sans rien
+ * empecher : ils vivent dans `AnomaliesAliment`, et `VerdictAliment` sert les
+ * deux a l'ecran. Le serveur decide ce qui entre en base, l'ecran aide a
+ * saisir ; les deux roles sont sur le serveur depuis le 20 septembre 2026.
  *
- * DEUXIEME ECRITURE ASSUMEE, donc verrouillee : `api/regles/coherence.json`
- * est lu par les DEUX suites de tests. Le jour ou l'un des deux juges change
- * d'avis sans l'autre, une des deux tombe en nommant le cas. C'est le meme
- * dispositif que le mot de passe, le rendement et l'avancement.
+ * ELLE N'A PLUS DE JUMEAU DANS LE FRONT. Elle en a eu un, tenu d'accord par
+ * `api/regles/coherence.json` lu par les deux suites. Ce dispositif est
+ * abandonne — il GARDAIT la duplication au lieu de la supprimer — et le
+ * fichier est supprime avec les trois autres. L'ecran appelle desormais
+ * `POST /api/verification/aliment` et affiche ce qui revient, phrases et
+ * couleur comprises.
  *
  * AUCUNE DEPENDANCE DE SERVICE, ET C'EST VOULU : les tests du projet
  * instancient les validateurs sans conteneur, et un validateur a dependance a

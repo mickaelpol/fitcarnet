@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Service\ModesDeTravail;
 use App\Service\MotDePasse;
 use App\Service\VerdictAliment;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -57,6 +58,35 @@ final class VerificationController extends AbstractController
         $saisie = (array) \json_decode((string) $requete->getContent(), true);
 
         return $this->json(VerdictAliment::pour($saisie));
+    }
+
+    /**
+     * COMBIEN DE SERIES COMPTENT, SELON LA FACON DONT ON TRAVAILLE.
+     *
+     * POURQUOI L'ECRAN A BESOIN DE CA, et pourquoi un poids par serie ne
+     * suffisait pas. L'ecran d'une seance est autoritaire sur son etat local :
+     * il ajoute un exercice, supprime une ligne, bascule un mode, et le
+     * compteur « 7 sur 12 » doit suivre le geste SANS aller-retour reseau,
+     * hors ligne compris.
+     *
+     * Un poids par serie est DERIVE du mode et du rang de la ligne — les deux
+     * choses que ces gestes changent. Il etait donc perime des le premier
+     * geste : ajouter un exercice « for time » affichait 0/3 la ou le serveur
+     * dirait 0/1. Mesure et corrige le 21 septembre 2026.
+     *
+     * Ce catalogue, lui, est indexe sur le MODE : un bloc fabrique a l'ecran a
+     * un mode, une bascule change la cle et pas la reponse. L'ecran fait une
+     * addition parametree, il ne decide rien.
+     *
+     * AUTHENTIFIEE ET SANS CACHE COTE SERVEUR : la reponse ne depend d'aucune
+     * donnee de compte, mais rien n'oblige a l'offrir a qui n'a pas de compte.
+     * L'ecran, lui, ne la redemande jamais (`staleTime: Infinity`).
+     */
+    #[Route('/modes-de-travail', methods: ['GET'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function modesDeTravail(): JsonResponse
+    {
+        return $this->json(ModesDeTravail::catalogue());
     }
 
     /**

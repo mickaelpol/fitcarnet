@@ -151,12 +151,10 @@ class Seance implements ProprieteUtilisateur
      * Un exercice « for time » (mode chrono) ne compte que pour UNE serie :
      * il n'a qu'un temps total, meme si des lignes vides subsistent.
      *
-     * IL ADDITIONNE LES POIDS, IL NE REECRIT PAS LA REGLE — 21 septembre 2026.
-     * Elle vit dans `SeanceExercice::compteUneSeuleSerie()`, et
-     * `Serie::getPoidsDansLAvancement()` s'y ramene comme cette methode. Les
-     * trois ne peuvent donc plus se contredire, et c'est exactement ce que
-     * `PoidsDansLAvancementTest` verifie : la somme des poids DOIT redonner ce
-     * que rend cette methode.
+     * IL NE REECRIT PAS LA REGLE, IL LA DEMANDE — 21 septembre 2026. Elle vit
+     * dans `ModesDeTravail`, et `SeanceExercice::compteUneSeuleSerie()` la lui
+     * demande. L'ecran d'une seance obtient la meme reponse par
+     * `GET /api/modes-de-travail` : une seule ecriture, deux lecteurs.
      *
      * LE SCHEMA EST ECRIT A LA MAIN parce que PHP ne sait pas le dire. Le type
      * de retour est `array`, et API Platform en deduisait « tableau de
@@ -178,12 +176,17 @@ class Seance implements ProprieteUtilisateur
         $total = 0;
         $faites = 0;
 
-        foreach ($this->exercices as $exercice) {
-            foreach ($exercice->getSeries() as $serie) {
-                $poids = $serie->getPoidsDansLAvancement();
-                $total += $poids;
+        foreach ($this->exercices as $bloc) {
+            /* Un « for time » n'a qu'un temps total : seule sa premiere ligne
+               compte, les suivantes notent le detail. */
+            $comptees = $bloc->compteUneSeuleSerie()
+                ? \array_slice($bloc->getSeries()->toArray(), 0, 1)
+                : $bloc->getSeries()->toArray();
+
+            $total += \count($comptees);
+            foreach ($comptees as $serie) {
                 if ($serie->isFaite()) {
-                    $faites += $poids;
+                    ++$faites;
                 }
             }
         }

@@ -34,9 +34,19 @@ const sql = (requete: string): string =>
  * Crée un compte et rend son adresse.
  *
  * `source` décide du frigo : `base` est ce que fait la production depuis la
- * migration du 20 septembre 2026 ; `grocy` sert à éprouver l'autre chemin
- * d'écriture, celui qui n'emprunte pas l'entité `Aliment` — et qui avait été
- * oublié par le palier 1.
+ * migration du 20 septembre 2026.
+ *
+ * ⚠️ **`'grocy'` ÉCRIT DANS L'INSTANCE GROCY RÉELLE DU PROPRIÉTAIRE.**
+ * Un compte jetable n'y change rien : `POST /api/mon-frigo/aliment` sur un
+ * compte en `source_frigo = 'grocy'` part vers `https://grocy.mickael-pol.fr`,
+ * pas vers une base de test. Le 21 septembre 2026, un agent de vérification a
+ * ainsi créé un vrai produit (« Poulet verification », id 67) en croyant Grocy
+ * injoignable ; il l'a retiré et l'a prouvé, mais la règle du projet — « n'écris
+ * jamais sur une donnée que tu n'as pas créée » — ne protège de rien ici :
+ * la donnée EST créée par l'agent, dans le vrai Grocy.
+ *
+ * **N'utiliser `'grocy'` que pour éprouver des REFUS** (422 rendus avant tout
+ * appel à Grocy), jamais un chemin d'acceptation.
  */
 export function creerCompte(nom: string, source: 'base' | 'grocy' = 'base'): string {
   const email = `${nom}-${Date.now()}${SUFFIXE}`;

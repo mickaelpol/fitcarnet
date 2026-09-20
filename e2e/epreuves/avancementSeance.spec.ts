@@ -136,3 +136,22 @@ test.describe('le compteur d\'une séance', () => {
  */
 const compteur = (page: import('@playwright/test').Page) =>
   page.getByText(/^\d+\/\d+ séries?$/).first();
+
+/* CE QUI MANQUE ENCORE ICI, ET IL FAUT LE DIRE — 21 septembre 2026.
+ *
+ * Ces trois épreuves posent la séance par l'API puis ne font que COCHER. Elles
+ * n'ajoutent pas d'exercice, n'en suppriment pas, ne changent pas de mode. Or
+ * c'est exactement là que la première version de la refonte cassait : le
+ * serveur envoyait un POIDS par série, et un bloc que l'écran vient de
+ * fabriquer n'en a aucun — un « for time » ajouté affichait 0/3 là où le
+ * serveur dirait 0/1.
+ *
+ * LE GESTE EST DÉSORMAIS COUVERT PAR UN TEST UNITAIRE, `blocSeance.test.ts`,
+ * cas « UN BLOC FABRIQUÉ PAR L'ÉCRAN compte juste » — qui construit le bloc
+ * avec la vraie `blocDepuisExercice`. Il n'est PAS couvert de bout en bout :
+ * je n'ai pas su piloter le sélecteur d'exercice (`ChoixDansListe`) depuis
+ * Playwright — ni le champ de recherche ni le titre de la modale ne se
+ * laissent viser, et la modale ne paraît pas s'ouvrir sous le navigateur de
+ * test. À reprendre : c'est le geste le plus banal de cet écran, et deux
+ * agents ont trouvé la régression avant qu'aucune épreuve ne la voie.
+ */

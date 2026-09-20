@@ -27,7 +27,7 @@ front quand bon me semble »* — et la contrainte qui borne tout le chantier :
 | Cohérence d'un aliment | `POST /api/verification/aliment` → `VerdictAliment` |
 | Rendement cru/cuit | la même route |
 | Force d'un mot de passe | `POST /api/verification/mot-de-passe` (publique) |
-| Avancement d'une séance | un **poids par série** rendu en `seance:lire` |
+| Avancement d'une séance | `GET /api/modes-de-travail` → `ModesDeTravail` |
 
 **`api/regles/` est vide** : les quatre fichiers de règles et leurs huit suites
 jumelles sont supprimés. Le dispositif « un fichier lu par les deux suites »
@@ -35,11 +35,38 @@ est abandonné — il *gardait* la duplication au lieu de la supprimer.
 
 **Ce qui a débloqué l'avancement**, le dernier et le plus coriace : cocher une
 série doit bouger le compteur *immédiatement*, hors ligne compris, donc lire
-`seance.avancement` était exclu. La sortie n'a pas été de partager la règle,
-mais de **déplacer ce qui est transmis** — chaque série porte son poids (1, ou
-0 au-delà de la première ligne d'un chrono), et le front ne fait plus qu'une
-addition. Motif à reprendre la prochaine fois qu'un « il faut que l'écran
-réponde pendant le geste » semble imposer un second juge.
+`seance.avancement` était exclu. La sortie a été de **déplacer ce qui est
+transmis** — le serveur envoie, par mode de travail, **combien de séries
+comptent** (`GET /api/modes-de-travail` : `chrono → 1`, les autres → toutes), et
+l'écran découpe à ce nombre.
+
+### La leçon de la journée, et elle dépasse l'avancement
+
+**La première version de cette correction était fausse, et il a fallu deux
+agents pour le voir.** Elle envoyait un **poids par série** que l'écran
+additionnait. Élégant — et périmé dès que l'utilisateur touchait au bloc, parce
+qu'un poids par ligne est *dérivé* du mode et du rang, les deux choses que
+l'écran modifie sans le serveur :
+
+| Geste | L'écran affichait | Le serveur dirait |
+|---|---|---|
+| **Ajouter un exercice « for time »** | 0/**3** | 0/1 |
+| Supprimer la première ligne d'un chrono | 0/**0**, et la jauge disparaissait | 0/1 |
+| Basculer Chrono → Charge | 0/**1** | 0/3 |
+| Basculer Charge → Chrono | 0/**3** | 0/1 |
+
+Le premier est le geste le plus banal de l'écran. Aucune épreuve ne le voyait :
+les E2E posaient la séance par l'API puis ne faisaient que **cocher**, et le
+garde `avancementUnique` ne peut voir qu'une règle **réécrite**, jamais une
+règle **manquante**.
+
+> **NE JAMAIS TRANSMETTRE AU FRONT UNE VALEUR DÉRIVÉE D'UN ÉTAT QU'IL MUTE.**
+> Transmettre la règle, indexée sur quelque chose que le client possède déjà.
+
+Ce qui garde maintenant les trois listes de modes (`db/01-schema.sql`,
+`ModesDeTravail.php`, `choixMode.tsx`) : `avancementUnique.test.ts` les compare
+**en trois langages**. PHPUnit ne le pouvait pas — le conteneur ne monte que
+`api/` sous `/app`, `db/` n'y est pas, et le test le criait au lieu de passer.
 
 **Comment la fidélité a été prouvée**, puisque l'application doit rester la
 même :
@@ -51,7 +78,9 @@ même :
   écrits dans `api/tests/Entity/AvancementTest.php` ;
 - l'ordre des séries après la jointure, **mesuré sur la vraie route** avec les
   lignes écrites à l'envers en base : `#[ORM\OrderBy]` traverse bien le
-  fetch-join, donc le poids tombe sur la bonne ligne.
+  fetch-join, donc « la première ligne » est bien celle d'`ordre` 0 ;
+- les quatre gestes locaux (ajouter, supprimer, basculer le mode dans les deux
+  sens), rejoués sur le module compilé **avant et après** la correction.
 
 ### Ce qu'une revue a trouvé sur ce code le jour même
 
@@ -99,6 +128,15 @@ désormais le temps écoulé et exige moins de 500 ms.
 - `front/src/calcul/blocSeance.ts` garde le mot « chrono » dans ses
   commentaires ; le garde retire les commentaires avant de chercher, et c'est
   volontaire — mais c'est une subtilité à connaître avant de le modifier.
+- **Le geste « ajouter un exercice » n'est pas couvert de bout en bout.** Il
+  l'est par un test unitaire (`blocSeance.test.ts`, « UN BLOC FABRIQUÉ PAR
+  L'ÉCRAN compte juste »), mais je n'ai pas su piloter le sélecteur
+  `ChoixDansListe` depuis Playwright — la modale ne paraît pas s'ouvrir sous le
+  navigateur de test. C'est le geste qui portait la régression : à reprendre.
+- **`e2e` : `creerCompte(nom, 'grocy')` écrit dans le Grocy RÉEL.** Un agent de
+  vérification y a créé un vrai produit le 21 septembre 2026 en croyant Grocy
+  injoignable ; il l'a retiré et l'a prouvé. L'avertissement est maintenant dans
+  `compteJetable.ts`, mais rien n'empêche techniquement le geste.
 
 ---
 

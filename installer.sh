@@ -9,7 +9,7 @@
 # --mot-de-passe est FACULTATIF : sans lui, le mot de passe est demandé sans
 # écho. Dans les deux cas il doit respecter la règle du projet — 12 caractères
 # au minimum, une minuscule, une majuscule, un chiffre et un caractère spécial
-# (durcie le 18 septembre 2026, voir api/regles/motdepasse.json). Un mot de
+# (durcie le 18 septembre 2026, voir api/src/Service/MotDePasse.php). Un mot de
 # passe trop faible arrête le script en disant ce qui lui manque.
 #
 # Enchaîne : base, référentiel, compte, objectifs, catalogue, séances,

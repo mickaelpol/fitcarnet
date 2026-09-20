@@ -147,78 +147,113 @@ const catalogue = (...ex: Exercice[]): Map<number, Exercice> =>
  *
  * Ces cas vérifiaient que le front SAIT qu'un chrono ne compte que pour une
  * série. Il ne le sait plus : le serveur donne à chaque série son POIDS, et
- * cette fonction ne fait plus qu'additionner. La règle, elle, est éprouvée
- * côté serveur par `api/tests/Entity/PoidsDansLAvancementTest.php`, dont un
- * verrou exige que la somme des poids redonne exactement l'avancement.
+ * cette fonction DÉCOUPE selon ce que le serveur a dit. La règle — « un chrono
+ * ne compte que pour une série » — n'est écrite qu'une fois, dans
+ * `api/src/Service/ModesDeTravail.php`, et elle arrive ici par
+ * `GET /api/modes-de-travail`.
  *
- * Ce qui reste à vérifier ici est donc l'arithmétique, et un seul cas de bon
- * sens : une série jamais enregistrée n'a pas encore de poids.
+ * Ce qui se vérifie ici est donc l'arithmétique et les replis, jamais la
+ * règle elle-même : `COMBIEN` ci-dessous est une ENTRÉE du test, pas une
+ * recopie de la règle.
  */
 
-const avecPoids = (
-  series: { faite: boolean; poids?: number }[],
-  poidsDUneNouvelleSerie?: number,
+/**
+ * Ce que le serveur repond sur `GET /api/modes-de-travail`, en dur ici :
+ * c'est une ENTREE de la fonction, pas une regle qu'on recopie.
+ */
+const COMBIEN = (mode: string): number | null =>
+  ({ charge: null, iso: null, chrono: 1 } as Record<string, number | null>)[mode] ?? null;
+
+const blocDe = (
+  mode: string | null,
+  faites: readonly boolean[],
 ): SeanceExercice => ({
   exercice: '/api/exercices/7',
   ordre: 0,
-  mode: null,
+  mode,
   notes: null,
   secondesTotal: null,
-  poidsDUneNouvelleSerie,
-  series: series.map((x, i) => ({
-    ordre: i, reps: null, poids: null, secondes: null, faite: x.faite,
+  series: faites.map((faite, i) => ({
+    ordre: i, reps: null, poids: null, secondes: null, faite,
     repsCible: null, poidsCible: null, secondesCible: null,
-    poidsDansLAvancement: x.poids,
   })),
 } as unknown as SeanceExercice);
 
-test('l\'avancement additionne les poids rendus par le serveur', () => {
-  const a = avancementDe([avecPoids([
-    { faite: true, poids: 1 }, { faite: false, poids: 1 }, { faite: true, poids: 1 },
-  ])]);
-
-  assert.deepEqual(a, { faites: 2, total: 3 });
+test('un exercice ordinaire compte toutes ses séries', () => {
+  assert.deepEqual(
+    avancementDe([blocDe('charge', [true, false, true])], COMBIEN),
+    { faites: 2, total: 3 },
+  );
 });
 
-test('une série à POIDS ZÉRO ne compte ni au total ni aux faites', () => {
-  /* C'est ainsi qu'un « for time » ne vaut qu'une série : le serveur met 0 aux
-     lignes au-delà de la première. Cet écran n'a pas à savoir pourquoi. */
-  const a = avancementDe([avecPoids([
-    { faite: true, poids: 1 }, { faite: true, poids: 0 }, { faite: true, poids: 0 },
-  ])]);
+test('un « for time » ne compte que sa première ligne', () => {
+  /* Le serveur a dit « chrono → 1 ». Cet écran découpe à ce nombre ; il ne
+     sait pas ce qu'est un chrono, et c'est le but. */
+  assert.deepEqual(
+    avancementDe([blocDe('chrono', [true, true, true])], COMBIEN),
+    { faites: 1, total: 1 },
+  );
+});
 
-  assert.deepEqual(a, { faites: 1, total: 1 });
+test('LE CAS QUI DÉPARTAGE : sur un chrono, la DEUXIÈME ligne cochée ne compte pas', () => {
+  /* « la première décide » et « n'importe laquelle décide » donnent le même
+     résultat sur tous les cas ci-dessus. Celui-ci les sépare, et c'est ce que
+     faisait l'ancien `series.slice(0, 1)`. */
+  assert.deepEqual(
+    avancementDe([blocDe('chrono', [false, true])], COMBIEN),
+    { faites: 0, total: 1 },
+  );
 });
 
 test('plusieurs blocs s\'additionnent', () => {
-  const a = avancementDe([
-    avecPoids([{ faite: true, poids: 1 }, { faite: false, poids: 0 }]),
-    avecPoids([{ faite: true, poids: 1 }, { faite: true, poids: 1 }]),
-  ]);
-
-  assert.deepEqual(a, { faites: 3, total: 3 });
+  assert.deepEqual(
+    avancementDe([blocDe('chrono', [true, false]), blocDe('charge', [true, true])], COMBIEN),
+    { faites: 3, total: 3 },
+  );
 });
 
-test('une série JAMAIS ENREGISTRÉE prend le poids que le bloc annonce', () => {
-  /* L'écran garde un état local : une série qu'on vient d'ajouter n'a pas
-     encore de poids, et le compteur doit pourtant bouger tout de suite. Le
-     serveur dit ce que pèserait une nouvelle série dans ce bloc — l'écran ne
-     le DÉDUIT pas, sinon il réécrirait la règle du chrono. */
-  const surUnChronoDejaServi = avancementDe([avecPoids(
-    [{ faite: true, poids: 1 }, { faite: false }], 0)]);
-  assert.deepEqual(surUnChronoDejaServi, { faites: 1, total: 1 });
+test('UN BLOC FABRIQUÉ PAR L\'ÉCRAN compte juste, lui aussi', () => {
+  /* LA RÉGRESSION DU 21 SEPTEMBRE 2026, ET LA RAISON DE TOUTE CETTE FORME.
+     La première correction envoyait un POIDS par série. Un bloc que l'écran
+     vient de fabriquer — `blocDepuisExercice`, « ajouter un exercice » — n'en
+     a aucun : chaque ligne retombait sur 1, et un « for time » à trois lignes
+     affichait 0/3 là où le serveur dirait 0/1. Trouvé par DEUX agents, chacun
+     de son côté, sur le geste le plus banal de l'écran.
 
-  const surUnBlocOrdinaire = avancementDe([avecPoids(
-    [{ faite: true, poids: 1 }, { faite: false }], 1)]);
-  assert.deepEqual(surUnBlocOrdinaire, { faites: 1, total: 2 });
+     Ici le bloc n'a que son mode, et ça suffit. */
+  const neuf = blocDepuisExercice(
+    { id: 7, nom: 'Burpees', nomFr: 'Burpees', modeDefaut: 'chrono', public: true } as never,
+    0, undefined, { series: 3, reps: 10 },
+  );
+
+  assert.equal(neuf.series.length, 3, 'trois lignes à l\'écran…');
+  assert.deepEqual(avancementDe([neuf], COMBIEN), { faites: 0, total: 1 },
+    '…mais une seule qui compte');
 });
 
-test('sans aucune indication, une série compte pour une', () => {
-  /* LE TÉMOIN DU REPLI. Le catalogue peut ne pas avoir chargé, la réponse peut
-     dater d'avant ce champ : mieux vaut annoncer trop à faire que trop peu —
-     un compteur qui sous-estime laisse croire une séance finie. */
-  assert.deepEqual(avancementDe([avecPoids([{ faite: true }, { faite: false }])]),
-    { faites: 1, total: 2 });
+test('LE MODE DE LA LIGNE L\'EMPORTE sur celui du catalogue', () => {
+  /* Faire un exercice chrono à la charge un jour donné est un choix, et il se
+     respecte. Même ordre que `SeanceExercice::modeApplique()` côté serveur. */
+  const catalogueDitChrono = () => 'chrono';
+
+  assert.deepEqual(
+    avancementDe([blocDe('charge', [true, false, false])], COMBIEN, catalogueDitChrono),
+    { faites: 1, total: 3 },
+  );
+  assert.deepEqual(
+    avancementDe([blocDe(null, [true, false, false])], COMBIEN, catalogueDitChrono),
+    { faites: 1, total: 1 },
+  );
+});
+
+test('sans catalogue des modes, TOUT compte', () => {
+  /* LE TÉMOIN DU REPLI — premier affichage, hors ligne, panne du serveur.
+     Mieux vaut annoncer trop à faire que trop peu : un compteur qui
+     sous-estime laisse croire une séance finie. */
+  assert.deepEqual(
+    avancementDe([blocDe('chrono', [true, false, false])]),
+    { faites: 1, total: 3 },
+  );
 });
 
 test('une séance vide donne un avancement nul, sans division à venir', () => {

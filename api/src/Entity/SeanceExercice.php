@@ -8,6 +8,7 @@ use ApiPlatform\Metadata\ApiResource;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
+use App\Service\ModesDeTravail;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -85,49 +86,32 @@ class SeanceExercice
     public function setSecondesTotal(?int $v): self { $this->secondesTotal = $v; return $this; }
     public function setNotes(?string $v): self { $this->notes = $v; return $this; }
 
-    /** @return Collection<int, Serie> */
     /**
-     * COMBIEN DE SERIES CE BLOC COMPTE-T-IL DANS L'AVANCEMENT ?
-     *
-     * C'EST LE SEUL ENDROIT OU LA REGLE DU CHRONO EST ECRITE, depuis le
-     * 21 septembre 2026. Un exercice « for time » n'a qu'UN temps total : ses
-     * lignes supplementaires ne sont pas des series a faire, meme si elles
-     * subsistent a l'ecran.
-     *
-     * `Seance::getAvancement()` et `Serie::getPoidsDansLAvancement()` s'y
-     * ramenent tous les deux — et le second est ce qui permet a l'ecran
-     * d'additionner sans connaitre la regle.
+     * LE MODE REELLEMENT APPLIQUE A CE BLOC.
      *
      * LE MODE DE LA LIGNE L'EMPORTE sur celui du catalogue : faire un exercice
      * chrono a la charge un jour donne est un choix, et il se respecte. Sans
      * mode nulle part, le repli est « charge », donc le decompte complet —
      * mieux vaut annoncer trop a faire que trop peu.
      */
-    public function compteUneSeuleSerie(): bool
+    public function modeApplique(): string
     {
-        $mode = $this->mode ?? $this->exercice?->getModeDefaut() ?? 'charge';
-
-        return 'chrono' === $mode;
+        return $this->mode ?? $this->exercice?->getModeDefaut() ?? ModesDeTravail::PAR_DEFAUT;
     }
 
     /**
-     * CE QUE PESERAIT UNE SERIE AJOUTEE MAINTENANT DANS CE BLOC.
+     * COMBIEN DE SERIES CE BLOC COMPTE-T-IL DANS L'AVANCEMENT ?
      *
-     * L'ECRAN GARDE UN ETAT LOCAL, avec sauvegarde automatique : une serie
-     * qu'on vient d'ajouter n'a pas encore de poids rendu par le serveur, et
-     * le compteur doit pourtant bouger tout de suite.
-     *
-     * Sans ce champ, l'ecran devrait DEDUIRE le poids — c'est-a-dire
-     * reecrire la regle du chrono, et le double juge reviendrait par la
-     * fenetre. Ici il lit un nombre : zero si ce bloc compte deja sa seule
-     * serie, un sinon.
+     * LA REGLE N'EST PAS ECRITE ICI, ELLE EST DEMANDEE a `ModesDeTravail`, qui
+     * est sa seule ecriture dans tout le depot. Cette methode ne fait que lui
+     * donner le mode.
      */
-    #[Groups(['seance:lire'])]
-    public function getPoidsDUneNouvelleSerie(): int
+    public function compteUneSeuleSerie(): bool
     {
-        return $this->compteUneSeuleSerie() && !$this->series->isEmpty() ? 0 : 1;
+        return ModesDeTravail::compteUneSeuleSerie($this->modeApplique());
     }
 
+    /** @return Collection<int, Serie> */
     public function getSeries(): Collection { return $this->series; }
 
     /**

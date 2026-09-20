@@ -38,7 +38,25 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 | Composition de repas | `src/solveur/` |
 | Suppression des accents | `src/calcul/texte.ts` |
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
-| Force d'un mot de passe, et ce qui lui manque | `src/calcul/motDePasse.ts` — verrouillé sur `api/src/Service/MotDePasse.php` par `api/regles/motdepasse.json`, que les DEUX suites lisent. Ne jamais réécrire « 12 caractères » dans un écran : c'est ce qui a laissé l'écran d'invitation annoncer une règle que le serveur n'appliquait plus |
+
+**CE QUI N'EST PLUS DANS LE FRONT — refonte des 20 et 21 septembre 2026.** Ces
+règles-là ont un module de référence **sur le serveur**, et l'écran se contente
+d'afficher ce qu'il reçoit. Cette page a listé `src/calcul/motDePasse.ts` et
+`src/calcul/plausibilite.ts` comme modules de référence **après leur
+suppression** : c'est le défaut `texte.ts` à l'identique, une ligne qui annonce
+un fichier absent.
+
+| Domaine | Où la règle vit maintenant | Ce que l'écran appelle |
+|---|---|---|
+| Force d'un mot de passe, et ce qui lui manque | `api/src/Service/MotDePasse.php` | `POST /api/verification/mot-de-passe` (publique) |
+| Cohérence d'un aliment, ses 14 anomalies, la couleur du bandeau | `api/src/Service/VerdictAliment.php` et `AnomaliesAliment.php` | `POST /api/verification/aliment` |
+| Rendement cru/cuit | la même route | idem |
+| « Un chrono ne compte que pour une série » | `api/src/Entity/SeanceExercice.php` | rien : le serveur envoie un **poids** par série, l'écran additionne |
+
+**NE JAMAIS RÉÉCRIRE UN CHIFFRE DE CES RÈGLES DANS UN ÉCRAN** — ni « 12
+caractères », ni un seuil de kcal. C'est ce qui a laissé l'écran d'invitation
+annoncer une règle que le serveur n'appliquait plus. Le serveur renvoie
+**la phrase**, pas seulement les clés : l'afficher telle quelle.
 
 **Aucune formule métier recopiée.** Un écran qui recalcule un 1RM importe
 `performance.ts`. Trois copies d'Epley aux bornes divergentes ont produit un

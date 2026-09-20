@@ -328,8 +328,10 @@ class Aliment implements ProprieteUtilisateur
      * d'ecran, un autre client demain — et la donnee entrait.
      *
      * LA REGLE N'EST PAS REECRITE ICI, ELLE EST APPELEE — comme celle du
-     * rendement juste au-dessus. `CoherenceNutritionnelle` la porte, et
-     * `api/regles/coherence.json` la verrouille sur son jumeau du front.
+     * rendement juste au-dessus. `CoherenceNutritionnelle` la porte, et elle
+     * n'a plus de jumeau : l'ecran ne juge plus, il demande son verdict a
+     * `POST /api/verification/aliment`. Le `api/regles/coherence.json` qui
+     * tenait les deux d'accord est supprime depuis le 20 septembre 2026.
      *
      * ON NE VALIDE QUE SI LES MACROS SONT LA. Un `PATCH` partiel qui ne porte
      * que le nom charge l'entite complete, donc les macros sont renseignees de

@@ -26,16 +26,18 @@ import { REPS_MAX_POUR_1RM } from './performance';
  * `performance.ts`.
  *
  * POURQUOI UN GARDE PLUTÔT QU'UN FICHIER DE RÈGLES PARTAGÉ. Le mot de passe et
- * le rendement ont, eux, DEUX juges assumés — l'écran doit répondre pendant la
- * frappe — et c'est `api/regles/*.json` qui les tient d'accord. Le 1RM n'a
+ * le rendement avaient, eux, DEUX juges assumés — l'écran doit répondre pendant
+ * la frappe — tenus d'accord par `api/regles/*.json`. Ce dispositif est ABANDONNÉ
+ * depuis le 21 septembre 2026 : les quatre doubles juges sont supprimés, et un
+ * garde comme celui-ci est ce qui les remplace. Le 1RM, lui, n'a jamais eu
  * aucune raison d'être calculé deux fois : le front recalcule tout ce qu'il
  * affiche. Un second juge n'apportait rien qu'un risque, donc on le retire au
  * lieu de le synchroniser.
  *
  * CE TEST LIT `api/` ET `db/`, hors de `front/`. C'est voulu, et c'est le seul
  * moyen : une divergence entre PHP et TypeScript ne se voit d'aucun des deux
- * côtés. Même dispositif que `motDePassePartage.test.ts`, qui lit
- * `api/regles/motdepasse.json` par un chemin relatif.
+ * côtés. C'est aussi ce que fait `avancementUnique.test.ts`, écrit le
+ * 21 septembre 2026 sur ce modèle — à ceci près qu'il ne lit que `front/`.
  */
 
 /* Depuis `front/`, là où `npm test` s'exécute. */

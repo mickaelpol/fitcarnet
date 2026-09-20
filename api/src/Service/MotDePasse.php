@@ -14,11 +14,16 @@ namespace App\Service;
  * ailleurs. Elles disaient la meme chose par accident, et rien ne les y
  * obligeait. Elles passent toutes par ici desormais.
  *
- * LE QUATRIEME JUGE EST DANS LE FRONT, et on ne peut pas l'y eviter : la jauge
- * doit repondre pendant la frappe, sans aller-retour reseau. Les deux sont donc
- * verrouilles sur `api/regles/motdepasse.json`, que leurs deux suites de tests
- * lisent — meme dispositif que `rendement.json`, invente pour le constat 04#7
- * ou deux juges divergeaient en silence.
+ * IL N'Y A PLUS DE JUGE DANS LE FRONT — 20 septembre 2026. Il y en avait un,
+ * `front/src/calcul/motDePasse.ts`, parce que la jauge doit repondre pendant la
+ * frappe sans aller-retour reseau ; les deux etaient tenus d'accord par
+ * `api/regles/motdepasse.json`, lu par leurs deux suites.
+ *
+ * CE DISPOSITIF EST ABANDONNE, et le fichier avec : il GARDAIT la duplication
+ * au lieu de la supprimer, et supposait qu'un futur front pense a le lire. La
+ * jauge vient desormais de `POST /api/verification/mot-de-passe`, qui rend les
+ * manquements, la force ET la phrase a afficher. Cette classe est la seule
+ * ecriture de la regle, dans tout le depot.
  *
  * LA DECISION, TRANCHEE LE 18 SEPTEMBRE 2026 par le proprietaire du projet.
  * `Invitation` argumentait CONTRE les regles de composition : « ces regles
@@ -32,7 +37,8 @@ namespace App\Service;
  * chose a la fois fait recommencer quatre fois — et c'est la meilleure facon
  * de faire choisir « Motdepasse1! » a quelqu'un d'excede.
  *
- * @see MotDePassePartageTest
+ * @see MotDePasseTest
+ * @see \App\Controller\VerificationController::motDePasse
  */
 final class MotDePasse
 {
@@ -55,9 +61,10 @@ final class MotDePasse
     /**
      * Ce qui manque a ce mot de passe, dans l'ordre de la liste partagee.
      *
-     * Vide veut dire « rien ne manque ». L'ordre est celui de
-     * `api/regles/motdepasse.json`, et il compte : c'est celui dans lequel
-     * l'ecran affiche la liste, et c'est celui que le test partage verifie.
+     * Vide veut dire « rien ne manque ». L'ORDRE COMPTE : c'est celui dans
+     * lequel l'ecran affiche la liste, et il est fige par `MotDePasseTest`.
+     * Il etait autrefois fige par `api/regles/motdepasse.json`, supprime le
+     * 20 septembre 2026 avec le juge du front.
      *
      * `\p{Ll}` ET `\p{Lu}` PLUTOT QUE `a-z` ET `A-Z` — avec le drapeau `u`.
      * « é » est une minuscule et « É » une majuscule ; les classes ASCII les

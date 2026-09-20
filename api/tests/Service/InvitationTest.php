@@ -312,8 +312,9 @@ final class InvitationTest extends TestCase
      * pas les deux gestes six mois plus tard.
      *
      * La regle elle-meme ne s'eprouve plus ici : elle est dans
-     * `MotDePassePartageTest`, contre la liste que le front lit aussi. Ce qui
-     * reste ci-dessous, c'est que cette PORTE-LA y mene bien.
+     * `MotDePasseTest`. Ce qui reste ci-dessous, c'est que cette PORTE-LA y mene
+     * bien. (Ce renvoi nommait `MotDePassePartageTest`, supprime le
+     * 20 septembre 2026 avec le juge du front.)
      */
 
     public function testUnMotDePasseFaibleEstRefuseALAcceptationDUneInvitation(): void

@@ -45,9 +45,17 @@ Aucun ne se voit sans monter l'application entière.
 
 ## Ce qu'on n'éprouve PAS ici
 
-**Les bornes et les formules.** Elles vivent dans `api/regles/*.json`, lus par
-les deux suites unitaires, qui tombent en nommant le cas. Les rejouer dans un
-navigateur rendrait ces épreuves lentes sans rien garantir de plus.
+**Les bornes et les formules.** Elles vivent **sur le serveur**, et les suites
+PHPUnit les éprouvent là-bas — dont un corpus de 7 936 cas pour les quatorze
+anomalies. Les rejouer dans un navigateur rendrait ces épreuves lentes sans
+rien garantir de plus.
+
+*(Ce paragraphe disait « elles vivent dans `api/regles/*.json`, lus par les deux
+suites ». Les quatre fichiers ont été supprimés les 20 et 21 septembre 2026 avec
+les doubles juges qu'ils tenaient d'accord. La phrase jumelle de `CLAUDE.md` a
+été corrigée le 21 ; celle-ci a été oubliée le même jour, et retrouvée par
+`verite-documentaire`. Le motif 1 du projet — le jumeau oublié — appliqué à sa
+propre documentation.)*
 
 On éprouve **l'assemblage** : que l'écran dise ce que le serveur fera, et que
 la base contienne ce que l'écran a promis.

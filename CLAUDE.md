@@ -33,11 +33,11 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 749 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 765 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 483 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 501 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -52,7 +52,7 @@ python3 test_ciqual.py                 # l'import CIQUAL, sans dépendance
 # ÉPREUVES DE BOUT EN BOUT : vrai navigateur, vraie API, vraie base.
 # Exigent l'environnement de dev debout ET un `front/dist` à jour.
 cd e2e && npm install                  # une seule fois
-cd e2e && npm test                     # ~11 s pour trois épreuves
+cd e2e && npm test                     # ~33 s pour six épreuves
 ```
 
 ### Les épreuves de bout en bout — `e2e/`
@@ -191,7 +191,7 @@ contente d'afficher ce qu'ils répondent :
 | Cohérence des kilocalories déclarées | `api/src/Service/CoherenceNutritionnelle.php` |
 | Somme d'Atwater, côté serveur | `api/src/Service/Atwater.php` — **seule écriture PHP**, elle l'était cinq fois |
 | Force d'un mot de passe | `api/src/Service/MotDePasse.php` — servi par `POST /api/verification/mot-de-passe`, **route publique** (l'écran d'invitation n'a pas encore de compte) |
-| « Un chrono ne compte que pour une série » | `api/src/Entity/SeanceExercice.php` `compteUneSeuleSerie()` — lue par `Serie::getPoidsDansLAvancement()` et `Seance::getAvancement()`, qui ne la réécrivent pas |
+| « Un chrono ne compte que pour une série » | `api/src/Service/ModesDeTravail.php` — **seule écriture du dépôt**. `Seance::getAvancement()` la lui demande, l'écran la reçoit par `GET /api/modes-de-travail` |
 
 ### Les doubles juges : il n'y en a plus, et `api/regles/` n'existe plus
 
@@ -205,12 +205,11 @@ partis en deux jours, et avec eux les quatre fichiers de règles :
 | Cohérence d'un aliment | 20 sept. 2026 | `POST /api/verification/aliment` → `VerdictAliment` |
 | Rendement cru/cuit | 20 sept. 2026 | la même route |
 | Force d'un mot de passe | 20 sept. 2026 | `POST /api/verification/mot-de-passe` → `MotDePasse` |
-| **Avancement d'une séance** | **21 sept. 2026** | `Serie::getPoidsDansLAvancement()` et `SeanceExercice::getPoidsDUneNouvelleSerie()`, exposés en `seance:lire` |
+| **Avancement d'une séance** | **21 sept. 2026** | `api/src/Service/ModesDeTravail.php`, servi par `GET /api/modes-de-travail` |
 
 `api/regles/coherence.json`, `rendement.json`, `motdepasse.json` et
 `avancement.json` sont supprimés, ainsi que leurs huit suites jumelles.
-**Le dossier `api/regles/` est vide et n'a plus de raison d'être : ne pas en
-recréer un.**
+**Le dossier `api/regles/` n'existe plus : ne pas en recréer un.**
 
 **POURQUOI UNE ROUTE, ET NON UN FICHIER DE RÈGLES.** Un fichier de règles est un
 *contrat* : il suppose qu'un futur front pense à le lire, donc il **garde** la
@@ -221,10 +220,23 @@ ne l'appelle pas n'affiche rien, et ça se voit tout de suite.
 série doit bouger le compteur *immédiatement*, hors ligne compris : lire
 `seance.avancement` l'aurait figé jusqu'au retour de la requête. La sortie n'est
 pas de partager la règle, c'est de **déplacer ce qui est transmis** — le serveur
-donne à chaque série son *poids* (1, ou 0 pour les lignes d'un chrono au-delà de
-la première), et le front ne fait plus qu'une **addition**. Ce n'est plus une
-règle métier, c'est de l'arithmétique. Motif réutilisable la prochaine fois que
-« l'écran doit répondre pendant le geste » semble imposer un second juge.
+envoie, par mode de travail, **combien de séries comptent** (`GET
+/api/modes-de-travail` : `chrono → 1`, les autres → toutes), et l'écran découpe
+à ce nombre. Ce n'est plus une règle métier, c'est de l'arithmétique paramétrée.
+
+**ET LA PREMIÈRE VERSION DE CETTE CORRECTION ÉTAIT FAUSSE — même journée.** Elle
+envoyait un **poids par série** (1, ou 0 au-delà de la première ligne d'un
+chrono) que l'écran additionnait. Élégant, et périmé dès que l'utilisateur
+touchait au bloc : un poids par ligne est *dérivé* du mode et du rang, les deux
+choses que l'écran modifie sans le serveur. Mesuré — ajouter un exercice « for
+time » affichait **0/3** là où le serveur dirait 0/1, supprimer la première
+ligne d'un chrono donnait 0/0 et faisait disparaître la jauge, basculer
+Chrono → Charge donnait 0/1 au lieu de 0/3. Trouvé par **deux agents**, chacun
+de son côté, sur le geste le plus banal de l'écran.
+
+> **NE JAMAIS TRANSMETTRE AU FRONT UNE VALEUR DÉRIVÉE D'UN ÉTAT QU'IL MUTE.**
+> Transmettre la règle, indexée sur quelque chose que le client possède déjà.
+> C'est la leçon du 21 septembre 2026, et elle dépasse largement l'avancement.
 
 **NE COMPTE PAS LES DOUBLES JUGES DE TÊTE — CETTE PAGE S'EST TROMPÉE CINQ
 FOIS.** Successivement : « le mot de passe est le seul cas », « deux cas et deux
@@ -235,14 +247,23 @@ croyait vérifier. **Si tu lis cette page pour savoir combien il y en a, va
 d'abord regarder `api/regles/` et la liste des routes de vérification.**
 
 **CE QUI EMPÊCHE MAINTENANT QU'ILS REVIENNENT**, faute de fichier de règles à
-tenir d'accord — deux gardes qui lisent **tout le dépôt**, et non une suite de
-chaque côté :
+tenir d'accord — **trois** gardes, dont **un seul** lit tout le dépôt. La
+portée de chacun est écrite ci-dessous parce qu'elle décide de ce qu'il peut
+voir : un garde qui ne lit que `front/` ne verra jamais une divergence entre
+deux langages, et c'est précisément le défaut qu'on cherche.
 
 | Garde | Ce qu'il refuse |
 |---|---|
-| `front/src/calcul/epleyUnique.test.ts` | le coefficient d'Epley hors de `performance.ts`, dans `.ts`, `.tsx`, `.php`, `.sql`, `.py` |
-| `front/src/calcul/avancementUnique.test.ts` | le mot « chrono » dans le module d'avancement, et tout décompte partiel des séries (`slice(0, 1)`) dans le front |
-| `front/src/calcul/formuleUnique.test.ts` | toute multiplication par un coefficient `KCAL_…` hors de `nutrition.ts` |
+| Garde | Ce qu'il refuse | Ce qu'il LIT |
+|---|---|---|
+| `front/src/calcul/epleyUnique.test.ts` | le coefficient d'Epley hors de `performance.ts` | **tout le dépôt** : `.ts`, `.tsx`, `.php`, `.sql`, `.py` |
+| `front/src/calcul/avancementUnique.test.ts` | le mot « chrono » dans le module d'avancement, et tout décompte partiel des séries (`slice(0, 1)`) | `front/src` + `front/app` |
+| `front/src/calcul/formuleUnique.test.ts` | toute multiplication par un coefficient `KCAL_…` hors de `nutrition.ts` | `front/src` + `front/app` |
+
+**LES DEUX DERNIERS NE VOIENT PAS LE SERVEUR NI LA BASE**, et ça se paie :
+`db/manuel/cibles.sql` écrit `4 * prot + 4 * gluc + 9 * lip` — l'Atwater
+**américain**, sans fibres, contraire à la règle 4 — et aucun garde ne le voit.
+Relevé par `verite-documentaire` le 21 septembre 2026, non corrigé.
 
 **Un garde ne suffit pas : il faut qu'il PUISSE tomber.** Chacun porte donc un
 cas TÉMOIN qui vérifie qu'il reconnaît encore sa référence — sans quoi un motif

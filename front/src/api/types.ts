@@ -131,7 +131,6 @@ export interface Serie {
    * série » — qui ne vit plus que sur le serveur. Absent sur une série qu'on
    * vient d'ajouter et qui n'a pas encore été enregistrée.
    */
-  poidsDansLAvancement?: number;
   id?: number;
   ordre: number;
   reps: number | null;
@@ -154,7 +153,6 @@ export interface SeanceExercice {
    * devrait le DÉDUIRE — donc réécrire la règle du chrono, et le double juge
    * reviendrait par la fenêtre.
    */
-  poidsDUneNouvelleSerie?: number;
   exercice: Exercice | string;
   ordre: number;
   mode: 'charge' | 'iso' | 'chrono' | null;

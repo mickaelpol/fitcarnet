@@ -8,6 +8,7 @@ import {
 import { TYPES_SEANCE, couleurDuType } from '@/calcul/typesSeance';
 import type { Exercice } from '@/api/types';
 import { avancementDe, blocDepuisExercice, blocsDepuisModele } from '@/calcul/blocSeance';
+import { useModesDeTravail } from '@/api/hooks/modesDeTravail';
 import { Bouton, Carte, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
@@ -39,6 +40,9 @@ export default function DetailSeance() {
   } = useSeanceEditable(id);
 
   const exercices = useExercices();
+  /* La regle du chrono vient du serveur, indexee sur le mode : c'est ce qui
+     permet au compteur de suivre un geste local sans la reecrire ici. */
+  const { seriesQuiComptent } = useModesDeTravail();
   const modeles = useModeles();
   const supprimer = useSupprimerSeance();
   const versModele = useSeanceVersModele();
@@ -110,7 +114,15 @@ export default function DetailSeance() {
   }
   if (!seance) return <Chargement />;
 
-  const avancement = avancementDe(seance.exercices);
+  /* LE CATALOGUE DES MODES VIENT DU SERVEUR, et c'est ce qui permet au
+     compteur de suivre un geste local — ajouter un exercice, supprimer une
+     ligne, basculer un mode — sans que cet écran connaisse la règle du chrono.
+     `parId` donne le mode par défaut d'un exercice que le bloc ne précise pas. */
+  const avancement = avancementDe(
+    seance.exercices,
+    seriesQuiComptent,
+    (bloc) => parId.get(idDe(bloc.exercice))?.modeDefaut ?? null,
+  );
 
   const ajouterExercice = (idExercice: number) => {
     const ex = parId.get(idExercice);

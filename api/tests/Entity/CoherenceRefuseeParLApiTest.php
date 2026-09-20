@@ -13,7 +13,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 /**
  * LA REGLE EST-ELLE VRAIMENT BRANCHEE SUR L'ENTITE ?
  *
- * `CoherencePartageTest` eprouve le SERVICE ; il resterait vert si personne
+ * `CoherenceNutritionnelleTest` eprouve le SERVICE ; il resterait vert si personne
  * n'appelait jamais `CoherenceNutritionnelle` depuis `Aliment`. C'est le motif
  * dominant du projet — une decision juste, posee a un endroit et oubliee a
  * l'autre — et c'est exactement ce qui s'etait passe pour le rendement :

@@ -45,41 +45,70 @@ export interface FormatPrescrit {
 }
 
 /**
+ * Ce que le serveur dit de chaque façon de travailler : combien de séries
+ * comptent, `null` voulant dire « toutes ».
+ *
+ * Servi par `GET /api/modes-de-travail`. La règle elle-même n'est écrite qu'à
+ * un endroit, `api/src/Service/ModesDeTravail.php`.
+ */
+export type SeriesQuiComptent = (mode: string) => number | null;
+
+/**
  * Combien de séries sont cochées, sur combien.
  *
- * ELLE N'APPLIQUE PLUS AUCUNE RÈGLE : ELLE ADDITIONNE — 21 septembre 2026,
- * dernier double juge du projet supprimé.
+ * ELLE N'APPLIQUE AUCUNE RÈGLE : elle découpe selon ce que le serveur a dit.
  *
- * Elle résolvait le mode elle-même (`b.mode ?? parId.get(…)?.modeDefaut ??
- * 'charge'`) puis tranchait « un chrono ne compte que pour une série ». La
- * même règle vivait dans `Seance::getAvancement()`, et `api/regles/avancement.json`
- * les tenait alignées.
+ * ── L'HISTOIRE, PARCE QU'ELLE SE REFAIT VITE ──────────────────────────────
  *
- * LE SERVEUR DONNE DÉSORMAIS SON POIDS À CHAQUE SÉRIE — 1, ou 0 pour les
- * lignes d'un chrono au-delà de la première — et, pour chaque bloc, ce que
- * pèserait une série ajoutée maintenant. Additionner des nombres fournis n'est
- * pas une règle métier : c'est de l'arithmétique.
+ * Cette fonction tranchait elle-même « un chrono ne compte que pour une
+ * série », et `Seance::getAvancement()` écrivait la même règle en PHP :
+ * c'était le dernier double juge du projet.
  *
- * POURQUOI ON N'A PAS SIMPLEMENT LU `seance.avancement` : cocher une série doit
+ * PREMIÈRE CORRECTION, LE MATIN DU 21 SEPTEMBRE 2026 : le serveur donnait son
+ * POIDS à chaque série — 1, ou 0 au-delà de la première ligne d'un chrono — et
+ * cette fonction les additionnait. Élégant, et **faux dès que l'utilisateur
+ * touchait au bloc** : un poids par ligne est dérivé du mode et du rang, les
+ * deux choses que l'écran modifie sans le serveur. Mesuré le jour même —
+ * ajouter un exercice « for time » affichait 0/3 là où le serveur dirait 0/1,
+ * supprimer la première ligne d'un chrono donnait 0/0 et faisait disparaître
+ * la jauge, basculer Chrono → Charge donnait 0/1 au lieu de 0/3.
+ *
+ * SECONDE CORRECTION, LE MÊME JOUR : le serveur transmet la règle INDEXÉE SUR
+ * LE MODE, que l'écran possède déjà pour chaque bloc, y compris un bloc qu'il
+ * vient de fabriquer. Un geste local change la clé, pas la réponse.
+ *
+ * ── CE QU'IL NE FAUT PAS REFAIRE ──────────────────────────────────────────
+ *
+ * **Ne jamais transmettre au front une valeur dérivée d'un état qu'il mute.**
+ * C'est la leçon, et elle dépasse l'avancement.
+ *
+ * POURQUOI PAS `seance.avancement` TOUT SIMPLEMENT : cocher une série doit
  * bouger le compteur immédiatement, sans aller-retour, hors ligne compris.
- * Lire le champ du serveur l'aurait figé jusqu'au retour de la requête, et
- * l'application n'aurait plus été la même.
  *
- * `poidsDUneNouvelleSerie` COUVRE LA SÉRIE QU'ON VIENT D'AJOUTER, qui n'a pas
- * encore de poids : sans lui, cet écran devrait le déduire — donc réécrire la
- * règle du chrono, et le double juge reviendrait par la fenêtre.
+ * @param seriesQuiComptent ce que rend `GET /api/modes-de-travail`. Tant qu'il
+ *   n'a pas répondu — premier écran, hors ligne — le repli compte TOUTES les
+ *   séries : mieux vaut annoncer trop à faire que trop peu.
  */
 export function avancementDe(
   exercices: readonly SeanceExercice[],
+  seriesQuiComptent: SeriesQuiComptent = () => null,
+  modeDefautDe: (bloc: SeanceExercice) => string | null = () => null,
 ): { faites: number; total: number } {
   return exercices.reduce(
     (acc, bloc) => {
-      for (const serie of bloc.series) {
-        const poids = serie.poidsDansLAvancement ?? bloc.poidsDUneNouvelleSerie ?? 1;
+      /* LE MODE DE LA LIGNE L'EMPORTE sur celui du catalogue : faire un
+         exercice chrono à la charge un jour donné est un choix. Même ordre
+         que `SeanceExercice::modeApplique()` côté serveur. */
+      const mode = bloc.mode ?? modeDefautDe(bloc) ?? 'charge';
+      const combien = seriesQuiComptent(mode);
 
-        acc.total += poids;
-        if (serie.faite) acc.faites += poids;
-      }
+      /* `combien` vient du serveur : découper à ce nombre est de
+         l'arithmétique, pas une règle. C'est `ModesDeTravail` qui décide que
+         le chrono vaut 1 — ici, personne ne sait ce qu'est un chrono. */
+      const comptees = combien === null ? bloc.series : bloc.series.slice(0, combien);
+
+      acc.total += comptees.length;
+      acc.faites += comptees.filter((s) => s.faite).length;
 
       return acc;
     },
