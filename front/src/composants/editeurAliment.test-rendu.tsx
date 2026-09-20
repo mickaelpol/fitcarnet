@@ -20,7 +20,7 @@
  * pas un composant. Ce test tombe si on remet `aliment` dans les dépendances,
  * vérifié en le remettant.
  */
-import { type TestContext, test } from 'node:test';
+import { describe, it, type TestContext, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -158,4 +158,50 @@ test('des lipides illisibles ne partent pas non plus', (t: TestContext) => {
   fireEvent.click(screen.getByText('Enregistrer'));
 
   assert.equal(envoyes.length, 0);
+});
+
+describe('l\'éditeur dit ce que le SERVEUR refusera', () => {
+  /**
+   * RELEVÉ PAR LE PROPRIÉTAIRE DU PROJET, le 20 septembre 2026, sur son écran.
+   *
+   * Il saisit un féculent à 130 kcal qui gonfle, et l'éditeur affiche en vert
+   * « Cohérent, mais sans les fibres le contrôle reste approximatif ». Puis le
+   * serveur refuse l'enregistrement.
+   *
+   * LES DEUX ONT RAISON, ET C'EST LE PROBLÈME. `controler()` ne compare que la
+   * somme d'Atwater aux calories déclarées : 130 contre 125,5, c'est cohérent.
+   * Mais `verifierAliment()` sait en plus qu'un grain sec fait au moins
+   * 300 kcal — et l'éditeur ne l'appelait PAS. L'écran jugeait avec la moitié
+   * de ce que l'application sait, et disait « cohérent » de ce que le serveur
+   * allait refuser.
+   *
+   * Ce n'est pas un juge de plus : `verifierAliment` existe déjà et est
+   * verrouillé sur le serveur par `api/regles/coherence.json`. L'éditeur cesse
+   * simplement de s'en priver.
+   */
+  const SAISIE = {
+    nom: 'Riz test', categorie: 'fec' as const,
+    kcal100: 130, prot100: 2.7, gluc100: 28, lip100: 0.3, fibres100: null,
+    ratio: 2.26, peseeAvant: null, peseeApres: null,
+  };
+
+  it('annonce le refus AVANT d\'envoyer', (t: TestContext) => {
+    t.after(cleanup);
+    render(<EditeurAliment visible aliment={SAISIE} onFermer={() => undefined}
+      onEnregistrer={() => undefined} />);
+
+    const texte = document.body.textContent ?? '';
+    assert.match(texte, /grain sec/,
+      'l\'écran doit dire ce que le serveur dira, pas « cohérent »');
+  });
+
+  it('LE TÉMOIN : un riz SEC ne déclenche rien', (t: TestContext) => {
+    t.after(cleanup);
+    /* Sans ce cas, un avertissement permanent passerait le test ci-dessus tout
+       en criant sur chaque aliment juste — et on apprendrait à l'ignorer. */
+    render(<EditeurAliment visible aliment={{ ...SAISIE, kcal100: 350, gluc100: 78, prot100: 7, lip100: 0.6 }}
+      onFermer={() => undefined} onEnregistrer={() => undefined} />);
+
+    assert.doesNotMatch(document.body.textContent ?? '', /grain sec/);
+  });
 });

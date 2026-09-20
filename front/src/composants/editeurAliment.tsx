@@ -14,7 +14,9 @@ import {
    mesure d'épinard (0,32) et laissait passer un féculent à 0,8 que la base
    rejette — l'utilisateur recevait alors un 500 avec le SQL brut. Voir
    `plausibilite.ts`, qui porte désormais la règle, la même que l'API et la base. */
-import { rendementPossible } from '@/calcul/plausibilite';
+import { rendementPossible, verifierAliment } from '@/calcul/plausibilite';
+import type { Anomalie } from '@/calcul/plausibilite';
+import type { Aliment } from '@/solveur/types';
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
 import { nombreSaisi } from '@/calcul/saisieNombre';
 
@@ -260,6 +262,7 @@ export function EditeurAliment({
   const controle = controler(macros);
   const kilojoules = soupconKilojoules(macros);
 
+
   /* `nombreSaisi` ET NON `parseFloat` : « 4,2,1 » g se lisait 4,2 et proposait
      un ratio calculé sur une pesée qui n'existe pas. */
   const ratioMesure = ratioDepuisPesees(nombreSaisi(avant) ?? NaN, nombreSaisi(apres) ?? NaN);
@@ -269,11 +272,40 @@ export function EditeurAliment({
     && (textes.fibres100.trim() === '' || lisible(textes.fibres100));
   const illisible = (cle: CleNombre): boolean => textes[cle].trim() !== '' && !lisible(textes[cle]);
 
+  /* CE QUE LE SERVEUR REFUSERA, DIT AVANT D'ENVOYER — 20 septembre 2026,
+     relevé par le propriétaire du projet sur son écran.
+
+     Il saisit un féculent à 130 kcal qui gonfle, et l'éditeur affiche en vert
+     « Cohérent ». Puis le serveur refuse l'enregistrement.
+
+     LES DEUX AVAIENT RAISON, ET C'ÉTAIT LE PROBLÈME. `controler()` ne compare
+     que la somme d'Atwater aux calories déclarées : 130 contre 125,5, c'est
+     cohérent. Mais `verifierAliment()` sait en plus qu'un grain sec fait au
+     moins 300 kcal, qu'on ne met pas 110 g de nutriments dans 100 g, et qu'une
+     énergie peut être des kilojoules — et cet écran ne l'appelait PAS. Il
+     jugeait avec la moitié de ce que l'application sait.
+
+     CE N'EST PAS UN JUGE DE PLUS. `verifierAliment` existe déjà et est
+     verrouillé sur le serveur par `api/regles/coherence.json` : l'écran cesse
+     simplement de s'en priver. On ne montre que les BLOCAGES — ceux que le
+     serveur refusera vraiment ; ses avertissements restent des
+     avertissements. */
+  const refus: Anomalie[] = macrosLisibles
+    ? verifierAliment({
+        id: 0, nom: a.nom, categorie: a.categorie,
+        kcal100: a.kcal100, prot100: a.prot100, gluc100: a.gluc100,
+        lip100: a.lip100, fibres100: a.fibres100, ratio: a.ratio,
+      } as Aliment).filter((x: Anomalie) => x.gravite === 'blocage')
+    : [];
+
   const valide = a.nom.trim() !== ''
     && macrosLisibles
     && a.kcal100 > 0
     && rendementPossible(a.categorie, a.ratio)
-    && controle.verdict !== 'incoherent';
+    && controle.verdict !== 'incoherent'
+    /* Le bouton s'éteint sur ce que le serveur refuserait : partir pour
+       revenir avec un 422 fait perdre la saisie de vue. */
+    && refus.length === 0;
 
   const couleurVerdict = {
     coherent: C.ok, ecart: C.vif, incoherent: C.erreur, indecidable: C.attenue,
@@ -449,7 +481,19 @@ export function EditeurAliment({
               )}
 
               {/* ---- contrôle ---- */}
-              {(a.kcal100 > 0 || a.prot100 > 0) && (
+              {refus.length > 0 ? (
+                /* LE REFUS PASSE DEVANT. Afficher « cohérent » au-dessus de
+                   « le serveur va refuser » serait deux réponses à la même
+                   question. */
+                <View style={[s.controle, { borderColor: C.erreur }]}>
+                  {refus.map((x) => (
+                    <Discret key={x.code}
+                      style={{ color: C.erreur, fontSize: T.normal, lineHeight: 18 }}>
+                      {x.message}
+                    </Discret>
+                  ))}
+                </View>
+              ) : (a.kcal100 > 0 || a.prot100 > 0) && (
                 <View style={[s.controle, { borderColor: couleurVerdict }]}>
                   <Discret style={{ color: couleurVerdict, fontSize: T.normal, lineHeight: 18 }}>
                     {controle.message}
