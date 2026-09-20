@@ -6,21 +6,9 @@ import type { Exercice } from '@/api/types';
 import { Bouton, Discret, Texte } from './base';
 import { libelleDuMuscle } from '@/muscles/groupes';
 import { enFrancais, libelle, MATERIELS, SECONDAIRES, ZONES } from '@/muscles/vocabulaire';
+import { identifiantYoutube } from '@/calcul/affichageCourt';
 import { C, E, P, R, T } from '@/theme';
 
-/** Extrait l'identifiant d'une URL YouTube, quelle qu'en soit la forme. */
-export function identifiantYoutube(url: string | null): string | null {
-  if (!url) return null;
-  const motifs = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]{11})/,
-  ];
-  for (const motif of motifs) {
-    const m = motif.exec(url);
-    if (m) return m[1] ?? null;
-  }
-
-  return null;
-}
 
 const lecteur = (id: string) =>
   `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1`;

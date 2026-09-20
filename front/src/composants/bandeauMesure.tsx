@@ -2,7 +2,7 @@ import { useEffect, useReducer } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Discret, Texte } from './base';
 import { Chiffre } from './base';
-import { mmss } from './chronoSerie';
+import { mmss } from '@/calcul/affichageCourt';
 import { useEcranEveille } from './ecranEveille';
 import { abonnerMesure, arreterMesure, cibleMesuree, ecouleMesure } from './etatMesure';
 import { C, E, N, P, R, T, TOUCHE } from '@/theme';

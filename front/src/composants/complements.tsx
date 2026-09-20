@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import {
   useComplements, useEnregistrerComplement, useSupprimerComplement,
 } from '@/api/hooks';
+import { nombreLisible } from '@/calcul/affichageCourt';
 import type { Complement } from '@/api/types';
 import { NOM_REPAS, REPAS, type Repas } from '@/solveur/composer';
 import { Bouton, Champ, Discret, Texte } from './base';
@@ -37,15 +38,6 @@ export function complementsDuRepas(
 /** « 5 g Créatine · 400 mg Magnésium » — la forme courte, pour un rappel. */
 export const resumeComplements = (liste: Complement[]): string =>
   liste.map((c) => `${nombreLisible(c.quantite)} ${c.unite} ${c.nom}`).join(' · ');
-
-/* `quantite` arrive en chaîne décimale — « 5.00 ». L'afficher tel quel donne
-   « 5.00 g de créatine », ce que personne n'écrit. On enlève les zéros
-   inutiles et on rend la virgule française. */
-export function nombreLisible(decimale: string): string {
-  const n = Number(decimale);
-
-  return Number.isFinite(n) ? String(n).replace('.', ',') : decimale;
-}
 
 /**
  * Le rappel court, à poser sous les macros d'un repas.

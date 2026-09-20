@@ -1,13 +1,11 @@
 import { useEffect, useReducer } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { mmss } from '@/calcul/affichageCourt';
 import { Chiffre, Discret, Texte } from './base';
 import {
   type CibleMesure, abonnerMesure, arreterMesure, demarrerMesure, ecouleMesure, mesureSur,
 } from './etatMesure';
 import { C, E, N, P, R, T, TOUCHE } from '@/theme';
-
-export const mmss = (s: number): string =>
-  `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /**
  * Chronomètre qui compte VERS LE HAUT, pour mesurer un effort.

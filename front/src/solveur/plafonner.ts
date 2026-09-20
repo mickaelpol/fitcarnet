@@ -103,10 +103,10 @@ export function ajusterAuStock(
    */
   const choisirReleve = (epuise: Aliment, role: Role | null): Aliment | undefined => {
     const permis = releveDe(epuise);
-    const valable = (c: Aliment | undefined): boolean => c !== undefined
-      && permis.includes(roleDe(c) as Role)
-      && !utilises.has(c.id)
-      && stockDe(c) > 0;
+    /* LA MEME QUESTION QUE L'ECRAN POSE, depuis le 20 septembre 2026 : elle
+       ne s'ecrit plus ici et dans `app/(onglets)/repas.tsx`. */
+    const valable = (c: Aliment | undefined): boolean =>
+      peutPrendreLeRelais(c, permis, utilises, stockDe);
 
     const voulu = role === null ? undefined : releves[role];
     if (valable(voulu)) return voulu;
@@ -254,3 +254,34 @@ export function ajusterAuStock(
 
   return sortie(calculer(cibles, variables, fixes, { glucidesTotaux }));
 }
+
+/**
+ * CE CANDIDAT PEUT-IL PRENDRE LE RELAIS ?
+ *
+ * LA MEME QUESTION POUR LE CALCUL ET POUR L'ECRAN, depuis le 20 septembre 2026
+ * (palier 0). `choisirReleve` ci-dessus la posait pour decider ; `relayeurs`,
+ * dans `app/(onglets)/repas.tsx`, la reposait a la main pour PROPOSER. Le
+ * commentaire de l'ecran promettait pourtant, en majuscules : « LES MEMES
+ * REGLES QUE LE CALCUL, PAS DES REGLES PARALLELES ». Rien ne le garantissait.
+ *
+ * Les deux ensembles d'exclusion coincidaient — verifie — donc il n'y avait
+ * pas de defaut actif. Mais le jour ou `choisirReleve` ajoute un critere,
+ * l'ecran proposerait un relais que le calcul refuse : on appuie, et rien ne
+ * change, sans un mot pour dire pourquoi.
+ *
+ * TROIS CONDITIONS, ET PAS UNE DE PLUS :
+ *   - le role du candidat fait partie de ceux que l'epuise autorise ;
+ *   - il n'est pas deja au menu — il ne peut pas tenir deux lignes a la fois ;
+ *   - il en reste en stock.
+ */
+export const peutPrendreLeRelais = (
+  candidat: Aliment | undefined,
+  permis: readonly Role[],
+  dejaUtilises: ReadonlySet<number | string>,
+  /* Le stock n'est pas porte par l'aliment : il se lit ailleurs selon
+     l'appelant, d'ou ce parametre plutot qu'un acces direct. */
+  stockDe: (a: Aliment) => number,
+): boolean => candidat !== undefined
+  && permis.includes(roleDe(candidat) as Role)
+  && !dejaUtilises.has(candidat.id)
+  && stockDe(candidat) > 0;

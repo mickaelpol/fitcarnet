@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { peutPrendreLeRelais } from '@/solveur/plafonner';
 import { composerLaPeriode } from '@/calcul/composerLaPeriode';
 import { useSupprimerPlan } from '@/api/hooks';
 import type { PlanRepas } from '@/api/hooks';
@@ -368,9 +369,11 @@ export default function Calculateur() {
       ...(compose?.ajouts ?? []).map((a) => a.id),
     ]);
 
-    return stock.filter((a) => permis.includes(roleDe(a) as Role)
-      && !dejaLa.has(a.id)
-      && stockDe(a) > 0);
+    /* LA QUESTION EST CELLE DU SOLVEUR, ET PLUS UNE COPIE. Le commentaire
+       ci-dessus le promettait en majuscules depuis le debut ; rien ne le
+       garantissait. Fusionne le 20 septembre 2026 : `peutPrendreLeRelais` est
+       la fonction meme dont `choisirReleve` se sert pour decider. */
+    return stock.filter((a) => peutPrendreLeRelais(a, permis, dejaLa, stockDe));
   })();
 
   /* UNE SEULE LISTE, parce que la modale ne parle qu'en positions. Ce filtre

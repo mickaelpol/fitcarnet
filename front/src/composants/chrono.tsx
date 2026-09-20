@@ -15,7 +15,7 @@ const PRESETS = [60, 90, 120, 180];
 /* `mmss` VIENT DE `chronoSerie`, il n'est plus réécrit ici — palier 0,
    20 septembre 2026. Les deux écritures étaient identiques ; c'est justement
    ce qui les rendait faciles à laisser diverger. */
-import { mmss } from './chronoSerie';
+import { mmss } from '@/calcul/affichageCourt';
 
 /**
  * Chrono de repos. L'écran reste allumé pendant le décompte : sans ça, le

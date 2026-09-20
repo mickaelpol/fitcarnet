@@ -5,7 +5,7 @@ import {
   basculerGroupe, type Brouillon, corpsAEnvoyer, type Ecarts, ecarts,
   type SaisieExercice, saisieDepuis,
 } from '../muscles/editionExercice';
-import { identifiantYoutube } from './modaleExercice';
+import { identifiantYoutube } from '@/calcul/affichageCourt';
 
 /**
  * L'ÉTAT DE L'ÉDITEUR D'UN EXERCICE. Les règles, elles, sont dans
