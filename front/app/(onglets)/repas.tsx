@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { composerLaPeriode } from '@/calcul/composerLaPeriode';
 import { useSupprimerPlan } from '@/api/hooks';
 import type { PlanRepas } from '@/api/hooks';
 import { Bouton, Carte, Chargement, Discret, Erreur } from '@/composants/base';
@@ -214,35 +215,18 @@ export default function Calculateur() {
 
   /** Compose tous les repas cochés, en évitant de resservir le même aliment. */
   const composerTout = () => {
-    const suite: Record<string, Compose> = {};
-
-    for (const rang of joursRetenus) {
-      /* « Déjà servi » se remet à zéro CHAQUE JOUR. Éviter le poulet deux
-         fois le même jour est un service ; l'éviter toute la semaine serait
-         une contrainte que personne n'a demandée. */
-      const servis = new Set<number | string>();
-
-      for (const repas of REPAS) {
-        const cle = cleDuRepas(rang, repas);
-        if (!coche(rang, repas)) continue;
-        const c = composer(stock, convives(rang, repas), servis, repas);
-
-        const roles: Partial<Record<Role, Aliment>> = {};
-        /* Une variable du solveur peut venir d'un rôle différent : à la
-           collation, c'est le laitage qui porte les protéines. */
-        for (const slot of ['proteine', 'glucide', 'lipide'] as const) {
-          const a = c.variables[slot];
-          if (a) { roles[MODELE[repas][slot]] = a; servis.add(a.id); }
-        }
-        /* Les quantités imposées ne comptent pas dans « déjà servi » :
-           resservir la même huile à tous les repas est normal. */
-        for (const [role, aliment] of Object.entries(c.imposes)) {
-          roles[role as Role] = aliment;
-        }
-
-        suite[cle] = { roles, restes: {}, verrous: [], ajouts: [], releves: {} };
-      }
-    }
+    /* LES TRENTE-CINQ LIGNES QUI ETAIENT ICI VIVENT DANS
+       `calcul/composerLaPeriode.ts` DEPUIS LE 20 SEPTEMBRE 2026. Elles
+       portaient trois regles metier — dont « deja servi se remet a zero chaque
+       jour » — dans un fichier que `tsconfig.tests.json` n'atteint pas. La
+       declaration de `servis` sortie d'un cran ne cassait rien et privait le
+       quatrieme jour de proteine. */
+    const suite = composerLaPeriode({
+      jours: joursRetenus,
+      stock,
+      convives,
+      coche,
+    });
 
     setPlan(suite);
     setCourses(false);
