@@ -192,10 +192,26 @@ def main() -> None:
 --  L'energie vient de la colonne « Reglement UE N° 1169/2011 » (regle 3), pas
 --  de « N x facteur Jones » qui se trompe de convention.
 --
---  IDEMPOTENT : rejoue a chaque demarrage par entrypoint-prod.sh.
+--  IDEMPOTENT PAR MISE A JOUR, ET SURTOUT PAS PAR TRUNCATE.
+--
+--  La premiere version commencait par `TRUNCATE aliment_reference`. Elle a
+--  MIS LA PRODUCTION A TERRE le 20 septembre 2026 :
+--
+--      ERROR: cannot truncate a table referenced in a foreign key constraint
+--      DETAIL: Table "aliment" references "aliment_reference".
+--
+--  Des que la migration 41 pose la cle etrangere depuis `aliment`, le TRUNCATE
+--  devient impossible. Ca passait en developpement parce que le contenu y
+--  avait ete charge AVANT cette migration — jamais dans l'ordre reel.
+--
+--  ET ON NE SUPPRIME RIEN, MEME AVEC CASCADE. `aliment.reference_ciqual` est
+--  en `ON DELETE SET NULL` : effacer une ligne d'ici detacherait en silence
+--  l'aliment de quelqu'un. Une edition CIQUAL qui retire un code laisse donc
+--  sa ligne en place — inutile, inoffensive, et personne ne perd son
+--  rattachement.
+--
+--  Rejoue a chaque demarrage par entrypoint-prod.sh.
 -- ---------------------------------------------------------------------
-
-TRUNCATE aliment_reference;
 
 INSERT INTO aliment_reference
     (code, nom, groupe_code, groupe, sousgroupe_code, sousgroupe,
@@ -203,7 +219,19 @@ INSERT INTO aliment_reference
 VALUES
 """)
         sortie.write(",\n".join(valeurs))
-        sortie.write(";\n")
+        sortie.write("""
+ON CONFLICT (code) DO UPDATE SET
+    nom             = EXCLUDED.nom,
+    groupe_code     = EXCLUDED.groupe_code,
+    groupe          = EXCLUDED.groupe,
+    sousgroupe_code = EXCLUDED.sousgroupe_code,
+    sousgroupe      = EXCLUDED.sousgroupe,
+    kcal100         = EXCLUDED.kcal100,
+    prot100         = EXCLUDED.prot100,
+    gluc100         = EXCLUDED.gluc100,
+    lip100          = EXCLUDED.lip100,
+    fibres100       = EXCLUDED.fibres100;
+""")
 
     print(f"  {SORTIE.relative_to(RACINE)} : {len(valeurs)} aliments, "
           f"{SORTIE.stat().st_size // 1024} Ko")
