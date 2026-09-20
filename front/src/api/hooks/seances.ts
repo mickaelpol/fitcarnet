@@ -5,7 +5,14 @@ import { useMemo } from 'react';
 /* Les réductions d'historique vivent dans `calcul/`, éprouvées : la formule
    d'Epley était recopiée ici DEUX fois, dont une sans son plafond, et l'écran
    de séance comparait les deux. */
-import { historiqueParExercice, recordsAnterieurs } from '@/calcul/historiqueSeances';
+/* CHEMIN RELATIF, PAS L'ALIAS `@/`. Il etait ecrit `@/calcul/historiqueSeances`
+   et c'etait inoffensif tant qu'aucun test ne remontait jusqu'ici : `npm test`
+   compile vers `dist-tests/` sans reecrire l'alias, et un import de VALEUR y
+   tombe sur « Cannot find module ». Releve par la revue du 20 septembre 2026,
+   le meme jour ou le piege a mordu pour de bon dans `calcul/resumeBoite.ts`. */
+import {
+  derniereFoisParExercice, historiqueParExercice, recordsAnterieurs,
+} from '../../calcul/historiqueSeances';
 import { api, membres } from '../client';
 import { idDe, type Modele, type Seance } from '../types';
 import { modeleEnEcriture, nombreEnTexte, seanceEnEcriture } from './decimales';
@@ -49,27 +56,18 @@ export function useRecordsAnterieurs(dateExclue?: string) {
 export function useDerniereFois(dateExclue?: string) {
   const seances = useSeances();
 
-  // Memoise pour la meme raison que `useRecordsAnterieurs`, et il y a un tri
-  // en plus : sans cela, l'historique entier est re-trie a chaque frappe.
-  const parExercice = useMemo(() => {
-    const acc = new Map<number, { reps: number | null; poids: number | null; secondes: number | null }[]>();
+  /* LA TROISIEME REDUCTION EST DESCENDUE LE 20 SEPTEMBRE 2026. Elle etait
+     ecrite ici, dans ce `useMemo`, avec trois regles metier en clair — la
+     borne de date, « la plus recente d'abord », et ce qu'est une serie
+     renseignee. Dans ce fichier, qui importe react-query et React Native,
+     rien ne pouvait les eprouver. L'en-tete de ce module le dit depuis le
+     15 septembre ; ses deux soeurs etaient parties, pas elle.
 
-    const triees = [...(seances.data ?? [])]
-      .filter((s) => dateExclue === undefined || s.date.slice(0, 10) < dateExclue.slice(0, 10))
-      .sort((a, b) => b.date.localeCompare(a.date));
-
-    for (const s of triees) {
-      for (const bloc of s.exercices) {
-        const idExercice = idDe(bloc.exercice);
-        if (acc.has(idExercice)) continue;   // la plus récente d'abord
-        const series = bloc.series
-          .filter((x) => x.reps !== null || x.poids !== null || x.secondes !== null)
-          .map((x) => ({ reps: x.reps, poids: x.poids, secondes: x.secondes }));
-        if (series.length > 0) acc.set(idExercice, series);
-      }
-    }
-    return acc;
-  }, [seances.data, dateExclue]);
+     Le `useMemo` reste, avec les memes dependances : le tri de tout
+     l'historique a chaque frappe est un cout reel. Seul le corps est parti. */
+  const parExercice = useMemo(
+    () => derniereFoisParExercice(seances.data ?? [], dateExclue),
+    [seances.data, dateExclue]);
 
   return { parExercice, pret: !seances.isLoading };
 }

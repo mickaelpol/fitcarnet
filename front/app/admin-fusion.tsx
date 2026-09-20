@@ -5,31 +5,12 @@ import type { Exercice } from '@/api/types';
 import { Bouton, Carte, Chargement, Discret, Texte, Vide } from '@/composants/base';
 import { ChoixDansListe } from '@/composants/choixAliment';
 import { Confirmer } from '@/composants/confirmer';
+import { SEUIL_PROXIMITE, proximite } from '@/calcul/proximite';
 import { libelle, ZONES } from '@/muscles/vocabulaire';
 import { C, E, P, R, T } from '@/theme';
 
-/** Distance de Levenshtein, pour proposer les correspondances probables. */
-function proximite(a: string, b: string): number {
-  const x = a.toLowerCase();
-  const y = b.toLowerCase();
-  if (x === y) return 1;
-  if (x.includes(y) || y.includes(x)) return 0.9;
-
-  const m: number[][] = Array.from({ length: x.length + 1 }, () => new Array<number>(y.length + 1).fill(0));
-  for (let i = 0; i <= x.length; i++) m[i]![0] = i;
-  for (let j = 0; j <= y.length; j++) m[0]![j] = j;
-  for (let i = 1; i <= x.length; i++) {
-    for (let j = 1; j <= y.length; j++) {
-      m[i]![j] = Math.min(
-        m[i - 1]![j]! + 1,
-        m[i]![j - 1]! + 1,
-        m[i - 1]![j - 1]! + (x[i - 1] === y[j - 1] ? 0 : 1),
-      );
-    }
-  }
-
-  return 1 - m[x.length]![y.length]! / Math.max(x.length, y.length);
-}
+/** Le nom qu'on montre, et donc le seul qu'on doit comparer. */
+const nomAffiche = (e: Exercice): string => e.nomFr ?? e.nom;
 
 /**
  * Fusion de deux exercices.
@@ -52,26 +33,46 @@ export default function AdminFusion() {
   const suggestions = useMemo(() => {
     if (!ancien) return [];
 
+    /* LE MEME NOM DES DEUX COTES. On lisait ici `ancien.nom` — l'anglais —
+       contre `e.nomFr ?? e.nom` — le francais. `29-noms-francais.sql`
+       renseigne `nom_fr` pour 1314 des 1318 exercices importes et laisse `nom`
+       en anglais : l'ecran comparait « barbell incline bench press » a 1314
+       noms francais, et ne proposait que du bruit. Deux lignes plus bas, le
+       meme ecran affichait pourtant `ancien.nomFr ?? ancien.nom`. Corrige le
+       20 septembre 2026 ; le cas perso -> catalogue marchait, francais des
+       deux cotes, et c'est ce qui rendait la panne invisible a l'essai. */
     return (exercices.data ?? [])
       .filter((e) => e.id !== ancien.id)
-      .map((e) => ({ e, score: proximite(ancien.nom, e.nomFr ?? e.nom) }))
-      .filter((x) => x.score > 0.45)
+      .map((e) => ({ e, score: proximite(nomAffiche(ancien), nomAffiche(e)) }))
+      .filter((x) => x.score > SEUIL_PROXIMITE)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
   }, [ancien, exercices.data]);
+
+  /* MEMOISE, ET AU-DESSUS DES RETOURS ANTICIPES. Ce tableau etait construit
+     dans le corps du rendu, plus bas : un tableau NEUF a chaque frappe, donc
+     le `useMemo` de `ChoixDansListe` refiltrait les 1338 exercices a chaque
+     caractere, modale fermee comprise. Meme correctif que `seance/[id].tsx:62`
+     et `modele/[id].tsx:70` — ce troisieme frere avait ete oublie. */
+  const elements = useMemo(
+    () => (exercices.data ?? []).map((e) => ({
+      id: e.id,
+      nom: nomAffiche(e),
+      detail: `${e.source === 'perso' ? "★ ajouté dans l'app · " : ''}`
+        + `${e.partieCorps ? libelle(ZONES, e.partieCorps) : ''}`,
+      couleur: e.source === 'perso' ? C.vif : C.ligne,
+      /* Comme chez les deux freres : c'est ce champ qui fait apparaitre les
+         vignettes de muscles. Sans lui, cet ecran etait le seul selecteur ou
+         il fallait chercher parmi 1338 entrees au mot seul. */
+      muscle: e.muscleCible ?? null,
+    })),
+    [exercices.data],
+  );
 
   if (moi.isLoading || exercices.isLoading) return <Chargement />;
   if (!moi.data?.roles?.includes('ROLE_ADMIN')) {
     return <Vide message="Cet écran est réservé à l'administrateur." />;
   }
-
-  const elements = (exercices.data ?? []).map((e) => ({
-    id: e.id,
-    nom: e.nomFr ?? e.nom,
-    detail: `${e.source === 'perso' ? "★ ajouté dans l'app · " : ''}`
-      + `${e.partieCorps ? libelle(ZONES, e.partieCorps) : ''}`,
-    couleur: e.source === 'perso' ? C.vif : C.ligne,
-  }));
 
   return (
     <ScrollView contentContainerStyle={s.page}>
@@ -84,7 +85,7 @@ export default function AdminFusion() {
         <Discret style={s.etiquette}>Exercice à remplacer</Discret>
         <Pressable onPress={() => setChoix('ancien')} style={s.choix}>
           <Texte style={{ flex: 1 }} numberOfLines={1}>
-            {ancien ? (ancien.nomFr ?? ancien.nom) : 'Choisir…'}
+            {ancien ? nomAffiche(ancien) : 'Choisir…'}
           </Texte>
           <Discret>▾</Discret>
         </Pressable>
@@ -102,7 +103,7 @@ export default function AdminFusion() {
           {suggestions.map(({ e, score }) => (
             <Pressable key={e.id} onPress={() => setNouveau(e)} style={s.suggestion}>
               <Texte style={{ flex: 1, fontSize: T.normal }} numberOfLines={1}>
-                {e.nomFr ?? e.nom}
+                {nomAffiche(e)}
               </Texte>
               <Discret style={{ fontSize: T.petit }}>{Math.round(score * 100)} %</Discret>
             </Pressable>
@@ -114,7 +115,7 @@ export default function AdminFusion() {
         <Discret style={s.etiquette}>Remplacé par</Discret>
         <Pressable onPress={() => setChoix('nouveau')} style={s.choix}>
           <Texte style={{ flex: 1 }} numberOfLines={1}>
-            {nouveau ? (nouveau.nomFr ?? nouveau.nom) : 'Choisir…'}
+            {nouveau ? nomAffiche(nouveau) : 'Choisir…'}
           </Texte>
           <Discret>▾</Discret>
         </Pressable>
@@ -160,7 +161,7 @@ export default function AdminFusion() {
         visible={confirmer}
         titre="Fusionner ces exercices ?"
         message={`« ${ancien?.nom ?? ''} » sera remplacé partout par `
-          + `« ${nouveau?.nomFr ?? nouveau?.nom ?? ''} », puis supprimé. `
+          + `« ${nouveau ? nomAffiche(nouveau) : ''} », puis supprimé. `
           + 'Ton historique est conservé, mais l\'opération est définitive.'}
         libelle="Fusionner"
         onConfirmer={() => {
