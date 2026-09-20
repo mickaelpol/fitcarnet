@@ -8,6 +8,7 @@ import type { AlimentAMigrer } from '@/api/types';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte, Titre } from '@/composants/base';
 import { ChampRattachement } from '@/composants/champRattachement';
 import { Confirmer } from '@/composants/confirmer';
+import { avancementMigration, restantsAMigrer } from '@/calcul/migrationGrocy';
 import { nombreSaisi } from '@/calcul/saisieNombre';
 import { C, E, R, T, nb } from '@/theme';
 
@@ -47,9 +48,15 @@ export default function MigrationGrocy() {
   }
 
   const donnees = etat.data;
-  const faits = new Set(donnees?.dejaEnBase ?? []);
   const tous = donnees?.aRattacher ?? [];
-  const restants = tous.filter((a) => !faits.has(a.nom));
+  /* LA COMPARAISON DES NOMS VIT DANS `calcul/migrationGrocy`, depuis le
+     20 septembre 2026 — en pleine migration réelle. Elle était écrite ici, en
+     une ligne, et ignorait le `trim()` que le serveur fait à l'écriture : un
+     produit Grocy nommé « Oasis sorbet » avec une espace finale revenait dans
+     la liste après avoir été rempli, indéfiniment. Et le compteur annonçait
+     « 62 sur 62 » en additionnant les lignes de la base. */
+  const restants = restantsAMigrer(tous, donnees?.dejaEnBase ?? []);
+  const avancement = avancementMigration(tous, donnees?.dejaEnBase ?? []);
 
   if (donnees?.source === 'base') {
     return (
@@ -80,7 +87,7 @@ export default function MigrationGrocy() {
 
       <Carte style={{ gap: E.s }}>
         <Texte>
-          {faits.size} sur {tous.length} aliments sont passés dans la base.
+          {avancement.faits} sur {avancement.total} aliments sont passés dans la base.
         </Texte>
         {/* PAS DE MARKDOWN DANS DU JSX. Écrit `**Rien n'est supprimé**` d'abord,
             et les astérisques s'affichaient telles quelles à l'écran — vu dans
@@ -119,10 +126,12 @@ export default function MigrationGrocy() {
 
       {/* CE QUI EST DÉJÀ PASSÉ RESTE VISIBLE, et c'est voulu : voir la liste
           fondre est ce qui rend une soirée de saisie tenable. */}
-      {faits.size > 0 && (
+      {avancement.faits > 0 && (
         <Discret style={s.aide}>
-          Déjà dans la base : {[...faits].slice(0, 8).join(', ')}
-          {faits.size > 8 ? `… et ${faits.size - 8} autres` : ''}.
+          Déjà dans la base : {tous.filter((a) => !restants.includes(a))
+            .slice(0, 8).map((a) => a.nom.trim())
+            .join(', ')}
+          {avancement.faits > 8 ? `… et ${avancement.faits - 8} autres` : ''}.
         </Discret>
       )}
 
