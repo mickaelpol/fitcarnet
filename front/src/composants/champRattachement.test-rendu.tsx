@@ -67,6 +67,29 @@ describe('rattacher un aliment au catalogue', () => {
       'il faut dire que l\'aliment s\'enregistre quand même');
   });
 
+  it('NE PRÉ-REMPLIT PAS le champ avec le nom : il le PROPOSE', (t: TestContext) => {
+    t.after(cleanup);
+    /* Mesure du 20 septembre 2026, sur le vrai écran : le nom tapé servait
+       d'invite au champ de rattachement. Quelqu'un tape « sqdkjqlkmd » dans
+       « Nom », le voit apparaître grisé sous « Ça ressemble à », croit le champ
+       rempli — et ne comprend pas que rien ne se cherche. Relevé :
+
+           invite du champ  : "sqdkjqlkmd"
+           contenu réel     : ""
+
+       Une invite décrit ce qu'on attend, elle ne propose pas une valeur. */
+    let demande = '';
+    render(<ChampRattachement {...BASE} nomAliment="Poulet rôti"
+      onRecherche={(q) => { demande = q; }} />);
+
+    const champ = screen.getByPlaceholderText(/poulet, riz, yaourt/);
+    assert.equal((champ as HTMLInputElement).value, '',
+      'le champ doit rester vide tant que personne n\'a rien tapé dedans');
+
+    fireEvent.click(screen.getByText(/Chercher « Poulet rôti »/));
+    assert.equal(demande, 'Poulet rôti', 'le raccourci remplit VRAIMENT le champ');
+  });
+
   it('se tait tant que la recherche est trop courte', (t: TestContext) => {
     t.after(cleanup);
     /* Le serveur ne cherche pas en dessous de deux caractères. Annoncer

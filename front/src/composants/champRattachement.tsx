@@ -85,12 +85,34 @@ export function ChampRattachement({
         etiquette="Ça ressemble à"
         valeur={recherche}
         onChange={onRecherche}
-        placeholder={nomAliment.trim() === '' ? 'poulet, riz, yaourt…' : nomAliment}
+        placeholder="poulet, riz, yaourt…"
       />
       <Discret style={s.aide}>
         Ce que c'est, en général — pas la marque. Ça sert à savoir à quel repas
         l'aliment convient. Tes valeurs, elles, restent celles de ton paquet.
       </Discret>
+
+      {/* PARTIR DU NOM DÉJÀ TAPÉ, MAIS EN LE DEMANDANT.
+          La première écriture mettait ce nom en INVITE du champ — le texte
+          grisé. Mesuré le 20 septembre 2026 : quelqu'un tape « poulet » dans
+          « Nom », voit « poulet » apparaître sous « Ça ressemble à », croit le
+          champ rempli, et ne comprend pas pourquoi rien ne se cherche. Le
+          champ était vide ; c'est l'invite qui mentait.
+
+          Une invite décrit ce qu'on ATTEND, elle ne propose pas une valeur.
+          Le raccourci est donc un bouton : un geste, visible, qui remplit
+          vraiment le champ. */}
+      {recherche.trim() === '' && nomAliment.trim() !== '' && (
+        <Pressable
+          onPress={() => onRecherche(nomAliment.trim())}
+          style={s.raccourci}
+          accessibilityRole="button"
+        >
+          <Discret style={{ color: C.vif }}>
+            Chercher « {nomAliment.trim()} »
+          </Discret>
+        </Pressable>
+      )}
 
       {resultats.map((r) => (
         <Pressable
@@ -165,6 +187,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.ligne, borderRadius: R.m, padding: E.m,
   },
   changer: { minHeight: TOUCHE, justifyContent: 'center', paddingHorizontal: E.s },
+  raccourci: { minHeight: TOUCHE, justifyContent: 'center' },
   ligne: {
     flexDirection: 'row', alignItems: 'center', gap: E.s,
     minHeight: TOUCHE, paddingVertical: E.xs, paddingHorizontal: E.m,
