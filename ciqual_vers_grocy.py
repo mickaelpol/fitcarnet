@@ -576,7 +576,7 @@ def candidats_pour(aliments, motifs: str, combien: int = 6):
 
 # Bande dans laquelle tombe toute cereale ou legumineuse SECHE : c'est de la
 # matiere seche, et la matiere seche fait 300 a 400 kcal aux 100 g. Toujours.
-# Meme borne que `front/src/calcul/plausibilite.ts` — si tu la changes ici,
+# Meme borne que `api/src/Service/AnomaliesAliment.php` — si tu la changes ici,
 # change-la la-bas.
 #
 # CE COUPLE ETAIT DEFINI DEUX FOIS dans ce fichier, ici et juste avant
@@ -621,7 +621,7 @@ def sens_du_rendement(categorie: str, ratio: float):
 
     CETTE FONCTION DISAIT « MEME REGLE QUE L'API », ET C'ETAIT FAUX sur un
     point : le cas `leg` manquait. Un legume a 1,5 passait ici, quand l'ecran
-    (`plausibilite.ts`), l'API (`RendementPlausible::sens`) et la contrainte
+    l'API (`RendementPlausible::sens`) et la contrainte
     `aliment_ratio_sens` le refusent tous les trois. Releve par la revue le
     16 septembre 2026, ajoute le meme jour.
 

@@ -85,9 +85,10 @@ const CAPTURES = [
      exact de `08-repas-cuissons.jpg`. Deux images identiques nommées comme
      deux fonctionnalités différentes, c'est une image qui ment, et c'est
      précisément ce que ce script existe pour empêcher.
-     Le contrôle de cohérence vit dans l'éditeur d'aliment — seul appelant de
-     `rendementPossible` dans tout le front (`editeurAliment.tsx:15`). On va
-     donc l'y chercher, par le chemin de l'utilisateur. */
+     Le contrôle de cohérence s'AFFICHE dans l'éditeur d'aliment, mais il se
+     DÉCIDE sur le serveur depuis le 20 septembre 2026 : l'éditeur envoie la
+     saisie à `POST /api/verification/aliment` et affiche ce qui revient. Le
+     chemin filmé, lui, n'a pas changé — c'est celui de l'utilisateur. */
   { fichier: '14-garde-fou-donnees.jpg',
     legende: "Le contrôle de cohérence permanent des valeurs, dans l'éditeur d'aliment",
     aller: async (p) => {

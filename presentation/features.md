@@ -22,7 +22,8 @@ Inventaire établi le 14 septembre 2026 par exploration systématique du code.
 > jour-là — `Aliment.php`, `Exercice.php`, `FrigoController.php`,
 > `ComptesController.php`, `ProtectionDuCompte.php`,
 > `AlimentSuppressionProcessor.php`, `editeurAliment.tsx`,
-> `admin-utilisateurs.tsx`, `nutrition.ts`, `plausibilite.ts`, `planCoach.ts`,
+> `admin-utilisateurs.tsx`, `nutrition.ts`, `plausibilite.ts` *(supprimé le
+> 21 septembre 2026 ; ses renvois pointent désormais `AnomaliesAliment.php`)*, `planCoach.ts`,
 > `solveur.ts` — ont été rouverts et recalés un par un. Les autres restent
 > périmés.
 
@@ -436,9 +437,9 @@ Ces garanties sont **éprouvées par test de propriétés** — 250 frigos aléa
 
 - **Système singulier** — « Ces aliments se ressemblent trop pour que le calcul fonctionne. Choisis-en un plus riche en protéines, un plus riche en féculents et un plus gras. » `solveur.ts:199`
 - **Lipides incompressibles** — « Trop gras de X g… sans le moindre oléagineux. Choisis une viande ou un poisson plus maigre. » `solveur.ts:363`
-- **Valeurs déjà cuites détectées** — bande physique du grain sec, 300 à 400 kcal/100 g, avec la correction chiffrée complète. `plausibilite.ts:244`
-- **Féculent qui rétrécit** — « un féculent absorbe de l'eau, il ne peut pas peser moins cuit que sec. Ce n'est pas une cuisson inhabituelle, c'est impossible. » `plausibilite.ts:349`
-- **Plus de 100 g de nutriments dans 100 g de produit.** `plausibilite.ts:215`
+- **Valeurs déjà cuites détectées** — bande physique du grain sec, 300 à 400 kcal/100 g, avec la correction chiffrée complète. `AnomaliesAliment.php`
+- **Féculent qui rétrécit** — « un féculent absorbe de l'eau, il ne peut pas peser moins cuit que sec. Ce n'est pas une cuisson inhabituelle, c'est impossible. » `AnomaliesAliment.php`
+- **Plus de 100 g de nutriments dans 100 g de produit.** `AnomaliesAliment.php`
 - **Soupçon de kilojoules** — deux détections, le plafond de 900 kcal et le rapport 4,184 aux macros. `nutrition.ts:158`
 - **Apport négligeable** — « X ne pèse quasiment rien ici (1,0 g, soit 0,3 g de protéines). Retire-le, ou réduis ce que tu as déjà mis. » `solveur.ts:464`
 - **Rendement à contresens** — une viande qui gagnerait du poids, un féculent qui en perdrait. `RendementPlausible.php:255`

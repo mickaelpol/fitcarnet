@@ -141,10 +141,12 @@ quantités décimales, et **laisse deux aliments à zéro**
    (`AlimentProcessor.php:39-44`, index `aliment_nom_unique_par_compte`). Le
    même nom dans un **autre** compte passe.
 
-6. **L'enregistrement est BLOQUÉ sur « incohérent ».** `valide` exige à la fois
-   un nom non vide, **les quatre macros lisibles**, `kcal100 > 0`, un rendement
-   possible pour la catégorie (`rendementPossible`), et
-   `controle.verdict !== 'incoherent'` (`editeurAliment.tsx:236-240`). Le verdict passe à `incoherent` au-delà de
+6. **L'enregistrement est BLOQUÉ sur « incohérent ».** Depuis le 20 septembre
+   2026, ce n'est plus l'écran qui décide : il envoie la saisie à
+   `POST /api/verification/aliment` et lit `enregistrable`. Le serveur exige un
+   nom non vide, les quatre macros lisibles, `kcal100 > 0`, une catégorie
+   connue, un rendement possible pour cette catégorie, et un verdict qui ne
+   soit pas `incoherent` (`api/src/Service/VerdictAliment.php`). Le verdict passe à `incoherent` au-delà de
    **30 %** d'écart (`nutrition.ts:108`).
    **Et le bouton ne se désactive pas en silence** : « Renseigne les quatre
    valeurs — écris 0 si l'aliment n'en contient pas. » (`editeurAliment.tsx:342-346`).
@@ -173,8 +175,9 @@ quantités décimales, et **laisse deux aliments à zéro**
    (2,3) » et se désactive en « **Ces deux poids sont inversés : ce produit ne
    peut pas varier ainsi** » quand la mesure contredit la catégorie : un
    féculent ne pèse pas moins cuit que cru, une protéine ou un légume cuit ne
-   dépasse pas 1,05 fois son poids cru (`rendementPossible`, `front/src/calcul/plausibilite.ts:149-155`,
-   `editeurAliment.tsx:476-481`). **Refus** : `nombreSaisi` et non `parseFloat` —
+   dépasse pas 1,05 fois son poids cru. La règle est sur le SERVEUR depuis le
+   20 septembre 2026 — `api/src/Service/RendementPlausible.php::sens`, servie
+   par `POST /api/verification/aliment` ; l'écran affiche ce qui revient. **Refus** : `nombreSaisi` et non `parseFloat` —
    « 4,2,1 » ne produit aucun ratio (`editeurAliment.tsx:227-229`).
 
 10. **Un aliment créé appartient à son compte.** Après création, en base :
@@ -359,10 +362,10 @@ La frappe à 60 ms par caractère et les temps morts volontaires viennent de
 - **Le contrôle de cohérence est un garde-fou, pas une garantie** : « un aliment
   sans macros et sous 900 kcal passera entre les mailles »
   (`front/src/calcul/nutrition.ts:155-156`).
-- **Les contrôles de `plausibilite.ts` ne s'affichent pas dans cet écran.** Le
+- **Les anomalies du serveur ne s'affichent pas dans cet écran.** Le
   refus des valeurs déjà cuites, du féculent qui rétrécit et des « plus de 100 g
   de nutriments dans 100 g » vit dans l'onglet **Repas**, au paramétrage
-  (`front/src/calcul/plausibilite.ts:185`, affichage
+  (`api/src/Service/AnomaliesAliment.php`, affichage
   `front/src/composants/etapeReglage.tsx:483-523`). Ne pas le chercher ici.
 - **`presentation/features.md` (section B) est périmé sur ses `fichier:ligne`.**
   Il cite `frigo.tsx:222`, `:635`, `:644`, `:658`, `:669`, `:702`, `:730` — or le

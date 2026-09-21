@@ -308,11 +308,12 @@ export const resumeRatio = (ratio: number): string =>
 
      - une vraie mesure d'épinard (500 g crus → 160 g cuits, soit 0,32) était
        REFUSÉE par l'éditeur, avec un message affirmant qu'elle n'était pas
-       vraisemblable — alors que `plausibilite.ts` la déclare légitime ;
+       vraisemblable — alors que la bande des légumes la déclare légitime ;
      - un féculent à 0,8 était ACCEPTÉ, puis rejeté par la contrainte `CHECK` de
        la base : l'utilisateur recevait un HTTP 500 portant le SQL brut.
 
-   La règle vit désormais dans `calcul/plausibilite.ts` sous le nom
+   La règle vit désormais sur le SERVEUR, dans
+   `api/src/Service/RendementPlausible.php::sens`, sous le nom
    `rendementPossible`, au même endroit que les bandes de rendement, et elle dit
    exactement ce que disent l'API (`RendementPlausible::sens`) et la base
    (`aliment_ratio_sens`) : un féculent absorbe de l'eau, une protéine et un

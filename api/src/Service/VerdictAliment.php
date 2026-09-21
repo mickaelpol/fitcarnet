@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Aliment;
+
 /**
  * TOUT CE QUE L'ECRAN DOIT DIRE D'UN ALIMENT EN COURS DE SAISIE.
  *
@@ -30,9 +32,6 @@ namespace App\Service;
  */
 final class VerdictAliment
 {
-
-
-
     /**
      * Plafond physique pour 100 g : rien n'est plus dense que la matiere
      * grasse pure, a 9 kcal par gramme. Au-dela, la valeur saisie ne peut pas
@@ -59,10 +58,26 @@ final class VerdictAliment
      */
     public static function pour(array $saisie): array
     {
-        $refus = [];
         $avertissements = [];
 
         $categorie = \trim((string) ($saisie['categorie'] ?? ''));
+
+        /* UNE CATEGORIE QUE LA BASE REFUSERA N'EST PAS ENREGISTRABLE, et
+           l'ecran doit le savoir AVANT d'allumer son bouton — 21 septembre
+           2026. `categorie: "zzz"` rendait `enregistrable: true` pendant que
+           `POST /api/aliments` repondait 422 (`Assert\Choice`). Inatteignable
+           par l'interface, qui choisit dans une liste ; mais le but de la
+           refonte est qu'un AUTRE front obtienne la meme reponse sans avoir a
+           connaitre les huit valeurs.
+
+           LA LISTE EST CELLE DE L'ENTITE, pas une copie : une neuvieme
+           categorie ajoutee la-bas passe ici sans qu'on y pense. */
+        $refus = [];
+        if ('' !== $categorie && !\in_array($categorie, Aliment::CATEGORIES, true)) {
+            $refus[] = ['champ' => 'categorie', 'message' => \sprintf(
+                '« %s » n\'est pas une catégorie connue.', $categorie)];
+        }
+
         $lus = [];
         foreach (['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100', 'ratio'] as $champ) {
             $brut = $saisie[$champ] ?? null;

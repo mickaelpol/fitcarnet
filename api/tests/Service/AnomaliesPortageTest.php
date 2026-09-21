@@ -10,7 +10,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * LE PORTAGE DIT-IL EXACTEMENT LA MEME CHOSE QUE LE FRONT ?
  *
- * `AnomaliesAliment` est la traduction de `front/src/calcul/plausibilite.ts`,
+ * `AnomaliesAliment` est la traduction de `front/src/calcul/plausibilite.ts`
+ * — supprime le 21 septembre 2026, avec le generateur du corpus ci-dessous ;
+ * le corpus fige reste, mais il n'est plus regenerable, et c'est assume —
  * ecrite le 20 septembre 2026 pour que le metier vive sur le serveur : « comme
  * ca je peux changer le front quand bon me semble ».
  *

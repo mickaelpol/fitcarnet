@@ -70,8 +70,9 @@ somme « coefficient × grammes » s'écrivait quatre fois en entier
 `carteRepas.tsx` — celle-là trouvée par le test de garde ; coefficients importés,
 mais fibres inconnues traitées à la façon de chacun.
 Elle vit maintenant dans **`kcalDesGrammes`** (`src/calcul/nutrition.ts:45-51`) ;
-`controler`, `kcalDesMacros`, `kcalAtwater`, `planCoach.ts` et `carteRepas.tsx`
-l'appellent. **`src/calcul/formuleUnique.test.ts` refuse toute multiplication
+`controler`, `kcalDesMacros`, `planCoach.ts` et `carteRepas.tsx` l'appellent.
+*(`kcalAtwater` vivait dans `plausibilite.ts`, supprimé le 21 septembre 2026
+avec le reste de l'ancien juge du front.)* **`src/calcul/formuleUnique.test.ts` refuse toute multiplication
 par un coefficient `KCAL_…` ailleurs**, dans `src/` comme dans `app/`,
 commentaires exclus — avec un témoin qui vérifie que le motif reconnaît bien la
 formule de référence.

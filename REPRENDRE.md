@@ -118,6 +118,32 @@ test** (2 000 ms) qui rejetait, pas le signal, et son message ne contenait pas
 non plus la phrase interdite. Un test vert sur un défaut présent. Il mesure
 désormais le temps écoulé et exige moins de 500 ms.
 
+### Le nettoyage du 21 septembre (soir)
+
+- **`plausibilite.ts` et son générateur sont supprimés** — 573 lignes.
+  Vérifié avant : *rien* ne les importait hors leur lien mutuel. Conséquence
+  assumée : `api/tests/corpus/anomalies-reference.json.gz` reste valable mais
+  n'est **plus régénérable**, ce que son propre en-tête prévoyait.
+- **Vingt-cinq renvois au présent** corrigés — dans les skills (qui pilotent les
+  agents), `CALCULATEUR.md`, `presentation/`, `ciqual_vers_grocy.py`,
+  `db/manuel/25-garde-fous.sql`, `capturer.mjs`. Quatre étaient **déjà faux
+  avant** la suppression.
+- **Une catégorie inconnue est maintenant refusée par l'écran aussi.**
+  `categorie: "zzz"` rendait `enregistrable: true` pendant que
+  `POST /api/aliments` répondait 422. C'était le seul cas où l'écran promettait
+  ce que le serveur allait refuser.
+- **`EcranEtEcritureDAccordTest`** verrouille l'invariant sur les 7 808 cas
+  lisibles du corpus : *si l'écran dit « enregistrable », l'écriture passe*.
+  Mesuré, 0 contre-exemple.
+
+**Ce qui N'A PAS été changé, et pourquoi.** L'entité accepte 2 096 cas que
+l'écran refuse. J'ai failli « aligner » — c'eût été une faute : ces cas sont des
+croisements que le corpus fabrique exprès (du « Pastis » rangé en protéines avec
+un rendement de 0,2). Sur de vraies valeurs, l'écran accepte le pastis, le vin,
+le vinaigre et le cidre. Rendre l'entité aussi stricte ramenait exactement la
+régression du 20 septembre — **un serveur qui refuse le vin**. L'asymétrie est
+délibérée, et un seul sens compte : celui que le test garde.
+
 ### Ce qui reste ouvert
 
 - **La famille `/api/mon-frigo/*` n'est pas dans OpenAPI** : ce sont des

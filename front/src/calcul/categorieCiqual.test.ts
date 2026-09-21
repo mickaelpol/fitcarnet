@@ -8,7 +8,7 @@ import { categorieDepuisCiqual } from './categorieCiqual';
  *
  * Onze correspondances, écrites dans `app/migration-grocy.tsx` — donc
  * intestables. Ce qu'elles décident n'est pas cosmétique : la catégorie fixe
- * le RÔLE de l'aliment dans le calculateur, et `plausibilite.ts` s'en sert
+ * le RÔLE de l'aliment dans le calculateur, et le serveur s'en sert
  * pour juger un rendement cru/cuit. Une catégorie devinée de travers classe un
  * aliment dans le mauvais rôle, en silence.
  *

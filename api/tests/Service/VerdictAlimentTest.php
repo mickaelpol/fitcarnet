@@ -122,6 +122,39 @@ final class VerdictAlimentTest extends TestCase
             . 'faute de frappe inexistante');
     }
 
+    public function testUNE_CATEGORIE_INCONNUE_EST_REFUSEE_PAR_L_ECRAN_AUSSI(): void
+    {
+        /* L'ECRAN NE DOIT JAMAIS PROMETTRE CE QUE LE SERVEUR REFUSERA.
+           Mesure le 21 septembre 2026 : `categorie: "zzz"` rendait
+           `enregistrable: true`, bouton allume — et `POST /api/aliments`
+           repondait 422 (`Assert\Choice` sur `Aliment::CATEGORIES`).
+
+           Inatteignable par l'interface, qui choisit dans une liste. Mais le
+           but de la refonte est qu'un AUTRE front obtienne la meme reponse :
+           s'il faut deja connaitre les huit categories pour ne pas se faire
+           refuser, le verdict ne suffit pas, et le front doit rejuger. */
+        $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
+            'lip100' => '0.6', 'categorie' => 'zzz', 'ratio' => '1']);
+
+        self::assertFalse($v['enregistrable']);
+        self::assertStringContainsString('catégorie',
+            \implode(' ', \array_column($v['refus'], 'message')));
+    }
+
+    public function testLES_HUIT_CATEGORIES_REELLES_PASSENT(): void
+    {
+        /* LE TEMOIN. Sans lui, un garde trop strict refuserait tout et
+           passerait le test ci-dessus en rendant l'application inutilisable.
+           On lit la liste de l'entite plutot que de la recopier : une neuvieme
+           categorie ajoutee la-bas doit passer ici sans qu'on y pense. */
+        foreach (\App\Entity\Aliment::CATEGORIES as $categorie) {
+            $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
+                'lip100' => '0.6', 'categorie' => $categorie, 'ratio' => '1']);
+
+            self::assertSame([], $v['refus'], 'la categorie ' . $categorie . ' doit passer');
+        }
+    }
+
     public function testLE_ZERO_RESTE_ACCEPTE(): void
     {
         /* LE TEMOIN du cas ci-dessus. Un garde ecrit `<= 0` refuserait le zero,

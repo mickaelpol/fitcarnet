@@ -155,7 +155,7 @@ Ils viennent de trois endroits, et ne se ressemblent pas.
   être vrais — et un résultat juste sur des chiffres faux reste faux. Corrige-les
   avant de cuisiner. »*, **jusqu'à 6 lignes** puis « … et N autre(s) », et
   **« Corriger dans mon frigo → »** (`etapeReglage.tsx:483-522`). Le contenu
-  vient de `front/src/calcul/plausibilite.ts` — grain sec sous 300 kcal, féculent
+  vient de `api/src/Service/AnomaliesAliment.php` — grain sec sous 300 kcal, féculent
   qui rétrécit, plus de 100 g de nutriments dans 100 g.
 - **Fibres inconnues**, **seulement si une cible est en glucides totaux**
   (`front/src/calcul/planCalcule.ts:123`) : **« Fibres inconnues sur 6
@@ -315,7 +315,7 @@ jetable** (jamais sur une donnée qu'on n'a pas créée) :
 |---|---|
 | `grain_sec_invraisemblable` | un aliment `fec`, rendement `2,3`, **83 kcal/100 g** |
 | `valeurs_deja_cuites` | un aliment `fec`, rendement `3,5`, **99 kcal/100 g** (350 une fois multiplié) |
-| `feculent_qui_retrecit` | un aliment `fec` avec un rendement **`0,41`** — **impossible à créer sur un compte tenu en base** : l'éditeur (`rendementPossible`), l'API (`RendementPlausible::sens`) et la base (`aliment_ratio_sens`) refusent un féculent sous 1. Seul un produit Grocy peut le porter |
+| `feculent_qui_retrecit` | un aliment `fec` avec un rendement **`0,41`** — **impossible à créer sur un compte tenu en base** : l'API (`RendementPlausible::sens`, qui répond aussi à l'éditeur depuis le 20 septembre 2026) et la base (`aliment_ratio_sens`) refusent un féculent sous 1. Seul un produit Grocy peut le porter |
 | fibres inconnues | une cible **en glucides totaux** + un aliment `fec` sans fibres |
 | `systeme_singulier` | deux féculents quasi identiques et rien d'autre d'utilisable |
 | `lipides_incompressibles` | une protéine grasse, **aucun oléagineux** en stock |
@@ -437,7 +437,9 @@ Une prise ratée se refait ; **on ne monte jamais une prise fausse**.
   d'heure, non fait** (`carteRepas.tsx:127-134`).
 - **`presentation/features.md` (14 septembre 2026) cite cet écran en
   `repas.tsx:2054`, `:2120`, `:2239`, `composer.ts:800` : ces lignes n'existent
-  plus.** Ses renvois vers `solveur.ts`, `nutrition.ts` et `plausibilite.ts`,
-  eux, ont été recalés le 17 septembre 2026. Le découpage du 15 septembre a ramené `repas.tsx` à
+    plus.** Ses renvois vers `solveur.ts` et `nutrition.ts`, eux, ont été
+    recalés le 17 septembre 2026 ; ceux vers `plausibilite.ts` pointent
+    désormais `api/src/Service/AnomaliesAliment.php`, ce fichier ayant été
+    supprimé le 21 septembre 2026. Le découpage du 15 septembre a ramené `repas.tsx` à
   655 lignes et éclaté `composer.ts` en cinq fichiers. Les `fichier:ligne` de
   cette fiche ont été relus le 16 septembre 2026.

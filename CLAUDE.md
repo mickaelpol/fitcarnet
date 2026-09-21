@@ -211,6 +211,15 @@ partis en deux jours, et avec eux les quatre fichiers de règles :
 `avancement.json` sont supprimés, ainsi que leurs huit suites jumelles.
 **Le dossier `api/regles/` n'existe plus : ne pas en recréer un.**
 
+**ET L'ANCIEN JUGE DU FRONT EST PARTI AVEC, le 21 septembre 2026** :
+`front/src/calcul/plausibilite.ts` (422 l.) et son générateur de corpus
+(151 l.) sont supprimés. Ils ne servaient plus — aucun écran ne les importait —
+mais tant qu'ils étaient là, « il n'y a plus de double juge » n'était vrai que
+**par accident** : rien n'empêchait un écran de les rappeler. Vingt-cinq renvois
+écrits au présent pointaient encore vers eux, dont quatre **déjà faux avant la
+suppression** ; ils sont corrigés. Ceux écrits au PASSÉ sont gardés : ce dépôt
+met son histoire dans ses commentaires.
+
 **POURQUOI UNE ROUTE, ET NON UN FICHIER DE RÈGLES.** Un fichier de règles est un
 *contrat* : il suppose qu'un futur front pense à le lire, donc il **garde** la
 duplication au lieu de la supprimer. Une route ne le suppose pas — un écran qui

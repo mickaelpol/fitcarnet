@@ -6,7 +6,7 @@ import type { Aliment } from '../solveur/types';
  * DESCENDUE LE 20 SEPTEMBRE 2026 (palier 0) depuis `app/migration-grocy.tsx`,
  * ou ces onze correspondances vivaient sans test possible. Ce qu'elles
  * decident n'est pas cosmetique : la categorie fixe le ROLE de l'aliment dans
- * le calculateur, et `plausibilite.ts` s'en sert pour juger un rendement
+ * le calculateur, et le serveur s'en sert pour juger un rendement
  * cru/cuit. Une categorie devinee de travers classe un aliment dans le mauvais
  * role, en silence.
  *

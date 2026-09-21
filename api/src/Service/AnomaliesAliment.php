@@ -11,7 +11,8 @@ namespace App\Service;
  * metier doit etre sur le serveur et puis c'est tout, comme ca je peux changer
  * le front quand bon me semble ».
  *
- * Ce fichier est la traduction fidele de `front/src/calcul/plausibilite.ts`,
+ * Ce fichier est la traduction fidele de `front/src/calcul/plausibilite.ts`
+ * (SUPPRIME le 21 septembre 2026, une fois le portage prouve),
  * fonction `verifierAliment`. Quatorze anomalies, trois gravites, et des
  * messages que l'utilisateur lit.
  *

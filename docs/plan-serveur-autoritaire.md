@@ -189,7 +189,7 @@ Aucun aller-retour ajouté : tout se greffe sur le `POST`/`PATCH` qui existe dé
 *« Aucun test ne lit la clé »* : **deux** la lisent, un par langage, et depuis le
 commit qui a créé `rendement.json` — `RendementPartageTest::testLeSeuilDeMatiereEstCeluiDeLaListe`
 et son jumeau `rendementPartage.test.ts`. Le comportement est même posé aux
-**trois** étages : `AlimentDisponible.php`, `plausibilite.ts`, et la contrainte
+**trois** étages : `AlimentDisponible.php`, `plausibilite.ts` (front, supprimé le 21 septembre 2026 — il n'en reste que deux), et la contrainte
 SQL `aliment_matiere_plausible`. Il ne restait qu'à transformer l'erreur SQL en
 refus **nommé**, ce que fait `CoherenceNutritionnelle`.
 
@@ -528,5 +528,5 @@ Hors ligne : à brancher AVEC le palier 1, pas après. C'est ce qui prouve que l
 - **La contrainte SQL `aliment_ratio_sens`** — troisième juge du rendement, en
   base, qu'aucun des deux tests partagés ne confronte à `rendement.json`.
 - **L'écart d'arrondi du rendement** — 2 décimales au front
-  (`plausibilite.ts`), 3 à l'API (`AlimentDisponible.php:99`). Constaté ; on
+  (`plausibilite.ts`), 3 à l'API (`AlimentDisponible.php:99`). **Refermé le 21 septembre 2026** par la suppression du juge du front ; on
   ignore s'il se voit à l'écran.

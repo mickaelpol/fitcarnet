@@ -43,7 +43,7 @@
 --  quatre colonnes d'`aliment` et ces quatre de `cible` l'interdisent, et
 --  changer leur nullabilite pour raccommoder une faute de signe couterait plus
 --  cher que ca ne vaut. Zero est donc un pis-aller assume : la valeur reste
---  fausse, mais elle est VISIBLE — `src/calcul/plausibilite.ts` signale un
+--  fausse, mais elle est VISIBLE — `api/src/Service/AnomaliesAliment.php` signale un
 --  aliment a 0 kcal dont les macros ne le sont pas, et la ligne remonte a
 --  l'ecran au lieu de bloquer le demarrage.
 --

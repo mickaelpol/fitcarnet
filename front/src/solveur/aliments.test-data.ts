@@ -31,7 +31,7 @@ export const A = {
   /* Grains secs : les valeurs cuites d'hier multipliees par leur rendement.
      Boulgour 131 x 2,5, riz 130 x 3, quinoa 120 x 2,75. Toutes retombent
      entre 300 et 400 kcal, la bande de la matiere seche — c'est le controle
-     que `plausibilite.ts` applique desormais a ces trois-la.
+     que le serveur applique desormais a ces trois-la (`AnomaliesAliment.php`).
 
      CE SONT DES DONNEES DE TEST, PAS UNE REFERENCE. Le « 130 x 3 » du riz
      vient d'une valeur USDA ; CIQUAL 2025 (colonne « Reglement UE n° 1169

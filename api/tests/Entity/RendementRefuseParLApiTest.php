@@ -25,9 +25,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * Deux defauts dans une seule reponse : le message n'apprend rien a
  * l'utilisateur, et la ligne brute expose l'UUID du proprietaire.
  *
- * CE QUI A ETE CORRIGE CE JOUR-LA NE SUFFISAIT PAS. `rendementPossible`
- * (`front/src/calcul/plausibilite.ts`) grise le bouton d'enregistrement : plus
- * personne ne provoque ce 500 DEPUIS L'APPLICATION. Mais le serveur seul n'a
+ * CE QUI A ETE CORRIGE CE JOUR-LA NE SUFFISAIT PAS. L'ecran grise son bouton
+ * d'enregistrement — a l'epoque avec son propre `rendementPossible`, depuis le
+ * 20 septembre 2026 en lisant `enregistrable` de
+ * `POST /api/verification/aliment` : plus personne ne provoque ce 500 DEPUIS
+ * L'APPLICATION. Mais le serveur seul n'a
  * rien gagne — curl, un autre client, une version d'application en retard le
  * declenchent encore. C'est l'agent de verification bout en bout qui l'a
  * releve, en repondant franchement a la question posee.

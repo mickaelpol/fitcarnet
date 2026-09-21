@@ -27,8 +27,9 @@ s'en sert. **Ne pas aller « corriger » un défaut qui n'existe plus.**
 
 **Depuis le 17 septembre 2026, la somme elle-même n'a plus qu'une écriture** :
 `kcalDesGrammes` (`front/src/calcul/nutrition.ts:45-51`), fibres à
-`KCAL_FIBRES`. `controler`, `kcalDesMacros` (solveur), `kcalAtwater`
-(`plausibilite.ts`), `planCoach.ts` et `carteRepas.tsx` l'appellent, et
+`KCAL_FIBRES`. `controler`, `kcalDesMacros` (solveur), `planCoach.ts` et
+`carteRepas.tsx` l'appellent — `kcalAtwater` vivait dans `plausibilite.ts`,
+supprimé le 21 septembre 2026 — et
 `front/src/calcul/formuleUnique.test.ts` refuse toute multiplication par un
 coefficient `KCAL_…` ailleurs, dans `src/` comme dans `app/`. Une fibre absente
 y compte pour zéro gramme : c'est à l'appelant de savoir s'il la connaît, et de
@@ -67,8 +68,9 @@ Cette règle vaut aussi pour **les scripts d'import** et pour ce qu'on écrit da
 
 ## 3. Ta balance passe avant CIQUAL
 
-Une pesée réelle prime sur la table de référence. C'est ce que prouvent
-`RendementMesureTest` côté API et `plausibilite.ts` côté front : la provenance de
+Une pesée réelle prime sur la table de référence. C'est ce que prouve
+`RendementMesureTest` côté API — le juge du front est parti le 21 septembre
+2026, et c'est le serveur qui répond désormais : la provenance de
 la valeur remonte jusqu'à l'écran, pour que l'utilisateur sache d'où vient le
 chiffre qu'on lui montre.
 

@@ -510,7 +510,7 @@ riz dont les valeurs sont celles du produit cuit mais qu'on pèse sec se calcule
 parfaitement — il fait simplement peser trois fois trop, et aucun test du
 solveur ne peut le voir.
 
-`src/calcul/plausibilite.ts` regarde donc chaque aliment du frigo AVANT de
+Le serveur (`api/src/Service/AnomaliesAliment.php`) regarde donc chaque aliment du frigo AVANT de
 composer, et se demande si ce qu'il raconte est physiquement possible :
 
 - des valeurs finies, positives, qui tiennent dans 100 g ;
