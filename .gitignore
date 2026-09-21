@@ -166,3 +166,8 @@ e2e/node_modules/
 e2e/rapport/
 e2e/test-results/
 e2e/package-lock.json
+
+# Le dossier de travail personnel de Mickaël — sorti du dépôt le 21 septembre
+# 2026 : « il n'a rien à faire dans le projet ». Les fichiers restent sur le
+# disque, ils ne sont simplement plus suivis par git.
+prompt/

@@ -12,6 +12,80 @@ d'une ligne de code, pas ce qui reste à faire.
 
 ---
 
+# ⏩ REPRENDRE ICI — sur l'autre poste, le 22 septembre 2026
+
+**Le travail vit sur la branche `serveur-autoritaire`, poussée sur Gitea. Elle
+n'est PAS fusionnée dans `master`** — et il ne faut pas la fusionner sans
+décision : le NAS tire `master` toutes les cinq minutes.
+
+## 1. Se remettre à niveau (cinq minutes)
+
+```bash
+cd ~/fitcarnet                      # le chemin diffère d'un poste à l'autre
+git fetch origin
+git switch serveur-autoritaire      # ou : git pull, si tu y es déjà
+db/manuel/rattraper-dev.sh          # rejoue les migrations sur la base de dév
+cd front && npm install             # si package.json a bougé
+cd ../e2e && npm install            # une seule fois par poste
+```
+
+Puis l'environnement, et les quatre suites — **si l'une n'est pas au vert,
+s'arrêter là et lire le message avant de coder** :
+
+```bash
+docker compose -f compose.dev.yml up -d
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'      # 498, 0 échec
+cd front && npm test                                              # 767 + 46, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse --no-progress'
+                                                                  # 5 erreurs, ANTÉRIEURES
+cd ../e2e && npm test                                             # 6, 0 échec
+```
+
+**Le `dist` est versionné.** Si `front/src` ou `front/app` a bougé :
+`cd front && npm run build:web`, puis `rm -rf api/front && cp -r front/dist api/front`.
+Les épreuves E2E tournent contre ce `dist` — un `dist` périmé les rend
+mensongères.
+
+## 2. Où on en est, en une phrase
+
+**Les quatre doubles juges sont supprimés et `api/regles/` n'existe plus.** Le
+serveur décide de la cohérence d'un aliment, du rendement cru/cuit, de la force
+d'un mot de passe et de la règle du chrono. **La refonte n'est pas finie pour
+autant** : il reste ~4 200 lignes de calcul dans le front (détail au § « Ce qui
+reste »).
+
+## 3. Par quoi continuer — le palier B
+
+`performance.ts` (375 l., le 1RM), `frigo.ts` (194 l.), `planCoach.ts` (131 l.),
+`fournees.ts` (265 l.), `habitudesCuisson.ts` (156 l.).
+
+> ⚠️ **LE PIÈGE DU 1RM, à lire avant de commencer.** Epley n'a qu'**une seule
+> écriture** dans tout le dépôt, gardée par `epleyUnique.test.ts` qui balaie
+> `.ts`, `.tsx`, `.php`, `.sql`, `.py`. Le porter en PHP **rouvre** une
+> duplication qu'on a mis du travail à fermer. Il faut le **déplacer**
+> entièrement et retirer le garde dans le même commit — pas le dupliquer.
+
+## 4. Les trois choses à ne pas refaire
+
+1. **Ne jamais transmettre au front une valeur dérivée d'un état qu'il mute.**
+   Transmettre la *règle*, indexée sur ce que le client possède déjà. C'est la
+   leçon qui a coûté une correction de correction le 21 septembre.
+2. **Ne pas recréer `api/regles/`** ni un « double juge assumé tenu par un
+   fichier de règles ». Le dispositif est abandonné : il *gardait* la
+   duplication au lieu de la supprimer.
+3. **`e2e` : `creerCompte(nom, 'grocy')` écrit dans le Grocy RÉEL.** Un agent y
+   a créé un vrai produit le 21 septembre en croyant Grocy injoignable. Ne
+   l'utiliser que pour éprouver des *refus*.
+
+## 5. Ce qui n'est pas commité et qu'il faut savoir
+
+Rien. L'arbre est propre. **Le dossier `prompt/` est sorti du dépôt** le
+21 septembre (« il n'a rien à faire dans le projet ») : les fichiers restent sur
+le disque du poste d'origine, ils ne sont plus suivis. Sur l'autre poste, il
+n'apparaîtra donc pas — c'est voulu.
+
+---
+
 ## L'état, au 21 septembre 2026
 
 ### Le serveur est autoritaire : les quatre doubles juges ont disparu
@@ -200,6 +274,24 @@ plutôt que par `TooManyRequestsHttpException` (écart assumé et meilleur —
 **ne pas le « corriger » vers le patron de la doc**), `keepPreviousData`, et
 `ModesDeTravail` en classe statique (l'injecter n'apporterait rien et coûterait
 les tests sans conteneur).
+
+### Deux restes trouvés en répondant à « il ne reste rien en front ? » (21 sept.)
+
+1. **`controler()` et `soupconKilojoules()` sont morts mais toujours exportés**
+   (`front/src/calcul/nutrition.ts`). Plus aucun écran ne les appelle — les
+   seules mentions hors du fichier sont des commentaires. C'est exactement la
+   situation de `plausibilite.ts` avant sa suppression : tant qu'ils sont là,
+   « le front ne juge plus un aliment » n'est vrai que **par accident**.
+   Attention : `soupconKilojoules` est appelé *à l'intérieur* de `nutrition.ts`,
+   donc les supprimer demande de vérifier ce qui en dépend encore.
+2. **Un CINQUIÈME double juge, candidat, sur les CIBLES.** `front/app/objectifs.tsx`
+   calcule `incoherent` avec `SEUIL_COHERENCE` / `ecartDeCoherence`, pendant que
+   `api/src/Entity/Cible.php` valide avec
+   `CoherenceNutritionnelle::motifDeRefusDUneCible`. **Non caractérisé** : les
+   deux ne posent peut-être pas la même question (l'écran *avertit*, le serveur
+   *refuse*, comme pour l'aliment). À mesurer avant de conclure — j'ai déjà
+   sur-affirmé une fois aujourd'hui en croyant voir deux juges là où il n'y en
+   avait qu'un.
 
 ### Ce qui reste ouvert
 
