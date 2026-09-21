@@ -656,13 +656,22 @@ describe('cibles incohérentes entre elles', () => {
   });
 
   /**
-   * `app/objectifs.tsx` affiche le même avertissement que le solveur et
-   * appelle ces deux fonctions pour le faire. Il ne peut pas être testé
-   * lui-même — le motif de `tsconfig.tests.json` ne descend que sous `src/`,
-   * donc un test posé dans `app/` ne serait jamais exécuté, sans un signal.
-   * C'est ici, et seulement ici, que sa règle est vérifiée.
+   * CE `describe` A CHANGÉ DE RAISON D'ÊTRE — palier B, 21 septembre 2026.
+   *
+   * Il s'appelait « la cohérence des cibles, telle que l'écran objectifs la
+   * lit », et c'était vrai : `app/objectifs.tsx` appelait ces deux fonctions,
+   * ne pouvait pas être testé lui-même (le motif de `tsconfig.tests.json` ne
+   * descend que sous `src/`), et sa règle n'était donc vérifiée qu'ICI.
+   *
+   * L'ÉCRAN NE LES APPELLE PLUS. Sa règle vit sur le serveur
+   * (`api/src/Service/CoherenceDesCibles.php`, éprouvée par
+   * `CoherenceDesCiblesTest`), et il affiche la phrase reçue.
+   *
+   * Ces cas gardent donc ce qui RESTE ici : le diagnostic
+   * `cibles_incoherentes` du solveur, qui pose le même constat sur les cibles
+   * mises à l'échelle d'un repas. Ils partent au palier 3, avec le solveur.
    */
-  describe('la coherence des cibles, telle que l’écran objectifs la lit', () => {
+  describe('la coherence des cibles, telle que le solveur la pose', () => {
     const cible = { kcal: 710, prot: 40, gluc: 100, lip: 20 };
 
     it('borne les calories par la part de fibres, de 2 à 4 kcal/g', () => {

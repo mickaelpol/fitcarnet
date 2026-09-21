@@ -5,16 +5,26 @@ import {
   NOM_LONG_REPAS, NOM_REPAS, REPAS as LISTE_REPAS,
 } from '@/solveur/repasVocabulaire';
 import { useCibles, useEnregistrerCible } from '@/api/hooks';
+import { useVerdictCible } from '@/api/hooks/verification';
 import type { Cible } from '@/api/types';
 import { nombreSaisi } from '@/calcul/saisieNombre';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
 import { convertir, fibresDouteuses } from '@/calcul/planCoach';
 /* La formule des calories ne se recopie pas : elle vit dans le solveur, qui
    tient ses coefficients de `src/calcul/nutrition.ts`. L'alias `@/` est sans
-   danger ici — `app/` n'est jamais compilé vers `dist-tests/`. */
-import {
-  SEUIL_COHERENCE, bornesDeCoherence, ecartDeCoherence, kcalDesMacros,
-} from '@/solveur/solveur';
+   danger ici — `app/` n'est jamais compilé vers `dist-tests/`.
+
+   CET ÉCRAN NE JUGE PLUS SA CIBLE — palier B, 21 septembre 2026. Il importait
+   aussi `SEUIL_COHERENCE`, `ecartDeCoherence` et `bornesDeCoherence`, et
+   rédigeait lui-même « Tes grammes représentent 740 calories, pas 710 ». La
+   règle et la phrase viennent maintenant de `POST /api/verification/cible`
+   (`api/src/Service/CoherenceDesCibles.php`) ; `coherenceCibleUnique.test.ts`
+   refuse qu'un écran s'y remette.
+
+   `kcalDesMacros` reste : proposer un nombre de calories à partir des grammes
+   saisis est de la SAISIE assistée, pas un jugement — le champ reste modifiable
+   et rien n'est refusé. */
+import { kcalDesMacros } from '@/solveur/solveur';
 import { C, E, P, R, T, TOUCHE, nb } from '@/theme';
 
 /* LES NOMS VIENNENT DU VOCABULAIRE, ILS NE SE REECRIVENT PAS. Cette table
@@ -49,6 +59,34 @@ export default function Objectifs() {
   const [plan, setPlan] = useState<Plan>(planVide);
   const [convertisseur, setConvertisseur] = useState(false);
   const [totaux, setTotaux] = useState(false);
+
+  /* LA VIRGULE ÉTAIT IGNORÉE ICI — 15 septembre 2026, relevé par la revue.
+     `parseFloat('12,5')` rend 12 : sur un clavier Android français, 12,5 g de
+     protéines s'enregistraient 12, et le calcul des repas visait la mauvaise
+     cible sans que rien ne le montre. Le convertisseur du plan étranger
+     remplaçait bien la virgule : le jumeau de ces quatre lectures, oublié
+     d'elles.
+
+     LIRE N'EST PAS JUGER. Ces quatre lectures restent à l'écran après le
+     palier B : la virgule, le vide et l'illisible sont de la saisie
+     (`saisieNombre.ts`), et c'est le seul métier qui lui reste ici. */
+  const valeurs = {
+    prot: lire(saisie.prot), gluc: lire(saisie.gluc),
+    lip: lire(saisie.lip), kcal: lire(saisie.kcal),
+  };
+  const valide = Object.values(valeurs).every((v) => !Number.isNaN(v) && v >= 0);
+
+  /* TOUS LES HOOKS AVANT LE PREMIER `return`, sans exception — c'est la règle
+     de React, et elle a déjà coûté un écran BLANC le 19 septembre 2026 : deux
+     `useRef` posés sous un retour anticipé faisaient tomber le rendu du seul
+     chemin pour lequel l'écran existait. `eslint` le refuse désormais, mais la
+     tentation est ici : ce hook a besoin de `valeurs`, qui se lisait plus bas.
+
+     `null` tant que les quatre nombres ne sont pas lisibles : ce qui manque ne
+     vaut pas zéro (règle 6), et c'est exactement la condition qui commandait
+     l'avertissement avant que la règle parte au serveur. */
+  const { verdict: verdictCible, perime: verdictPerime, enPanne: verdictEnPanne } =
+    useVerdictCible(valide ? { ...valeurs, glucidesTotaux: totaux } : null);
 
   const existante = (cibles.data ?? []).find((c) => c.repas === repas);
 
@@ -109,26 +147,6 @@ export default function Objectifs() {
     }
     setSaisie(suite);
   };
-
-  /* LA VIRGULE ÉTAIT IGNORÉE ICI — 15 septembre 2026, relevé par la revue.
-     `parseFloat('12,5')` rend 12 : sur un clavier Android français, 12,5 g de
-     protéines s'enregistraient 12, et le calcul des repas visait la mauvaise
-     cible sans que rien ne le montre. Le convertisseur du plan étranger, trente
-     lignes plus haut, remplaçait bien la virgule : le jumeau de ces quatre
-     lectures, oublié d'elles. */
-  const valeurs = {
-    prot: lire(saisie.prot), gluc: lire(saisie.gluc),
-    lip: lire(saisie.lip), kcal: lire(saisie.kcal),
-  };
-  const valide = Object.values(valeurs).every((v) => !Number.isNaN(v) && v >= 0);
-  /* Même règle que le solveur, et la même fonction : en glucides TOTAUX les
-     fibres sont dans la cible sans qu'on sache combien, donc les mêmes grammes
-     couvrent un intervalle de calories. Compter les fibres à 4 kcal/g déclarait
-     « incohérente » une cible atteignable dès 7,5 g de fibres — l'écran
-     accusait l'utilisateur d'une faute qu'il n'avait pas commise. */
-  const bornes = valide ? bornesDeCoherence(valeurs) : { min: 0, max: 0 };
-  const incoherent = valide
-    && Math.abs(ecartDeCoherence(valeurs, totaux)) > SEUIL_COHERENCE;
 
   /* Le convertisseur ne fait qu'une chose : retrancher les fibres des
      glucides. C'est là qu'est le piège d'un plan américain, et nulle part
@@ -296,14 +314,31 @@ export default function Objectifs() {
               unite="kcal" numerique placeholder="0" style={{ flex: 1 }} />
           </View>
 
-          {incoherent && (
-            <Discret style={{ color: C.vif, fontSize: T.normal }}>
-              {totaux
-                ? `Tes grammes représentent entre ${nb(bornes.min)} et ${nb(bornes.max)} `
-                  + `calories selon la part de fibres, pas ${nb(valeurs.kcal)}. `
-                : `Tes grammes représentent ${nb(bornes.max)} calories, `
-                  + `pas ${nb(valeurs.kcal)}. `}
-              L'app respecte les grammes ; les calories suivent.
+          {/* LA PHRASE VIENT DU SERVEUR, TELLE QUELLE — palier B. L'écran la
+              composait lui-même à partir des bornes et du seuil ; il ne sait
+              plus ni l'un ni l'autre.
+
+              L'ESTOMPE DIT « CECI PARLE DE CE QUE TU TAPAIS IL Y A UN INSTANT ».
+              La règle est jugée à distance : entre la frappe et la réponse il
+              existe une fenêtre où l'avertissement affiché décrit la saisie
+              PRÉCÉDENTE. Le montrer à pleine opacité, c'est ce que la revue du
+              20 septembre 2026 a trouvé sur l'éditeur d'aliment — un jugement
+              périmé présenté comme courant. */}
+          {verdictCible?.avertissement != null && (
+            <Discret style={[{ color: C.vif, fontSize: T.normal },
+              verdictPerime && { opacity: 0.45 }]}>
+              {verdictCible.avertissement}
+            </Discret>
+          )}
+
+          {/* ON DIT L'INCERTITUDE PLUTÔT QUE RIEN (règle 7). Avant le palier B,
+              l'écran jugeait sur place et ne pouvait pas se taire ; maintenant
+              il peut — et un silence dû au réseau ressemblerait à « tes
+              objectifs sont cohérents ». */}
+          {verdictEnPanne && valide && (
+            <Discret style={{ color: C.attenue, fontSize: T.normal }}>
+              La cohérence de tes objectifs n'a pas pu être vérifiée : le serveur
+              n'a pas répondu. Tu peux enregistrer.
             </Discret>
           )}
 

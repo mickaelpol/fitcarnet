@@ -28,7 +28,25 @@ import type {
 export const TOLERANCE_DEFAUT = { kcal: 45, prot: 1.5, gluc: 2.5, lip: 1.2 } as const;
 const ARRONDI_DEFAUT = { proteine: 1, glucide: 5, lipide: 0.5 };
 
-/** Au-delà, l'écart entre les kcal annoncées et les grammes n'est plus un arrondi. */
+/**
+ * Au-delà, l'écart entre les kcal annoncées et les grammes n'est plus un arrondi.
+ *
+ * ── UN JUMEAU DÉCLARÉ, ET IL EST SUR LE SERVEUR ───────────────────────────
+ *
+ * `api/src/Service/CoherenceDesCibles.php` porte la même règle depuis le
+ * palier B (21 septembre 2026), et c'est LUI la référence : l'écran des
+ * objectifs ne juge plus rien, il demande `POST /api/verification/cible` et
+ * affiche la phrase reçue.
+ *
+ * Ces trois symboles ne restent que pour le solveur, qui calcule encore dans le
+ * navigateur et pose le même constat dans ses diagnostics (`calculer`, plus
+ * bas). Ils partent au palier 3, avec lui. Même situation — et même phrase dans
+ * l'en-tête — qu'`Atwater.php` et `nutrition.ts`.
+ *
+ * `coherenceCibleUnique.test.ts` interdit qu'un écran s'y remette, et compare
+ * ce seuil à celui du PHP : les deux écritures ne peuvent pas diverger en
+ * silence le temps que la seconde disparaisse.
+ */
 export const SEUIL_COHERENCE = 15;
 
 /**

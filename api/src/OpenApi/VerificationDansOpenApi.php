@@ -98,6 +98,65 @@ final readonly class VerificationDansOpenApi implements OpenApiFactoryInterface
             ],
         )));
 
+        $chemins->addPath('/api/verification/cible', new PathItem(post: new Operation(
+            operationId: 'verifierCible',
+            tags: ['Vérification'],
+            summary: 'L\'écart entre les calories annoncées et ce que les grammes peuvent donner.',
+            description: <<<'TXT'
+                ELLE AVERTIT, ELLE NE REFUSE PAS. C'est la différence avec la
+                validation d'une cible à l'écriture, qui ne refuse qu'une erreur
+                d'unité (des kilojoules pris pour des calories). Ici, quelqu'un
+                recopie un plan de coach qui ne tombe pas juste : on le lui dit,
+                et on le laisse enregistrer.
+
+                EN GLUCIDES TOTAUX (convention nord-américaine, fibres comprises
+                dans les glucides), les mêmes grammes couvrent un INTERVALLE de
+                calories — de 2 kcal/g pour les fibres à 4 kcal/g sans aucune
+                fibre. Une cible qui tombe dedans est atteignable, et la réponse
+                est alors muette.
+
+                AUCUN CHAMP N'EST OBLIGATOIRE : l'écran appelle dès la première
+                frappe, et ce qui manque vaut zéro gramme.
+                TXT,
+            requestBody: new RequestBody(
+                content: new \ArrayObject(['application/json' => [
+                    'schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'kcal' => ['type' => 'number', 'description' => 'Les calories annoncées.'],
+                            'prot' => ['type' => 'number', 'description' => 'Grammes de protéines.'],
+                            'gluc' => ['type' => 'number', 'description' => 'Grammes de glucides.'],
+                            'lip' => ['type' => 'number', 'description' => 'Grammes de lipides.'],
+                            'glucidesTotaux' => [
+                                'type' => 'boolean',
+                                'description' => 'Les glucides annoncés comprennent-ils les fibres.',
+                            ],
+                        ],
+                    ],
+                    'example' => ['kcal' => 710, 'prot' => 40, 'gluc' => 100, 'lip' => 20,
+                        'glucidesTotaux' => false],
+                ]]),
+            ),
+            responses: [
+                '200' => new Response(
+                    'La phrase à afficher telle quelle, ou `null` quand il n\'y a rien à dire.',
+                    new \ArrayObject(['application/json' => ['schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'avertissement' => [
+                                'type' => 'string',
+                                'nullable' => true,
+                                'example' => 'Tes grammes représentent 740 calories, pas 710. '
+                                    . 'L\'app respecte les grammes ; les calories suivent.',
+                            ],
+                        ],
+                        'required' => ['avertissement'],
+                    ]]]),
+                ),
+                '401' => new Response('Route authentifiée : elle répond sur des règles métier.'),
+            ],
+        )));
+
         $chemins->addPath('/api/verification/mot-de-passe', new PathItem(post: new Operation(
             operationId: 'verifierMotDePasse',
             tags: ['Vérification'],

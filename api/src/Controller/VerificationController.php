@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Service\CoherenceDesCibles;
 use App\Service\ModesDeTravail;
 use App\Service\MotDePasse;
 use App\Service\VerdictAliment;
@@ -58,6 +59,41 @@ final class VerificationController extends AbstractController
         $saisie = (array) \json_decode((string) $requete->getContent(), true);
 
         return $this->json(VerdictAliment::pour($saisie));
+    }
+
+    /**
+     * L'AVERTISSEMENT D'UNE CIBLE EN COURS DE SAISIE — palier B, 21 septembre 2026.
+     *
+     * L'ecran des objectifs jugeait lui-meme : il portait le seuil de 15 kcal,
+     * les deux conventions de glucides et la phrase. Il n'a plus rien de tout
+     * cela — il affiche `avertissement` tel quel, ou rien.
+     *
+     * CE N'EST PAS UN REFUS, et c'est voulu. `Cible::verifierLUniteDesCalories`
+     * refuse les kilojoules, seule erreur d'unite ; celle-ci AVERTIT et laisse
+     * enregistrer. « Quelqu'un recopie un plan de coach qui ne tombe pas juste,
+     * et on ne lui interdit pas de le saisir. »
+     *
+     * AUCUN CHAMP N'EST OBLIGATOIRE, comme pour l'aliment : l'ecran appelle des
+     * la premiere frappe, et ce qui manque vaut zero gramme. L'ecran n'envoie
+     * que ce qu'il a DEJA lu — la virgule et le vide sont de la saisie, pas du
+     * metier (`saisieNombre.ts`), et c'est la seule chose qui lui reste ici.
+     */
+    #[Route('/verification/cible', methods: ['POST'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function cible(Request $requete): JsonResponse
+    {
+        /** @var array<string, mixed> $saisie */
+        $saisie = (array) \json_decode((string) $requete->getContent(), true);
+
+        return $this->json([
+            'avertissement' => CoherenceDesCibles::avertissement(
+                (float) ($saisie['kcal'] ?? 0),
+                (float) ($saisie['prot'] ?? 0),
+                (float) ($saisie['gluc'] ?? 0),
+                (float) ($saisie['lip'] ?? 0),
+                (bool) ($saisie['glucidesTotaux'] ?? false),
+            ),
+        ]);
     }
 
     /**

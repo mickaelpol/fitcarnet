@@ -13,7 +13,7 @@ le métier.**
 ## Les commandes, dans cet ordre
 
 ```bash
-cd front && npm test          # tsc --noEmit + 647 tests, puis 33 de rendu (18 septembre 2026)
+cd front && npm test          # tsc --noEmit + 756 tests, puis 46 de rendu (21 septembre 2026)
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, servi par Caddy)
 ```
@@ -51,7 +51,18 @@ un fichier absent.
 | Force d'un mot de passe, et ce qui lui manque | `api/src/Service/MotDePasse.php` | `POST /api/verification/mot-de-passe` (publique) |
 | Cohérence d'un aliment, ses 14 anomalies, la couleur du bandeau | `api/src/Service/VerdictAliment.php` et `AnomaliesAliment.php` | `POST /api/verification/aliment` |
 | Rendement cru/cuit | la même route | idem |
-| « Un chrono ne compte que pour une série » | `api/src/Entity/SeanceExercice.php` | rien : le serveur envoie un **poids** par série, l'écran additionne |
+| « Un chrono ne compte que pour une série » | `api/src/Service/ModesDeTravail.php` | `GET /api/modes-de-travail` → **combien de séries comptent par mode** (`seriesQuiComptent`) ; l'écran découpe à ce nombre |
+
+**Cette dernière ligne a dit le contraire jusqu'au 21 septembre 2026** — « le
+serveur envoie un **poids** par série, l'écran additionne ». C'était la
+**première** version de la correction, et elle était fausse : un poids par ligne
+est *dérivé* du mode et du rang, les deux choses que l'écran modifie sans le
+serveur. Ajouter un exercice « for time » affichait 0/**3** là où le serveur
+dirait 0/1 ; supprimer la première ligne d'un chrono affichait 0/**0** et la
+jauge disparaissait. Il a fallu deux agents pour le voir.
+
+> **NE JAMAIS TRANSMETTRE AU FRONT UNE VALEUR DÉRIVÉE D'UN ÉTAT QU'IL MUTE.**
+> Transmettre la **règle**, indexée sur ce que le client possède déjà.
 
 **NE JAMAIS RÉÉCRIRE UN CHIFFRE DE CES RÈGLES DANS UN ÉCRAN** — ni « 12
 caractères », ni un seuil de kcal. C'est ce qui a laissé l'écran d'invitation
@@ -239,7 +250,7 @@ Relevé le 15 septembre 2026, après que deux agents y sont tombés le même jou
 **Deux passes, et deux suffixes.** `npm test` lance :
 
 ```bash
-node --test "dist-tests/**/*.test.js"                    # 647 tests, SANS DOM
+node --test "dist-tests/**/*.test.js"                    # 756 tests, SANS DOM
 node --import ./dist-tests/tests/environnement.js \
      --test "dist-tests/**/*.test-rendu.js"              # 33 tests de rendu
 ```

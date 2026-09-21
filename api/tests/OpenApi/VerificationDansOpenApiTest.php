@@ -27,13 +27,18 @@ use PHPUnit\Framework\TestCase;
  */
 final class VerificationDansOpenApiTest extends TestCase
 {
-    public function testLES_TROIS_ROUTES_DU_METIER_SONT_DOCUMENTEES(): void
+    public function testLES_QUATRE_ROUTES_DU_METIER_SONT_DOCUMENTEES(): void
     {
         $paths = $this->decore()->getPaths();
 
         foreach ([
             '/api/verification/aliment',
             '/api/verification/mot-de-passe',
+            /* LA QUATRIEME est arrivee avec le palier B, le 21 septembre 2026 :
+               l'ecran des objectifs ne juge plus la coherence d'une cible, il
+               demande. Elle est inscrite ici AVANT d'exister, pour que le test
+               tombe si le decorateur l'oublie comme il a oublie la troisieme. */
+            '/api/verification/cible',
             /* LA TROISIEME A ETE OUBLIEE LE JOUR DE SA CREATION — releve par
                `revue-pile` le 21 septembre 2026. L'en-tete du decorateur
                annoncait « LES DEUX ROUTES DE VERIFICATION » et cette liste en

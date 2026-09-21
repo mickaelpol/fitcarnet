@@ -255,3 +255,67 @@ export function useJaugeMotDePasse(motDePasse: string) {
     enPanne: requete.isError,
   };
 }
+
+/** Ce que le serveur dit d'une cible en cours de saisie. */
+export interface VerdictCible {
+  /**
+   * LA PHRASE, DEJA REDIGEE, ou `null` quand il n'y a rien a dire.
+   *
+   * L'ecran l'affiche telle quelle. Il n'a ni le seuil, ni les bornes, ni la
+   * formule — c'est tout l'interet.
+   */
+  avertissement: string | null;
+}
+
+/** Ce que l'ecran des objectifs soumet au serveur. */
+export interface SaisieCible {
+  kcal: number;
+  prot: number;
+  gluc: number;
+  lip: number;
+  /** Les glucides annonces comprennent-ils les fibres (convention nord-americaine). */
+  glucidesTotaux: boolean;
+}
+
+/**
+ * L'AVERTISSEMENT D'UNE CIBLE, RENDU PAR LE SERVEUR — palier B, 21 septembre 2026.
+ *
+ * `app/objectifs.tsx` portait la regle entiere : le seuil de 15 kcal, les deux
+ * conventions de glucides, et la phrase « Tes grammes representent 740 calories,
+ * pas 710 ». Elle vit maintenant dans `api/src/Service/CoherenceDesCibles.php`,
+ * et l'ecran ne fait plus qu'afficher.
+ *
+ * CE N'EST PAS UN REFUS. La cible s'enregistre quand meme : « l'app respecte les
+ * grammes ; les calories suivent ». La seule chose que le serveur REFUSE sur une
+ * cible, c'est une erreur d'unite (des kilojoules), et c'est `Cible.php` qui s'en
+ * charge a l'ecriture. Deux questions differentes, mesurees comme telles.
+ *
+ * `null` quand l'ecran n'a pas encore de quoi juger : ce qui manque ne vaut pas
+ * zero (regle 6), donc on ne demande rien tant que les quatre nombres ne sont
+ * pas lisibles. C'est exactement la condition qui commandait l'avertissement
+ * avant le palier B.
+ */
+export function useVerdictCible(saisie: SaisieCible | null) {
+  /* MEME ANTI-REBOND QUE POUR L'ALIMENT, ET POUR LA MEME RAISON : il vit DANS le
+     hook, sinon `isPlaceholderData` ne voit pas la fenetre de retard et l'ecran
+     affiche un avertissement perime a pleine opacite. */
+  const interrogee = useRetarde(saisie);
+  const enRetard = JSON.stringify(saisie) !== JSON.stringify(interrogee);
+
+  const requete = useQuery({
+    queryKey: ['verdict-cible', interrogee],
+    enabled: null !== interrogee,
+    staleTime: Infinity,
+    gcTime: 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => api<VerdictCible>(
+      '/verification/cible', { methode: 'POST', corps: interrogee, signal }),
+  });
+
+  return {
+    verdict: requete.data,
+    /* Les deux fenetres, comme partout dans ce fichier. */
+    perime: enRetard || requete.isPlaceholderData,
+    enPanne: requete.isError,
+  };
+}
