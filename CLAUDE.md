@@ -33,11 +33,11 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 765 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 735 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 501 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 555 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -52,7 +52,7 @@ python3 test_ciqual.py                 # l'import CIQUAL, sans dépendance
 # ÉPREUVES DE BOUT EN BOUT : vrai navigateur, vraie API, vraie base.
 # Exigent l'environnement de dev debout ET un `front/dist` à jour.
 cd e2e && npm install                  # une seule fois
-cd e2e && npm test                     # ~33 s pour six épreuves
+cd e2e && npm test                     # ~2 min pour douze épreuves (elles tombent si la machine peine : rejouer le fichier seul)
 ```
 
 ### Les épreuves de bout en bout — `e2e/`

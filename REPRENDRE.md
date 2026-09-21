@@ -18,6 +18,11 @@ d'une ligne de code, pas ce qui reste à faire.
 n'est PAS fusionnée dans `master`** — et il ne faut pas la fusionner sans
 décision : le NAS tire `master` toutes les cinq minutes.
 
+> **Session interrompue le 21 septembre 2026 au soir**, en pleine traversée du
+> palier B. Trois morceaux sur cinq sont faits, éprouvés et commités ; l'arbre
+> est propre. Les deux qui restent sont décrits au § 3, et le plus délicat —
+> Epley — a son piège écrit en gras.
+
 ## 1. Se remettre à niveau (cinq minutes)
 
 ```bash
@@ -34,12 +39,17 @@ s'arrêter là et lire le message avant de coder** :
 
 ```bash
 docker compose -f compose.dev.yml up -d
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'      # 498, 0 échec
-cd front && npm test                                              # 756 + 46, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'      # 555, 0 échec
+cd front && npm test                                              # 735 + 46, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse --no-progress'
                                                                   # 5 erreurs, ANTÉRIEURES
-cd ../e2e && npm test                                             # 6, 0 échec
+cd ../e2e && npm test                                             # 12, 0 échec
 ```
+
+**Les E2E tombent quand la machine peine.** Mesuré le 21 septembre : une épreuve
+qui passe en 7,8 s isolée met 32,9 s juste après un `build:web`, et la connexion
+expire au bout de 30 s. Une épreuve rouge se rejoue SEULE avant d'être crue :
+`npx playwright test epreuves/<la-sienne>.spec.ts`.
 
 **Le `dist` est versionné.** Si `front/src` ou `front/app` a bougé :
 `cd front && npm run build:web`, puis `rm -rf api/front && cp -r front/dist api/front`.
@@ -48,25 +58,81 @@ mensongères.
 
 ## 2. Où on en est, en une phrase
 
-**Les quatre doubles juges sont supprimés et `api/regles/` n'existe plus.** Le
-serveur décide de la cohérence d'un aliment, du rendement cru/cuit, de la force
-d'un mot de passe et de la règle du chrono. **La refonte n'est pas finie pour
-autant** : il reste ~4 200 lignes de calcul dans le front (détail au § « Ce qui
-reste »).
+**Les quatre doubles juges sont supprimés, `api/regles/` n'existe plus, et le
+palier B est à moitié traversé.** Le serveur décide de la cohérence d'un
+aliment, du rendement cru/cuit, de la force d'un mot de passe, de la règle du
+chrono — et depuis le 21 septembre, de la cohérence d'une cible, de la
+conversion d'un plan américain, de ce qui reste vraiment dans le frigo et du
+seuil d'écart d'un inventaire. **La refonte n'est pas finie pour autant** : il
+reste les fournées, le 1RM, et tout le solveur (détail au § 3).
 
-## 3. Par quoi continuer — le palier B
+## 3. Par quoi continuer — le palier B, à moitié traversé
 
-`performance.ts` (375 l., le 1RM), `frigo.ts` (194 l.), `planCoach.ts` (131 l.),
-`fournees.ts` (265 l.), `habitudesCuisson.ts` (156 l.), et **la cohérence des
-cibles** (`ecartDeCoherence` / `bornesDeCoherence` / `SEUIL_COHERENCE` dans
-`solveur.ts`) — dont le serveur porte déjà la moitié
-(`CoherenceNutritionnelle::motifDeRefusDUneCible`).
+### Ce qui est FAIT, éprouvé et commité (21 septembre 2026)
+
+| Ce qui est parti au serveur | Où ça vit maintenant | Ce qu'il reste au front |
+|---|---|---|
+| La cohérence d'une cible — seuil de 15 kcal, deux conventions, la phrase | `CoherenceDesCibles.php` → `POST /api/verification/cible` | rien ; le solveur garde les 3 symboles pour SON diagnostic (**jumeau déclaré**, part au palier 3) |
+| La conversion d'un plan « coach » américain | `PlanCoach.php` → `POST /api/verification/plan-coach` | **rien du tout** : `src/calcul/planCoach.ts` est SUPPRIMÉ |
+| « Stock moins ce qui est promis » | `StockPromis.php` + `PlansPrevus.php` → champ `grammesDisponibles` de `GET /api/mon-frigo` | rien ; `grammesEnStock`, `dejaPromis` et `grammesDisponibles` sont SUPPRIMÉS |
+| Le seuil d'écart d'inventaire (0,001) | `EcartDInventaire::SEUIL` → champ `seuilEcartInventaire` de `GET /api/mon-frigo` | la comparaison, **paramétrée** par le nombre reçu |
+
+Trois gardes neufs tiennent ces déménagements :
+`coherenceCibleUnique.test.ts` (aucun écran ne rejuge, et les deux seuils
+concordent entre langages), `FormatCourtTest` (le serveur écrit ses nombres
+comme l'écran les écrivait), et six épreuves e2e dans
+`e2e/epreuves/cibleIncoherente.spec.ts`.
+
+### Ce qui RESTE — deux morceaux
+
+**B4 — fournées et habitudes de cuisson.** `src/calcul/fournees.ts` (265 l.) et
+`src/calcul/habitudesCuisson.ts` (156 l.).
+
+> ⚠️ **Le plus gros est de l'ÉTAT D'ÉCRAN, et ne doit pas partir tel quel.**
+> Inventorié le 21 septembre : `enFournees`, `sansCuisson`, `repartition` et
+> `habitudesAEcrire` reçoivent toutes `cuissonsChoisies`, un `useState` que
+> l'utilisateur mute en cochant (`usePlanCalcule.ts:90`). `resteSansCuisson`
+> n'est même pas un calcul — c'est un `setState`. Leur envoyer ces valeurs
+> rejouerait exactement l'erreur du 21 septembre au matin.
+> **Le seul candidat net est `depuisLesHabitudes`** (`planCalcule.ts:231`) :
+> ses habitudes viennent du serveur, lues telles quelles.
+> `cleDeCuisson` et `cleDHabitude` sont de la **fabrication de clé**, pas du
+> jugement — et `cleDHabitude` garde volontairement sa table manuelle (Hermes
+> n'implémente pas `normalize`). Ne pas les toucher.
+
+**B5 — 1RM, paliers, volume.** `src/calcul/performance.ts` (375 l.).
 
 > ⚠️ **LE PIÈGE DU 1RM, à lire avant de commencer.** Epley n'a qu'**une seule
 > écriture** dans tout le dépôt, gardée par `epleyUnique.test.ts` qui balaie
 > `.ts`, `.tsx`, `.php`, `.sql`, `.py`. Le porter en PHP **rouvre** une
 > duplication qu'on a mis du travail à fermer. Il faut le **déplacer**
 > entièrement et retirer le garde dans le même commit — pas le dupliquer.
+>
+> **Et le serveur l'a déjà eu, puis s'en est débarrassé exprès** :
+> `SeanceExercice.php:151-172` dit « LE 1RM NE SE CALCULE PLUS ICI — retiré le
+> 19 septembre 2026 », et la migration 39 a supprimé la vue `v_performance` qui
+> le recalculait en SQL. La décision a changé le 20 septembre avec la refonte ;
+> le dire dans le commit, sinon on croira à une rechute.
+>
+> **Trois chemins sur quatre partent d'un état que l'écran mute** (inventorié
+> le 21 septembre) : `performanceDe` et `tempsTotal` lisent la séance EN COURS
+> DE SAISIE, `estimerDepuisEssai` / `pasConseille` / `paliersPour` lisent les
+> champs texte du calculateur. **Le seul chemin entièrement serveur** est
+> `rmDesSeries` / `volumeDesSeries` via `historiqueSeances.ts`, qui travaille
+> sur `seances.data` sans rien éditer. C'est par là qu'il faut commencer.
+
+### Ce qui a été mesuré et qu'il ne faut pas re-mesurer
+
+- **`nb` de l'écran n'est PAS `number_format`.** 3 410 divergences sur 100 001
+  valeurs. Le portage exact de `toFixed` est `FormatCourt::decimale` ; tout
+  nombre que le serveur écrit dans une phrase passe par `FormatCourt::nb`.
+- **`placeholderData` survit à une requête coupée** (`enabled: false`) : un
+  affichage nourri par une réponse doit dépendre AUSSI de la saisie vivante,
+  sinon il reste à l'écran sur une saisie effacée. Deux fois le cas le
+  21 septembre, dont un « NaN » visible.
+- **Hors ligne sur le web, il n'y a pas d'erreur** : `fetchStatus` passe à
+  `paused` et `isError` reste faux. C'est `isPaused` qu'il faut lire — les
+  hooks de `verification.ts` le font désormais tous les quatre.
 
 ## 4. Les trois choses à ne pas refaire
 
@@ -82,10 +148,18 @@ cibles** (`ecartDeCoherence` / `bornesDeCoherence` / `SEUIL_COHERENCE` dans
 
 ## 5. Ce qui n'est pas commité et qu'il faut savoir
 
-Rien. L'arbre est propre. **Le dossier `prompt/` est sorti du dépôt** le
-21 septembre (« il n'a rien à faire dans le projet ») : les fichiers restent sur
-le disque du poste d'origine, ils ne sont plus suivis. Sur l'autre poste, il
-n'apparaîtra donc pas — c'est voulu.
+Rien. L'arbre est propre, et les cinq commits du palier B sont poussés.
+
+**Le dossier `prompt/` est sorti du dépôt** le 21 septembre (« il n'a rien à
+faire dans le projet ») : les fichiers restent sur le disque du poste
+d'origine, ils ne sont plus suivis. Sur l'autre poste, il n'apparaîtra donc
+pas — c'est voulu.
+
+**Une revue est passée sur les trois premiers morceaux du palier B** et a
+trouvé un chiffre faux (`number_format` au lieu de `toFixed`) plus deux
+affichages périmés. Les trois sont corrigés et commités. **Les deux morceaux
+qui restent — B4 et B5 — n'ont PAS encore été relus** : lancer
+`revue-fitcarnet` sur eux avant de les croire finis.
 
 ---
 
