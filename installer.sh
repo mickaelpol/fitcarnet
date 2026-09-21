@@ -170,8 +170,11 @@ titre "Migrations"
 # jumelles, et une seule des deux corrigée est pire que zéro.
 #
 # `db/03-ciqual.sql` vient en DERNIER : il remplit `aliment_reference`, que la
-# migration 40 vient de créer. Il est idempotent (TRUNCATE puis INSERT) et se
-# rejoue donc sans dommage à chaque démarrage.
+# migration 40 vient de créer. Il est idempotent PAR MISE À JOUR — `INSERT …
+# ON CONFLICT`, et surtout pas `TRUNCATE` : la première version commençait par
+# là et a mis la production à terre le 20 septembre 2026, `aliment.reference_ciqual`
+# pointant sur cette table. Ce commentaire a dit « TRUNCATE puis INSERT »
+# jusqu'au 21 septembre, soit l'inverse de ce que le fichier fait et explique.
 migrations=""
 for fichier in \
     db/manuel/aliment-fibres.sql \

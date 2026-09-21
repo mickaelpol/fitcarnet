@@ -340,13 +340,52 @@ for lanceur in installer.sh docker/entrypoint-prod.sh; do
 done
 (( nonconformes == 0 )) && gris "  ✓ tous les lanceurs s'arrêtent à la première erreur"
 
+# ------------------------------------------- les CINQ listes sont jumelles
+#
+# `verifier-schema.sh` contrôle déjà qu'aucune migration de `db/manuel/` n'est
+# oubliée de TOUTES les listes. Il ne voit pas qu'une liste en joue moins que
+# les autres : il compare chacune au dossier, jamais les listes entre elles, et
+# il écarte explicitement `db/03-ciqual.sql`, qui n'est pas dans `db/manuel/`.
+#
+# C'est par là que le trou est passé, le 21 septembre 2026 : les quatre autres
+# listes jouaient `db/03-ciqual.sql`, `rattraper-dev.sh` non. Un poste qui fait
+# `git pull` puis `rattraper-dev.sh` obtenait donc la table `aliment_reference`
+# VIDE — la migration 40 la crée, personne ne la remplit — et le rattachement
+# d'un aliment au catalogue ne proposait rien, sans un seul message.
+#
+# On compare donc les listes DEUX À DEUX. Ce qui est extrait : les lignes du
+# `for fichier in …` qui nomment un chemin sous `db/`, et elles seules — pas la
+# prose qui cite ces mêmes noms.
+gris "Les cinq listes de fichiers joués sont-elles jumelles..."
+listes_dissemblables=0
+liste_jouee() {
+    grep -oE '^[[:space:]]*("\$RACINE"/|"\$APP"/)?db/[][A-Za-z0-9_./*-]+\.sql[[:space:]]*\\?$' "$1" \
+        | sed -E 's|^[[:space:]]*||; s|"\$RACINE"/||; s|"\$APP"/||; s|[[:space:]]*\\$||' \
+        | sort -u
+}
+reference=$(liste_jouee "$RACINE/installer.sh")
+if [[ -z "$reference" ]]; then
+    rouge "  ✗ aucune liste lue dans installer.sh — le contrôle ne contrôle plus rien"
+    listes_dissemblables=1
+fi
+for lanceur in docker/entrypoint-prod.sh db/manuel/rattraper-dev.sh \
+               db/manuel/verifier-schema.sh db/manuel/verifier-migrations.sh; do
+    ecart=$(diff <(printf '%s\n' "$reference") <(liste_jouee "$RACINE/$lanceur") || true)
+    if [[ -n "$ecart" ]]; then
+        rouge "  ✗ $lanceur ne joue pas la même liste qu'installer.sh :"
+        printf '%s\n' "$ecart" | grep -E '^[<>]' | sed 's/^</      manque :/; s/^>/      en trop :/'
+        listes_dissemblables=$((listes_dissemblables + 1))
+    fi
+done
+(( listes_dissemblables == 0 )) && gris "  ✓ les cinq listes jouent les mêmes fichiers"
+
 echo
-if (( echecs == 0 && manquantes == 0 && nonconformes == 0 && stock_faux == 0 && garde34 == 0 )) && [[ "$restantes" == "0" ]]; then
+if (( echecs == 0 && manquantes == 0 && nonconformes == 0 && stock_faux == 0 && garde34 == 0 && listes_dissemblables == 0 )) && [[ "$restantes" == "0" ]]; then
     vert "✓ Les migrations passent sur des données réelles, tous les garde-fous sont posés."
     exit 0
 fi
 
-rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s), $stock_faux défaut(s) de stock entre comptes, $garde34 base ancienne mal nommée."
+rouge "✗ $echecs migration(s) en échec, $manquantes garde-fou(s) manquant(s), $restantes valeur(s) négative(s) restante(s), $nonconformes lanceur(s) non conforme(s), $stock_faux défaut(s) de stock entre comptes, $garde34 base ancienne mal nommée, $listes_dissemblables liste(s) de lanceur dissemblable(s)."
 rouge "  En l'état, le conteneur applicatif ne redémarrerait pas : entrypoint-prod.sh"
 rouge "  rejoue db/manuel/ à chaque démarrage, avec ON_ERROR_STOP=1 et set -e."
 exit 1

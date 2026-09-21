@@ -63,13 +63,21 @@ docker ps --format '{{.Names}}' | grep -qx "$CONTENEUR" || {
 # Quand tu ajoutes une décennie, elle va dans CINQ fichiers :
 #   celui-ci, `installer.sh`, `docker/entrypoint-prod.sh`,
 #   `db/manuel/verifier-migrations.sh`, `db/manuel/verifier-schema.sh`.
+#
+# ET CE N'EST PAS QU'UNE AFFAIRE DE DIZAINES. Le 21 septembre 2026, ce script
+# était le seul des cinq à ne pas jouer `db/03-ciqual.sql` : les migrations
+# passaient, `aliment_reference` existait — et restait VIDE. Sur le second
+# poste, le rattachement d'un aliment au catalogue ne proposait rien, sans un
+# message. `verifier-migrations.sh` compare désormais les cinq listes entre
+# elles, et pas seulement chacune au dossier `db/manuel/`.
 migrations=""
 for fichier in \
     "$RACINE"/db/manuel/aliment-fibres.sql \
     "$RACINE"/db/manuel/1[0-9]-*.sql \
     "$RACINE"/db/manuel/2[0-9]-*.sql \
     "$RACINE"/db/manuel/3[0-9]-*.sql \
-    "$RACINE"/db/manuel/4[0-9]-*.sql
+    "$RACINE"/db/manuel/4[0-9]-*.sql \
+    "$RACINE"/db/03-ciqual.sql
 do
     [[ -f "$fichier" ]] && migrations+="$fichier"$'\n'
 done
