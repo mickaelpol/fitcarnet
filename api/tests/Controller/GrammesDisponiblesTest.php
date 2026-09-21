@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Controller\FrigoController;
 use App\Entity\Utilisateur;
 use App\Repository\PlansPrevus;
+use App\Service\EcartDInventaire;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
@@ -87,6 +88,27 @@ final class GrammesDisponiblesTest extends TestCase
         foreach ($requetesDePlans as $requete) {
             self::assertStringContainsString('cuisine_le IS NULL', $requete);
         }
+    }
+
+    /**
+     * LE SEUIL D'ECART PART AVEC LE FRIGO — palier B, 21 septembre 2026.
+     *
+     * `SEUIL_ECART = 0.001` etait ecrit dans `front/src/calcul/frigo.ts`. Il
+     * decide de ce qui part vers Grocy : c'est une regle, pas un detail
+     * d'affichage. Le serveur l'envoie, l'ecran l'applique — motif de
+     * `GET /api/modes-de-travail`, parce qu'un verdict par frappe sur cinq
+     * cents lignes serait la regression que le plan interdit.
+     */
+    public function testLeSeuilDEcartPartAvecLeFrigo(): void
+    {
+        $vues = [];
+        $controleur = self::controleur(self::connexion(1000.0, 0.0, $vues));
+
+        /** @var array<string, mixed> $corps */
+        $corps = \json_decode((string) $controleur->lire()->getContent(), true);
+
+        self::assertSame(EcartDInventaire::SEUIL, $corps['seuilEcartInventaire'] ?? null,
+            'sans ce champ, l’écran n’a aucun moyen de savoir ce qu’il doit ignorer');
     }
 
     // ----------------------------------------------------------------- outils

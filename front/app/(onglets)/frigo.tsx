@@ -128,7 +128,19 @@ export default function MonFrigo() {
 
   /* Les écarts se calculent sur TOUT le frigo, pas sur ce que la recherche
      laisse voir : filtrer puis envoyer perdrait les lignes déjà saisies. */
-  const ecarts = useMemo(() => ecartsInventaire(tous, saisies), [tous, saisies]);
+  /* LE SEUIL VIENT DU SERVEUR — palier B, 21 septembre 2026. Il était écrit
+     dans `src/calcul/frigo.ts` ; il vit dans `EcartDInventaire.php` et arrive
+     avec le frigo.
+
+     `?? 0` QUAND IL N'EST PAS ENCORE LÀ : « je ne sais pas ce qu'il faut
+     ignorer, donc tout compte ». C'est la même réponse que `seriesQuiComptent`
+     donne à la même question, et c'est le bon sens du risque — un mouvement de
+     stock au millième se voit et se corrige, une pesée silencieusement écartée
+     ne se voit pas. Le cas est de toute façon théorique : sans `frigo.data`,
+     il n'y a pas non plus d'aliments à comparer. */
+  const ecarts = useMemo(
+    () => ecartsInventaire(tous, saisies, frigo.data?.seuilEcartInventaire ?? 0),
+    [tous, saisies, frigo.data?.seuilEcartInventaire]);
 
   const enStock = useMemo(() => tous.filter((a) => a.stock > 0).length, [tous]);
   const comptes = Object.values(vus).filter(Boolean).length;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { AlimentDisponible, AlimentIncomplet } from '@/api/types';
 import {
-  SEUIL_ECART, ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement, poidsConnu, resultatEncoreFrais, stockEnGrammes,
+  ecartsInventaire, estIncomplet, filtrerFrigo, grouperParEmplacement, poidsConnu, resultatEncoreFrais, stockEnGrammes,
 } from './frigo';
 
 const aliment = (
@@ -23,28 +23,34 @@ const aliment = (
 describe('écarts d\'inventaire', () => {
   const stock = [aliment('base:1', 'Riz', 500), aliment('base:2', 'Thon', 120)];
 
+  /* LE SEUIL VIENT DU SERVEUR depuis le palier B (21 septembre 2026) :
+     `EcartDInventaire::SEUIL`, publié par `GET /api/mon-frigo`. Il était écrit
+     dans le module, et il décidait de ce qui part vers Grocy. On le pose ici
+     comme l'écran le recevra. */
+  const SEUIL = 0.001;
+
   it('un champ vide n\'est pas un zéro', () => {
-    assert.deepEqual(ecartsInventaire(stock, { 'base:1': '', 'base:2': '   ' }), []);
+    assert.deepEqual(ecartsInventaire(stock, { 'base:1': '', 'base:2': '   ' }, SEUIL), []);
   });
 
   it('un zéro saisi part, lui', () => {
     assert.deepEqual(
-      ecartsInventaire(stock, { 'base:1': '0' }),
+      ecartsInventaire(stock, { 'base:1': '0' }, SEUIL),
       [{ reference: 'base:1', quantite: 0 }]);
   });
 
   it('n\'envoie que ce qui a changé', () => {
-    const lignes = ecartsInventaire(stock, { 'base:1': '500', 'base:2': '90' });
+    const lignes = ecartsInventaire(stock, { 'base:1': '500', 'base:2': '90' }, SEUIL);
     assert.deepEqual(lignes, [{ reference: 'base:2', quantite: 90 }]);
   });
 
   it('ignore une différence sous le seuil d\'arrondi', () => {
-    assert.deepEqual(ecartsInventaire(stock, { 'base:1': String(500 + SEUIL_ECART / 2) }), []);
+    assert.deepEqual(ecartsInventaire(stock, { 'base:1': String(500 + SEUIL / 2) }, SEUIL), []);
   });
 
   it('accepte la virgule décimale', () => {
     assert.deepEqual(
-      ecartsInventaire(stock, { 'base:2': '119,5' }),
+      ecartsInventaire(stock, { 'base:2': '119,5' }, SEUIL),
       [{ reference: 'base:2', quantite: 119.5 }]);
   });
 
@@ -52,15 +58,15 @@ describe('écarts d\'inventaire', () => {
     /* `parseFloat` lisait « 4,2,1 » 4,2 sans broncher : un stock inventé,
        envoyé à Grocy comme une pesée. Relevé par la revue le 15 septembre
        2026 ; la lecture passe désormais par `nombreSaisi`, qui rend `null`. */
-    assert.deepEqual(ecartsInventaire(stock, { 'base:1': '4,2,1', 'base:2': '12O' }), []);
+    assert.deepEqual(ecartsInventaire(stock, { 'base:1': '4,2,1', 'base:2': '12O' }, SEUIL), []);
   });
 
   it('écarte une saisie illisible ou négative plutôt que de deviner', () => {
-    assert.deepEqual(ecartsInventaire(stock, { 'base:1': 'abc', 'base:2': '-3' }), []);
+    assert.deepEqual(ecartsInventaire(stock, { 'base:1': 'abc', 'base:2': '-3' }, SEUIL), []);
   });
 
   it('ignore une saisie qui ne correspond à aucun aliment', () => {
-    assert.deepEqual(ecartsInventaire(stock, { 'base:99': '10' }), []);
+    assert.deepEqual(ecartsInventaire(stock, { 'base:99': '10' }, SEUIL), []);
   });
 });
 

@@ -120,22 +120,32 @@ export interface LigneInventaire {
 }
 
 /**
- * Seuil d'écart. En deçà, la différence vient de l'arrondi d'affichage, pas
- * de la balance : l'envoyer ferait un mouvement de stock pour rien.
- */
-export const SEUIL_ECART = 0.001;
-
-/**
  * Ce qui sera réellement envoyé : uniquement les lignes saisies dont la
  * valeur diffère du stock théorique.
  *
  * Une saisie vide n'est pas un zéro — elle signifie « pas encore compté ».
  * Confondre les deux viderait le frigo de tout ce qu'on n'a pas eu le temps
  * de peser.
+ *
+ * LE SEUIL VIENT DU SERVEUR — palier B, 21 septembre 2026. `SEUIL_ECART = 0.001`
+ * était écrit ici, avec sa raison : en deçà, la différence vient de l'arrondi
+ * d'AFFICHAGE, pas de la balance. C'est une règle — elle décide de ce qui part
+ * vers Grocy — et elle vit maintenant dans `api/src/Service/EcartDInventaire.php`,
+ * publiée par `GET /api/mon-frigo` (`seuilEcartInventaire`).
+ *
+ * LE NOMBRE ET NON LE VERDICT, exprès : un inventaire se compare à chaque
+ * frappe sur jusqu'à cinq cents lignes, et `docs/plan-serveur-autoritaire.md`
+ * écrit noir sur blanc qu'un aller-retour par case serait une RÉGRESSION. Même
+ * motif que `seriesQuiComptent` : le serveur transmet la règle, indexée sur ce
+ * que le client possède déjà, et l'écran fait une comparaison paramétrée.
+ *
+ * `seuil` N'A PAS DE VALEUR PAR DÉFAUT, et c'est voulu : un appelant qui
+ * l'oublierait remettrait le nombre ici, en silence.
  */
 export function ecartsInventaire(
   aliments: AlimentDisponible[],
   saisies: Record<string, string>,
+  seuil: number,
 ): LigneInventaire[] {
   const lignes: LigneInventaire[] = [];
 
@@ -148,7 +158,7 @@ export function ecartsInventaire(
        Négatif et illisible rendent `null` : la ligne n'est pas envoyée. */
     const quantite = nombreSaisi(texte);
     if (quantite === null) continue;
-    if (Math.abs(quantite - a.stock) <= SEUIL_ECART) continue;
+    if (Math.abs(quantite - a.stock) <= seuil) continue;
 
     lignes.push({ reference: a.reference, quantite });
   }

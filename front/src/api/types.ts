@@ -424,6 +424,17 @@ export interface MonFrigo {
    * étaient déjà là.
    */
   anomalies?: Anomalie[];
+  /**
+   * SOUS CET ÉCART, UNE PESÉE NE BOUGE PAS LE STOCK — palier B, 21 septembre
+   * 2026. Le nombre était écrit dans `src/calcul/frigo.ts` (`SEUIL_ECART`), et
+   * il décide de ce qui part vers Grocy.
+   *
+   * LE SERVEUR ENVOIE LE NOMBRE, PAS LE VERDICT : un inventaire se compare à
+   * chaque frappe sur jusqu'à cinq cents lignes, et un aller-retour par case
+   * serait la régression que le plan interdit. Même motif que
+   * `seriesQuiComptent`.
+   */
+  seuilEcartInventaire?: number;
   /** message expliquant pourquoi la liste est vide, le cas échéant */
   probleme: string | null;
 }

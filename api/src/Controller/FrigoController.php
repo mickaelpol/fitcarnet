@@ -10,6 +10,7 @@ use App\Repository\PlansPrevus;
 use App\Service\AnomaliesAliment;
 use App\Service\CoherenceNutritionnelle;
 use App\Service\ControleDesMacros;
+use App\Service\EcartDInventaire;
 use App\Service\Frigo;
 use App\Service\RendementPlausible;
 use App\Service\FrigoBase;
@@ -77,6 +78,7 @@ final class FrigoController extends AbstractController
                 'aliments' => [],
                 'incomplets' => [],
                 'anomalies' => [],
+                'seuilEcartInventaire' => EcartDInventaire::SEUIL,
                 'probleme' => $probleme,
             ]);
         }
@@ -91,6 +93,7 @@ final class FrigoController extends AbstractController
                 'aliments' => [],
                 'incomplets' => [],
                 'anomalies' => [],
+                'seuilEcartInventaire' => EcartDInventaire::SEUIL,
                 'probleme' => $e->getMessage(),
             ]);
         }
@@ -159,6 +162,20 @@ final class FrigoController extends AbstractController
                     'ratio' => (float) $a['ratio'],
                 ],
                 $aliments)),
+            /* LE SEUIL SOUS LEQUEL UNE PESEE N'EST PAS UN ECART — palier B,
+               21 septembre 2026. Il etait ecrit dans `front/src/calcul/frigo.ts`,
+               et il decide de ce qui part vers Grocy.
+
+               LE NOMBRE, ET NON LE VERDICT : un inventaire se compare a chaque
+               frappe sur jusqu'a cinq cents lignes, et le plan ecrit noir sur
+               blanc qu'un aller-retour par case serait une REGRESSION. Motif de
+               `GET /api/modes-de-travail` : le serveur transmet la regle, l'ecran
+               fait une comparaison parametree.
+
+               IL PART AVEC LES TROIS REPONSES, y compris celles qui rendent une
+               liste vide : un frigo Grocy en panne laisse quand meme l'ecran
+               afficher un inventaire deja saisi, et il lui faut le seuil. */
+            'seuilEcartInventaire' => EcartDInventaire::SEUIL,
             'probleme' => null,
         ]);
     }
