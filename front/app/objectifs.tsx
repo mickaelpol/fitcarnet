@@ -281,7 +281,15 @@ export default function Objectifs() {
                 onChange={(v) => setPlan({ ...plan, kcal: v })}
                 unite="kcal" numerique placeholder="0" />
 
-              {converti !== undefined && (
+              {/* `planLisible &&` POUR LA MÊME RAISON, et ici ça allait plus
+                  loin qu'un affichage périmé : la ligne ci-dessous mêle la
+                  réponse du serveur (`converti.prot`) à la saisie VIVANTE
+                  (`chiffresPlan.gluc`). Effacer « Glucides totaux » affichait
+                  « Sera enregistré : 26,8 P · NaN G fibres comprises », et le
+                  bloc ne se refermait jamais. La fiche `fonctionnalite-objectifs`
+                  l'interdit en toutes lettres : « aucun NaN ni undefined ne
+                  doit apparaître à l'écran ». */}
+              {planLisible && converti !== undefined && (
                 <View style={conversionPerimee ? { opacity: 0.45 } : undefined}>
                   <Discret style={{ fontSize: T.petit, lineHeight: 18 }}>
                     Sera enregistré : <Texte style={{ fontFamily: P.fort }}>
@@ -335,7 +343,15 @@ export default function Objectifs() {
               PRÉCÉDENTE. Le montrer à pleine opacité, c'est ce que la revue du
               20 septembre 2026 a trouvé sur l'éditeur d'aliment — un jugement
               périmé présenté comme courant. */}
-          {verdictCible?.avertissement != null && (
+          {/* `valide &&` GARDE CET AFFICHAGE, et il a manqué — relevé par
+              `revue-fitcarnet` le 21 septembre 2026. `placeholderData` conserve
+              la réponse précédente même quand la requête est COUPÉE
+              (`enabled: false`) : effacer le champ Calories laissait donc
+              « Tes grammes représentent 740 calories, pas 710 » à l'écran,
+              indéfiniment, sur une cible qui n'a plus de calories. Avant le
+              palier B le calcul était synchrone et la phrase disparaissait à
+              la frappe. */}
+          {valide && verdictCible?.avertissement != null && (
             <Discret style={[{ color: C.vif, fontSize: T.normal },
               verdictPerime && { opacity: 0.45 }]}>
               {verdictCible.avertissement}

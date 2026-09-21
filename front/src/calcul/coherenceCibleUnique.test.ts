@@ -126,6 +126,39 @@ describe('la cohérence d’une cible se juge sur le serveur', () => {
       + 'passe au serveur : elles doivent dire le même nombre jusque-là.');
   });
 
+  it('LE SERVEUR ÉCRIT SES NOMBRES COMME L’ÉCRAN LES ÉCRIVAIT', () => {
+    /* `number_format` N'EST PAS `toFixed`, ET CE GARDE EXISTE PARCE QUE LA
+       LEÇON A ÉTÉ OUBLIÉE UNE FOIS. `AnomaliesAliment` porte depuis le
+       20 septembre 2026 un `decimale()` écrit exprès — « les deux candidats
+       PHP échouent, chacun d'un côté » — et `FormatCourt::nb`, écrit le
+       lendemain, est reparti sur `number_format`.
+
+       Mesuré sur les deux moteurs : 3 410 divergences sur 100 001 valeurs au
+       pas de 0,01. « 300,45 » s'écrivait « 300,5 » côté serveur et « 300,4 »
+       côté écran — dans une phrase que l'utilisateur lit pour corriger ses
+       objectifs. C'est la règle 7 prise à revers.
+
+       Le garde est TEXTUEL et il le reste : comparer les deux moteurs pour de
+       vrai demanderait de lancer PHP depuis `npm test`, qui doit pouvoir
+       tourner sans Docker. */
+    /* SANS LES COMMENTAIRES, et c'est le même piège que dans
+       `avancementUnique.test.ts` : ce fichier PHP raconte sa panne, donc il
+       écrit « number_format » une demi-douzaine de fois dans ses docblocks. Un
+       garde qui se déclenche sur sa propre explication finit désactivé. */
+    const php = sansCommentaires(lire('api/src/Service/FormatCourt.php'));
+
+    assert.doesNotMatch(php, /number_format/,
+      '`FormatCourt` est repassé à `number_format`, qui PRÉ-ARRONDIT : il rendra '
+      + '« 300,5 » là où l’écran écrivait « 300,4 ». Le portage exact de `toFixed` '
+      + 'est `FormatCourt::decimale` — c’est lui qu’il faut appeler.');
+    assert.match(php, /decimale\(\$valeur, 1\)/,
+      '`FormatCourt::nb` ne passe plus par le portage de `toFixed` : soit il a été '
+      + 'renommé, soit quelqu’un a réécrit l’arrondi sur place.');
+    assert.match(lire('front/src/theme/index.ts'), /toFixed\(1\)/,
+      'le témoin : `nb` côté écran n’écrit plus avec `toFixed(1)`, donc ce garde '
+      + 'compare le serveur à une référence qui a bougé.');
+  });
+
   it('LE TÉMOIN DU CONTRÔLE CI-DESSUS : les deux motifs reconnaissent leur fichier', () => {
     /* Sans ce cas, deux `null` seraient « égaux » et le contrôle passerait en ne
        garantissant rien. C'est le motif 4 du projet. */

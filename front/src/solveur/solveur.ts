@@ -46,6 +46,21 @@ const ARRONDI_DEFAUT = { proteine: 1, glucide: 5, lipide: 0.5 };
  * `coherenceCibleUnique.test.ts` interdit qu'un écran s'y remette, et compare
  * ce seuil à celui du PHP : les deux écritures ne peuvent pas diverger en
  * silence le temps que la seconde disparaisse.
+ *
+ * ── LA PHRASE AUSSI EST ÉCRITE DEUX FOIS, ET C'EST VOULU ──────────────────
+ *
+ * `calculer` rédige plus bas « Tes objectifs ne collent pas entre eux : … font
+ * forcément 740 calories, pas 710. L'app respecte les grammes ; les calories
+ * suivent. » Le serveur, lui, écrit « Tes grammes représentent 740 calories,
+ * pas 710. » suivie de la même dernière phrase.
+ *
+ * DEUX RÉDACTIONS, PAS DEUX RÈGLES : l'écran des objectifs parle de ce qu'on
+ * vient de taper, le diagnostic du plan parle d'une cible enregistrée et nomme
+ * ses grammes. Elles diffèrent depuis bien avant le palier B. Le garde du
+ * front ne balaie que `front/app` et ne peut donc PAS voir celle-ci — relevé
+ * par `revue-fitcarnet` le 21 septembre 2026, et écrit ici plutôt que corrigé :
+ * l'élargir ferait tomber le garde sur le jumeau déclaré qu'on vient de
+ * documenter. Les deux partent ensemble au palier 3.
  */
 export const SEUIL_COHERENCE = 15;
 

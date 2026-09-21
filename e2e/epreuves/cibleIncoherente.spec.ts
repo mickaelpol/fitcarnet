@@ -80,6 +80,27 @@ test.describe('l\'écran des objectifs', () => {
   });
 
   /**
+   * EFFACER LES CALORIES DOIT FAIRE DISPARAÎTRE L'AVERTISSEMENT.
+   *
+   * Relevé par `revue-fitcarnet` le 21 septembre 2026. Le verdict vient du
+   * serveur avec `placeholderData: keepPreviousData`, qui conserve la réponse
+   * précédente même quand la requête est COUPÉE. La phrase restait donc à
+   * l'écran sur une cible qui n'avait plus de calories — alors qu'avant le
+   * palier B, le calcul étant synchrone, elle disparaissait à la frappe.
+   */
+  test('l\'avertissement disparaît dès que la saisie n\'est plus lisible', async ({ page }) => {
+    await seConnecter(page, email);
+    await page.goto('/objectifs');
+
+    await saisirLaCible(page);
+    await expect(page.getByText(AVERTISSEMENT)).toBeVisible();
+
+    await champ(page, 'Calories').fill('');
+
+    await expect(page.getByText(AVERTISSEMENT)).toBeHidden();
+  });
+
+  /**
    * LE CONVERTISSEUR DE PLAN AMÉRICAIN — porté au serveur le 21 septembre 2026,
    * `front/src/calcul/planCoach.ts` supprimé. Ses treize cas de test sont
    * maintenant en PHP (`PlanCoachTest`) ; ce qu'ils ne peuvent PAS voir, c'est
@@ -105,10 +126,44 @@ test.describe('l\'écran des objectifs', () => {
        3,5 g pour 64,7 g de glucides, soit moins du dixième. */
     await expect(page.getByText(/ton plan les sous-estime/)).toBeVisible();
   });
+
+  /**
+   * ET LE BLOC SE REFERME QUAND UN CHAMP REDEVIENT ILLISIBLE, SANS « NaN ».
+   *
+   * Le jumeau du cas ci-dessus, en pire : la ligne « Sera enregistré » mêle la
+   * réponse du serveur à la saisie VIVANTE. Effacer « Glucides totaux »
+   * affichait « 26,8 P · NaN G fibres comprises », et le bloc ne se refermait
+   * jamais. La fiche `fonctionnalite-objectifs` l'interdit : « aucun NaN ni
+   * undefined ne doit apparaître à l'écran ».
+   */
+  test('effacer un champ du plan referme le bloc, sans afficher « NaN »', async ({ page }) => {
+    await seConnecter(page, email);
+    await page.goto('/objectifs');
+
+    await page.getByText(/Recopier depuis un plan américain/).click();
+    await champDuPlan(page, 'Protéines').fill('26.8');
+    await champDuPlan(page, 'Glucides totaux').fill('64.7');
+    await champDuPlan(page, 'Lipides').fill('25.9');
+    await champDuPlan(page, 'Fibres').fill('3.5');
+    await champDuPlan(page, 'Calories du plan').fill('578.6');
+    await expect(page.getByText(/Sera enregistré/)).toBeVisible();
+
+    await champDuPlan(page, 'Glucides totaux').fill('');
+
+    await expect(page.getByText(/Sera enregistré/)).toBeHidden();
+    await expect(page.getByText(/NaN/)).toHaveCount(0);
+  });
 });
 
-/* Les cinq champs du convertisseur viennent APRÈS les quatre de la cible dans
-   l'ordre du document — le panneau se déplie au-dessus d'eux. */
+/* LES CINQ CHAMPS DU CONVERTISSEUR VIENNENT AVANT les quatre de la cible dans
+   l'ordre du document : le panneau se déplie AU-DESSUS d'eux (`objectifs.tsx`
+   rend le convertisseur, puis les champs de la cible).
+
+   Ce commentaire disait le contraire — relevé par `revue-fitcarnet` le
+   21 septembre 2026. Le piège qu'il cachait : `champ()` plus bas vise les
+   indices 0 à 3 pour la cible, ce qui n'est vrai QUE PANNEAU FERMÉ. Aucune
+   épreuve ne fait les deux à la fois aujourd'hui ; celle qui s'y essaiera
+   trouvera ici de quoi comprendre pourquoi elle tape dans le mauvais champ. */
 const champDuPlan = (page: import('@playwright/test').Page, etiquette: string) =>
   page.locator('input').nth(
     ({ 'Protéines': 0, 'Glucides totaux': 1, 'Lipides': 2, 'Fibres': 3, 'Calories du plan': 4 })[etiquette] ?? 0);
@@ -127,8 +182,8 @@ async function saisirLaCible(page: import('@playwright/test').Page): Promise<voi
 const champ = (page: import('@playwright/test').Page, etiquette: string) =>
   page.locator('input').nth(indexDuChamp(etiquette));
 
-/* L'ordre des quatre champs de l'écran, de haut en bas. Les libellés ne sont
-   pas des `<label for>` en React Native web : on ne peut pas les viser par
-   `getByLabel`. */
+/* L'ordre des quatre champs de la cible, PANNEAU DU CONVERTISSEUR FERMÉ. Les
+   libellés ne sont pas des `<label for>` en React Native web : on ne peut pas
+   les viser par `getByLabel`. */
 const indexDuChamp = (etiquette: string): number =>
   ({ 'Protéines': 0, 'Glucides': 1, 'Lipides': 2, 'Calories': 3 })[etiquette] ?? 0;

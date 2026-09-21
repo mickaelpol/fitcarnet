@@ -168,7 +168,7 @@ export function useVerdictAliment(saisie: SaisieAliment | null) {
      * refus, ni une incertitude enoncee, mais une absence de reponse deguisee
      * en reponse. La regle 7 demande l'inverse.
      */
-    enPanne: requete.isError,
+    enPanne: sansReponse(requete),
   };
 }
 
@@ -195,6 +195,33 @@ export function useRetarde<T>(valeur: T, millisecondes = 250): T {
 
   return retarde;
 }
+
+/**
+ * LE SERVEUR N'A PAS REPONDU — LES DEUX FACONS, ET LA SECONDE ETAIT OUBLIEE.
+ *
+ * `isError` ne couvre que la requete PARTIE qui echoue. Hors ligne sur le web,
+ * TanStack Query v5 en `networkMode: 'online'` (le defaut) ne la fait pas
+ * partir du tout : elle passe en `fetchStatus: 'paused'`, `status` reste
+ * `pending`, et `isError` reste FAUX.
+ *
+ * Consequence relevee par `revue-fitcarnet` le 21 septembre 2026 : l'ecran des
+ * objectifs n'affichait alors NI l'avertissement, NI le message d'incertitude —
+ * exactement le silence que la regle 7 interdit, et que le commentaire de cet
+ * ecran disait avoir supprime. Sur Android la requete part et echoue, donc le
+ * message s'affichait : le defaut ne se voyait que sur le web.
+ *
+ * `queryFn` n'est jamais appelee en pause : ce n'est pas une requete perdue,
+ * c'est une requete qui attend le reseau. Pour l'ecran, les deux se disent de
+ * la meme facon — « le serveur n'a pas repondu ».
+ *
+ * `isPaused` EST LE DRAPEAU DE LA BIBLIOTHEQUE, pas une comparaison a la main :
+ * la documentation de TanStack Query v5 le derive elle-meme de
+ * `fetchStatus === 'paused'` et le dit « expose for convenience ». Verifie sur
+ * la documentation officielle le 21 septembre 2026, et pas seulement dans le
+ * code de `queryObserver`.
+ */
+const sansReponse = (requete: { isError: boolean; isPaused: boolean }): boolean =>
+  requete.isError || requete.isPaused;
 
 /** Ce que le serveur dit d'un mot de passe en cours de frappe. */
 export interface VerdictMotDePasse {
@@ -252,7 +279,7 @@ export function useJaugeMotDePasse(motDePasse: string) {
     /* Les deux fenetres, comme pour l'aliment : l'anti-rebond que la
        bibliotheque ne voit pas, et l'aller-retour qu'elle voit. */
     perime: enRetard || requete.isPlaceholderData,
-    enPanne: requete.isError,
+    enPanne: sansReponse(requete),
   };
 }
 
@@ -316,7 +343,7 @@ export function useVerdictCible(saisie: SaisieCible | null) {
     verdict: requete.data,
     /* Les deux fenetres, comme partout dans ce fichier. */
     perime: enRetard || requete.isPlaceholderData,
-    enPanne: requete.isError,
+    enPanne: sansReponse(requete),
   };
 }
 
@@ -381,6 +408,6 @@ export function useConversionPlanCoach(saisie: SaisiePlanCoach | null) {
   return {
     conversion: requete.data,
     perime: enRetard || requete.isPlaceholderData,
-    enPanne: requete.isError,
+    enPanne: sansReponse(requete),
   };
 }

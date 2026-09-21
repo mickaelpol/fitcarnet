@@ -80,10 +80,14 @@ somme « coefficient × grammes » s'écrivait quatre fois en entier
 `planCoach.ts`), et une cinquième fois pour les seules fibres dans
 `carteRepas.tsx` — celle-là trouvée par le test de garde ; coefficients importés,
 mais fibres inconnues traitées à la façon de chacun.
-Elle vit maintenant dans **`kcalDesGrammes`** (`src/calcul/nutrition.ts:45-51`) ;
-`controler`, `kcalDesMacros`, `planCoach.ts` et `carteRepas.tsx` l'appellent.
+Elle vit maintenant dans **`kcalDesGrammes`** (`src/calcul/nutrition.ts:34`) ;
+`kcalDesMacros` (le solveur) et `carteRepas.tsx` l'appellent — ce sont les deux
+seuls, vérifiés le 21 septembre 2026.
 *(`kcalAtwater` vivait dans `plausibilite.ts`, supprimé le 21 septembre 2026
-avec le reste de l'ancien juge du front.)* **`src/calcul/formuleUnique.test.ts` refuse toute multiplication
+avec le reste de l'ancien juge du front ; `controler` avec lui ; et
+`planCoach.ts` est parti au serveur le même jour — `api/src/Service/PlanCoach.php`.
+Cette ligne a cité les trois APRÈS leur suppression, ce qui est exactement le
+défaut que le paragraphe du dessus dénonce.)* **`src/calcul/formuleUnique.test.ts` refuse toute multiplication
 par un coefficient `KCAL_…` ailleurs**, dans `src/` comme dans `app/`,
 commentaires exclus — avec un témoin qui vérifie que le motif reconnaît bien la
 formule de référence.

@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsDecorator;
 use Symfony\Component\DependencyInjection\Attribute\AutowireDecorated;
 
 /**
- * LES TROIS ROUTES DU METIER SERVI A L'ECRAN, DANS LE CONTRAT DE L'API.
+ * LES CINQ ROUTES DU METIER SERVI A L'ECRAN, DANS LE CONTRAT DE L'API.
  *
  * POURQUOI CA COMPTE ICI PLUS QU'AILLEURS. La refonte des 20 et 21 septembre
  * 2026 a deplace le metier vers le serveur pour une raison precise, dans les

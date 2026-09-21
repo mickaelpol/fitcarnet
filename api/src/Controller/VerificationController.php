@@ -23,8 +23,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * metier doit etre sur le serveur et puis c'est tout, comme ca je peux changer
  * le front quand bon me semble ».
  *
- * Cette route ne lit rien et n'ecrit rien. Elle repond a une seule question :
- * « voila ce qui est tape — qu'est-ce que j'affiche, et puis-je enregistrer ? »
+ * CES ROUTES — elles sont CINQ, et l'en-tete a dit « cette route » jusqu'au
+ * 21 septembre 2026 — ne lisent rien et n'ecrivent rien. Elles repondent a une
+ * seule question : « voila ce qui est tape — qu'est-ce que j'affiche, et
+ * puis-je enregistrer ? »
  *
  * POURQUOI UNE ROUTE ET NON UN FICHIER DE REGLES. Un fichier de regles est un
  * contrat : il suppose qu'un futur front pense a le lire. Une route ne le
