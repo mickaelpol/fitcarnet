@@ -10,11 +10,12 @@ use ApiPlatform\OpenApi\Model\PathItem;
 use ApiPlatform\OpenApi\Model\RequestBody;
 use ApiPlatform\OpenApi\Model\Response;
 use ApiPlatform\OpenApi\OpenApi;
+use App\Service\ModesDeTravail;
 use Symfony\Component\DependencyInjection\Attribute\AsDecorator;
 use Symfony\Component\DependencyInjection\Attribute\AutowireDecorated;
 
 /**
- * LES DEUX ROUTES DE VERIFICATION, DANS LE CONTRAT DE L'API.
+ * LES TROIS ROUTES DU METIER SERVI A L'ECRAN, DANS LE CONTRAT DE L'API.
  *
  * POURQUOI CA COMPTE ICI PLUS QU'AILLEURS. La refonte des 20 et 21 septembre
  * 2026 a deplace le metier vers le serveur pour une raison precise, dans les
@@ -24,6 +25,13 @@ use Symfony\Component\DependencyInjection\Attribute\AutowireDecorated;
  * API Platform ne documente que ses propres ressources. Elles etaient
  * invisibles dans `/api/docs` : le metier avait bien quitte le front, mais son
  * mode d'emploi n'existait nulle part.
+ *
+ * LA TROISIEME A ETE OUBLIEE LE JOUR DE SA CREATION — `GET /api/modes-de-travail`,
+ * releve par `revue-pile` le 21 septembre 2026. Cet en-tete disait « LES DEUX »
+ * et la liste en portait deux : le jumeau oublie, applique au contrat. C'etait
+ * la pire des trois a manquer — un front ecrit demain decouvrait comment juger
+ * un aliment et un mot de passe, mais PAS la regle du chrono, la seule sans
+ * laquelle son compteur « 7 sur 12 » est faux.
  *
  * LE MEME PROCEDE QUE LE BUNDLE JWT, qui fait exactement cela pour
  * `/api/connexion` — seule route hors API Platform a figurer dans le contrat
@@ -132,6 +140,57 @@ final readonly class VerificationDansOpenApi implements OpenApiFactoryInterface
                         ],
                     ]]]),
                 ),
+            ],
+        )));
+
+        $chemins->addPath('/api/modes-de-travail', new PathItem(get: new Operation(
+            operationId: 'modesDeTravail',
+            tags: ['Vérification'],
+            summary: 'Combien de séries comptent, selon la façon dont on travaille.',
+            description: <<<'TXT'
+                LA RÈGLE DU CHRONO, ET RIEN D'AUTRE. Un exercice « for time » n'a
+                qu'un temps total : ses lignes supplémentaires notent le détail,
+                ce ne sont pas des séries à faire. Les autres modes comptent
+                toutes les leurs.
+
+                POURQUOI UN ÉCRAN A BESOIN DE LA RÈGLE, et pas seulement du
+                résultat. `seance.avancement` donne déjà le compte, mais l'écran
+                d'une séance est autoritaire sur son état local : on y ajoute un
+                exercice, on supprime une ligne, on bascule un mode, et le
+                compteur doit suivre le geste SANS aller-retour réseau, hors
+                ligne compris.
+
+                NE PAS SERVIR UN POIDS PAR SÉRIE À LA PLACE. Essayé le
+                21 septembre 2026, et faux : un poids par ligne est dérivé du
+                mode et du rang, les deux choses que l'écran modifie seul.
+                Ajouter un exercice « for time » affichait 0/3 là où le serveur
+                dirait 0/1. Une donnée indexée sur le MODE, elle, survit au geste.
+
+                ELLE NE CHANGE QU'AVEC UNE VERSION DU SERVEUR : la demander une
+                fois par session suffit.
+                TXT,
+            responses: [
+                '200' => new Response(
+                    'Le catalogue des façons de travailler.',
+                    new \ArrayObject(['application/json' => [
+                        'schema' => [
+                            'type' => 'array',
+                            'items' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'cle' => ['type' => 'string', 'enum' => ModesDeTravail::cles()],
+                                    'seriesQuiComptent' => [
+                                        'type' => 'integer', 'nullable' => true, 'minimum' => 1,
+                                        'description' => 'Combien de séries comptent. `null` veut dire « toutes ».',
+                                    ],
+                                ],
+                                'required' => ['cle', 'seriesQuiComptent'],
+                            ],
+                        ],
+                        'example' => ModesDeTravail::catalogue(),
+                    ]]),
+                ),
+                '401' => new Response('Route authentifiée.'),
             ],
         )));
 

@@ -6,6 +6,7 @@ namespace App\Entity;
 
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -97,7 +98,15 @@ class Aliment implements ProprieteUtilisateur
      * l'index fonctionnel `aliment_nom_unique_par_compte` (utilisateur_id,
      * lower(nom)), que Doctrine ne sait pas exprimer. Deux comptes peuvent
      * nommer pareil ; un compte ne le peut pas deux fois.
+     *
+     * LA `description:` CI-DESSOUS EXISTE POUR NE PAS PUBLIER CE PARAGRAPHE.
+     * API Platform prend la premiere ligne du PHPDoc comme description de la
+     * propriete dans `/api/docs` : sans elle, le contrat public annoncait
+     * « Pas de "unique: true" ici… » et le nom d'un index de la base. Deux
+     * publics, deux textes — le PHPDoc pour qui lit le code, `description:`
+     * pour qui lit le contrat. Releve par `revue-pile` le 21 septembre 2026.
      */
+    #[ApiProperty(description: 'Le nom de l\'aliment. Unique au sein d\'un compte, insensible a la casse.')]
     #[ORM\Column(type: Types::TEXT)]
     #[Assert\NotBlank]
     /* PLAFONDS DE LONGUEUR — CONSTAT F-08, 15 SEPTEMBRE 2026.

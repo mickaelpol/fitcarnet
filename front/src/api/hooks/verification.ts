@@ -108,7 +108,11 @@ export function useVerdictAliment(saisie: SaisieAliment | null) {
     queryKey: ['verdict-aliment', interrogee],
     enabled: ilYAQuelqueChoseAJuger(interrogee),
     /* Le verdict ne vieillit pas : pour une saisie donnee, la reponse est
-       toujours la meme. On ne redemande donc jamais la meme. */
+       toujours la meme. On ne redemande donc jamais la meme — SAUF une saisie
+       dont la requete a ete ABANDONNEE : consommer le `signal` fait annuler la
+       requete par TanStack avec `cancel({revert: true})`, ce qui remet son
+       entree de cache a `undefined`. Borne et benin (l'anti-rebond est a
+       250 ms), mais ce n'est plus « jamais ». Precise le 21 septembre 2026. */
     staleTime: Infinity,
     gcTime: 60_000,
     /* L'AIDE DOCUMENTEE PLUTOT QUE LA FONCTION ECRITE A LA MAIN. Les deux
@@ -226,6 +230,13 @@ export function useJaugeMotDePasse(motDePasse: string) {
 
   const requete = useQuery({
     queryKey: ['jauge-mot-de-passe', interroge],
+    /* RIEN DE TAPE, RIEN A DEMANDER — le jumeau du garde pose sur l'aliment ce
+       matin, et oublie ici le meme jour. Sans lui, monter l'ecran d'invitation
+       ou celui du changement de mot de passe partait aussitot en
+       `POST {"motDePasse":""}` — sur la SEULE route publique du projet, celle
+       qui est bornee a 120 appels par minute. Releve par `revue-pile` le
+       21 septembre 2026. */
+    enabled: '' !== interroge,
     staleTime: Infinity,
     gcTime: 60_000,
     placeholderData: keepPreviousData,

@@ -372,8 +372,28 @@ async function fetchAvecDelai(url: string, options: RequestInit = {}): Promise<R
    *
    * Le minuteur ci-dessus, et l'appelant qui n'a plus besoin de la réponse.
    * On relaie le second dans le premier plutôt que d'employer
-   * `AbortSignal.any` : Hermes ne l'implémente pas partout, et ce fichier a
-   * déjà payé une fois le prix d'un `normalize()` absent du moteur.
+   * `AbortSignal.any`, QUI N'EXISTE PAS SUR MOBILE — et la raison n'est pas
+   * celle qu'on croit.
+   *
+   * CE N'EST PAS HERMES. Ce commentaire a d'abord accusé le moteur ; c'est
+   * faux, et c'est exactement le mécanisme de la croyance `Intl` démontée le
+   * 20 septembre. React Native REMPLACE le global, quel que soit le moteur :
+   * `node_modules/react-native/Libraries/Core/setUpXHR.js:42` fait
+   * `polyfillGlobal('AbortSignal', () => require('abort-controller').AbortSignal)`.
+   * Le paquet est `abort-controller@3.0.0`, et il n'a AUCUNE méthode statique —
+   * ni `any`, ni `timeout`, ni `abort` ; son prototype n'a ni `reason` ni
+   * `throwIfAborted`. Énuméré sur le paquet installé, RN 0.81.5 / Expo SDK 54,
+   * le 21 septembre 2026.
+   *
+   * POURQUOI ÇA COMPTE : les tests tournent sous Node, qui a `AbortSignal.any`
+   * depuis la 20. Quelqu'un qui « corrigerait » vers `AbortSignal.any` verrait
+   * 1 293 tests au vert et un `TypeError` sur le téléphone. La doc officielle
+   * de React Native ne sert à rien ici — sa page est marquée « work in
+   * progress » et renvoie à MDN, ce qui laisse croire l'inverse.
+   *
+   * `addEventListener` / `removeEventListener`, eux, viennent du shim
+   * `event-target-shim` et fonctionnent : le relais manuel ci-dessous est
+   * correct sur les deux plateformes.
    *
    * ON GARDE LES DEUX RAISONS DISTINCTES, parce que le `catch` en fait des
    * messages différents : « le serveur ne répond pas » pour le minuteur, et
@@ -660,6 +680,21 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
        finissent ici, comme un serveur qui s'est tu. La première version disait
        « il a accepté la connexion » et envoyait l'enquête côté serveur à tort
        — relevé par la revue le 15 septembre 2026. */
+    /* UN ABANDON N'EST PAS UNE PANNE, et il ressort tel quel.
+       Sans cette ligne, il tombait dans le repli ci-dessous : « Serveur
+       injoignable », plus DEUX réessais (`reessai.ts` réessaie tout
+       `statut === 0`) sur une requête que l'écran venait d'annuler. La classe
+       `AbandonDemande` promettait « aucun message » et le `catch` n'en savait
+       rien — relevé par `revue-pile` le 21 septembre 2026.
+
+       Ça ne se voyait pas : TanStack Query rejette son propre retryer AVANT
+       que notre promesse ne retombe, dès que la `queryFn` a consommé le
+       `signal`. C'était donc un piège armé pour le premier appelant qui
+       passerait un `AbortSignal` hors de TanStack. */
+    if (e instanceof AbandonDemande) {
+      throw e;
+    }
+
     if (e instanceof DelaiDepasse) {
       return {
         statut: 0,

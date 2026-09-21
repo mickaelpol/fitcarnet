@@ -164,6 +164,43 @@ porter. Deux des trois parades prévues sont déjà écrites (anti-rebond,
 annulation de la requête en vol). **Ce que la mesure ne dit pas** : le coût du
 reste de `calculer()`, ni la latence d'un téléphone sur le réseau du NAS.
 
+### La revue de pile (Symfony 7.4 / React 19 / TanStack v5), 21 septembre au soir
+
+Trois défauts, tous vérifiés avant correction :
+
+1. **`GET /api/modes-de-travail` était absent d'OpenAPI** — le jumeau oublié
+   appliqué au contrat, le jour même de sa création. L'en-tête du décorateur
+   disait « LES DEUX ROUTES » et la liste en portait deux. C'était **la pire
+   des trois à manquer** : un front écrit demain découvrait comment juger un
+   aliment et un mot de passe, mais pas la règle du chrono. 28 chemins désormais.
+2. **`useJaugeMotDePasse` n'avait pas reçu le garde `enabled`** posé le matin
+   sur son jumeau. Ouvrir l'écran d'invitation partait aussitôt en
+   `POST {"motDePasse":""}` — sur la seule route publique. Mesuré après : **0**.
+3. **`AbandonDemande` tombait dans le repli « Serveur injoignable »**, plus deux
+   réessais, sur une requête que l'écran venait d'annuler. Invisible aujourd'hui
+   (TanStack rejette son retryer avant), donc un piège armé pour le premier
+   appelant hors TanStack.
+
+**Et une raison écrite qui était fausse.** Le commentaire écartait
+`AbortSignal.any` au motif que « Hermes ne l'implémente pas partout ».
+**Hermes n'a rien à voir** : React Native remplace le global par
+`abort-controller@3.0.0` (`setUpXHR.js:42`), qui n'a aucune méthode statique.
+Conclusion juste, cause fausse — le même mécanisme que la croyance `Intl`. Le
+danger était réel : les tests tournent sous Node, qui a `AbortSignal.any`
+depuis la 20, donc « corriger » vers lui aurait donné 1 293 tests verts et un
+`TypeError` sur le téléphone.
+
+Au passage : `Aliment.nom` publiait le nom d'un **index de base de données**
+dans le contrat public — API Platform prend la première ligne du PHPDoc comme
+description. Séparé par un `#[ApiProperty(description:)]` explicite.
+
+**Ce que la revue confirme comme bon** : le décorateur OpenAPI, le double
+`jsonSchemaContext`/`openapiContext`, `sliding_window`, le 429 rendu en JSON
+plutôt que par `TooManyRequestsHttpException` (écart assumé et meilleur —
+**ne pas le « corriger » vers le patron de la doc**), `keepPreviousData`, et
+`ModesDeTravail` en classe statique (l'injecter n'apporterait rien et coûterait
+les tests sans conteneur).
+
 ### Ce qui reste ouvert
 
 - **La famille `/api/mon-frigo/*` n'est pas dans OpenAPI** : ce sont des
@@ -179,6 +216,19 @@ reste de `calculer()`, ni la latence d'un téléphone sur le réseau du NAS.
   L'ÉCRAN compte juste »), mais je n'ai pas su piloter le sélecteur
   `ChoixDansListe` depuis Playwright — la modale ne paraît pas s'ouvrir sous le
   navigateur de test. C'est le geste qui portait la régression : à reprendre.
+- **`#[Target('verification_publique')]` existe en Symfony 7.4** et remplacerait
+  l'injection par convention de nommage, que le commentaire qualifie lui-même de
+  « garde qui disparaît sans bruit ». À mesurer avant d'y toucher : qu'un
+  `#[Target]` erroné fasse bien tomber la compilation du conteneur.
+- **`^/api/invitation/` est publique et non bornée.** Peu dangereux (le jeton
+  fait 256 bits et le hachage n'est atteint qu'après lui), mais le geste
+  rentable serait un abonné `kernel.request` unique bornant cette route ET
+  `/api/verification/mot-de-passe` — ce que recommande la doc Symfony.
+- **`useModesDeTravail` reconstruit sa `Map` à chaque rendu.** Inoffensif
+  aujourd'hui (un seul appelant, non mémoïsé, et le compilateur React n'est pas
+  activé) ; deviendrait une boucle si quelqu'un mettait `seriesQuiComptent` dans
+  un tableau de dépendances. La parade documentée est un `select` au niveau du
+  module, que query-core mémoïse lui-même.
 - **`e2e` : `creerCompte(nom, 'grocy')` écrit dans le Grocy RÉEL.** Un agent de
   vérification y a créé un vrai produit le 21 septembre 2026 en croyant Grocy
   injoignable ; il l'a retiré et l'a prouvé. L'avertissement est maintenant dans

@@ -27,16 +27,30 @@ use PHPUnit\Framework\TestCase;
  */
 final class VerificationDansOpenApiTest extends TestCase
 {
-    public function testLES_DEUX_ROUTES_DE_VERIFICATION_SONT_DOCUMENTEES(): void
+    public function testLES_TROIS_ROUTES_DU_METIER_SONT_DOCUMENTEES(): void
     {
         $paths = $this->decore()->getPaths();
 
-        foreach (['/api/verification/aliment', '/api/verification/mot-de-passe'] as $chemin) {
+        foreach ([
+            '/api/verification/aliment',
+            '/api/verification/mot-de-passe',
+            /* LA TROISIEME A ETE OUBLIEE LE JOUR DE SA CREATION — releve par
+               `revue-pile` le 21 septembre 2026. L'en-tete du decorateur
+               annoncait « LES DEUX ROUTES DE VERIFICATION » et cette liste en
+               portait deux : le jumeau oublie, applique au contrat.
+
+               C'est la pire des trois a manquer. Un front ecrit demain
+               decouvrait comment juger un aliment et un mot de passe, mais PAS
+               la regle du chrono — la seule sans laquelle son compteur
+               « 7 sur 12 » est faux. */
+            '/api/modes-de-travail',
+        ] as $chemin) {
             $item = $paths->getPath($chemin);
 
             self::assertInstanceOf(PathItem::class, $item,
                 $chemin . ' manque au contrat : un autre front ne peut pas le deviner');
-            self::assertInstanceOf(Operation::class, $item->getPost());
+            self::assertNotNull($item->getPost() ?? $item->getGet(),
+                $chemin . ' est declare sans operation : il ne dit rien');
         }
     }
 
