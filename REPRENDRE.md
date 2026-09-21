@@ -144,6 +144,26 @@ le vinaigre et le cidre. Rendre l'entité aussi stricte ramenait exactement la
 régression du 20 septembre — **un serveur qui refuse le vin**. L'asymétrie est
 délibérée, et un seul sens compte : celui que le test garde.
 
+### ⏱ La mesure qui débloque le palier 3 — faite le 21 septembre 2026
+
+Le plan disait : *« Combien de millisecondes prend une résolution complète en
+PHP ? […] C'est une demi-journée, et ça tranche le palier entier. »* C'est fait.
+
+| | 5 000 résolutions — le pire cas d'un plan 7 jours × 4 repas |
+|---|---|
+| TypeScript (navigateur) | **19 ms** |
+| PHP 8.3 (serveur) | **125 ms** |
+
+**Gauss n'est pas le mur.** Le système est de taille *n × n* où *n* est le
+nombre de macros actives : **au plus 4 × 4**. « 5 000 éliminations » sonne
+énorme et ne l'est pas. Le port PHP est fidèle à la neuvième décimale, ce qui
+rend la mesure utilisable.
+
+**Ce qui reste le vrai coût : l'aller-retour par geste**, et les 2 500 lignes à
+porter. Deux des trois parades prévues sont déjà écrites (anti-rebond,
+annulation de la requête en vol). **Ce que la mesure ne dit pas** : le coût du
+reste de `calculer()`, ni la latence d'un téléphone sur le réseau du NAS.
+
 ### Ce qui reste ouvert
 
 - **La famille `/api/mon-frigo/*` n'est pas dans OpenAPI** : ce sont des

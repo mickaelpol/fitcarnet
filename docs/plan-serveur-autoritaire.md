@@ -235,15 +235,46 @@ soit **jusqu'à ~5 000 éliminations de Gauss** pour un plan de 7 jours × 4 rep
 — refaites à chaque geste : cocher un jour, changer le nombre de convives,
 verrouiller un rôle, déclarer un reste, remplacer un aliment.
 
-**À MESURER AVANT DE DÉCIDER, et non à supposer :**
+### ⏱ MESURE FAITE LE 21 SEPTEMBRE 2026 — Gauss n'est PAS le mur
 
-1. Combien de millisecondes prend une résolution complète en PHP ? Écrire
-   `algebre.ts` seul en PHP (158 lignes) et le chronométrer sur le pire cas
-   réel. C'est une demi-journée, et ça tranche le palier entier.
-2. Combien de gestes par minute fait-on réellement sur l'écran de plan ?
+`resoudre` a été porté en PHP et chronométré dans le conteneur, sur des
+matrices de macros réelles (riz, poulet, huile, lentilles) :
+
+| | 5 000 résolutions — le pire cas annoncé ci-dessus |
+|---|---|
+| TypeScript (`dist-tests`, Node 22) | **19 ms** |
+| PHP 8.3 (conteneur) | **125 ms** |
+
+**Le port est fidèle à la neuvième décimale** sur 3×3 comme sur 4×4 — c'est ce
+qui rend la mesure utilisable : `[1.845637584, 0.080974613, 0.572573595,
+2.802013423]` des deux côtés.
+
+**Pourquoi c'était surestimé.** Le système est de taille *n × n* où *n* est le
+nombre de macros ACTIVES (`A = actifs.map(eq => actifs.map(…))`,
+`solveur.ts:216`) : **au plus 4 × 4**. « 5 000 éliminations de Gauss » sonne
+énorme et ne l'est pas — ce sont 5 000 systèmes minuscules. PHP est 6,5× plus
+lent que Node ici, et 125 ms de calcul pur tient largement dans un aller-retour.
+
+**CE QUI RESTE LE VRAI COÛT, donc : l'aller-retour par geste, pas l'arithmétique.**
+Le palier 3 se décide sur la latence réseau et sur les 2 500 lignes à porter,
+plus sur ce que coûtent le plafonnement, la composition et le vocabulaire — non
+mesurés. Les trois parades listées plus bas restent les bonnes, et **deux sont
+déjà en place depuis le 21 septembre 2026** : l'anti-rebond et l'annulation de
+la requête en vol (`Options.signal` dans `client.ts`).
+
+**Ce que cette mesure ne dit PAS** : le coût du reste de `calculer()`, celui de
+la sérialisation d'un plan complet, et la latence réelle d'un téléphone sur le
+réseau du NAS. Ne pas lui faire dire que le palier 3 est facile — seulement
+qu'il n'est pas bloqué par ce qu'on croyait.
+
+**CE QUI RESTE À MESURER :**
+1. Combien de gestes par minute fait-on réellement sur l'écran de plan ?
    `verification-android` sait le mesurer.
-3. Un appel unique par recalcul, anti-rebond de ~300 ms et annulation de la
-   requête en vol suffisent-ils à rendre l'écran vivable ?
+2. Un appel unique par recalcul, anti-rebond de ~300 ms et annulation de la
+   requête en vol suffisent-ils à rendre l'écran vivable ? (Les deux derniers
+   existent déjà, écrits pour la route de vérification.)
+3. Combien coûtent le plafonnement, la composition et le vocabulaire des repas,
+   qui sont le gros des 2 500 lignes ?
 
 Si la réponse est non, le repli est **un échec provisoire, pas une solution** :
 on déclare le solveur cas à deux juges assumés, on le verrouille par un fichier
