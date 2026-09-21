@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Service\CoherenceDesCibles;
 use App\Service\ModesDeTravail;
 use App\Service\MotDePasse;
+use App\Service\PlanCoach;
 use App\Service\VerdictAliment;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -93,6 +94,43 @@ final class VerificationController extends AbstractController
                 (float) ($saisie['lip'] ?? 0),
                 (bool) ($saisie['glucidesTotaux'] ?? false),
             ),
+        ]);
+    }
+
+    /**
+     * UN PLAN DE COACH AMERICAIN, CONVERTI — palier B, 21 septembre 2026.
+     *
+     * Les plans americains comptent les fibres DANS les glucides ; l'application
+     * les compte a part, a 2 kcal/g (regle 4). L'ecran des objectifs portait
+     * cette conversion, le seuil de plausibilite des fibres et la phrase qui
+     * l'accompagne : `front/src/calcul/planCoach.ts` est supprime dans le meme
+     * commit, il n'en reste rien au front.
+     *
+     * L'ECRAN NE DEVINE PAS LA CONVENTION, IL LA DEMANDE A L'UTILISATEUR — et
+     * ce bloc n'est ouvert que si celui-ci l'a ouvert. La route ne fait donc que
+     * repondre a ce qui est tape, comme les autres de ce contrat.
+     *
+     * AUCUN CHAMP N'EST OBLIGATOIRE : ce qui manque vaut zero gramme.
+     */
+    #[Route('/verification/plan-coach', methods: ['POST'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function planCoach(Request $requete): JsonResponse
+    {
+        /** @var array<string, mixed> $saisie */
+        $saisie = (array) \json_decode((string) $requete->getContent(), true);
+
+        $glucides = (float) ($saisie['gluc'] ?? 0);
+        $fibres = (float) ($saisie['fibres'] ?? 0);
+
+        return $this->json([
+            'cible' => PlanCoach::convertir(
+                (float) ($saisie['kcal'] ?? 0),
+                (float) ($saisie['prot'] ?? 0),
+                $glucides,
+                (float) ($saisie['lip'] ?? 0),
+                $fibres,
+            ),
+            'avertissement' => PlanCoach::avertissementDesFibres($glucides, $fibres),
         ]);
     }
 

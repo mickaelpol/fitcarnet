@@ -118,30 +118,14 @@ final class CoherenceDesCibles
         $constat = $glucidesTotaux
             ? \sprintf(
                 'Tes grammes représentent entre %s et %s calories selon la part de fibres, pas %s. ',
-                self::nb($bornes['min']), self::nb($bornes['max']), self::nb($kcal),
+                FormatCourt::nb($bornes['min']), FormatCourt::nb($bornes['max']),
+                FormatCourt::nb($kcal),
             )
             : \sprintf(
                 'Tes grammes représentent %s calories, pas %s. ',
-                self::nb($bornes['max']), self::nb($kcal),
+                FormatCourt::nb($bornes['max']), FormatCourt::nb($kcal),
             );
 
         return $constat."L'app respecte les grammes ; les calories suivent.";
-    }
-
-    /**
-     * LE FORMAT COURT DE L'APPLICATION, jumeau de `nb` — `front/src/theme/index.ts:174`.
-     *
-     * Entier tant qu'on en est a moins de 0,05, sinon UNE decimale et une
-     * VIRGULE. Ce n'est pas une preference : c'est ce que l'ecran affichait
-     * avant le palier B, et la consigne est que l'application se comporte
-     * exactement comme avant.
-     */
-    private static function nb(float $valeur): string
-    {
-        if (abs($valeur - round($valeur)) < 0.05) {
-            return (string) (int) round($valeur);
-        }
-
-        return str_replace('.', ',', number_format($valeur, 1, '.', ''));
     }
 }

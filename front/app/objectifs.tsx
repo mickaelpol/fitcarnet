@@ -5,11 +5,10 @@ import {
   NOM_LONG_REPAS, NOM_REPAS, REPAS as LISTE_REPAS,
 } from '@/solveur/repasVocabulaire';
 import { useCibles, useEnregistrerCible } from '@/api/hooks';
-import { useVerdictCible } from '@/api/hooks/verification';
+import { useConversionPlanCoach, useVerdictCible } from '@/api/hooks/verification';
 import type { Cible } from '@/api/types';
 import { nombreSaisi } from '@/calcul/saisieNombre';
 import { Bouton, Carte, Champ, Chargement, Discret, Erreur, Texte } from '@/composants/base';
-import { convertir, fibresDouteuses } from '@/calcul/planCoach';
 /* La formule des calories ne se recopie pas : elle vit dans le solveur, qui
    tient ses coefficients de `src/calcul/nutrition.ts`. L'alias `@/` est sans
    danger ici — `app/` n'est jamais compilé vers `dist-tests/`.
@@ -88,6 +87,23 @@ export default function Objectifs() {
   const { verdict: verdictCible, perime: verdictPerime, enPanne: verdictEnPanne } =
     useVerdictCible(valide ? { ...valeurs, glucidesTotaux: totaux } : null);
 
+  /* Le convertisseur ne fait qu'une chose : retrancher les fibres des
+     glucides. C'est là qu'est le piège d'un plan américain, et nulle part
+     ailleurs — protéines et lipides ne dépendent d'aucune convention.
+
+     LA CONVERSION AUSSI EST PARTIE AU SERVEUR — palier B, 21 septembre 2026.
+     `src/calcul/planCoach.ts` est supprimé : l'arrondi au dixième, l'ordre
+     « les grammes d'abord, les calories ensuite » (F6) et le seuil de
+     plausibilité des fibres vivent dans `api/src/Service/PlanCoach.php`. */
+  const chiffresPlan = {
+    kcal: lire(plan.kcal), prot: lire(plan.prot),
+    gluc: lire(plan.gluc), lip: lire(plan.lip), fibres: lire(plan.fibres),
+  };
+  const planLisible = Object.values(chiffresPlan).every((v) => !Number.isNaN(v) && v >= 0);
+  const { conversion, perime: conversionPerimee } =
+    useConversionPlanCoach(planLisible ? chiffresPlan : null);
+  const converti = conversion?.cible;
+
   const existante = (cibles.data ?? []).find((c) => c.repas === repas);
 
   /* On recharge les champs à chaque changement de repas.
@@ -148,17 +164,6 @@ export default function Objectifs() {
     setSaisie(suite);
   };
 
-  /* Le convertisseur ne fait qu'une chose : retrancher les fibres des
-     glucides. C'est là qu'est le piège d'un plan américain, et nulle part
-     ailleurs — protéines et lipides ne dépendent d'aucune convention. */
-  const chiffresPlan = {
-    kcal: lire(plan.kcal), prot: lire(plan.prot),
-    glucides: lire(plan.gluc), lipides: lire(plan.lip), fibres: lire(plan.fibres),
-  };
-  const planLisible = Object.values(chiffresPlan).every((v) => !Number.isNaN(v) && v >= 0);
-  const converti = planLisible ? convertir(chiffresPlan) : null;
-  const fibresSuspectes = planLisible && fibresDouteuses(chiffresPlan);
-
   /**
    * Reporte le plan tel qu'il est imprimé, et coche la case.
    *
@@ -173,10 +178,15 @@ export default function Objectifs() {
    * pour un même but, dont l'un est moins sûr, c'en était un de trop.
    */
   const appliquerConversion = () => {
-    if (converti === null) return;
+    /* `conversionPerimee` GARDE CE BOUTON, et ce n'est pas du zèle. La
+       conversion vient du serveur avec un anti-rebond : entre une frappe et la
+       réponse, ce qui est affiché décrit la saisie PRÉCÉDENTE. Reporter à ce
+       moment-là écrirait des grammes qui ne sont pas ceux du plan — règle 7,
+       un chiffre faux qui sera pesé. Le bouton est éteint aussi. */
+    if (converti === undefined || conversionPerimee) return;
     setSaisie({
       prot: String(converti.prot),
-      gluc: String(chiffresPlan.glucides),
+      gluc: String(chiffresPlan.gluc),
       lip: String(converti.lip),
       kcal: String(converti.kcalAnnoncees),
     });
@@ -271,11 +281,11 @@ export default function Objectifs() {
                 onChange={(v) => setPlan({ ...plan, kcal: v })}
                 unite="kcal" numerique placeholder="0" />
 
-              {converti !== null && (
-                <>
+              {converti !== undefined && (
+                <View style={conversionPerimee ? { opacity: 0.45 } : undefined}>
                   <Discret style={{ fontSize: T.petit, lineHeight: 18 }}>
                     Sera enregistré : <Texte style={{ fontFamily: P.fort }}>
-                      {nb(converti.prot)} P · {nb(chiffresPlan.glucides)} G fibres comprises
+                      {nb(converti.prot)} P · {nb(chiffresPlan.gluc)} G fibres comprises
                       · {nb(converti.lip)} L · {converti.kcalAnnoncees} kcal
                     </Texte>
                     {'\n'}À titre indicatif, hors fibres ces glucides valent
@@ -284,18 +294,19 @@ export default function Objectifs() {
                     connues, plutôt que celles de ton plan, qui ne le sont pas.
                   </Discret>
 
-                  {fibresSuspectes && (
+                  {/* LA PHRASE VIENT DU SERVEUR, telle quelle. Le ⚠ reste ici :
+                      c'est de la décoration, au même titre que la couleur. */}
+                  {conversion?.avertissement != null && (
                     <Discret style={{ color: C.vif, fontSize: T.petit, lineHeight: 18 }}>
-                      ⚠ {nb(chiffresPlan.fibres)} g de fibres pour {nb(chiffresPlan.glucides)} g
-                      de glucides : ton plan les sous-estime. Sans conséquence ici —
-                      c'est justement pour ça qu'on ne s'en sert pas.
+                      ⚠ {conversion.avertissement}
                     </Discret>
                   )}
 
-                  <Bouton variante="contour" onPress={appliquerConversion}>
+                  <Bouton variante="contour" onPress={appliquerConversion}
+                    desactive={conversionPerimee}>
                     Reporter et cocher « fibres comprises »
                   </Bouton>
-                </>
+                </View>
               )}
             </View>
           )}

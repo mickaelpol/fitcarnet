@@ -319,3 +319,68 @@ export function useVerdictCible(saisie: SaisieCible | null) {
     enPanne: requete.isError,
   };
 }
+
+/** La cible europeenne que decrit un plan americain. */
+export interface CibleConvertie {
+  prot: number;
+  /** Fibres retranchees. */
+  gluc: number;
+  lip: number;
+  /** Ce qui a ete retranche des glucides. */
+  fibres: number;
+  /** Recalculees sur les grammes RENDUS, arrondis au dixieme. */
+  kcal: number;
+  /** Ce que le plan d'origine annoncait, pour comparaison. */
+  kcalAnnoncees: number;
+}
+
+/** Ce que le serveur rend d'un plan de coach recopie. */
+export interface ConversionPlanCoach {
+  cible: CibleConvertie;
+  /** La phrase sur des fibres sous-estimees, deja redigee, ou `null`. */
+  avertissement: string | null;
+}
+
+/** Ce que l'ecran recopie d'un plan etranger, avant conversion. */
+export interface SaisiePlanCoach {
+  kcal: number;
+  prot: number;
+  /** Glucides TOTAUX, fibres comprises — c'est la convention du plan. */
+  gluc: number;
+  lip: number;
+  fibres: number;
+}
+
+/**
+ * UN PLAN DE COACH AMERICAIN, CONVERTI PAR LE SERVEUR — palier B, 21 septembre 2026.
+ *
+ * `front/src/calcul/planCoach.ts` est SUPPRIME dans le meme commit : la
+ * conversion, le seuil de plausibilite des fibres et la phrase qui l'accompagne
+ * vivent maintenant dans `api/src/Service/PlanCoach.php`, et nulle part
+ * ailleurs. Ce n'est pas un jumeau declare comme `Atwater` — c'est un
+ * demenagement complet, parce que le module n'avait qu'un seul appelant.
+ *
+ * `null` tant que les cinq nombres ne sont pas lisibles : ce qui manque ne vaut
+ * pas zero (regle 6), et c'est exactement la condition qui commandait
+ * l'affichage avant le palier B.
+ */
+export function useConversionPlanCoach(saisie: SaisiePlanCoach | null) {
+  const interrogee = useRetarde(saisie);
+  const enRetard = JSON.stringify(saisie) !== JSON.stringify(interrogee);
+
+  const requete = useQuery({
+    queryKey: ['conversion-plan-coach', interrogee],
+    enabled: null !== interrogee,
+    staleTime: Infinity,
+    gcTime: 60_000,
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) => api<ConversionPlanCoach>(
+      '/verification/plan-coach', { methode: 'POST', corps: interrogee, signal }),
+  });
+
+  return {
+    conversion: requete.data,
+    perime: enRetard || requete.isPlaceholderData,
+    enPanne: requete.isError,
+  };
+}

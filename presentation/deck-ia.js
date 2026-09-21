@@ -173,15 +173,16 @@ async function besoin(p) {
     texte(d, `0${i + 1}`, { x: 7.15, y, w: 0.7, h: 1.3, fontFace: TITRE, fontSize: 26, bold: true, color: C.vif, valign: 'middle' });
     texte(d, r, { x: 7.9, y, w: 4.6, h: 1.3, fontSize: 15, bold: true, valign: 'middle' });
   });
-  await bandeau(d, 'Multi-comptes · auto-hébergée sur mon NAS · web + Android · utilisée au quotidien');
+  // Le bandeau ne parle que du BESOIN : la fiche technique est sur la diapositive du cadrage.
+  await bandeau(d, 'Un besoin réel : je m’en sers tous les jours — ce qui s’affiche est pesé, puis mangé.');
   d.addNotes('Le besoin est personnel et réel : je m’en sers tous les jours. C’est ce qui rend le projet exigeant — ce qui est affiché est pesé et mangé.');
 }
 
 async function cadrage(p) {
   const d = p.addSlide();
   enTete(d, '02 · LE CADRAGE', 4, TOTAL);
-  texte(d, 'Cadrer avant de générer.', { x: MARGE, y: 1.0, w: 5.2, h: 1.5, fontFace: TITRE, fontSize: 40, bold: true, valign: 'middle' });
-  texte(d, 'L’IA code vite. Sans cadre, elle code vite dans la mauvaise direction. Tout le cadre est écrit, versionné dans git, et relu par l’IA à chaque session.', { x: 6.2, y: 1.0, w: 6.5, h: 1.5, fontSize: 15, color: C.attenue, valign: 'middle', lineSpacingMultiple: 1.15 });
+  texte(d, 'Cadrer avant de générer.', { x: MARGE, y: 0.9, w: 5.2, h: 1.4, fontFace: TITRE, fontSize: 40, bold: true, valign: 'middle' });
+  texte(d, 'L’IA code vite. Sans cadre, elle code vite dans la mauvaise direction. Tout le cadre est écrit, versionné dans git, et relu par l’IA à chaque session.', { x: 6.2, y: 0.9, w: 6.5, h: 1.4, fontSize: 15, color: C.attenue, valign: 'middle', lineSpacingMultiple: 1.15 });
   const cartes = [
     ['boxes', 'Une pile choisie par moi', 'Symfony 7.4 · API Platform 4 · PostgreSQL 16 · Expo / React Native · Docker'],
     [['file-check-2', 'file-check-corner', 'file-check'], 'CLAUDE.md', 'La « constitution » du projet : architecture, 7 règles non négociables, pièges connus'],
@@ -191,8 +192,9 @@ async function cadrage(p) {
   const w = (LARGEUR - 0.3) / 2;
   for (let i = 0; i < cartes.length; i++) {
     const [ic, nom, desc] = cartes[i];
-    await carteInfo(d, MARGE + (i % 2) * (w + 0.3), 2.85 + Math.floor(i / 2) * 1.95, w, 1.7, ic, nom, desc, { tailleNom: 17, tailleTexte: 13.5 });
+    await carteInfo(d, MARGE + (i % 2) * (w + 0.3), 2.5 + Math.floor(i / 2) * 1.85, w, 1.65, ic, nom, desc, { tailleNom: 17, tailleTexte: 13.5 });
   }
+  await bandeau(d, 'L’application : multi-comptes · auto-hébergée sur mon NAS · web + Android');
   d.addNotes('Le point clé de toute la présentation : l’IA relit ce cadre à chaque session. Ce n’est pas un prompt, c’est de la documentation versionnée.');
 }
 

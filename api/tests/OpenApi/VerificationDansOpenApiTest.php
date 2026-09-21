@@ -27,7 +27,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class VerificationDansOpenApiTest extends TestCase
 {
-    public function testLES_QUATRE_ROUTES_DU_METIER_SONT_DOCUMENTEES(): void
+    public function testLES_CINQ_ROUTES_DU_METIER_SONT_DOCUMENTEES(): void
     {
         $paths = $this->decore()->getPaths();
 
@@ -39,6 +39,11 @@ final class VerificationDansOpenApiTest extends TestCase
                demande. Elle est inscrite ici AVANT d'exister, pour que le test
                tombe si le decorateur l'oublie comme il a oublie la troisieme. */
             '/api/verification/cible',
+            /* LA CINQUIEME, meme jour : la conversion d'un plan de coach
+               americain. Son module front a ete SUPPRIME — si elle manquait au
+               contrat, un autre front n'aurait aucun moyen de retrouver la
+               regle. */
+            '/api/verification/plan-coach',
             /* LA TROISIEME A ETE OUBLIEE LE JOUR DE SA CREATION — releve par
                `revue-pile` le 21 septembre 2026. L'en-tete du decorateur
                annoncait « LES DEUX ROUTES DE VERIFICATION » et cette liste en

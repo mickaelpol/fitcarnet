@@ -157,6 +157,72 @@ final readonly class VerificationDansOpenApi implements OpenApiFactoryInterface
             ],
         )));
 
+        $chemins->addPath('/api/verification/plan-coach', new PathItem(post: new Operation(
+            operationId: 'convertirPlanCoach',
+            tags: ['Vérification'],
+            summary: 'Un plan de coach américain, converti en convention européenne.',
+            description: <<<'TXT'
+                LES PLANS AMÉRICAINS COMPTENT LES FIBRES DANS LES GLUCIDES
+                (MyFitnessPal, USDA, la plupart des coachs anglophones).
+                L'application les compte à part, à 2 kcal/g. Recopier un plan
+                sans le convertir laisse donc les glucides trop hauts.
+
+                LES GRAMMES D'ABORD, LES CALORIES ENSUITE — et sur ces grammes-là,
+                arrondis au dixième. Ce qui est affiché est ce qui sera pesé.
+
+                `avertissement` signale des fibres sous-estimées, c'est-à-dire un
+                champ que le plan n'a pas rempli plutôt qu'une valeur. Il
+                n'interdit rien : rien n'est déduit des fibres déclarées par le
+                plan, le calculateur retranche celles des aliments, qui sont
+                connues.
+
+                ON NE DEVINE PAS LA CONVENTION, ON LA DEMANDE. Une détection
+                automatique a été tentée et retirée : les calories d'un plan
+                viennent des étiquettes, pas d'un calcul, et la comparaison ne
+                mesurait que du bruit.
+                TXT,
+            requestBody: new RequestBody(
+                content: new \ArrayObject(['application/json' => [
+                    'schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'kcal' => ['type' => 'number', 'description' => 'Les calories que le plan annonce.'],
+                            'prot' => ['type' => 'number'],
+                            'gluc' => ['type' => 'number', 'description' => 'Glucides TOTAUX, fibres comprises.'],
+                            'lip' => ['type' => 'number'],
+                            'fibres' => ['type' => 'number', 'description' => 'Les fibres que le plan déclare.'],
+                        ],
+                    ],
+                    'example' => ['kcal' => 578.6, 'prot' => 26.8, 'gluc' => 64.7,
+                        'lip' => 25.9, 'fibres' => 3.5],
+                ]]),
+            ),
+            responses: [
+                '200' => new Response(
+                    'La cible en convention européenne, et la phrase à afficher s\'il y en a une.',
+                    new \ArrayObject(['application/json' => ['schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'cible' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'prot' => ['type' => 'number'],
+                                    'gluc' => ['type' => 'number', 'description' => 'Fibres retranchées.'],
+                                    'lip' => ['type' => 'number'],
+                                    'fibres' => ['type' => 'number', 'description' => 'Ce qui a été retranché.'],
+                                    'kcal' => ['type' => 'number', 'description' => 'Recalculées sur les grammes rendus.'],
+                                    'kcalAnnoncees' => ['type' => 'number', 'description' => 'Ce que le plan disait.'],
+                                ],
+                            ],
+                            'avertissement' => ['type' => 'string', 'nullable' => true],
+                        ],
+                        'required' => ['cible', 'avertissement'],
+                    ]]]),
+                ),
+                '401' => new Response('Route authentifiée : elle répond sur des règles métier.'),
+            ],
+        )));
+
         $chemins->addPath('/api/verification/mot-de-passe', new PathItem(post: new Operation(
             operationId: 'verifierMotDePasse',
             tags: ['Vérification'],

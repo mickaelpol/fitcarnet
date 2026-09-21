@@ -78,7 +78,40 @@ test.describe('l\'écran des objectifs', () => {
 
     await expect(page.getByText(/Objectifs enregistrés/)).toBeVisible();
   });
+
+  /**
+   * LE CONVERTISSEUR DE PLAN AMÉRICAIN — porté au serveur le 21 septembre 2026,
+   * `front/src/calcul/planCoach.ts` supprimé. Ses treize cas de test sont
+   * maintenant en PHP (`PlanCoachTest`) ; ce qu'ils ne peuvent PAS voir, c'est
+   * que les cinq champs partent et que la conversion revienne à l'écran.
+   */
+  test('convertit un plan américain : les fibres quittent les glucides', async ({ page }) => {
+    await seConnecter(page, email);
+    await page.goto('/objectifs');
+
+    await page.getByText(/Recopier depuis un plan américain/).click();
+
+    /* Le petit-déjeuner du plan réel : 64,7 g de glucides dont 3,5 de fibres,
+       soit 61,2 g une fois les fibres retranchées. */
+    await champDuPlan(page, 'Protéines').fill('26.8');
+    await champDuPlan(page, 'Glucides totaux').fill('64.7');
+    await champDuPlan(page, 'Lipides').fill('25.9');
+    await champDuPlan(page, 'Fibres').fill('3.5');
+    await champDuPlan(page, 'Calories du plan').fill('578.6');
+
+    await expect(page.getByText(/hors fibres ces glucides valent 61,2 g/)).toBeVisible();
+
+    /* Et l'avertissement sur des fibres sous-estimées, rédigé par le serveur :
+       3,5 g pour 64,7 g de glucides, soit moins du dixième. */
+    await expect(page.getByText(/ton plan les sous-estime/)).toBeVisible();
+  });
 });
+
+/* Les cinq champs du convertisseur viennent APRÈS les quatre de la cible dans
+   l'ordre du document — le panneau se déplie au-dessus d'eux. */
+const champDuPlan = (page: import('@playwright/test').Page, etiquette: string) =>
+  page.locator('input').nth(
+    ({ 'Protéines': 0, 'Glucides totaux': 1, 'Lipides': 2, 'Fibres': 3, 'Calories du plan': 4 })[etiquette] ?? 0);
 
 /**
  * Les calories se saisissent EN DERNIER : changer une macro les recalcule, et
