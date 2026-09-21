@@ -15,6 +15,8 @@ const aliment = (
   kcal100: 0, prot100: 0, gluc100: 0, lip100: 0, fibres100: null,
   ratio: 1,
   stock, unite: 'g', grammesParUnite: 1,
+  /* Le serveur le rend depuis le palier B ; ces cas-ci n'en dependent pas. */
+  grammesDisponibles: stock,
   emplacement, peseeAvant: null, peseeApres: null, provenanceRatio: 'table',
 });
 

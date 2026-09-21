@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\Aliment;
 use App\Entity\Utilisateur;
+use App\Repository\PlansPrevus;
 use App\Service\AnomaliesAliment;
 use App\Service\CoherenceNutritionnelle;
 use App\Service\ControleDesMacros;
@@ -14,6 +15,7 @@ use App\Service\RendementPlausible;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
 use App\Service\InventaireLots;
+use App\Service\StockPromis;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -56,6 +58,10 @@ final class FrigoController extends AbstractController
         private readonly FrigoBase $base,
         private readonly FrigoGrocy $grocy,
         private readonly InventaireLots $lots,
+        /* AJOUTE AU PALIER B, le 21 septembre 2026 : le frigo ne dit plus
+           seulement ce qu'il contient, il dit ce qui reste VRAIMENT une fois
+           les plans prevus servis. Le front le calculait. */
+        private readonly PlansPrevus $plansPrevus,
     ) {
     }
 
@@ -105,12 +111,25 @@ final class FrigoController extends AbstractController
            Il part avec l'aliment plutot que dans une liste a part : c'est la
            ligne qui l'affiche, et l'apparier apres coup demanderait une cle
            que le nom ne garantit pas. */
-        $aliments = \array_map(static function ($a): array {
+        /* CE QUI EST DEJA PROMIS A UN AUTRE PLAN — palier B, 21 septembre 2026.
+           Le front lisait les plans et faisait la soustraction lui-meme
+           (`dejaPromis`, `grammesDisponibles`). Les deux entrees venaient du
+           serveur et il n'en modifiait aucune : c'est le cas ou le chiffre peut
+           etre rendu, plutot que la regle transmise.
+
+           SANS CETTE SOUSTRACTION, deux batch cooking d'affilee comptent deux
+           fois le meme frigo : chacun juste tout seul, faux ensemble, et rien ne
+           le dit. */
+        $promis = StockPromis::parReference($this->plansPrevus->duCompte((string) $utilisateur->getId()));
+
+        $aliments = \array_map(static function ($a) use ($promis): array {
             $t = $a->versTableau();
             $t['controle'] = ControleDesMacros::pour(
                 (float) $t['kcal100'], (float) $t['prot100'], (float) $t['gluc100'],
                 (float) $t['lip100'],
                 null === $t['fibres100'] ? null : (float) $t['fibres100']);
+            $t['grammesDisponibles'] = StockPromis::disponible(
+                $a->stockEnGrammes(), $promis[(string) $t['reference']] ?? 0.0);
 
             return $t;
         }, $tout['aliments']);

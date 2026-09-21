@@ -273,6 +273,16 @@ export interface AlimentDisponible {
   /** quantité réellement disponible, exprimée dans l'unité ci-dessous */
   stock: number;
   /**
+   * CE QUI RESTE VRAIMENT, EN GRAMMES — stock moins ce que les plans PRÉVUS
+   * ont déjà réservé. Rendu par le serveur depuis le palier B (21 septembre
+   * 2026) ; le front faisait la soustraction lui-même, à partir de deux
+   * réponses qu'il ne modifie pas.
+   *
+   * `null` quand le poids d'une unité est inconnu — un litre, un pack : on ne
+   * sait pas combien il y en a, et zéro dirait qu'il n'y en a plus (règle 6).
+   */
+  grammesDisponibles: number | null;
+  /**
    * Unité du stock. « g » pour tout ce que le calculateur sait traiter — les
    * macros sont pour 100 g. Une autre valeur (« Pieces », « Litres ») signale
    * un produit que le solveur ne peut pas utiliser tel quel.

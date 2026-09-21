@@ -15,13 +15,14 @@ import type { AuMieux } from '../solveur/composer';
 import type { Compose } from './demandeRepas';
 import {
   alimentsCalculables, alimentsSansFibresConnues, cibleDuRepas, cibleEnGlucidesTotaux,
-  cuissonsEffectives, demandesDuPlan, fibresPar100, grammesDisponibles, grammesEnStock,
+  cuissonsEffectives, demandesDuPlan, fibresPar100,
   mettreAPlat,
 } from './planCalcule';
 
 const dispo = (p: Partial<AlimentDisponible> & { reference: string }): AlimentDisponible => ({
   nom: p.reference, categorie: 'prot', kcal100: 100, prot100: 20, gluc100: 0, lip100: 2,
   fibres100: 0, ratio: 1, stock: 1, unite: 'g', grammesParUnite: 1, emplacement: null,
+  grammesDisponibles: 1,
   peseeAvant: null, peseeApres: null, provenanceRatio: 'table', ...p,
 });
 
@@ -66,48 +67,6 @@ test("l'identifiant du solveur est la référence du frigo", () => {
 test('des fibres inconnues restent inconnues, elles ne deviennent pas zéro', () => {
   const [a] = alimentsCalculables([dispo({ reference: 'grocy:1', fibres100: null })]);
   assert.equal(a?.fibres100, undefined);
-});
-
-/* ---------------------------------------------------------- grammesEnStock */
-
-test('le stock se convertit en grammes par le poids unitaire', () => {
-  const m = grammesEnStock([
-    dispo({ reference: 'grocy:1', stock: 3, grammesParUnite: 55 }),
-    dispo({ reference: 'grocy:2', stock: 0.8, grammesParUnite: 1000 }),
-  ]);
-
-  assert.equal(m.get('grocy:1'), 165);
-  assert.equal(m.get('grocy:2'), 800);
-});
-
-test('un aliment dont le poids unitaire est inconnu n’entre pas dans la table', () => {
-  const m = grammesEnStock([dispo({ reference: 'grocy:1', grammesParUnite: null })]);
-  assert.equal(m.has('grocy:1'), false);
-});
-
-test('un aliment sans énergie garde un poids : il est écarté du calcul, pas du frigo', () => {
-  const m = grammesEnStock([dispo({ reference: 'grocy:1', kcal100: 0, stock: 2, grammesParUnite: 100 })]);
-  assert.equal(m.get('grocy:1'), 200);
-});
-
-/* ------------------------------------------------------- grammesDisponibles */
-
-test('ce qui est promis à un plan prévu est retiré du disponible', () => {
-  const enStock = new Map<Aliment['id'], number>([['grocy:1', 800]]);
-  const promis = new Map<Aliment['id'], number>([['grocy:1', 300]]);
-
-  assert.equal(grammesDisponibles(enStock, promis, aliment('grocy:1')), 500);
-});
-
-test('un frigo négatif n’existe pas : le disponible plancher à zéro', () => {
-  const enStock = new Map<Aliment['id'], number>([['grocy:1', 200]]);
-  const promis = new Map<Aliment['id'], number>([['grocy:1', 800]]);
-
-  assert.equal(grammesDisponibles(enStock, promis, aliment('grocy:1')), 0);
-});
-
-test('un aliment absent des deux tables vaut zéro, pas NaN', () => {
-  assert.equal(grammesDisponibles(new Map(), new Map(), aliment('grocy:9')), 0);
 });
 
 /* ------------------------------------------------------------ fibresPar100 */

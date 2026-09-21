@@ -211,18 +211,3 @@ export function estCuisine(plan: { cuisineLe?: string | null }): boolean {
      silence, et on le découvre devant le bac. */
   return plan.cuisineLe != null && plan.cuisineLe !== '';
 }
-
-export function dejaPromis(
-  plans: readonly { contenu: PlanEnregistre; cuisineLe?: string | null }[],
-): Map<number | string, number> {
-  const promis = new Map<number | string, number>();
-
-  for (const p of plans) {
-    if (estCuisine(p)) continue;
-    for (const c of p.contenu.consomme ?? []) {
-      promis.set(c.reference, (promis.get(c.reference) ?? 0) + c.grammes);
-    }
-  }
-
-  return promis;
-}

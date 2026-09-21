@@ -9,7 +9,7 @@ import {
 const aliment = (reference: string, stock: number): AlimentDisponible => ({
   reference, nom: reference, categorie: 'autre',
   kcal100: 0, prot100: 0, gluc100: 0, lip100: 0, fibres100: null,
-  ratio: 1, stock, unite: 'g', grammesParUnite: 1,
+  ratio: 1, stock, unite: 'g', grammesParUnite: 1, grammesDisponibles: stock,
   emplacement: null, peseeAvant: null, peseeApres: null, provenanceRatio: 'table',
 });
 

@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Controller\FrigoController;
 use App\Entity\Utilisateur;
+use App\Repository\PlansPrevus;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
@@ -242,7 +243,7 @@ final class ValeursGrocyObligatoiresTest extends TestCase
         $cnx = self::createStub(Connection::class);
         $grocy = new FrigoGrocy($http, new NullLogger(), 'https://grocy.test', 'cle');
         $base = new FrigoBase($cnx);
-        $controleur = new FrigoController(new Frigo($grocy, $base), $base, $grocy, new InventaireLots($cnx));
+        $controleur = new FrigoController(new Frigo($grocy, $base), $base, $grocy, new InventaireLots($cnx), new PlansPrevus($cnx));
 
         $utilisateur = (new Utilisateur())->setEmail('admin@exemple.test')->setSourceFrigo('grocy');
         $stockage = new TokenStorage();

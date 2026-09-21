@@ -19,7 +19,6 @@
  */
 
 import { poidsConnu } from './frigo';
-import { stockEnGrammes } from './frigo';
 import type { AlimentDisponible, Cible } from '@/api/types';
 import type { Aliment } from '@/solveur/types';
 import type { AuMieux, DemandeDatee, Repas as Creneau } from '@/solveur/composer';
@@ -50,30 +49,6 @@ export function alimentsCalculables(
 }
 
 /**
- * Combien il y en a VRAIMENT, en grammes à cuire.
- *
- * C'est ce qui empêche le calculateur de réclamer 327 g de saumon quand il
- * n'y en a que 200. Indexé par `reference`, qui est l'`id` que `vers` donne à
- * l'aliment du solveur — les deux clés sont la même, et doivent le rester.
- *
- * TOUT le frigo, pas seulement `alimentsCalculables` : un aliment dont
- * l'énergie manque n'est pas servi, mais son poids reste vrai.
- */
-export function grammesEnStock(
-  aliments: readonly AlimentDisponible[],
-): Map<Aliment['id'], number> {
-  const m = new Map<Aliment['id'], number>();
-  for (const a of aliments) {
-    /* `stockEnGrammes` ET NON LA FORMULE : la garde du serveur refuse un
-       facteur nul, celle-ci l'acceptait et posait « 0 g » en stock. */
-    const g = stockEnGrammes(a);
-    if (g !== null) m.set(a.reference, g);
-  }
-
-  return m;
-}
-
-/**
  * Les fibres pour 100 g, par aliment.
  *
  * Elles ne sont pas des macros pour le solveur — elles n'entrent dans aucune
@@ -91,20 +66,6 @@ export function fibresPar100(
   for (const a of aliments) m.set(a.reference, a.fibres100 ?? 0);
 
   return m;
-}
-
-/**
- * Combien il y en a vraiment, DISPONIBLE — stock moins ce qui est promis.
- *
- * Le plancher à zéro compte : un frigo négatif n'existe pas, et le solveur le
- * lirait comme une dette à rembourser sur les repas suivants.
- */
-export function grammesDisponibles(
-  enStock: ReadonlyMap<Aliment['id'], number>,
-  promis: ReadonlyMap<Aliment['id'], number>,
-  a: Aliment,
-): number {
-  return Math.max(0, (enStock.get(a.id) ?? 0) - (promis.get(a.id) ?? 0));
 }
 
 /** Au moins une cible compte-t-elle les fibres dans ses glucides ? */

@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 
 import { BROCOLI, RIZ, repas } from './cuisson.test-data';
 import {
-  consommationDuPlan, dejaPromis, estCuisine, figerLePlan,
+  consommationDuPlan, estCuisine, figerLePlan,
 } from './planFige';
 import type { PlanEnregistre } from './planFige';
 
@@ -43,91 +43,6 @@ describe('consommationDuPlan', () => {
   });
 });
 
-describe('dejaPromis', () => {
-  const contenu = (
-    lignes: { reference: string; nom: string; grammes: number }[],
-  ): PlanEnregistre => ({
-    version: 2, courses: [], fournees: [], boites: [], consomme: lignes,
-  });
-
-  it('LE BUG : deux plans prévus ne peuvent plus compter le même poulet', () => {
-    /* On compose lundi-mercredi, on enregistre ; on compose jeudi-samedi. Sans
-       réservation, le second repartait du stock d'avant et annonçait
-       « objectifs atteints » sur du poulet déjà promis. */
-    const promis = dejaPromis([
-      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]), cuisineLe: null },
-    ]);
-    assert.equal(promis.get('grocy:7'), 800);
-  });
-
-  it('un plan CUISINÉ ne réserve plus rien', () => {
-    /* Son stock a déjà été décrémenté pour de vrai. Le compter encore le
-       déduirait deux fois — la même erreur, prise par l'autre bout. */
-    const promis = dejaPromis([
-      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]),
-        cuisineLe: '2026-08-10T12:00:00Z' },
-    ]);
-    assert.equal(promis.size, 0);
-  });
-
-  it('deux plans prévus sur le même aliment s\'additionnent', () => {
-    const ligne = [{ reference: 'grocy:7', nom: 'Poulet', grammes: 300 }];
-    const promis = dejaPromis([
-      { contenu: contenu(ligne), cuisineLe: null },
-      { contenu: contenu(ligne), cuisineLe: null },
-    ]);
-    assert.equal(promis.get('grocy:7'), 600);
-  });
-
-  it('un plan version 1 ne réserve rien plutôt que d\'inventer', () => {
-    /* Il ne dit pas ce qu'il consomme. Deviner à partir de ses noms
-       d'aliments donnerait une réservation fausse, qu'on ne voit pas — pire
-       qu'une réservation manquante, qu'on voit. */
-    const ancien: PlanEnregistre = {
-      version: 1, courses: [], fournees: [], boites: [],
-    };
-    assert.equal(dejaPromis([{ contenu: ancien, cuisineLe: null }]).size, 0);
-  });
-
-  it('aucun plan, aucune réservation', () => {
-    assert.equal(dejaPromis([]).size, 0);
-  });
-
-  it('LE BUG DU 13/08 : un champ ABSENT vaut « prévu », pas « cuisiné »', () => {
-    /* Tant que le serveur n'a pas vidé son cache après la migration, il ne
-       renvoie pas `cuisineLe` du tout. `!== null` répondait alors « cuisiné »
-       pour TOUS les plans : plus aucune réservation, et l'écran affichait
-       « Cuisiné le Invalid Date » sur un plan jamais cuisiné.
-
-       Le défaut va vers PRÉVU. Réserver un stock qui ne l'était pas se voit
-       et se corrige d'un appui ; ne pas réserver laisse trois plans se
-       partager le même brocoli en silence. */
-    const promis = dejaPromis([
-      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]) },
-    ]);
-    assert.equal(promis.get('grocy:7'), 800);
-  });
-
-  it('le stock disponible ne descend jamais sous zéro', () => {
-    /* La règle telle que l'écran l'applique. Un frigo négatif n'existe pas,
-       et le solveur le lirait comme une dette à rembourser sur les repas
-       suivants. */
-    const promis = dejaPromis([
-      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 900 }]), cuisineLe: null },
-    ]);
-    const enStock = 400;
-    assert.equal(Math.max(0, enStock - (promis.get('grocy:7') ?? 0)), 0);
-  });
-
-  it('une chaîne vide vaut « prévu » elle aussi', () => {
-    const promis = dejaPromis([
-      { contenu: contenu([{ reference: 'grocy:7', nom: 'Poulet', grammes: 800 }]),
-        cuisineLe: '' },
-    ]);
-    assert.equal(promis.get('grocy:7'), 800);
-  });
-});
-
 describe('estCuisine', () => {
   it('ne dit « cuisiné » que sur une date réellement présente', () => {
     assert.equal(estCuisine({ cuisineLe: '2026-08-13T10:00:00Z' }), true);
@@ -136,25 +51,6 @@ describe('estCuisine', () => {
     assert.equal(estCuisine({ cuisineLe: '' }), false);
     assert.equal(estCuisine({}), false);
   });
-
-  it('LE CAS RÉEL : trois plans qui se partagent 800 g de brocoli sur 500', () => {
-    /* Trois plans prévus, 300 + 300 + 200. Sans réservation, chacun repartait
-       des 500 g du frigo et se croyait servi. Avec, le troisième ne trouve
-       plus rien — et le dit. */
-    const brocoli = (g: number) => ({
-      contenu: {
-        version: 2 as const, courses: [], fournees: [], boites: [],
-        consomme: [{ reference: 'base:3', nom: 'Brocoli', grammes: g }],
-      },
-      cuisineLe: null,
-    });
-    const promis = dejaPromis([brocoli(300), brocoli(300), brocoli(200)]);
-
-    assert.equal(promis.get('base:3'), 800);
-    assert.equal(Math.max(0, 500 - promis.get('base:3')!), 0,
-      'il ne doit plus rien rester de disponible');
-  });
-
 });
 
 describe('l\'instantané sait ce qu\'il prend au frigo', () => {

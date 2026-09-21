@@ -24,10 +24,8 @@ import { useCibles, useMonFrigo, usePlans } from '../api/hooks';
 import type { Cible } from '../api/types';
 import type { Aliment } from '../solveur/types';
 import type { Repas } from '../solveur/composer';
-import { dejaPromis } from '../calcul/cuisson';
 import {
-  alimentsCalculables, alimentsSansFibresConnues, cibleDuRepas,
-  fibresPar100, grammesDisponibles, grammesEnStock,
+  alimentsCalculables, alimentsSansFibresConnues, cibleDuRepas, fibresPar100,
 } from '../calcul/planCalcule';
 
 export function useFrigoCalculable() {
@@ -41,25 +39,32 @@ export function useFrigoCalculable() {
   const stock = useMemo(
     () => alimentsCalculables(frigo.data?.aliments ?? []), [frigo.data]);
 
-  /* Combien il y en a VRAIMENT, en grammes à cuire. C'est ce qui empêche le
-     calculateur de réclamer 327 g de saumon quand il n'y en a que 200. */
-  const enStock = useMemo(
-    () => grammesEnStock(frigo.data?.aliments ?? []), [frigo.data]);
-
   /**
-   * CE QUI EST DÉJÀ PROMIS À UN PLAN PRÉVU.
+   * CE QUI RESTE VRAIMENT, EN GRAMMES À CUIRE — rendu par le serveur.
    *
-   * Le bug que ça corrige : deux batch cooking d'affilée comptaient DEUX FOIS
-   * le même frigo. On compose lundi-mercredi, on enregistre ; on compose
-   * jeudi-samedi, et le solveur repartait du stock d'avant. Le premier plan
-   * avait beau vider les 800 g de poulet, le second annonçait « objectifs
-   * atteints » sur du poulet qui n'existait plus — et rien ne le disait,
-   * puisque chaque plan était juste tout seul.
+   * C'est ce qui empêche le calculateur de réclamer 327 g de saumon quand il
+   * n'y en a que 200, ET ce qui empêche deux batch cooking d'affilée de
+   * compter deux fois le même frigo : on compose lundi-mercredi, on
+   * enregistre ; on compose jeudi-samedi, et le solveur repartait du stock
+   * d'avant. Le premier plan avait beau vider les 800 g de poulet, le second
+   * annonçait « objectifs atteints » sur du poulet qui n'existait plus — et
+   * rien ne le disait, puisque chaque plan était juste tout seul.
+   *
+   * CE FRONT LE CALCULAIT (`grammesEnStock` + `dejaPromis` +
+   * `grammesDisponibles`, supprimés au palier B, le 21 septembre 2026). Les
+   * deux entrées venaient du serveur et l'écran n'en modifiait aucune : c'est
+   * le cas où le chiffre se rend, plutôt que la règle se transmette.
+   *
+   * `?? 0` REPREND LE COMPORTEMENT D'AVANT À L'IDENTIQUE : un aliment sans
+   * poids par unité n'avait pas d'entrée dans `grammesEnStock`, et
+   * `grammesDisponibles` rendait alors 0. Le solveur ne les voit de toute
+   * façon pas — `alimentsCalculables` les écarte plus haut.
    */
-  const promis = useMemo(() => dejaPromis(plans.data ?? []), [plans.data]);
+  const disponible = useMemo(() => new Map<Aliment['id'], number>(
+    (frigo.data?.aliments ?? []).map((a) => [a.reference, a.grammesDisponibles ?? 0])),
+  [frigo.data]);
 
-  const stockDe = useCallback(
-    (a: Aliment) => grammesDisponibles(enStock, promis, a), [enStock, promis]);
+  const stockDe = useCallback((a: Aliment) => disponible.get(a.id) ?? 0, [disponible]);
 
   /* Les fibres ne sont pas des macros pour le solveur — elles n'entrent dans
      aucune cible — mais elles pèsent 2 kcal par gramme. Sans elles à l'écran,

@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Controller\FrigoController;
 use App\Entity\Utilisateur;
+use App\Repository\PlansPrevus;
 use App\Service\Frigo;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
@@ -76,7 +77,7 @@ final class EmplacementInconnuTest extends TestCase
 
         $grocy = new FrigoGrocy(new MockHttpClient(), new NullLogger(), 'https://grocy.test', 'cle');
         $base = new FrigoBase($cnx);
-        $controleur = new FrigoController(new Frigo($grocy, $base), $base, $grocy, new InventaireLots($cnx));
+        $controleur = new FrigoController(new Frigo($grocy, $base), $base, $grocy, new InventaireLots($cnx), new PlansPrevus($cnx));
 
         $utilisateur = (new Utilisateur())->setEmail('bob@exemple.test')->setSourceFrigo('base');
         $stockage = new TokenStorage();
