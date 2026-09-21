@@ -4,7 +4,7 @@ import { resoudre, arrondir } from './algebre';
 /* Chemin RELATIF, et pas `@/calcul/nutrition` : `tsc -p tsconfig.tests.json`
    ne réécrit pas l'alias, et un `require('@/…')` casse dans `dist-tests/` au
    moment du `node --test`, pas au typage. */
-import { controler } from '../calcul/nutrition';
+import { kcalDesGrammes } from '../calcul/nutrition';
 import {
   bornesDeCoherence, calculer, convertir, ecartDeCoherence, kcalDesMacros,
   pourObtenirCuit, versReference,
@@ -646,7 +646,12 @@ describe('cibles incohérentes entre elles', () => {
    */
   it('les calories des macros sortent de nutrition.ts, pas d’une copie', () => {
     const m = { prot: 40, gluc: 85, lip: 20, fibres: 15 };
-    assert.equal(kcalDesMacros(m), controler({ kcal: 0, ...m }).calculees);
+    /* PAR `kcalDesGrammes` DIRECTEMENT. Ce test passait par
+       `controler(…).calculees`, qui n'etait qu'un appel a `kcalDesGrammes`
+       deguise ; `controler` a ete supprime le 21 septembre 2026 avec le reste
+       du jugement mort du front. Le lien est desormais direct — et c'est la
+       fonction que la regle 5 designe. */
+    assert.equal(kcalDesMacros(m), kcalDesGrammes(m));
     assert.equal(kcalDesMacros({ prot: 40, gluc: 100, lip: 20 }), 740);
   });
 

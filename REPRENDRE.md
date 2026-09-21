@@ -35,7 +35,7 @@ s'arrêter là et lire le message avant de coder** :
 ```bash
 docker compose -f compose.dev.yml up -d
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'      # 498, 0 échec
-cd front && npm test                                              # 767 + 46, 0 échec
+cd front && npm test                                              # 756 + 46, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse --no-progress'
                                                                   # 5 erreurs, ANTÉRIEURES
 cd ../e2e && npm test                                             # 6, 0 échec
@@ -57,7 +57,10 @@ reste »).
 ## 3. Par quoi continuer — le palier B
 
 `performance.ts` (375 l., le 1RM), `frigo.ts` (194 l.), `planCoach.ts` (131 l.),
-`fournees.ts` (265 l.), `habitudesCuisson.ts` (156 l.).
+`fournees.ts` (265 l.), `habitudesCuisson.ts` (156 l.), et **la cohérence des
+cibles** (`ecartDeCoherence` / `bornesDeCoherence` / `SEUIL_COHERENCE` dans
+`solveur.ts`) — dont le serveur porte déjà la moitié
+(`CoherenceNutritionnelle::motifDeRefusDUneCible`).
 
 > ⚠️ **LE PIÈGE DU 1RM, à lire avant de commencer.** Epley n'a qu'**une seule
 > écriture** dans tout le dépôt, gardée par `epleyUnique.test.ts` qui balaie
@@ -275,23 +278,51 @@ plutôt que par `TooManyRequestsHttpException` (écart assumé et meilleur —
 `ModesDeTravail` en classe statique (l'injecter n'apporterait rien et coûterait
 les tests sans conteneur).
 
-### Deux restes trouvés en répondant à « il ne reste rien en front ? » (21 sept.)
+### Le front ne juge plus AUCUN aliment — réglé le 21 septembre au soir
 
-1. **`controler()` et `soupconKilojoules()` sont morts mais toujours exportés**
-   (`front/src/calcul/nutrition.ts`). Plus aucun écran ne les appelle — les
-   seules mentions hors du fichier sont des commentaires. C'est exactement la
-   situation de `plausibilite.ts` avant sa suppression : tant qu'ils sont là,
-   « le front ne juge plus un aliment » n'est vrai que **par accident**.
-   Attention : `soupconKilojoules` est appelé *à l'intérieur* de `nutrition.ts`,
-   donc les supprimer demande de vérifier ce qui en dépend encore.
-2. **Un CINQUIÈME double juge, candidat, sur les CIBLES.** `front/app/objectifs.tsx`
-   calcule `incoherent` avec `SEUIL_COHERENCE` / `ecartDeCoherence`, pendant que
-   `api/src/Entity/Cible.php` valide avec
-   `CoherenceNutritionnelle::motifDeRefusDUneCible`. **Non caractérisé** : les
-   deux ne posent peut-être pas la même question (l'écran *avertit*, le serveur
-   *refuse*, comme pour l'aliment). À mesurer avant de conclure — j'ai déjà
-   sur-affirmé une fois aujourd'hui en croyant voir deux juges là où il n'y en
-   avait qu'un.
+**174 lignes de jugement mort retirées de `front/src/calcul/nutrition.ts`**
+(336 → 162 lignes) : `controler`, `soupconKilojoules`, `kilojoulesCertains`,
+les types `Verdict` / `Controle` / `SoupconKilojoules` et leurs seuils
+(`TOLERANCE`, `TOLERANCE_SANS_FIBRES`, `TOLERANCE_RAPPORT`, `KJ_PAR_KCAL`,
+`KCAL_MAX_100G`, `ATWATER_MINIMUM_POUR_REFUSER`).
+
+**Aucun écran ne les appelait plus** — exactement la situation de
+`plausibilite.ts`. Et `kilojoulesCertains` portait encore en commentaire
+« verrouillée sur son jumeau PHP par `api/regles/coherence.json` », un fichier
+supprimé la veille.
+
+Le seul usage restant était un test du solveur qui passait par
+`controler(…).calculees` — un `kcalDesGrammes` déguisé. Il appelle désormais
+`kcalDesGrammes` directement, ce qui est *la* fonction que la règle 5 désigne.
+
+> **Ce qui reste dans `nutrition.ts` n'est plus du jugement** : les quatre
+> coefficients, `kcalDesGrammes` (la seule somme d'Atwater du front), les
+> ratios de cuisson, les catégories. De la mise en forme et une formule de
+> référence, pas une décision.
+
+### Le CINQUIÈME double juge n'en est pas un — mesuré le 21 septembre
+
+`front/app/objectifs.tsx` calcule `incoherent` avec `SEUIL_COHERENCE` /
+`ecartDeCoherence` pendant que `api/src/Entity/Cible.php` valide avec
+`CoherenceNutritionnelle::motifDeRefusDUneCible`. J'ai soupçonné un double
+juge. **Mesuré sur 1 125 combinaisons de cibles :**
+
+| | |
+|---|---|
+| les deux disent quelque chose | 248 |
+| l'écran avertit seul | 733 |
+| personne ne dit rien | 144 |
+| **le serveur refuse, l'écran muet** | **0** |
+
+**Deux questions différentes**, pas deux réponses à la même : l'écran
+*avertit* d'un écart entre kcal et macros, le serveur *refuse* un soupçon de
+kilojoules. Même forme que pour l'aliment — l'écran est plus strict, jamais
+plus permissif. Rien à corriger.
+
+**Aucun garde ne tient cette propriété**, faute de pouvoir comparer du TS à du
+PHP sans figer un corpus — et on ne veut plus de corpus-contrat. `ecartDeCoherence`
+et `bornesDeCoherence` sont de toute façon destinés au serveur : c'est au
+palier B qu'ils doivent partir, et le sujet se refermera tout seul.
 
 ### Ce qui reste ouvert
 

@@ -21,17 +21,6 @@ export interface Macros {
   fibres?: number | null;
 }
 
-export type Verdict = 'coherent' | 'ecart' | 'incoherent' | 'indecidable';
-
-export interface Controle {
-  verdict: Verdict;
-  /** calories déduites des macros saisies */
-  calculees: number;
-  /** écart relatif, en pourcentage */
-  ecart: number;
-  message: string;
-}
-
 /**
  * LES CALORIES QUE DÉCRIVENT DES GRAMMES — la seule écriture de la somme
  * d'Atwater dans le front (règle 5), convention européenne : fibres à
@@ -39,8 +28,8 @@ export interface Controle {
  *
  * `fibres` absent ou `null` compte pour zéro gramme. Ce n'est PAS une réponse à
  * « combien de fibres ? » : c'est à l'appelant de savoir s'il les connaît, et
- * de le dire à l'écran s'il ne les connaît pas — `controler` élargit alors sa
- * tolérance. Voir `formuleUnique.test.ts`, qui refuse toute autre écriture.
+ * de le dire à l'écran s'il ne les connaît pas. Voir `formuleUnique.test.ts`,
+ * qui refuse toute autre écriture.
  */
 export const kcalDesGrammes = (
   m: { prot: number; gluc: number; lip: number; fibres?: number | null },
@@ -50,169 +39,6 @@ export const kcalDesGrammes = (
   KCAL_FIBRES * (m.fibres ?? 0) +
   KCAL_LIPIDES * m.lip;
 
-/** Au-delà, l'écart ne s'explique plus par des arrondis. */
-const TOLERANCE = 0.08;
-const TOLERANCE_SANS_FIBRES = 0.2;
-
-/**
- * Les calories saisies correspondent-elles aux macros saisies ?
- *
- * C'est le seul garde-fou automatique possible : il attrape une virgule
- * mal placée, un champ oublié, ou des sucres additionnés aux glucides.
- */
-export function controler(m: Macros): Controle {
-  const fibresConnues = m.fibres !== null && m.fibres !== undefined;
-  const fibres = fibresConnues ? (m.fibres as number) : 0;
-
-  const calculees = kcalDesGrammes({ prot: m.prot, gluc: m.gluc, lip: m.lip, fibres });
-
-  if (m.kcal <= 0) {
-    return {
-      verdict: 'indecidable',
-      calculees,
-      ecart: 0,
-      message: `Ces macros représentent ${Math.round(calculees)} calories.`,
-    };
-  }
-
-  const ecart = (calculees - m.kcal) / m.kcal;
-  const seuil = fibresConnues ? TOLERANCE : TOLERANCE_SANS_FIBRES;
-  const absolu = Math.abs(ecart);
-
-  if (absolu <= seuil) {
-    return {
-      verdict: 'coherent',
-      calculees,
-      ecart: ecart * 100,
-      message: fibresConnues
-        ? 'Les valeurs sont cohérentes entre elles.'
-        : 'Cohérent, mais sans les fibres le contrôle reste approximatif.',
-    };
-  }
-
-  /* Sans fibres renseignées, un écart NÉGATIF est normal sur un aliment
-     qui en contient : les calories annoncées incluent leur apport, pas le
-     calcul. Inutile d'alarmer sur ce cas-là. */
-  if (!fibresConnues && ecart < 0) {
-    return {
-      verdict: 'ecart',
-      calculees,
-      ecart: ecart * 100,
-      message:
-        `Le calcul donne ${Math.round(calculees)} calories contre ${Math.round(m.kcal)} annoncées. ` +
-        "C'est normal si l'aliment contient des fibres — renseigne-les pour lever le doute.",
-    };
-  }
-
-  return {
-    verdict: absolu > 0.3 ? 'incoherent' : 'ecart',
-    calculees,
-    ecart: ecart * 100,
-    message:
-      `Le calcul donne ${Math.round(calculees)} calories contre ${Math.round(m.kcal)} annoncées, ` +
-      `soit ${ecart > 0 ? '+' : ''}${Math.round(ecart * 100)} %. ` +
-      (absolu > 0.3
-        ? 'Vérifie tes saisies : une valeur semble erronée.'
-        : 'Vérifie les glucides — les sucres en font partie, ils ne s\u2019ajoutent pas.'),
-  };
-}
-
-/* ------------------------------------------------------------ kilojoules */
-
-/** 1 kcal = 4,184 kJ. Facteur du règlement INCO. */
-export const KJ_PAR_KCAL = 4.184;
-
-/**
- * Plafond physique pour 100 g : rien n'est plus dense que la matière grasse
- * pure, à 9 kcal par gramme. Au-delà, la valeur saisie ne peut pas être des
- * calories.
- */
-export const KCAL_MAX_100G = 900;
-
-export interface SoupconKilojoules {
-  /** la valeur saisie, telle quelle */
-  saisi: number;
-  /** ce qu'elle vaudrait une fois convertie */
-  converti: number;
-  /** ce qui a déclenché le soupçon */
-  motif: 'plafond' | 'rapport';
-}
-
-/**
- * La valeur saisie ressemble-t-elle à des kilojoules ?
- *
- * Les étiquettes européennes affichent les kJ AVANT les kcal : « 1473 kJ /
- * 352 kcal ». Recopier la première ligne multiplie les calories par 4,18 sans
- * que rien ne le signale, et l'aliment ressort quatre fois trop riche du
- * solveur.
- *
- * Deux détections complémentaires :
- *  - le PLAFOND fonctionne sans macros saisies, mais rate les aliments peu
- *    caloriques : 50 kcal en kJ font 209, ce qui reste plausible ;
- *  - le RAPPORT aux macros attrape n'importe quel niveau, mais exige qu'elles
- *    soient renseignées.
- *
- * Aucune n'est infaillible : un aliment sans macros et sous 900 passera entre
- * les mailles. C'est un garde-fou, pas une garantie.
- */
-/**
- * EN DEÇÀ DE CETTE ÉNERGIE CALCULÉE, ON NE REFUSE RIEN.
- *
- * MESURÉ LE 20 SEPTEMBRE 2026 SUR LES 2 944 ENTRÉES CIQUAL, et c'est un
- * garde-fou qui a failli manquer : sans plancher, la règle refuse du vin doux
- * (148 kcal / 40,6 par Atwater, rapport 3,64), du cidre (4,34), du vinaigre
- * (4,63) et un kir royal (3,69).
- *
- * La cause est physique : **l'alcool fait 7 kcal/g et n'entre dans aucune des
- * quatre macros**. Tout produit alcoolisé a donc un rapport kcal/Atwater
- * élevé — et il passe par 4,184 en chemin. Refuser ces six aliments en
- * accusant quelqu'un d'avoir recopié des kilojoules serait un faux reproche
- * sur des valeurs publiées par l'Anses.
- *
- * 50 : le plus dense des six est à 40,6. Et ça ne coûte rien au cas qui
- * motive la règle — un riz recopié en kilojoules a un Atwater de 348.
- */
-export const ATWATER_MINIMUM_POUR_REFUSER = 50;
-
-/**
- * Est-on SÛR que cette énergie est en kilojoules ?
- *
- * PLUS STRICT QUE `soupconKilojoules`, et c'est délibéré : celui-là PROPOSE
- * une conversion, celle-ci fait REFUSER l'enregistrement. On ne refuse que
- * lorsqu'il ne reste pas de doute, d'où le plancher ci-dessus.
- *
- * Verrouillée sur son jumeau PHP par `api/regles/coherence.json` : la même
- * question est posée côté serveur depuis le palier 1, et deux écritures qui
- * divergeraient laisseraient l'écran accepter ce que l'API refuse.
- */
-export const kilojoulesCertains = (energie: number, atwater: number): boolean =>
-  (atwater >= ATWATER_MINIMUM_POUR_REFUSER
-    && Math.abs(energie / atwater - KJ_PAR_KCAL) / KJ_PAR_KCAL <= TOLERANCE_RAPPORT);
-
-/** Au-delà, c'est une autre erreur de saisie, et proposer une conversion l'aggraverait. */
-const TOLERANCE_RAPPORT = 0.1;
-
-export function soupconKilojoules(m: Macros): SoupconKilojoules | null {
-  if (!(m.kcal > 0)) return null;
-
-  const converti = Math.round((m.kcal / KJ_PAR_KCAL) * 10) / 10;
-
-  if (m.kcal > KCAL_MAX_100G) {
-    return { saisi: m.kcal, converti, motif: 'plafond' };
-  }
-
-  const { calculees } = controler(m);
-  if (calculees <= 0) return null;
-
-  /* Le rapport doit serrer 4,184 de près. Au-delà de 10 % d'écart, c'est
-     une autre erreur de saisie, et proposer une conversion l'aggraverait. */
-  const rapport = m.kcal / calculees;
-  if (Math.abs(rapport - KJ_PAR_KCAL) / KJ_PAR_KCAL <= TOLERANCE_RAPPORT) {
-    return { saisi: m.kcal, converti, motif: 'rapport' };
-  }
-
-  return null;
-}
 
 /* ---------------------------------------------------------------- ratio */
 
