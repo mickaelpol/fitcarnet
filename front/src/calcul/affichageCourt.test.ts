@@ -67,3 +67,44 @@ describe('une quantite telle qu\'on l\'ecrit', () => {
     assert.equal(nombreLisible(''), '');
   });
 });
+
+describe('ce que l\'API envoie VRAIMENT', () => {
+  /**
+   * LA PANNE DU 23 SEPTEMBRE 2026 : l'onglet Compte en page blanche.
+   *
+   *     Uncaught TypeError: t.trim is not a function
+   *         at nombreLisible
+   *         at MesComplements
+   *
+   * `Complement::getQuantite(): float` (api/src/Entity/Complement.php:128)
+   * rend un FLOTTANT depuis le 17 aout 2026. API Platform serialise par
+   * l'accesseur, donc `GET /api/complements` envoie `"quantite": 5` — un
+   * nombre JSON, jamais la chaine « 5.00 » que cette fonction attendait.
+   *
+   * POURQUOI PERSONNE NE L'A VU PENDANT CINQ SEMAINES :
+   *
+   *  - `types.ts` DECLARAIT une chaine, avec un commentaire affirmant que
+   *    l'API « refuse un nombre ». `tsc` ne pouvait pas voir le defaut : on
+   *    lui avait decrit le contraire de la realite.
+   *  - les tests ci-dessus n'envoient QUE des chaines. Ils eprouvent ce que
+   *    la signature promet, jamais ce qui arrive sur le cable.
+   *  - il faut au moins UN complement enregistre pour que la boucle de
+   *    `MesComplements` appelle cette fonction. Liste vide, aucun appel,
+   *    aucune panne — l'ecran a casse le jour du premier complement.
+   *
+   * Ce cas-ci part donc du nombre, et pas de sa representation en chaine.
+   */
+  it('accepte un nombre, parce que c\'est ce que le serveur envoie', () => {
+    assert.equal(nombreLisible(5), '5');
+    assert.equal(nombreLisible(0.5), '0,5');
+    assert.equal(nombreLisible(400), '400');
+  });
+
+  it('un nombre illisible reste visible, comme une chaine illisible', () => {
+    /* Regle 7 : jamais un « 0 » plausible a la place de ce qu'on ne sait
+       pas lire. NaN et Infinity ne viennent pas d'une colonne DECIMAL, mais
+       cette fonction est le dernier rempart avant l'ecran. */
+    assert.equal(nombreLisible(Number.NaN), 'NaN');
+    assert.equal(nombreLisible(Number.POSITIVE_INFINITY), 'Infinity');
+  });
+});

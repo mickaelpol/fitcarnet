@@ -47,8 +47,13 @@ export const useComplements = () =>
 /**
  * `quantite` PART EN CHAÎNE, comme les macros d'une cible — voir
  * `decimales.ts`, où la règle est écrite une fois pour toutes. C'est un
- * DECIMAL côté API : envoyer un nombre fait répondre « The type of the
- * "quantite" attribute must be "string", "integer" given ».
+ * DECIMAL côté API. Ce commentaire disait « envoyer un nombre fait répondre
+ * "The type of the quantite attribute must be string, integer given" » : c'est
+ * vrai jusqu'au 17 septembre 2026, et faux depuis — `App\Metadata\
+ * DecimalesNumeriques` declare `float|string` pour toute colonne DECIMAL, donc
+ * les deux formes passent. On continue d'envoyer une CHAINE, volontairement :
+ * c'est ce que Doctrine hydrate, et ca ne traverse jamais la virgule
+ * flottante. Ce qui change, c'est qu'on ne le fait plus par contrainte.
  */
 export function useEnregistrerComplement() {
   const qc = useQueryClient();
