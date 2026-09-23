@@ -224,7 +224,15 @@ BEGIN
     --  ressemble à aucun carnet réel.
     -- ----------------------------------------------------------------
     FOR v_semaine IN 0..8 LOOP
-        v_date   := (CURRENT_DATE - INTERVAL '1 day' * (7 * (8 - v_semaine) + 2))::date;
+        -- L'ANCRE EST A -6 JOURS, ET C'EST LE LEGS QUI LA FIXE — 23 sept. 2026.
+        -- Elle valait -2, ce qui placait bien le dernier Push deux jours avant
+        -- aujourd'hui. Mais le Pull s'ecrit `v_date + 2` et le Legs
+        -- `v_date + 4` : le dernier Legs tombait donc DEUX JOURS DANS LE
+        -- FUTUR, quel que soit le jour ou l'on joue ce fichier. Une seance
+        -- cochee 3/3 datee de vendredi prochain, sur l'ecran d'une
+        -- demonstration. A -6, les trois de la derniere semaine tombent a
+        -- J-6, J-4 et J-2 : toutes passees, la plus recente avant-hier.
+        v_date   := (CURRENT_DATE - INTERVAL '1 day' * (7 * (8 - v_semaine) + 6))::date;
         v_charge := 40 + 2.5 * floor(v_semaine / 2.0);
 
         -- ---- séance de poussée, celle qui porte la progression ----
