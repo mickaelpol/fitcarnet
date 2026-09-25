@@ -1,20 +1,5 @@
 {
-  "extraKnownMarketplaces": {
-    "superpowers-symfony": {
-      "source": {
-        "source": "github",
-        "repo": "dev-toolings/superpowers-symfony"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "expo@claude-plugins-official": true,
-    "php-lsp@claude-plugins-official": true,
-    "context7@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true,
-    "superpowers-symfony@superpowers-symfony": true
-  },
-    "hooks": {
+  "hooks": {
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
@@ -23,7 +8,7 @@
             "type": "command",
             "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; case \"$f\" in */front/src/*.ts|*/front/src/*.tsx|*/front/app/*.ts|*/front/app/*.tsx) cd \"${f%%/front/*}/front\" && npm run --silent verif ;; esac; }",
             "timeout": 120,
-            "statusMessage": "V\u00e9rification du typage front..."
+            "statusMessage": "Vérification du typage front..."
           },
           {
             "type": "command",
@@ -54,5 +39,31 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "expo@claude-plugins-official": true,
+    "php-lsp@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "superpowers-symfony@superpowers-symfony": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "claude-harness@mickael-harness": true
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-symfony": {
+      "source": {
+        "source": "github",
+        "repo": "dev-toolings/superpowers-symfony"
+      }
+    },
+    "mickael-harness": {
+      "source": {
+        "source": "git",
+        "url": "ssh://git@gitea.mickael-pol.fr:2222/mickael/claude-harness.git"
+      }
+    }
+  },
+  "env": {
+    "ENABLE_LSP_TOOL": "1"
   }
 }

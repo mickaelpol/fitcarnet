@@ -10,6 +10,25 @@ elles ont été trouvées), est archivé dans
 [docs/journal-2026-09.md](docs/journal-2026-09.md) : on y cherche le *pourquoi*
 d'une ligne de code, pas ce qui reste à faire.
 
+## Ce fichier et `docs/etat/` — la frontière, décidée le 25 septembre 2026
+
+Depuis l'installation du harness, il existe un second endroit qui parle d'état :
+[docs/etat/](docs/etat/). Deux journaux qui se recouvrent, c'est le défaut n°1 de
+ce projet appliqué à sa propre documentation — d'où cette frontière, écrite des
+deux côtés.
+
+- **Ce fichier fait foi sur le chantier**, c'est-à-dire la refonte serveur
+  autoritaire : le récit, les paliers, les décisions métier en vigueur, et
+  ce qui reste à faire dessus. C'est la première lecture, `CLAUDE.md` le dit.
+- **`docs/etat/` fait foi sur l'outillage** et sert de point d'entrée à `/harness`,
+  qui ne sait pas lire un récit : `statut.md` (où on en est, en bref),
+  `decisions.md` (append-only, avec le pourquoi), `prochaines-etapes.md` (la file).
+  `docs/etat/decouverte-initiale.md` est une reconnaissance datée du 25 septembre,
+  avec ses mesures — pas un document à tenir à jour.
+- **La file métier ne se recopie pas là-bas.** Si `docs/etat/` doit parler du
+  chantier, il renvoie ici. Le jour où les deux divergent, celui-ci a raison sur
+  le métier, l'autre sur l'outillage.
+
 ---
 
 # ⏩ REPRENDRE ICI — sur l'autre poste, le 22 septembre 2026

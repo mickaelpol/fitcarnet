@@ -538,3 +538,35 @@ Rules:
   jamais quand le code nomme le constat. Concrètement : lors d'un
   `/graphify . --update`, ajouter les `.php` de `api/src` à la liste envoyée aux
   sous-agents (partie B), en plus de leur passage AST habituel.
+
+## Cadre de projet (harness)
+
+Installé le 25 septembre 2026 par `/harness-init` (plugin `claude-harness@mickael-harness`).
+Il **n'ajoute aucune règle** : les sept règles non négociables ci-dessus restent la seule
+référence, et le gabarit du harness en propose cinq, génériques, qui ne sont
+volontairement pas recopiées ici — elles doubleraient les nôtres en moins précis et sans
+les dates de panne qui en font la valeur.
+
+- Point d'entrée : `/harness`. Il connaît la phase de chaque feature et propose la suite.
+- Pile détectée : `.claude/harness.json`, **régénéré** dès que les manifestes changent.
+  Les corrections tiennent dans `.claude/harness.overrides.json`, jamais dans
+  `harness.json` — c'est ce fichier-là qui survit à un `composer.json` modifié.
+  Trois valeurs y sont corrigées à la main, avec leur raison : les tests API passent
+  par le conteneur, l'analyse du front par `npm run verif`, les épreuves par `e2e/`.
+- Index du code : `.claude/harness/index.json` (285 fichiers), à interroger avant un
+  `grep` sur tout le dépôt. Il se maintient seul. **Il ne remplace pas graphify** :
+  l'index donne les symboles, graphify donne les relations et l'histoire.
+- État : `docs/etat/statut.md`, `docs/etat/decisions.md` (append-only),
+  `docs/etat/prochaines-etapes.md`. **`REPRENDRE.md` reste le journal de bord du
+  chantier** — c'est lui qu'on lit en premier, comme dit plus haut.
+- `docs/audits/` appartient au harness. **Ne pas le confondre avec
+  `docs/audit-2026-09/`**, qui porte les 79 constats de septembre.
+
+**Le piège qui a coûté l'installation, le 25 septembre 2026.** `core.autocrlf` valait
+`true` en global sur ce poste : git restituait les fichiers en CRLF *au checkout*, alors
+que les blobs étaient sains. Les dix-neuf scripts du harness mouraient tous sur
+`set -euo pipefail\r` — « invalid option name » — et avec eux `/harness-init` et les
+quatre hooks du plugin. **fitcarnet, lui, n'a rien senti** : son `.gitattributes` force
+`*.sh text eol=lf` et surcharge le réglage global ; ses quinze scripts sont restés en LF.
+Le réglage est passé à `input`, et le dépôt du harness a reçu le même `.gitattributes`.
+Sans ce fichier, un dépôt de scripts shell dépend de la configuration de qui le clone.

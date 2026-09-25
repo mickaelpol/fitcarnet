@@ -1,0 +1,80 @@
+{
+  "backend": {
+    "lang": "php",
+    "dir": "api",
+    "framework": "symfony",
+    "version": "7.4.*",
+    "orm": "doctrine",
+    "tests": "phpunit",
+    "static": "phpstan",
+    "cs": null
+  },
+  "frontend": {
+    "lang": "typescript",
+    "dir": "front",
+    "framework": "expo",
+    "version": "~54.0.37",
+    "tests": null,
+    "static": "tsc",
+    "lint": "eslint"
+  },
+  "api": {
+    "framework": "api-platform",
+    "version": "^4.3"
+  },
+  "db": "postgresql",
+  "e2e": {
+    "web": "playwright",
+    "mobile": "maestro (à installer)"
+  },
+  "mobile": [
+    "android",
+    "ios"
+  ],
+  "source_dirs": [
+    "api/src",
+    "e2e/src",
+    "front/src"
+  ],
+  "test_cmds": {
+    "back": "docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'",
+    "static_back": "cd api && vendor/bin/phpstan analyse",
+    "front": "cd front && npm test",
+    "static_front": "cd front && npm run verif",
+    "_back": "Le PHP de l'hôte n'a ni dom, ni mbstring, ni xmlwriter : PHPUnit refuse de démarrer. Les tests API tournent DANS le conteneur, et le binaire est bin/phpunit, pas vendor/bin/phpunit. Relevé par verite-documentaire le 15 septembre 2026, documenté dans CLAUDE.md.",
+    "_static_back": "phpstan tourne sur l'hôte (vérifié le 25 septembre 2026) et trouve phpstan.dist.neon depuis api/. Il n'est pas au vert : 5 erreurs préexistantes.",
+    "_front": "npm test = eslint + tsc --noEmit + les tests node:test, puis les tests de rendu. C'est la commande du projet, à lancer après toute modification du front.",
+    "_static_front": "Le projet a un script dédié : npm run verif = tsc --noEmit + eslint. Plus rapide que npm test, et c'est le nom que CLAUDE.md emploie.",
+    "_e2e": "Épreuves de bout en bout dans Chromium. Exigent l'environnement de dev debout ET un front/dist à jour.",
+    "e2e": "cd e2e && npm test"
+  },
+  "unknown": [],
+  "manifests": [
+    "api/composer.json",
+    "e2e/package.json",
+    "front/package.json"
+  ],
+  "docker": {
+    "compose_files": [
+      "compose.dev.yml",
+      "docker-compose.yml"
+    ],
+    "services": [
+      "app",
+      "db",
+      "fitcarnet-app",
+      "fitcarnet-db",
+      "fitcarnet-taches"
+    ]
+  },
+  "infra": "docker-compose",
+  "manifests_hash": "545d8b18bb72b489",
+  "_pourquoi": "Corrections manuelles de la détection automatique. Ce fichier n'est JAMAIS régénéré : il protège ces valeurs d'un futur changement de composer.json / package.json.",
+  "_unknown": "Le point Docker signalé par la détection est résolu : `docker inspect fitcarnet-app-dev` confirme qu'il monte le `api/` de CE dépôt sur /app, et pas celui d'un autre clone. Pas de chemin absolu ici : les deux postes n'ont pas la même racine. Vérifié le 25 septembre 2026.",
+  "_overrides_actifs": [
+    "_pourquoi",
+    "_unknown",
+    "test_cmds",
+    "unknown"
+  ]
+}

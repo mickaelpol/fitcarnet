@@ -1,0 +1,68 @@
+{
+  "backend": {
+    "lang": "php",
+    "dir": "api",
+    "framework": "symfony",
+    "version": "7.4.*",
+    "orm": "doctrine",
+    "tests": "phpunit",
+    "static": "phpstan",
+    "cs": null
+  },
+  "frontend": {
+    "lang": "typescript",
+    "dir": "front",
+    "framework": "expo",
+    "version": "~54.0.37",
+    "tests": null,
+    "static": "tsc",
+    "lint": "eslint"
+  },
+  "api": {
+    "framework": "api-platform",
+    "version": "^4.3"
+  },
+  "db": "postgresql",
+  "e2e": {
+    "web": "playwright",
+    "mobile": "maestro (à installer)"
+  },
+  "mobile": [
+    "android",
+    "ios"
+  ],
+  "source_dirs": [
+    "api/src",
+    "e2e/src",
+    "front/src"
+  ],
+  "test_cmds": {
+    "back": "cd api && vendor/bin/phpunit",
+    "static_back": "cd api && vendor/bin/phpstan analyse",
+    "front": "cd front && npm test",
+    "static_front": "cd front && npx tsc --noEmit"
+  },
+  "unknown": [
+    "Service(s) Docker détecté(s) pour le back : app, fitcarnet-app (fichier compose.dev.yml). Les commandes test_cmds.back peuvent devoir passer par 'docker compose exec <service> ...' au lieu d'un chemin hôte — vérifie avant de faire confiance à test_cmds.back, en particulier si vendor/ n'existe pas sur l'hôte."
+  ],
+  "manifests": [
+    "api/composer.json",
+    "e2e/package.json",
+    "front/package.json"
+  ],
+  "docker": {
+    "compose_files": [
+      "compose.dev.yml",
+      "docker-compose.yml"
+    ],
+    "services": [
+      "app",
+      "db",
+      "fitcarnet-app",
+      "fitcarnet-db",
+      "fitcarnet-taches"
+    ]
+  },
+  "infra": "docker-compose",
+  "manifests_hash": "545d8b18bb72b489"
+}

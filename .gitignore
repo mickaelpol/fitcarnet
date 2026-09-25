@@ -171,3 +171,16 @@ e2e/package-lock.json
 # 2026 : « il n'a rien à faire dans le projet ». Les fichiers restent sur le
 # disque, ils ne sont simplement plus suivis par git.
 prompt/
+
+# ---------------------------------------------------------------------
+#  Harness de projet (plugin claude-harness), posé le 25 septembre 2026
+# ---------------------------------------------------------------------
+# État de session et index du code : reconstruits tout seuls, propres à
+# chaque poste. `docs/etat/` en revanche EST versionné — c'est le journal.
+.claude/harness/
+# Sauvegardes horodatées que le bootstrap dépose à côté de settings.json.
+.claude/settings.json.bak-*
+# Les bobines des vérifications : lourdes, et git ne sait pas compresser une
+# vidéo. Les rapports écrits de docs/verifications/, eux, restent versionnés.
+docs/verifications/**/*.webm
+docs/verifications/**/*.mp4
