@@ -123,14 +123,6 @@ export const iriDe = (v: Exercice | string): string =>
   typeof v === 'string' ? v : v['@id'];
 
 export interface Serie {
-  /**
-   * CE QUE CETTE SÉRIE PÈSE DANS L'AVANCEMENT : 1, ou 0.
-   *
-   * Rendu par le serveur depuis le 21 septembre 2026. L'écran additionne ces
-   * poids au lieu d'appliquer la règle « un chrono ne compte que pour une
-   * série » — qui ne vit plus que sur le serveur. Absent sur une série qu'on
-   * vient d'ajouter et qui n'a pas encore été enregistrée.
-   */
   id?: number;
   ordre: number;
   reps: number | null;
@@ -140,19 +132,18 @@ export interface Serie {
   repsCible: number | null;
   poidsCible: number | null;
   secondesCible: number | null;
+  /* PAS DE POIDS DANS L'AVANCEMENT — l'API ne le rend plus depuis le
+     21 septembre 2026. Elle a envoye, le temps d'une matinee, un poids de 1 ou
+     de 0 par serie que l'ecran additionnait : faux des qu'on touchait au bloc,
+     parce qu'un poids par ligne se DEDUIT du mode et du rang, deux choses que
+     l'ecran modifie sans le serveur. Le champ est parti avec `0a45806` ; ce
+     commentaire, lui, etait reste accroche a `id` et le decrivait au present
+     jusqu'au 25 septembre 2026. Ce qui le remplace : `avancementDe`, dans
+     `calcul/blocSeance.ts`, qui decoupe selon `GET /api/modes-de-travail`. */
 }
 
 export interface SeanceExercice {
   id?: number;
-  /**
-   * CE QUE PÈSERAIT UNE SÉRIE AJOUTÉE MAINTENANT DANS CE BLOC.
-   *
-   * L'écran garde un état local avec sauvegarde automatique : une série qu'on
-   * vient d'ajouter n'a pas encore de poids rendu par le serveur, et le
-   * compteur doit pourtant bouger tout de suite. Sans ce champ, l'écran
-   * devrait le DÉDUIRE — donc réécrire la règle du chrono, et le double juge
-   * reviendrait par la fenêtre.
-   */
   exercice: Exercice | string;
   ordre: number;
   mode: 'charge' | 'iso' | 'chrono' | null;
@@ -163,6 +154,11 @@ export interface SeanceExercice {
   /* PAS DE `rmEstime` — l'API ne le rend plus depuis le 19 septembre 2026.
      Elle le calculait avec sa propre ecriture d'Epley, que personne ne lisait :
      le front recalcule tout ce qu'il affiche, par `calcul/performance.ts`. */
+  /* PAS DE POIDS D'UNE NOUVELLE SERIE non plus, jumeau de celui de `Serie`,
+     retire le meme jour pour la meme raison : il dependait du mode du bloc,
+     que l'ecran change sans le serveur. Une serie qu'on vient d'ajouter compte
+     tout de suite parce que la regle est indexee sur le MODE, que l'ecran
+     possede deja — voir `avancementDe`. */
 }
 
 export interface Seance {
