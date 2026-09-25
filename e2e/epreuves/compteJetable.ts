@@ -103,6 +103,31 @@ export const alimentsDe = (email: string): { nom: string; kcal: number; ratio: n
   });
 };
 
+/**
+ * Les cuissons habituelles d'un compte, telles que la base les tient VRAIMENT.
+ *
+ * `majLe` est rendu en secondes depuis l'époque (`EXTRACT(EPOCH …)`), et non
+ * en texte : la clause `ON CONFLICT … WHERE … IS DISTINCT FROM` (25 septembre
+ * 2026) ne touche pas la ligne quand le mode envoyé est celui déjà en base —
+ * `maj_le` ne bouge pas du tout, y compris à la microseconde. Une épreuve qui
+ * comparerait des horodatages en texte pourrait manquer un arrondi ; un nombre
+ * se compare pour une stricte égalité sans ambiguïté.
+ */
+export const habitudesDe = (
+  email: string,
+): { aliment: string; mode: number | null; majLe: number }[] => {
+  const lignes = sql(`SELECT c.aliment || '|' || coalesce(c.mode_cuisson_id::text, '') || '|'
+                              || extract(epoch from c.maj_le)
+                        FROM cuisson_habituelle c JOIN utilisateur u ON u.id = c.utilisateur_id
+                       WHERE u.email = '${email}' ORDER BY c.aliment`);
+
+  return lignes === '' ? [] : lignes.split('\n').map((l) => {
+    const [aliment, mode, majLe] = l.split('|');
+
+    return { aliment: aliment ?? '', mode: mode === '' ? null : Number(mode), majLe: Number(majLe) };
+  });
+};
+
 /** Où répond l'API — la même adresse que le navigateur des épreuves. */
 const BASE = process.env.FITCARNET_URL ?? 'http://localhost:8080';
 

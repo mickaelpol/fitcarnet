@@ -1,7 +1,7 @@
 ---
 titre: B4 — le serveur décide ce qu'il enregistre des habitudes de cuisson
 slug: habitudes-cuisson-au-serveur
-phase: e2e
+phase: verify
 cree_le: 2026-09-25
 brainstorm: aucun — le cadrage est l'inventaire du 21 septembre 2026, dans REPRENDRE.md § 3 (B4) et docs/plan-serveur-autoritaire.md § palier 2
 ---
@@ -53,23 +53,23 @@ semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
   un garde du front le refuse à l'avenir (sur le modèle de
   `coherenceCibleUnique.test.ts`). Le garde porte un cas témoin qui prouve qu'il
   peut tomber.
-- **CA-2** ⏳ *(le code est là — clause `IS DISTINCT FROM` + somme des lignes affectées ; la preuve contre une vraie base appartient à la phase e2e)* — *Étant donné* un compte dont « riz basmati » est déjà enregistré au
+- **CA-2** ✅ *(prouvé contre une vraie base le 25/09/2026 — `e2e/epreuves/habitudesCuisson.spec.ts`, `maj_le` comparé en epoch avant/après)* — *Étant donné* un compte dont « riz basmati » est déjà enregistré au
   mode 2, *quand* `PUT /api/mes-cuissons` reçoit `{"habitudes":[{"aliment":"riz
   basmati","mode":2}]}`, *alors* la réponse est `{"enregistrees":0}` et le
   `maj_le` de la ligne est **inchangé**.
-- **CA-3** ⏳ *(même chose : porté, à prouver en e2e)* — *Étant donné* le même compte, *quand* l'envoi porte `"mode":5` (un
+- **CA-3** ✅ *(prouvé en e2e le 25/09/2026)* — *Étant donné* le même compte, *quand* l'envoi porte `"mode":5` (un
   mode qui existe), *alors* la réponse est `{"enregistrees":1}`, la ligne vaut 5
   et son `maj_le` a bougé.
-- **CA-4** ⏳ *(même chose : porté, à prouver en e2e)* — *Étant donné* un aliment dont ce compte n'a jamais rien décidé,
+- **CA-4** ✅ *(prouvé en e2e le 25/09/2026, dans les DEUX sens : `null` → entier et entier → `null`, ce que `IS DISTINCT FROM` ajoute à `<>`)* — *Étant donné* un aliment dont ce compte n'a jamais rien décidé,
   *quand* l'envoi porte `"mode":null`, *alors* la réponse est
   `{"enregistrees":1}` et la ligne est créée avec `mode_cuisson_id` à `NULL` —
   « se mange sans cuisson » est une réponse, pas une absence (règle 6).
-- **CA-5** ✅ *(la règle : `LotDHabitudesTest::testLeMemeAlimentDeuxFoisNeFaitQuUneLigne`, déjà vert ; son UNICITÉ : le garde CA-1 (c). L'effet en base se prouve en phase e2e.)* — *Étant donné* une base où « riz basmati » vaut 2, *quand* un seul
+- **CA-5** ✅ *(trois preuves : la règle par `LotDHabitudesTest::testLeMemeAlimentDeuxFoisNeFaitQuUneLigne`, son UNICITÉ par le garde CA-1, son effet en base par l'épreuve e2e du 25/09/2026)* — *Étant donné* une base où « riz basmati » vaut 2, *quand* un seul
   envoi porte deux fois cet aliment, d'abord `"mode":2` puis `"mode":5`, *alors*
   la réponse est `{"enregistrees":1}` et la ligne vaut **5** : la dernière
   décision de l'envoi gagne, et c'est désormais la seule écriture de cette règle
   dans le dépôt.
-- **CA-6** ✅ *(volet front vert le 25/09/2026 ; le volet « aucun `maj_le` n'a bougé » se prouve en phase e2e)* — *Étant donné* un plan dont aucune cuisson n'a changé depuis la
+- **CA-6** ✅ *(volet front vert ; « aucun `maj_le` n'a bougé » prouvé en e2e par CA-2, qui rejoue le même envoi. Le volet ÉCRAN — composer un plan puis passer à « Cuisiner » — n'est pas automatisable : `ChoixDansListe` n'offre aucun sélecteur stable, blocage déjà connu de `avancementSeance.spec.ts`. Voir le pied de `habitudesCuisson.spec.ts`.)* — *Étant donné* un plan dont aucune cuisson n'a changé depuis la
   semaine dernière, *quand* l'utilisateur passe à l'étape « Cuisiner », *alors*
   un seul `PUT` part, il répond `{"enregistrees":0}`, et **aucun** `maj_le` de la
   table `cuisson_habituelle` n'a bougé.
@@ -226,3 +226,13 @@ en e2e ou par `verification-bout-en-bout`, sur un compte jetable en `@e2e.local`
   concurrents, fermé par un `ksort`. Reste **E1**, qui ne dépend pas du code :
   `api/front` doit recevoir le `front/dist` régénéré, sinon la phase e2e serait
   verte pour la mauvaise raison.
+- 2026-09-25 (nuit) — phase `e2e`. Six épreuves créées
+  (`e2e/epreuves/habitudesCuisson.spec.ts`), suite complète à **18 tests verts**,
+  ménage prouvé (zéro compte jetable restant). CA-2, CA-3, CA-4, CA-5 et CA-8
+  sont désormais prouvés **contre une vraie base** — c'est la clause
+  `IS DISTINCT FROM` qui est exercée, et elle ne pouvait l'être nulle part
+  ailleurs. **Un critère reste hors de portée** : le volet ÉCRAN de CA-6. Le
+  sélecteur `ChoixDansListe` n'expose ni rôle ni `testID` stable, blocage déjà
+  rencontré par `avancementSeance.spec.ts` le 20 septembre. Le montage aurait
+  exigé frigo + cibles + plan pour exercer, côté serveur, exactement ce que CA-2
+  exerce déjà. Non bricolé, volontairement : `retries: 0`.
