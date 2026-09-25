@@ -1,7 +1,7 @@
 ---
 titre: B4 — le serveur décide ce qu'il enregistre des habitudes de cuisson
 slug: habitudes-cuisson-au-serveur
-phase: review
+phase: e2e
 cree_le: 2026-09-25
 brainstorm: aucun — le cadrage est l'inventaire du 21 septembre 2026, dans REPRENDRE.md § 3 (B4) et docs/plan-serveur-autoritaire.md § palier 2
 ---
@@ -214,3 +214,15 @@ en e2e ou par `verification-bout-en-bout`, sur un compte jetable en `@e2e.local`
   `b9bd24d` (CA-8), `c35d3d2` (CA-R4), `4dfee03` (CA-1, CA-6, CA-7).
   **Un reste pour la phase `docs`** : `REPRENDRE.md` nomme encore
   `habitudesAEcrire` au présent.
+- 2026-09-25 (nuit) — revue par `revue-fitcarnet`, verdict **À CORRIGER**, six
+  constats traités le soir même (`2cab7b6`). Le plus instructif est **M3 : la
+  borne posée le matin pour éviter un refus sur geste légitime en créait un**
+  — 2 000 lignes sortait d'un « quinze aliments par repas » confortable, et un
+  mois entier à dix-sept en fait 2 108. Le plafond est désormais adossé au pire
+  cas concevable (7 440), pas à un chiffre rond. **M1 : le garde ne gardait
+  presque rien** — neuf réécritures plausibles sur dix passaient, et ses témoins
+  ne pouvaient pas le révéler puisqu'ils lui servaient sa propre source. Il vise
+  maintenant l'interface. **M2 : interblocage possible** sur deux envois
+  concurrents, fermé par un `ksort`. Reste **E1**, qui ne dépend pas du code :
+  `api/front` doit recevoir le `front/dist` régénéré, sinon la phase e2e serait
+  verte pour la mauvaise raison.

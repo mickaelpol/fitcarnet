@@ -10,6 +10,39 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-25 (nuit) — B4 : revue passée, six constats corrigés, phase `e2e` (session Claude)
+
+- **Verdict `revue-fitcarnet` : À CORRIGER.** Six constats, tous traités le soir
+  même (`2cab7b6`), aucun laissé en dette.
+- **M3, le plus instructif : la correction du matin avait recréé le défaut
+  qu'elle corrigeait.** `MAX_LIGNES = 2000` venait d'un « mois entier × quinze
+  aliments = 1 860 », un chiffre confortable. À dix-sept aliments, le même mois
+  fait 2 108 lignes → 422 → et l'échec des habitudes étant silencieux par
+  décision, tout le lot perdu sans un mot. Plafond adossé au pire cas concevable
+  (31 j × 4 repas × 60 aliments = 7 440), porté à 10 000.
+- **M1 : le garde écrit le matin ne gardait presque rien.** Neuf réécritures
+  plausibles sur dix passaient — dont `m` au lieu de `mode` et le type
+  `Habitudes` au lieu de `Record<string`, qui sont l'écriture naturelle du dépôt.
+  Ses témoins ne pouvaient pas le révéler : ils lui servaient sa propre source.
+  Il vise désormais l'**interface** (ce qui part au serveur vient de
+  `lignesDHabitudes`, et de rien d'autre), éprouvé en sabotant avec la réécriture
+  que l'ancien laissait passer.
+- **M2 : interblocage possible** sur deux envois concurrents du même compte —
+  `ON CONFLICT` verrouille même quand il n'écrit rien. Fermé par un `ksort`.
+- **Preuve** : API 564 / 1 306 assertions verts ; front 741 + 46 verts.
+- **BLOQUÉ SUR UNE SEULE CHOSE, E1** : `front/dist` est régénéré et commité, mais
+  `api/front` sert encore l'ancien bundle (`entry-177adb96…` contre
+  `entry-d0f7640f…`). Sans la recopie, la phase e2e prouverait CA-2/3/4 **pour la
+  mauvaise raison** : l'ancien front n'envoie rien, donc la clause SQL neuve ne
+  serait jamais exercée. La commande (`rm -rf api/front && cp -r front/dist
+  api/front`) a été refusée par le garde-fou de destruction locale et attend le
+  propriétaire.
+- **Pour la phase `docs`** : trois renvois périmés relevés par la revue —
+  `.claude/skills/fonctionnalite-batch-cooking/SKILL.md:214`,
+  `docs/audit-2026-09/03-front.md:440`, `CALCULATEUR.md:266`. Et
+  `e2e/LISEZMOI.md` annonce « 849 tests du front et 489 de l'API » : c'est 741 et
+  564.
+
 ## 2026-09-25 (nuit, fin) — B4 : phase `tdd` terminée, suites vertes des deux côtés (session Claude)
 
 - **Le cinquième double juge est parti.** `habitudesAEcrire` est supprimée ;
