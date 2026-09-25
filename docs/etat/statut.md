@@ -10,6 +10,31 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-25 (soir) — B4 cadré : spec écrite, phase `tdd` (session Claude)
+
+- **Feature ouverte** : `docs/features/habitudes-cuisson-au-serveur.md`, phase `tdd`.
+  C'est le morceau B4 du palier B — le récit reste dans `REPRENDRE.md` § 3.
+- **Décidé avec le propriétaire** : le chantier reste sur `serveur-autoritaire`,
+  **une seule PR à la fin**. Aucun push vers `master` — le NAS le tire toutes les
+  cinq minutes.
+- **Deux trouvailles de la phase de spec, dans aucun document jusqu'ici** :
+  1. **un cinquième double juge** — « la dernière décision gagne » est écrite
+     deux fois, `habitudesAEcrire` (`front/src/calcul/habitudesCuisson.ts:126`) et
+     `LotDHabitudes::depuis` (`api/src/Service/LotDHabitudes.php:79`) ;
+  2. **un défaut hors-ligne mesuré** — `usePlanCalcule.ts:133` passe
+     `mesCuissons.data ?? {}` : requête en pause, `data` vaut `undefined`, le front
+     croit ne rien connaître et réécrit toutes les habitudes du plan.
+- **Une affirmation de `REPRENDRE.md` corrigée** : `depuisLesHabitudes` n'est PAS
+  le candidat de B4 (il a besoin du plan résolu → palier 3). Le vrai candidat est
+  `habitudesAEcrire`. Le § 3 du journal est corrigé le même jour.
+- **Relevé au passage** : `remplacer()` rend `count($aEcrire)`, c'est-à-dire ce
+  qu'on lui a demandé et non ce qui a changé (CA-8). Et le plafond `MAX = 200` de
+  `LotDHabitudes` devient atteignable par un usage normal dès que le front
+  n'envoie plus seulement les écarts (CA-R4) : il faut deux bornes.
+- **L'outil `LSP` est actif** dans cette session : la ligne « redémarrer Claude
+  Code » de `prochaines-etapes.md` est fermée.
+- Rien n'a été codé, rien n'a été commité : phase de spec seulement.
+
 ## 2026-09-25 12:30 — installation du harness (session Claude)
 - **En cours** : la refonte « serveur autoritaire » (`docs/plan-serveur-autoritaire.md`,
   paliers 0 à 3). Le palier B est à moitié traversé. Déjà passés au serveur : cohérence

@@ -8,7 +8,13 @@
 > La file, dans l'ordre. /harness la lit. Une ligne = une chose finissable. Dette assumée datée.
 
 ## Maintenant
-- [ ] **Redémarrer Claude Code** pour que `ENABLE_LSP_TOOL` et le plugin `typescript-lsp` — activés en portée projet dans `.claude/settings.json` le 25/09/2026 — prennent effet. Contrainte de Claude Code, rien à installer de plus.
+- [x] **Redémarrer Claude Code** — fait. L'outil `LSP` est présent dans la session du 25/09/2026 au soir : `ENABLE_LSP_TOOL` et `typescript-lsp` ont pris effet.
+
+- [ ] **B4 — `habitudes-cuisson-au-serveur`, phase `tdd`.** Spec écrite le 25/09/2026 :
+  `docs/features/habitudes-cuisson-au-serveur.md`. Huit critères plus quatre refus.
+  Premier geste de la phase : **mesurer** le majorant de couples (repas, aliment)
+  d'un plan de 7 jours × 4 repas — CA-R4 en a besoin pour poser une borne défendable.
+  Reprendre par `/harness habitudes-cuisson-au-serveur`.
 
 ## Ensuite
 - [ ] `api/vendor/bin/phpstan analyse` rend **5 erreurs** — mesuré le 25/09/2026 sur `serveur-autoritaire`. Elles préexistent au harness. L'une est un `parameterByRef.unusedType` dans `api/tests/Service/InventaireUneLigneTest.php:121`.

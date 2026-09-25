@@ -113,8 +113,32 @@ comme l'écran les écrivait), et six épreuves e2e dans
 > l'utilisateur mute en cochant (`usePlanCalcule.ts:90`). `resteSansCuisson`
 > n'est même pas un calcul — c'est un `setState`. Leur envoyer ces valeurs
 > rejouerait exactement l'erreur du 21 septembre au matin.
-> **Le seul candidat net est `depuisLesHabitudes`** (`planCalcule.ts:231`) :
-> ses habitudes viennent du serveur, lues telles quelles.
+> ~~**Le seul candidat net est `depuisLesHabitudes`** (`planCalcule.ts:231`)~~ —
+> **écrit le 21 septembre 2026, MESURÉ FAUX le 25.** Deux raisons, et la seconde
+> suffit : `depuisLesHabitudes` a besoin des repas du plan **résolu**, que le
+> solveur calcule au front jusqu'au palier 3 — l'envoyer au serveur aujourd'hui
+> coûterait un aller-retour réseau **par geste**, la régression que
+> `docs/plan-serveur-autoritaire.md` § palier 1 nomme en clair. Et ce qu'il fait
+> n'est pas un jugement : il réindexe une clé d'habitude en clé de cuisson.
+> **Il part avec le palier 3.** Au passage, le renvoi était faux lui aussi : la
+> fonction est en `habitudesCuisson.ts:86`, et son seul appel en
+> `planCalcule.ts:192`.
+>
+> **LE VRAI CANDIDAT DE B4 EST `habitudesAEcrire`** (`habitudesCuisson.ts:126`),
+> et c'est un **cinquième double juge** que personne n'avait compté : « la
+> dernière décision gagne » est écrite là ET dans `LotDHabitudes::depuis`
+> (`api/src/Service/LotDHabitudes.php:79`), qui dédoublonne pour PostgreSQL. Il ne
+> tourne qu'au passage à « Cuisiner » — un geste, pas une frappe — donc il part
+> sans coûter de latence. Spec : `docs/features/habitudes-cuisson-au-serveur.md`.
+>
+> **ET IL PORTE DÉJÀ UN DÉFAUT, mesuré le 25 septembre 2026** :
+> `usePlanCalcule.ts:133` lui passe `mesCuissons.data ?? {}` comme « ce qui est
+> déjà connu ». Hors ligne, `fetchStatus` vaut `paused` et `data` vaut
+> `undefined` : le front croit ne rien connaître et déclare **toute** cuisson du
+> plan comme nouvelle — une trentaine de `maj_le` repoussés pour rien, ce que le
+> commentaire de la fonction dit vouloir éviter. Déplacer la décision au serveur
+> le referme, parce que le serveur, lui, sait toujours ce qu'il a en base.
+>
 > `cleDeCuisson` et `cleDHabitude` sont de la **fabrication de clé**, pas du
 > jugement — et `cleDHabitude` garde volontairement sa table manuelle (Hermes
 > n'implémente pas `normalize`). Ne pas les toucher.

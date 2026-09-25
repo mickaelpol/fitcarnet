@@ -1,0 +1,178 @@
+---
+titre: B4 — le serveur décide ce qu'il enregistre des habitudes de cuisson
+slug: habitudes-cuisson-au-serveur
+phase: tdd
+cree_le: 2026-09-25
+brainstorm: aucun — le cadrage est l'inventaire du 21 septembre 2026, dans REPRENDRE.md § 3 (B4) et docs/plan-serveur-autoritaire.md § palier 2
+---
+
+# B4 — le serveur décide ce qu'il enregistre des habitudes de cuisson
+
+Palier B de la refonte serveur autoritaire. **Le récit du chantier reste dans
+[REPRENDRE.md](../../REPRENDRE.md) § 3** ; cette fiche ne porte que les critères
+de CE morceau. Le besoin utilisateur, lui, est déjà écrit dans la skill
+`fonctionnalite-batch-cooking` : on y renvoie, on ne le recopie pas.
+
+## Pourquoi
+
+« Ce qui est pré-rempli est ce que tu as fait la dernière fois. » Cette règle est
+aujourd'hui jugée **deux fois** : `habitudesAEcrire`
+(`front/src/calcul/habitudesCuisson.ts:126`) décide au front quelle décision
+gagne et laquelle ne vaut pas la peine d'être écrite, et `LotDHabitudes::depuis`
+(`api/src/Service/LotDHabitudes.php:79`) re-dédoublonne côté serveur avec la même
+règle — « la dernière gagne » — pour une autre raison (PostgreSQL refuse un
+`ON CONFLICT` dont le lot porte deux fois la même clé).
+
+C'est le cinquième double juge du projet, et il n'était pas dans la liste.
+
+**Et il produit déjà un défaut mesurable.** `usePlanCalcule.ts:133` passe
+`mesCuissons.data ?? {}` comme « ce qui est déjà connu ». Quand la requête n'a
+pas répondu — hors ligne, `fetchStatus: 'paused'`, `data: undefined` — le front
+croit ne rien connaître et déclare **toute** cuisson du plan comme nouvelle : une
+trentaine de lignes réécrites et autant de `maj_le` repoussés sans raison,
+exactement ce que le commentaire de `habitudesAEcrire` dit vouloir éviter.
+
+## Comportement
+
+Au passage à l'étape « Cuisiner », l'écran envoie au serveur les cuissons
+effectives du plan — ce qu'il affiche, habitudes comprises — sans juger ce qui a
+changé. Le serveur retient la dernière décision de chaque aliment, la compare à
+ce qu'il a en base, et **n'écrit que les écarts**. Il répond combien de lignes
+ont réellement bougé.
+
+Pour l'utilisateur, rien ne change à l'écran : c'est le sens de la contrainte du
+propriétaire, « je veux la même application qu'au départ mais avec le serveur
+autoritaire ». L'échec reste silencieux — une habitude perdue coûte un appui la
+semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
+
+## Critères d'acceptation
+
+- **CA-1** — *Étant donné* le dépôt entier, *quand* on cherche une comparaison
+  entre une cuisson choisie et une habitude connue dans `front/src` ou
+  `front/app`, *alors* il n'y en a aucune : `habitudesAEcrire` n'existe plus, et
+  un garde du front le refuse à l'avenir (sur le modèle de
+  `coherenceCibleUnique.test.ts`). Le garde porte un cas témoin qui prouve qu'il
+  peut tomber.
+- **CA-2** — *Étant donné* un compte dont « riz basmati » est déjà enregistré au
+  mode 2, *quand* `PUT /api/mes-cuissons` reçoit `{"habitudes":[{"aliment":"riz
+  basmati","mode":2}]}`, *alors* la réponse est `{"enregistrees":0}` et le
+  `maj_le` de la ligne est **inchangé**.
+- **CA-3** — *Étant donné* le même compte, *quand* l'envoi porte `"mode":5` (un
+  mode qui existe), *alors* la réponse est `{"enregistrees":1}`, la ligne vaut 5
+  et son `maj_le` a bougé.
+- **CA-4** — *Étant donné* un aliment dont ce compte n'a jamais rien décidé,
+  *quand* l'envoi porte `"mode":null`, *alors* la réponse est
+  `{"enregistrees":1}` et la ligne est créée avec `mode_cuisson_id` à `NULL` —
+  « se mange sans cuisson » est une réponse, pas une absence (règle 6).
+- **CA-5** — *Étant donné* une base où « riz basmati » vaut 2, *quand* un seul
+  envoi porte deux fois cet aliment, d'abord `"mode":2` puis `"mode":5`, *alors*
+  la réponse est `{"enregistrees":1}` et la ligne vaut **5** : la dernière
+  décision de l'envoi gagne, et c'est désormais la seule écriture de cette règle
+  dans le dépôt.
+- **CA-6** — *Étant donné* un plan dont aucune cuisson n'a changé depuis la
+  semaine dernière, *quand* l'utilisateur passe à l'étape « Cuisiner », *alors*
+  un seul `PUT` part, il répond `{"enregistrees":0}`, et **aucun** `maj_le` de la
+  table `cuisson_habituelle` n'a bougé.
+- **CA-7** — *Étant donné* que `GET /api/mes-cuissons` n'a pas répondu (hors
+  ligne, requête en pause), *quand* l'utilisateur passe à l'étape « Cuisiner »
+  après le retour du réseau, *alors* le serveur n'écrit toujours que les écarts :
+  le front ne sait rien de ce qui est connu, et ça ne change plus le résultat.
+  C'est le défaut décrit dans « Pourquoi » ; ce critère est sa non-régression.
+- **CA-8** — *Étant donné* `remplacer()`, *quand* le lot ne contient que des
+  valeurs déjà en base, *alors* il rend `0` — et non le nombre de lignes reçues,
+  comme aujourd'hui (`return \count($aEcrire)`).
+
+## Ce que la feature refuse
+
+Les messages existants de `LotDHabitudes` **ne changent pas** : ce sont des refus
+déjà éprouvés, et les réécrire serait une régression silencieuse.
+
+- **CA-R1** — mode inconnu → 422, « Mode de cuisson inconnu : *N* » (inchangé).
+- **CA-R2** — aliment vide → 422, « Aliment non précisé. » (inchangé).
+- **CA-R3** — clé `mode` absente → 422, « Cuisson non précisée pour *aliment* »
+  (inchangé) ; `array_key_exists` et non `isset`, qui confondrait avec `null`.
+- **CA-R4** — **le plafond doit devenir DEUX bornes, et c'est nouveau.**
+  `LotDHabitudes::MAX` vaut 200 et se compare au nombre de lignes **reçues**.
+  Aujourd'hui le front n'envoie que les écarts, donc 200 n'est jamais atteint ;
+  demain il envoie une ligne par couple (repas, aliment) d'un plan qui peut
+  compter 28 repas, et le plafond deviendrait atteignable par un usage normal —
+  un refus 422 sur un geste légitime. Il faut donc : une borne sur l'envoi brut,
+  assez haute pour un plan de sept jours, et le plafond de 200 conservé sur le
+  nombre d'aliments **distincts** après dédoublonnage. Les deux bornes portent
+  leur chiffre et sa raison, et chacune a son test de refus.
+
+## Données
+
+- Table `cuisson_habituelle` (`utilisateur_id`, `aliment`, `mode_cuisson_id`,
+  `maj_le`), index unique `(utilisateur_id, aliment)`. **Aucune migration** : ni
+  colonne, ni contrainte, ni index ne change.
+- Source de vérité : la base. Le filtrage de l'inchangé se fait par
+  `ON CONFLICT … DO UPDATE … WHERE cuisson_habituelle.mode_cuisson_id IS DISTINCT
+  FROM EXCLUDED.mode_cuisson_id` — une clause, dans le seul dépôt qui écrit cette
+  table. `IS DISTINCT FROM` traite `NULL` comme une valeur, ce dont la règle 6 a
+  besoin ; PostgreSQL ne touche pas la ligne quand la condition est fausse, donc
+  `maj_le` ne bouge pas et l'instruction rend 0.
+- `aliment` reste la clé **déjà normalisée par l'écran**. `cleDHabitude` ne part
+  pas : c'est de la fabrication de clé, sa table d'accents est manuelle
+  volontairement (Hermes n'implémente pas `normalize`), et la réécrire en PHP
+  créerait la duplication que ce chantier ferme.
+
+## Droits
+
+`#[IsGranted('ROLE_USER')]` sur `CuissonsController`, inchangé. Chaque compte ne
+voit et n'écrit que ses lignes : `utilisateur_id` vient de la session, jamais du
+corps de la requête. Une requête forgée qui nommerait un autre compte n'a pas de
+champ pour le dire.
+
+## Hors périmètre
+
+- **`depuisLesHabitudes` ne part pas, et `REPRENDRE.md` se trompe en le désignant
+  « le seul candidat net ».** Il a besoin des repas du plan **résolu**, que le
+  solveur calcule au front ; le serveur ne les connaîtra qu'au palier 3. L'y
+  envoyer aujourd'hui coûterait un aller-retour réseau par geste — la régression
+  que `docs/plan-serveur-autoritaire.md` § palier 1 nomme explicitement. Et ce
+  qu'il fait n'est pas un jugement : il réindexe une clé d'habitude en clé de
+  cuisson. **Il part avec le palier 3, pas avant.**
+- `cuissonsEffectives`, `enFournees`, `resteSansCuisson`, `sansCuisson` et
+  `repartition` restent au front pour la même raison : toutes lisent
+  `cuissonsChoisies`, un `useState` que l'utilisateur mute en cochant
+  (`usePlanCalcule.ts:90`), et l'écran doit répondre à la coche sans attendre le
+  réseau. `resteSansCuisson` n'est même pas un calcul : c'est un `setState`.
+- `repartition` porte un vrai calcul métier — « ce qu'on ne cuit pas ne gonfle
+  pas » (F2, 15 septembre 2026) — et **c'est une dette assumée par cette fiche** :
+  elle ne peut partir qu'avec le solveur, au palier 3. Écrit ici pour que
+  personne ne croie B4 complet sur les fournées.
+- Aucun changement visible à l'écran. Si l'écran change, c'est un défaut.
+
+## Questions ouvertes
+
+- Le majorant réel du nombre de couples (repas, aliment) d'un plan de sept jours
+  n'est **pas mesuré**. CA-R4 en a besoin pour poser un chiffre défendable plutôt
+  qu'un nombre rond. À mesurer en phase `tdd`, sur un plan réel de 7 jours × 4
+  repas, avant d'écrire la borne. Tranche : la session qui écrit le test.
+
+## Vérification
+
+La vidéo doit montrer, sur l'application qui tourne :
+
+1. Un plan composé, réglage des cuissons, passage à « Cuisiner » — **l'écran se
+   comporte exactement comme avant** (CA-6, volet visible).
+2. Le même passage refait sans rien changer : côté base, aucun `maj_le` n'a bougé
+   (CA-2, CA-6). C'est le seul endroit où ça se voit, donc la capture doit montrer
+   la requête SQL et son résultat, pas seulement l'écran.
+3. Un changement de cuisson d'un aliment, puis passage à « Cuisiner » : une seule
+   ligne écrite (CA-3).
+
+CA-2 à CA-5 et CA-8 se prouvent **contre une vraie base** : les suites PHPUnit du
+projet tournent sans base ni noyau (skill `tests-api`), et une `Connection`
+doublée ne peut attester que la requête émise, pas son effet. La preuve est donc
+en e2e ou par `verification-bout-en-bout`, sur un compte jetable en `@e2e.local`.
+
+## Journal
+
+- 2026-09-25 — spec écrite directement, sans brainstorm : le cadrage existait
+  déjà (inventaire du 21 septembre 2026). Deux trouvailles de cette phase, qui
+  n'étaient dans aucun document : le double juge « la dernière gagne » entre
+  `habitudesAEcrire` et `LotDHabitudes`, et le défaut hors-ligne de
+  `mesCuissons.data ?? {}`. Une affirmation de `REPRENDRE.md` est corrigée
+  (`depuisLesHabitudes` n'est pas le candidat de B4 ; il part au palier 3).
