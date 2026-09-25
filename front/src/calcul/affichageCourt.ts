@@ -39,15 +39,36 @@ export function identifiantYoutube(url: string | null): string | null {
 /**
  * Une quantite decimale telle qu'on l'ecrit.
  *
- * `quantite` arrive en chaine — « 5.00 ». L'afficher tel quel donne « 5.00 g
- * de creatine », ce que personne n'ecrit. On enleve les zeros inutiles et on
- * rend la virgule francaise.
+ * `quantite` vaut « 5.00 » ou `5`. L'afficher tel quel donne « 5.00 g de
+ * creatine », ce que personne n'ecrit. On enleve les zeros inutiles et on rend
+ * la virgule francaise.
  *
  * CE QU'ON NE SAIT PAS LIRE EST RENDU TEL QUEL, et non remplace par zero : une
  * quantite illisible doit se voir, pas se transformer en « 0 g » plausible.
+ *
+ * LES DEUX FORMES, ET POURQUOI — PANNE DU 23 SEPTEMBRE 2026.
+ *
+ * Cette fonction n'acceptait qu'une chaine et appelait `.trim()` dessus.
+ * L'onglet Compte s'affichait en page blanche, sur un
+ * `TypeError: t.trim is not a function` leve pendant le rendu de
+ * `MesComplements` : `Complement::getQuantite(): float` rend un FLOTTANT depuis
+ * le 17 aout 2026, API Platform serialise par l'accesseur, et
+ * `GET /api/complements` envoie donc `"quantite": 5`.
+ *
+ * `types.ts` declarait pourtant une chaine, avec un commentaire affirmant que
+ * l'API « refuse un nombre ». `tsc` ne pouvait rien voir : on lui avait decrit
+ * le contraire du cable. Et il fallait au moins UN complement enregistre pour
+ * que la boucle atteigne cette ligne — d'ou cinq semaines de silence, puis une
+ * page blanche le jour du premier complement.
+ *
+ * On accepte donc les deux formes plutot que de parier sur l'une : un DECIMAL
+ * traverse ce projet tantot en chaine (ce que Doctrine hydrate, pour ne jamais
+ * passer par la virgule flottante), tantot en nombre (ce qu'un accesseur typé
+ * `float` serialise). Le dernier rempart avant l'ecran ne choisit pas son camp.
  */
-export function nombreLisible(decimale: string): string {
-  const n = Number(decimale);
+export function nombreLisible(decimale: string | number): string {
+  const texte = typeof decimale === 'number' ? String(decimale) : decimale;
+  const n = Number(texte);
 
-  return Number.isFinite(n) && decimale.trim() !== '' ? String(n).replace('.', ',') : decimale;
+  return Number.isFinite(n) && texte.trim() !== '' ? String(n).replace('.', ',') : texte;
 }

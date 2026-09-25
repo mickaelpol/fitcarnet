@@ -216,8 +216,15 @@ export interface Complement {
   '@id'?: string;
   id: number;
   nom: string;
-  /* En chaîne : c'est un DECIMAL côté API, et il refuse un nombre. */
-  quantite: string;
+  /* EN NOMBRE, ET CE CHAMP A DEJA MENTI — panne du 23 septembre 2026.
+     Il declarait `string`, avec un commentaire affirmant que l'API « refuse un
+     nombre ». Les deux etaient faux : `Complement::getQuantite(): float` rend
+     un flottant depuis le 17 aout 2026, et API Platform serialise par
+     l'accesseur. L'onglet Compte tombait donc en page blanche sur
+     `t.trim is not a function`, sans que `tsc` puisse rien voir — on lui avait
+     decrit le contraire du cable. En LECTURE c'est un nombre ; en ECRITURE les
+     deux formes passent depuis `App\Metadata\DecimalesNumeriques`. */
+  quantite: number;
   unite: string;
   repas: Repas;
 }
