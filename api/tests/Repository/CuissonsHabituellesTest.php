@@ -166,4 +166,68 @@ final class CuissonsHabituellesTest extends TestCase
         self::assertSame(0, (new CuissonsHabituelles($cnx))->remplacer(self::MOI, []));
         self::assertSame(0, $ouvertures);
     }
+
+    /**
+     * LE COMPTE RENDU EST CE QUI A CHANGE, PAS CE QU'ON A DEMANDE.
+     *
+     * `ON CONFLICT ... DO UPDATE ... WHERE ... IS DISTINCT FROM` fait que
+     * PostgreSQL ne touche pas une ligne inchangee : l'instruction rend alors
+     * 0. `remplacer()` doit rendre la somme de ce que chaque instruction a
+     * REELLEMENT ecrit, pas `count($aEcrire)` — sans quoi deux habitudes dont
+     * une seule a change se rapportent comme deux ecritures.
+     */
+    public function testRemplacerNeCompteQueCeQuiAReellementChange(): void
+    {
+        // CA-8 (a)
+        $appels = 0;
+        $cnx = self::createStub(Connection::class);
+        $cnx->method('transactional')->willReturnCallback(
+            static fn (callable $travail): mixed => $travail($cnx));
+        $cnx->method('executeStatement')->willReturnCallback(
+            function () use (&$appels): int {
+                ++$appels;
+
+                // La premiere ligne a change (la clause WHERE est vraie chez
+                // PostgreSQL), la seconde etait deja a jour (clause fausse) :
+                // c'est exactement ce que rend le moteur, pas un choix du test.
+                return 1 === $appels ? 1 : 0;
+            });
+
+        $ecrites = (new CuissonsHabituelles($cnx))->remplacer(
+            self::MOI, ['riz blanc' => 2, 'skyr' => null]);
+
+        self::assertSame(1, $ecrites, 'une seule des deux lignes a reellement change');
+    }
+
+    /**
+     * `NULL` EST UNE VALEUR, PAS UNE ABSENCE, MEME DANS LA CLAUSE DE FILTRE.
+     *
+     * Un simple `mode_cuisson_id <> EXCLUDED.mode_cuisson_id` serait FAUX des
+     * qu'un des deux cotes vaut NULL — SQL ne compare jamais rien a NULL par
+     * `<>` sans rendre NULL, donc jamais vrai. `IS DISTINCT FROM` est le seul
+     * operateur qui traite NULL comme une valeur comparable : sans lui,
+     * `maj_le` serait repousse a chaque appel pour "se mange sans cuisson"
+     * meme quand c'est deja ce qui est enregistre.
+     */
+    public function testLaClauseDeFiltrageTraiteNullCommeUneValeur(): void
+    {
+        // CA-8 (b)
+        $sqlVu = '';
+        $cnx = self::createStub(Connection::class);
+        $cnx->method('transactional')->willReturnCallback(
+            static fn (callable $travail): mixed => $travail($cnx));
+        $cnx->method('executeStatement')->willReturnCallback(
+            function (string $sql) use (&$sqlVu): int {
+                $sqlVu = $sql;
+
+                return 1;
+            });
+
+        (new CuissonsHabituelles($cnx))->remplacer(self::MOI, ['riz blanc' => 2]);
+
+        self::assertStringContainsString(
+            'WHERE cuisson_habituelle.mode_cuisson_id IS DISTINCT FROM EXCLUDED.mode_cuisson_id',
+            $sqlVu,
+        );
+    }
 }

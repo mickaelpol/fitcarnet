@@ -82,12 +82,34 @@ final readonly class CuissonsHabituelles
     }
 
     /**
-     * Enregistre, ou remplace, des habitudes — et rend combien.
+     * Enregistre, ou remplace, des habitudes — et rend combien ont REELLEMENT change.
      *
      * UNE SEULE TRANSACTION POUR TOUT LE LOT. « Les douze autres se mangent
      * sans cuisson » est UN geste de l'utilisateur : douze appels le feraient
      * reussir a moitie, sept habitudes ecrites et cinq perdues dans une
      * coupure, sans aucun moyen de savoir lesquelles.
+     *
+     * C'EST ICI QUE SE FAIT LE TRI DE L'INCHANGE, ET NULLE PART AILLEURS.
+     *
+     * Jusqu'au 25 septembre 2026, l'ecran comparait lui-meme ce qu'il venait de
+     * decider a ce qu'il croyait deja enregistre, et n'envoyait que les ecarts
+     * (`habitudesAEcrire`, front). C'etait le cinquieme double juge du projet :
+     * la meme regle, « la derniere decision gagne, et l'inchange ne s'ecrit
+     * pas », tenue dans deux langages. Et elle avait deja un defaut mesure —
+     * requete en pause, `mesCuissons.data` valait `undefined`, l'ecran croyait
+     * ne rien connaitre et reecrivait TOUT le plan, une trentaine de `maj_le`
+     * repousses sans raison.
+     *
+     * Desormais l'ecran envoie ce qu'il affiche, sans juger, et la clause
+     * `WHERE ... IS DISTINCT FROM` tranche. `IS DISTINCT FROM` et non `<>` :
+     * il traite `NULL` comme une valeur, ce dont la regle 6 a besoin — « se
+     * mange sans cuisson » est une REPONSE, et repasser du mode 2 a `null`
+     * doit s'ecrire. Quand la condition est fausse, PostgreSQL ne touche pas
+     * la ligne : `maj_le` ne bouge pas, et l'instruction rend 0.
+     *
+     * D'OU LA SOMME, et non `count($aEcrire)`. L'ancien retour disait ce qu'on
+     * avait DEMANDE, pas ce qui avait change — un compteur qui ne pouvait
+     * jamais dire zero, donc qui ne disait rien.
      *
      * @param array<string, int|null> $aEcrire cle deja normalisee par l'ecran
      */
@@ -97,18 +119,22 @@ final readonly class CuissonsHabituelles
             return 0;
         }
 
-        $this->cnx->transactional(function (Connection $cnx) use ($aEcrire, $utilisateur): void {
-            foreach ($aEcrire as $aliment => $mode) {
-                $cnx->executeStatement(
-                    'INSERT INTO cuisson_habituelle (utilisateur_id, aliment, mode_cuisson_id, maj_le)
-                     VALUES (:u, :a, :m, now())
-                     ON CONFLICT (utilisateur_id, aliment)
-                     DO UPDATE SET mode_cuisson_id = EXCLUDED.mode_cuisson_id, maj_le = now()',
-                    ['u' => $utilisateur, 'a' => (string) $aliment, 'm' => $mode],
-                );
-            }
-        });
+        $changees = 0;
 
-        return \count($aEcrire);
+        $this->cnx->transactional(
+            function (Connection $cnx) use ($aEcrire, $utilisateur, &$changees): void {
+                foreach ($aEcrire as $aliment => $mode) {
+                    $changees += (int) $cnx->executeStatement(
+                        'INSERT INTO cuisson_habituelle (utilisateur_id, aliment, mode_cuisson_id, maj_le)
+                         VALUES (:u, :a, :m, now())
+                         ON CONFLICT (utilisateur_id, aliment)
+                         DO UPDATE SET mode_cuisson_id = EXCLUDED.mode_cuisson_id, maj_le = now()
+                         WHERE cuisson_habituelle.mode_cuisson_id IS DISTINCT FROM EXCLUDED.mode_cuisson_id',
+                        ['u' => $utilisateur, 'a' => (string) $aliment, 'm' => $mode],
+                    );
+                }
+            });
+
+        return $changees;
     }
 }

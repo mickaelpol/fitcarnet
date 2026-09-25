@@ -78,7 +78,7 @@ semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
   après le retour du réseau, *alors* le serveur n'écrit toujours que les écarts :
   le front ne sait rien de ce qui est connu, et ça ne change plus le résultat.
   C'est le défaut décrit dans « Pourquoi » ; ce critère est sa non-régression.
-- **CA-8** — *Étant donné* `remplacer()`, *quand* le lot ne contient que des
+- **CA-8** ✅ *(vert le 25/09/2026)* — *Étant donné* `remplacer()`, *quand* le lot ne contient que des
   valeurs déjà en base, *alors* il rend `0` — et non le nombre de lignes reçues,
   comme aujourd'hui (`return \count($aEcrire)`).
 
@@ -96,10 +96,13 @@ déjà éprouvés, et les réécrire serait une régression silencieuse.
   Aujourd'hui le front n'envoie que les écarts, donc 200 n'est jamais atteint ;
   demain il envoie une ligne par couple (repas, aliment) d'un plan qui peut
   compter 28 repas, et le plafond deviendrait atteignable par un usage normal —
-  un refus 422 sur un geste légitime. Il faut donc : une borne sur l'envoi brut,
-  assez haute pour un plan de sept jours, et le plafond de 200 conservé sur le
-  nombre d'aliments **distincts** après dédoublonnage. Les deux bornes portent
-  leur chiffre et sa raison, et chacune a son test de refus.
+  un refus 422 sur un geste légitime. Il faut donc **deux** bornes, chacune avec
+  son chiffre, sa raison et son test de refus :
+  - `MAX_LIGNES = 2000` sur l'envoi **brut**, avant dédoublonnage ;
+  - `MAX = 200` conservé, mais sur le nombre d'aliments **distincts**, après
+    dédoublonnage — c'est-à-dire sur ce qui sera réellement écrit.
+
+  Les deux chiffres viennent de la mesure notée dans « Questions ouvertes ».
 
 ## Données
 
@@ -144,12 +147,40 @@ champ pour le dire.
   personne ne croie B4 complet sur les fournées.
 - Aucun changement visible à l'écran. Si l'écran change, c'est un défaut.
 
-## Questions ouvertes
+## Le majorant, mesuré le 25 septembre 2026
 
-- Le majorant réel du nombre de couples (repas, aliment) d'un plan de sept jours
-  n'est **pas mesuré**. CA-R4 en a besoin pour poser un chiffre défendable plutôt
-  qu'un nombre rond. À mesurer en phase `tdd`, sur un plan réel de 7 jours × 4
-  repas, avant d'écrire la borne. Tranche : la session qui écrit le test.
+**Il n'y en a pas dans le code, et c'est le résultat de la mesure.** Aucune des
+deux dimensions n'est bornée :
+
+- **Les jours.** `repas.tsx:142` prend `rangs`, alimenté par `Calendrier`, qui
+  affiche une grille MENSUELLE sans plafond (`calendrier.tsx:91`). Cocher
+  31 jours est possible. Les repas, eux, sont quatre :
+  `REPAS = ['R1','R2','R3','R4']` (`solveur/repasVocabulaire.ts:17`).
+- **Les aliments d'un repas.** Sept rôles au plus (`ROLES`,
+  `demandeRepas.ts:91`), **plus `ajouts`, une liste libre** (`Compose.ajouts`,
+  `demandeRepas.ts:274`) bornée seulement par le frigo — un aliment déjà pris
+  par un rôle ne se propose plus (`demandeRepas.ts:328`), rien d'autre.
+
+Chercher un majorant est donc une impasse : le pire cas théorique est
+31 × 4 × (taille du frigo). La borne brute ne peut pas être un majorant, ce
+sera un **plafond posé**, et voici son calcul.
+
+| | couples (repas, aliment) |
+|---|---|
+| Plan de la semaine, 7 j × 4 repas, 7 rôles + 3 ajouts | **280** |
+| Mois entier coché, 31 j × 4 repas, 15 aliments par repas | **1 860** |
+| `MAX_LIGNES` retenu | **2 000** |
+
+2 000 laisse passer le mois entier — le geste le plus gros que l'écran sache
+produire — et ferme la porte à un corps qui ne vient plus de lui. La base de
+dev de ce poste ne pouvait pas servir de mesure empirique : elle porte 8
+aliments et 2 plans de démonstration. Le seul chiffre mesuré du dépôt sur un
+vrai plan est celui de `usePlanCalcule.ts:34`, « sept jours sur 60 aliments ».
+
+Le second plafond, 200 aliments **distincts**, garde son chiffre d'origine et
+sa raison d'origine — « une semaine de quatre repas met en jeu une trentaine
+d'aliments distincts » — qui, elle, reste vraie : le dédoublonnage la rend
+enfin comparable à ce qu'elle prétend compter.
 
 ## Vérification
 
