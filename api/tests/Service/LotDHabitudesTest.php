@@ -162,4 +162,66 @@ final class LotDHabitudesTest extends TestCase
         self::assertFalse($lot->estValide());
         self::assertSame([], $lot->aEcrire);
     }
+
+    public function testUnEnvoiBrutDemesureEstRefuseAvantDedoublonnage(): void
+    {
+        // CA-R4 (a)
+        /* Le front enverra desormais une ligne par couple (repas, aliment) du
+           plan, sans juger : cette borne-la porte sur ce qui ARRIVE, avant
+           tout dedoublonnage — un mois entier coche (31 j x 4 repas x
+           15 aliments) fait 1 860 couples, donc MAX_LIGNES doit laisser
+           passer bien plus que MAX. */
+        $trop = [];
+        for ($i = 0; $i <= LotDHabitudes::MAX_LIGNES; ++$i) {
+            $trop[] = ['aliment' => 'aliment ' . $i, 'mode' => 1];
+        }
+
+        $lot = LotDHabitudes::depuis($trop, self::MODES);
+
+        self::assertFalse($lot->estValide());
+        self::assertStringContainsString((string) LotDHabitudes::MAX_LIGNES, (string) $lot->erreur);
+    }
+
+    public function testUnPlanAvecRepetitionsPasseSousLaBorneBrute(): void
+    {
+        // CA-R4 (b)
+        /* Le cas d'un vrai plan : le meme riz revient a chaque repas. 1 500
+           lignes mais seulement 12 aliments distincts — la borne brute ne
+           doit plus refuser ce geste legitime, seul le compte APRES
+           dedoublonnage compte pour MAX. */
+        $alimentsDistincts = [];
+        for ($i = 0; $i < 12; ++$i) {
+            $alimentsDistincts[] = 'aliment ' . $i;
+        }
+
+        $lignes = [];
+        for ($i = 0; $i < 1500; ++$i) {
+            $lignes[] = ['aliment' => $alimentsDistincts[$i % 12], 'mode' => 1];
+        }
+
+        $lot = LotDHabitudes::depuis($lignes, self::MODES);
+
+        self::assertTrue($lot->estValide());
+        self::assertCount(12, $lot->aEcrire);
+    }
+
+    public function testLesAlimentsDistinctsRestentPlafonnesSousLaBorneBrute(): void
+    {
+        // CA-R4 (c)
+        /* MAX+1 aliments tous distincts, mais un total de lignes largement
+           sous MAX_LIGNES : les deux bornes se prouvent separement, celle-ci
+           ne doit rien devoir a la premiere. */
+        $nombreDAlimentsDistincts = LotDHabitudes::MAX + 1;
+        self::assertLessThan(LotDHabitudes::MAX_LIGNES, $nombreDAlimentsDistincts);
+
+        $trop = [];
+        for ($i = 0; $i < $nombreDAlimentsDistincts; ++$i) {
+            $trop[] = ['aliment' => 'aliment ' . $i, 'mode' => 1];
+        }
+
+        $lot = LotDHabitudes::depuis($trop, self::MODES);
+
+        self::assertFalse($lot->estValide());
+        self::assertStringContainsString((string) LotDHabitudes::MAX, (string) $lot->erreur);
+    }
 }

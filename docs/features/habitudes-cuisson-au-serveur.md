@@ -91,7 +91,7 @@ déjà éprouvés, et les réécrire serait une régression silencieuse.
 - **CA-R2** — aliment vide → 422, « Aliment non précisé. » (inchangé).
 - **CA-R3** — clé `mode` absente → 422, « Cuisson non précisée pour *aliment* »
   (inchangé) ; `array_key_exists` et non `isset`, qui confondrait avec `null`.
-- **CA-R4** — **le plafond doit devenir DEUX bornes, et c'est nouveau.**
+- **CA-R4** ✅ *(vert le 25/09/2026)* — **le plafond doit devenir DEUX bornes, et c'est nouveau.**
   `LotDHabitudes::MAX` vaut 200 et se compare au nombre de lignes **reçues**.
   Aujourd'hui le front n'envoie que les écarts, donc 200 n'est jamais atteint ;
   demain il envoie une ligne par couple (repas, aliment) d'un plan qui peut

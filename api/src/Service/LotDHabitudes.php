@@ -21,13 +21,39 @@ namespace App\Service;
 final class LotDHabitudes
 {
     /**
-     * Plafond d'un envoi.
+     * Plafond des aliments DISTINCTS, apres dedoublonnage.
      *
      * Une semaine de quatre repas met en jeu une trentaine d'aliments
      * distincts au grand maximum. 200 laisse toute la marge voulue tout en
      * fermant la porte a un envoi qui ne serait plus un geste d'utilisateur.
+     *
+     * LE CHIFFRE N'A PAS BOUGE, SA CIBLE SI — le 25 septembre 2026. Il se
+     * comparait au nombre de lignes RECUES, et ca tenait tant que l'ecran
+     * n'envoyait que les ecarts. Depuis que le tri de l'inchange appartient a
+     * la base, l'ecran envoie une ligne par couple (repas, aliment) du plan :
+     * 200 serait devenu atteignable par un usage normal, c'est-a-dire un 422
+     * sur un geste legitime. Compare aux distincts, il redevient ce que sa
+     * raison dit compter.
      */
     public const MAX = 200;
+
+    /**
+     * Plafond de l'envoi BRUT, avant dedoublonnage.
+     *
+     * MESURE DU 25 SEPTEMBRE 2026, et elle ne dit pas ce qu'on attendait : il
+     * n'existe AUCUN majorant dans le code. Ni les jours — le calendrier de
+     * l'ecran est mensuel et laisse en cocher trente-et-un — ni les aliments
+     * d'un repas, `Compose.ajouts` etant une liste libre bornee par le seul
+     * frigo. Le pire cas theorique est 31 x 4 x (taille du frigo).
+     *
+     * Ce plafond est donc POSE, pas deduit :
+     *   - plan de la semaine, 7 j x 4 repas x 10 aliments .....   280 lignes
+     *   - mois entier coche, 31 j x 4 repas x 15 aliments ..... 1 860 lignes
+     *
+     * 2000 laisse passer le plus gros geste que l'ecran sache produire, et
+     * ferme la porte a un corps qui ne vient plus de lui.
+     */
+    public const MAX_LIGNES = 2000;
 
     /** Au-dela, ce n'est plus un nom d'aliment. */
     public const NOM_MAX = 200;
@@ -65,10 +91,14 @@ final class LotDHabitudes
                s'il a quelque chose a dire avant de le dire. */
             return new self([], null);
         }
-        if (\count($habitudes) > self::MAX) {
+        /* LA PREMIERE DES DEUX BORNES, et elle porte sur le BRUT : il faut
+           refuser un corps demesure AVANT de le parcourir, sans quoi le
+           dedoublonnage travaillerait sur ce qu'on cherche justement a ne pas
+           accepter. */
+        if (\count($habitudes) > self::MAX_LIGNES) {
             return self::refus(\sprintf(
-                'Trop d\'habitudes d\'un coup : %d pour %d au maximum.',
-                \count($habitudes), self::MAX));
+                'Trop de lignes d\'un coup : %d pour %d au maximum.',
+                \count($habitudes), self::MAX_LIGNES));
         }
 
         /* On DEDOUBLONNE avant d'ecrire. PostgreSQL refuse un ON CONFLICT dont
@@ -110,6 +140,16 @@ final class LotDHabitudes
             }
 
             $aEcrire[$aliment] = $mode;
+        }
+
+        /* LA SECONDE BORNE, et c'est ici qu'elle a un sens : apres le
+           dedoublonnage, `$aEcrire` compte les aliments distincts, donc les
+           lignes qui partiront vraiment en base. Un plan de sept jours qui
+           nomme trente fois le meme riz fait trente lignes et un aliment. */
+        if (\count($aEcrire) > self::MAX) {
+            return self::refus(\sprintf(
+                'Trop d\'habitudes d\'un coup : %d pour %d au maximum.',
+                \count($aEcrire), self::MAX));
         }
 
         return new self($aEcrire, null);
