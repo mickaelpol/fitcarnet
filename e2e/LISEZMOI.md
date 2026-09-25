@@ -1,7 +1,7 @@
 # Épreuves de bout en bout
 
-Un vrai navigateur, la vraie API, la vraie base. Ce que les 849 tests du front
-et les 489 de l'API ne peuvent pas voir : **l'assemblage**.
+Un vrai navigateur, la vraie API, la vraie base. Ce que les 741 tests du front
+(plus 46 de rendu) et les 564 de l'API ne peuvent pas voir : **l'assemblage**.
 
 ```bash
 cd e2e && npm install     # une seule fois

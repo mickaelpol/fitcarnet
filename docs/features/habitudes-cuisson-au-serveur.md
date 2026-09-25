@@ -1,7 +1,7 @@
 ---
 titre: B4 — le serveur décide ce qu'il enregistre des habitudes de cuisson
 slug: habitudes-cuisson-au-serveur
-phase: docs
+phase: done
 cree_le: 2026-09-25
 brainstorm: aucun — le cadrage est l'inventaire du 21 septembre 2026, dans REPRENDRE.md § 3 (B4) et docs/plan-serveur-autoritaire.md § palier 2
 ---
@@ -19,7 +19,7 @@ de CE morceau. Le besoin utilisateur, lui, est déjà écrit dans la skill
 aujourd'hui jugée **deux fois** : `habitudesAEcrire`
 (`front/src/calcul/habitudesCuisson.ts:126`) décide au front quelle décision
 gagne et laquelle ne vaut pas la peine d'être écrite, et `LotDHabitudes::depuis`
-(`api/src/Service/LotDHabitudes.php:79`) re-dédoublonne côté serveur avec la même
+(`api/src/Service/LotDHabitudes.php:101`) re-dédoublonne côté serveur avec la même
 règle — « la dernière gagne » — pour une autre raison (PostgreSQL refuse un
 `ON CONFLICT` dont le lot porte deux fois la même clé).
 
@@ -257,3 +257,16 @@ en e2e ou par `verification-bout-en-bout`, sur un compte jetable en `@e2e.local`
   **Non éprouvé** : le `ksort` anti-interblocage (M2) — deux transactions
   entrelacées ne se constatent pas de façon fiable depuis `curl`. Le code le
   porte, la preuve expérimentale manque.
+- 2026-09-25 (nuit) — phase `docs`, par `verite-documentaire`. **Vingt-trois
+  écarts**, dont six que personne n'avait vus et qui préexistaient à ce chantier :
+  `CLAUDE.md` annonçait **trois** gardes alors qu'il y en a cinq, affirmait que
+  deux d'entre eux « ne voient ni le serveur ni la base » — faux pour
+  `avancementUnique`, qui compare trois listes de modes à travers SQL, PHP et
+  TSX —, disait `epleyUnique` « seul dispositif à voir une divergence entre deux
+  langages » alors qu'ils sont quatre, comptait **quatre** doubles juges retirés
+  au lieu de six, et portait un tableau à deux en-têtes empilés. Et sa section
+  e2e ne prononçait **jamais** le mot `api/front` : la recopie du build, écrite
+  dans quatre autres fichiers, manquait précisément là où elle a bloqué la phase
+  e2e de ce soir. Quatorze compteurs de tests étaient faux, dont l'entrée de
+  `prochaines-etapes.md` **écrite pour traquer un compteur faux**. Tous corrigés ;
+  ce qui est écrit au passé et daté est gardé. **Feature terminée.**

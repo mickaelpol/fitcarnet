@@ -77,8 +77,12 @@ mensongères.
 
 ## 2. Où on en est, en une phrase
 
-**Les quatre doubles juges sont supprimés, `api/regles/` n'existe plus, et le
-palier B est à moitié traversé.** Le serveur décide de la cohérence d'un
+**SIX doubles juges sont supprimés, `api/regles/` n'existe plus, et le
+palier B est à moitié traversé.** *(Cette phrase disait « quatre » : elle
+oubliait la cohérence d'une cible, partie le 21 septembre, et les habitudes de
+cuisson, parties le 25. Corrigé le 25 septembre 2026 par `verite-documentaire`.
+Il en reste **un, déclaré** : `SEUIL_COHERENCE` dans le solveur, qui part au
+palier 3.)* Le serveur décide de la cohérence d'un
 aliment, du rendement cru/cuit, de la force d'un mot de passe, de la règle du
 chrono — et depuis le 21 septembre, de la cohérence d'une cible, de la
 conversion d'un plan américain, de ce qui reste vraiment dans le frigo et du
@@ -104,8 +108,11 @@ comme l'écran les écrivait), et six épreuves e2e dans
 
 ### Ce qui RESTE — deux morceaux
 
-**B4 — fournées et habitudes de cuisson.** `src/calcul/fournees.ts` (265 l.) et
-`src/calcul/habitudesCuisson.ts` (156 l.).
+**B4 — fournées.** `src/calcul/fournees.ts` (265 l.).
+**Les habitudes de cuisson, elles, sont FAITES** — le 25 septembre 2026, voir
+plus bas. `src/calcul/habitudesCuisson.ts` fait 167 lignes et ne juge plus rien :
+il fabrique la clé (`cleDHabitude`), pré-remplit l'écran (`depuisLesHabitudes`)
+et met à plat ce qui part au serveur (`lignesDHabitudes`).
 
 > ⚠️ **Le plus gros est de l'ÉTAT D'ÉCRAN, et ne doit pas partir tel quel.**
 > Inventorié le 21 septembre : `enFournees`, `sansCuisson`, `repartition` et
@@ -124,20 +131,26 @@ comme l'écran les écrivait), et six épreuves e2e dans
 > fonction est en `habitudesCuisson.ts:86`, et son seul appel en
 > `planCalcule.ts:192`.
 >
-> **LE VRAI CANDIDAT DE B4 EST `habitudesAEcrire`** (`habitudesCuisson.ts:126`),
-> et c'est un **cinquième double juge** que personne n'avait compté : « la
-> dernière décision gagne » est écrite là ET dans `LotDHabitudes::depuis`
-> (`api/src/Service/LotDHabitudes.php:79`), qui dédoublonne pour PostgreSQL. Il ne
-> tourne qu'au passage à « Cuisiner » — un geste, pas une frappe — donc il part
-> sans coûter de latence. Spec : `docs/features/habitudes-cuisson-au-serveur.md`.
+> ~~**LE VRAI CANDIDAT DE B4 EST `habitudesAEcrire`** (`habitudesCuisson.ts:126`)~~
+> — **FAIT le 25 septembre 2026.** C'était bien un **cinquième double juge** que
+> personne n'avait compté : « la dernière décision gagne » et « l'inchangé ne
+> s'écrit pas » étaient écrites là ET côté serveur. `habitudesAEcrire` n'existe
+> plus ; `lignesDHabitudes(repas, choisi)` met à plat sans juger, le
+> dédoublonnage est dans `LotDHabitudes::depuis`
+> (`api/src/Service/LotDHabitudes.php:101`) et le tri de l'inchangé **en SQL**,
+> dans `CuissonsHabituelles::remplacer` — les confondre fait recréer un double
+> juge. Un garde le refuse désormais : `front/src/calcul/habitudesAuServeur.test.ts`.
+> Spec, critères et journal : `docs/features/habitudes-cuisson-au-serveur.md`.
 >
-> **ET IL PORTE DÉJÀ UN DÉFAUT, mesuré le 25 septembre 2026** :
-> `usePlanCalcule.ts:133` lui passe `mesCuissons.data ?? {}` comme « ce qui est
+> **ET IL PORTAIT DÉJÀ UN DÉFAUT, mesuré puis corrigé le 25 septembre 2026** :
+> `usePlanCalcule.ts:133` lui passait `mesCuissons.data ?? {}` comme « ce qui est
 > déjà connu ». Hors ligne, `fetchStatus` vaut `paused` et `data` vaut
 > `undefined` : le front croit ne rien connaître et déclare **toute** cuisson du
 > plan comme nouvelle — une trentaine de `maj_le` repoussés pour rien, ce que le
-> commentaire de la fonction dit vouloir éviter. Déplacer la décision au serveur
-> le referme, parce que le serveur, lui, sait toujours ce qu'il a en base.
+> commentaire de la fonction disait vouloir éviter. Déplacer la décision au
+> serveur l'a refermé, parce que le serveur, lui, sait toujours ce qu'il a en
+> base : `lignesDHabitudes` n'a plus de paramètre `connues`, donc plus moyen de
+> se tromper dessus.
 >
 > `cleDeCuisson` et `cleDHabitude` sont de la **fabrication de clé**, pas du
 > jugement — et `cleDHabitude` garde volontairement sa table manuelle (Hermes

@@ -33,11 +33,11 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 735 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 741 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 555 tests API, sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 564 tests API (1 306 assertions), sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -50,9 +50,17 @@ db/manuel/verifier-jeux.sh             # jeu d'essai et jeu de démonstration, g
 python3 test_import_carnet.py          # l'import du carnet (exige psycopg2)
 python3 test_ciqual.py                 # l'import CIQUAL, sans dépendance
 # ÉPREUVES DE BOUT EN BOUT : vrai navigateur, vraie API, vraie base.
-# Exigent l'environnement de dev debout ET un `front/dist` à jour.
+# Exigent l'environnement de dev debout ET un `front/dist` à jour — MAIS CE QUI EST
+# SERVI EST `api/front`, PAS `front/dist`. Les deux gestes, jamais l'un sans l'autre :
+cd "$DEPOT/front" && npm run build:web
+rm -rf "$DEPOT/api/front" && cp -r "$DEPOT/front/dist" "$DEPOT/api/front"
+# `$DEPOT` explicite, et ce n'est pas du zèle : un `rm -rf api/front` parti d'un autre
+# dossier a déjà mordu. Cette recopie était écrite dans quatre fichiers et ABSENTE d'ici,
+# où le mot `api/front` n'apparaissait nulle part — une phase e2e s'est arrêtée dessus le
+# 25 septembre 2026, et elle serait passée au VERT pour la mauvaise raison si personne
+# n'avait comparé les empreintes des deux bundles.
 cd e2e && npm install                  # une seule fois
-cd e2e && npm test                     # ~2 min pour douze épreuves (elles tombent si la machine peine : rejouer le fichier seul)
+cd e2e && npm test                     # ~2 min pour dix-huit épreuves (elles tombent si la machine peine : rejouer le fichier seul)
 ```
 
 ### Les épreuves de bout en bout — `e2e/`
@@ -192,13 +200,18 @@ contente d'afficher ce qu'ils répondent :
 | Somme d'Atwater, côté serveur | `api/src/Service/Atwater.php` — **seule écriture PHP**, elle l'était cinq fois |
 | Force d'un mot de passe | `api/src/Service/MotDePasse.php` — servi par `POST /api/verification/mot-de-passe`, **route publique** (l'écran d'invitation n'a pas encore de compte) |
 | « Un chrono ne compte que pour une série » | `api/src/Service/ModesDeTravail.php` — **seule écriture du dépôt**. `Seance::getAvancement()` la lui demande, l'écran la reçoit par `GET /api/modes-de-travail` |
+| Cohérence d'une cible — seuil de 15 kcal, deux conventions de glucides | `api/src/Service/CoherenceDesCibles.php` — servi par `POST /api/verification/cible`. Le solveur garde `SEUIL_COHERENCE` pour SON diagnostic : jumeau **déclaré**, gardé par `coherenceCibleUnique.test.ts`, part au palier 3 |
+| Habitudes de cuisson : « la dernière décision gagne » | `api/src/Service/LotDHabitudes.php::depuis` — il dédoublonne, borne et valide. **Il ne trie AUCUN écart**, et le croire fait recréer un double juge |
+| Habitudes de cuisson : « l'inchangé ne s'écrit pas » | `api/src/Repository/CuissonsHabituelles.php::remplacer` — la clause `ON CONFLICT … DO UPDATE … WHERE mode_cuisson_id IS DISTINCT FROM EXCLUDED.mode_cuisson_id`, **seul endroit du dépôt où le tri de l'inchangé est décidé**. `IS DISTINCT FROM` et non `<>` : il traite `NULL` comme une valeur, ce dont la règle 6 a besoin |
 
 ### Les doubles juges : il n'y en a plus, et `api/regles/` n'existe plus
 
 **Décision du 20 septembre 2026**, dans les mots du propriétaire : « *tout doit
 passer par le serveur car le métier doit être sur le serveur et puis c'est tout,
-comme ça je peux changer le front quand bon me semble* ». Les **quatre** sont
-partis en deux jours, et avec eux les quatre fichiers de règles :
+comme ça je peux changer le front quand bon me semble* ». Les quatre premiers
+sont partis en deux jours, et avec eux les quatre fichiers de règles. **Il y en
+a SIX au total**, et cette page a longtemps annoncé quatre : les deux derniers
+n'y ont été ajoutés que le 25 septembre 2026, par `verite-documentaire`.
 
 | Ce qui était jugé deux fois | Parti le | Ce qui le décide aujourd'hui |
 |---|---|---|
@@ -206,6 +219,15 @@ partis en deux jours, et avec eux les quatre fichiers de règles :
 | Rendement cru/cuit | 20 sept. 2026 | la même route |
 | Force d'un mot de passe | 20 sept. 2026 | `POST /api/verification/mot-de-passe` → `MotDePasse` |
 | **Avancement d'une séance** | **21 sept. 2026** | `api/src/Service/ModesDeTravail.php`, servi par `GET /api/modes-de-travail` |
+| **Cohérence d'une cible** | **21 sept. 2026** | `api/src/Service/CoherenceDesCibles.php`, servi par `POST /api/verification/cible` |
+| **Habitudes de cuisson** — « la dernière décision gagne » et « l'inchangé ne s'écrit pas » | **25 sept. 2026** | **DEUX endroits, et les confondre invite à en recréer un** : `LotDHabitudes::depuis` dédoublonne, borne et valide — il ne trie AUCUN écart ; c'est la clause SQL de `CuissonsHabituelles::remplacer` qui n'écrit que ce qui a changé. Servis par `PUT /api/mes-cuissons` |
+
+**IL EN RESTE UN, ET IL EST DÉCLARÉ.** `front/src/solveur/solveur.ts` garde
+`SEUIL_COHERENCE`, `ecartDeCoherence` et `bornesDeCoherence` : le solveur pose le
+même constat dans ses propres diagnostics, et il part au palier 3 avec le reste
+du solveur. `coherenceCibleUnique.test.ts` vérifie que les deux seuils ne
+divergent pas d'ici là. C'est la seule réponse honnête à « combien en
+reste-t-il » : **un, déclaré, gardé**.
 
 `api/regles/coherence.json`, `rendement.json`, `motdepasse.json` et
 `avancement.json` sont supprimés, ainsi que leurs huit suites jumelles.
@@ -256,23 +278,35 @@ croyait vérifier. **Si tu lis cette page pour savoir combien il y en a, va
 d'abord regarder `api/regles/` et la liste des routes de vérification.**
 
 **CE QUI EMPÊCHE MAINTENANT QU'ILS REVIENNENT**, faute de fichier de règles à
-tenir d'accord — **trois** gardes, dont **un seul** lit tout le dépôt. La
-portée de chacun est écrite ci-dessous parce qu'elle décide de ce qu'il peut
-voir : un garde qui ne lit que `front/` ne verra jamais une divergence entre
-deux langages, et c'est précisément le défaut qu'on cherche.
+tenir d'accord — **cinq** gardes. La portée de chacun est écrite ci-dessous
+parce qu'elle décide de ce qu'il peut voir : un garde qui ne lit que `front/` ne
+verra jamais une divergence entre deux langages, et c'est précisément le défaut
+qu'on cherche. **La colonne distingue le BALAYAGE — ce qu'il parcourt en masse —
+des fichiers qu'il ouvre nommément**, et ce n'est pas cosmétique : c'est cette
+seconde liste qui dit s'il voit l'autre langage.
 
-| Garde | Ce qu'il refuse |
-|---|---|
 | Garde | Ce qu'il refuse | Ce qu'il LIT |
 |---|---|---|
 | `front/src/calcul/epleyUnique.test.ts` | le coefficient d'Epley hors de `performance.ts` | **tout le dépôt** : `.ts`, `.tsx`, `.php`, `.sql`, `.py` |
-| `front/src/calcul/avancementUnique.test.ts` | le mot « chrono » dans le module d'avancement, et tout décompte partiel des séries (`slice(0, 1)`) | `front/src` + `front/app` |
+| `front/src/calcul/avancementUnique.test.ts` | le mot « chrono » dans le module d'avancement, tout décompte partiel des séries (`slice(0, 1)`), **et la divergence des trois listes de modes de travail** | balaie `front/src` + `front/app`, **et ouvre `db/01-schema.sql`, `api/src/Service/ModesDeTravail.php`, `front/src/composants/choixMode.tsx`** |
 | `front/src/calcul/formuleUnique.test.ts` | toute multiplication par un coefficient `KCAL_…` hors de `nutrition.ts` | `front/src` + `front/app` |
+| `front/src/calcul/coherenceCibleUnique.test.ts` | qu'un écran rejuge la cohérence d'une cible ; la divergence des deux seuils | balaie `front/app`, **et ouvre `solveur.ts`, `CoherenceDesCibles.php`, `FormatCourt.php`, `theme/index.ts`** |
+| `front/src/calcul/habitudesAuServeur.test.ts` | toute comparaison choisi/connu, le nom `habitudesAEcrire`, tout envoi au serveur qui ne vient pas de `lignesDHabitudes` | balaie `front/src` + `front/app`, **et ouvre `LotDHabitudes.php`** |
 
-**LES DEUX DERNIERS NE VOIENT PAS LE SERVEUR NI LA BASE**, et ça se paie :
-`db/manuel/cibles.sql` écrit `4 * prot + 4 * gluc + 9 * lip` — l'Atwater
-**américain**, sans fibres, contraire à la règle 4 — et aucun garde ne le voit.
-Relevé par `verite-documentaire` le 21 septembre 2026, non corrigé.
+**CETTE PAGE A ANNONCÉ « TROIS » JUSQU'AU 25 SEPTEMBRE 2026**, et elle disait
+deux autres choses fausses dans le même paragraphe : que « les deux derniers ne
+voient ni le serveur ni la base » — alors qu'`avancementUnique` compare les trois
+listes de modes à travers SQL, PHP et TSX, et que son propre commentaire le
+revendique : « LE SEUL CONTRÔLE QUI VOIT CETTE DIVERGENCE » — et, plus bas,
+qu'`epleyUnique` serait « le seul dispositif qui voit une divergence entre deux
+langages », alors qu'ils sont **quatre**. Le tableau portait en prime deux lignes
+d'en-tête empilées, dont la seconde s'affichait comme une ligne de données.
+Relevé par `verite-documentaire`.
+
+**CE QUI RESTE VRAI DE L'AVERTISSEMENT** : `db/manuel/cibles.sql` écrit
+`4 * prot + 4 * gluc + 9 * lip` — l'Atwater **américain**, sans fibres,
+contraire à la règle 4 — et **aucun garde ne le voit**, parce qu'aucun ne balaie
+`db/`. Relevé le 21 septembre 2026, non corrigé, toujours vrai le 25.
 
 **Un garde ne suffit pas : il faut qu'il PUISSE tomber.** Chacun porte donc un
 cas TÉMOIN qui vérifie qu'il reconnaît encore sa référence — sans quoi un motif
@@ -292,8 +326,10 @@ constat E1 endormi dans une vue.
 Les deux copies sont supprimées (migration 39 pour la vue). **La formule n'a plus
 qu'un domicile**, et `front/src/calcul/epleyUnique.test.ts` refuse toute
 réécriture du coefficient **dans tout le dépôt** — `.ts`, `.tsx`, `.php`, `.sql`,
-`.py` — pas seulement dans le front. C'est le seul dispositif qui voit une
-divergence entre deux langages : aucun des deux côtés ne peut la voir seul.
+`.py` — pas seulement dans le front. C'est le seul qui balaie le dépôt ENTIER ;
+ils sont **quatre** à voir une divergence entre deux langages, chacun sur son
+sujet — voir le tableau des cinq gardes. Cette phrase disait « le seul
+dispositif » : faux depuis le 21 septembre 2026, corrigé le 25.
 
 **Ne pas réintroduire `rmEstime` dans l'API sans décision explicite.** Si un
 autre lecteur doit un jour obtenir ce chiffre du serveur, il faudra le lui faire

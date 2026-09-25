@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * ÉPREUVES DE BOUT EN BOUT — un vrai navigateur, la vraie API, la vraie base.
  *
- * POURQUOI ELLES EXISTENT. Les 804 tests du front et les 489 de l'API ne
+ * POURQUOI ELLES EXISTENT. Les 741 tests du front et les 564 de l'API ne
  * montent jamais l'application entière : ils éprouvent des fonctions et des
  * composants. Entre les deux, il reste tout ce qui ne casse qu'assemblé — un
  * champ branché sur la mauvaise route, un message que le serveur envoie et que

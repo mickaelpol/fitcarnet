@@ -31,9 +31,9 @@ qu'il était prévu, et pas tel que le frigo l'a contraint.
 | **Compteur des aliments à situer** et bouton « les autres se mangent tels quels » | étape Repas | `front/app/(onglets)/repas.tsx:405`, `front/src/calcul/fournees.ts:188` |
 | **Sélecteur « Comment cuire X ? »**, avec la marque « ce que tu fais d'habitude » | modale | `repas.tsx:600`, `:612` |
 | **Les cuissons sont mémorisées** d'une fois sur l'autre, et pré-remplies | — | `front/src/calcul/habitudesCuisson.ts:86`, `repas.tsx:432` |
-| **Deux couches** : habitudes en dessous, choix explicites au-dessus | — | `front/src/calcul/planCalcule.ts:221` |
-| **Seules les nouveautés sont écrites**, et la dernière décision gagne | — | `habitudesCuisson.ts:126`, `:138` |
-| **Écriture au passage au batch cooking**, en un seul `PUT` | — | `front/src/composants/usePlanCalcule.ts:159`, `front/src/api/hooks/cuissons.ts:74` |
+| **Deux couches** : habitudes en dessous, choix explicites au-dessus | — | `front/src/calcul/planCalcule.ts:187` |
+| **Seules les nouveautés sont écrites**, et la dernière décision gagne | — | **SUR LE SERVEUR depuis le 25 sept. 2026** : le tri de l'inchangé en SQL (`api/src/Repository/CuissonsHabituelles.php::remplacer`, clause `IS DISTINCT FROM`), le dédoublonnage dans `api/src/Service/LotDHabitudes.php::depuis`. L'écran envoie tout ce qu'il affiche, sans juger (`habitudesCuisson.ts::lignesDHabitudes`) |
+| **Écriture au passage au batch cooking**, en un seul `PUT` | — | `front/src/composants/usePlanCalcule.ts:172`, `front/src/api/hooks/cuissons.ts:74` |
 | **Fournées groupées par façon de cuire**, quantités additionnées sur la période | étape Cuisiner | `fournees.ts:127` |
 | **« On pèse sec »**, dit à l'endroit où la question se pose | étape Cuisiner | `front/src/composants/etapeBatch.tsx:114` |
 | **Répartition en boîtes**, une par repas, en poids **cuit** | étape Cuisiner | `fournees.ts:226`, `etapeBatch.tsx:147` |
@@ -142,19 +142,30 @@ aussi **au moins une façon de cuire** dans la table `mode_cuisson`.
    (`fournees.ts:188-201`).
 3. **Il part des cuissons EFFECTIVES, habitudes comprises.** Un riz dont
    l'habitude dit « à l'eau » ne doit **pas** devenir « sans cuisson » après cet
-   appui (`repas.tsx:415-420`, `usePlanCalcule.ts:179`).
+   appui (`repas.tsx:415-420`, `usePlanCalcule.ts:190`).
 4. **Un choix explicite est indéracinable.** Les habitudes se superposent
-   **en dessous** (`planCalcule.ts:226`) : changer l'habitude entre-temps ne doit
+   **en dessous** (`planCalcule.ts:187`) : changer l'habitude entre-temps ne doit
    jamais écraser ce que l'utilisateur vient de toucher.
 5. **La mémorisation fonctionne d'un plan à l'autre.** Composer, régler « Riz →
    Eau bouillante », passer au batch cooking, tout recommencer : au plan suivant
    le riz est **déjà** réglé, et la puce ne dit plus « à choisir »
    (`habitudesCuisson.ts:86`).
-6. **Seules les nouveautés sont écrites.** Recomposer un plan identique sans rien
-   changer ne doit provoquer **aucune écriture** (`habitudesCuisson.ts:126`,
-   `usePlanCalcule.ts:160`). Vérifiable sur `maj_le` en base.
+6. **Seules les nouveautés sont écrites — MAIS C'EST LA BASE QUI LE DÉCIDE**,
+   depuis le 25 septembre 2026. Recomposer un plan identique sans rien changer
+   provoque bien **aucune écriture**, et `maj_le` ne bouge pas : mais le `PUT`
+   part quand même, avec TOUTES les lignes du plan, et le serveur répond
+   `{"enregistrees": 0}`. C'est la clause `ON CONFLICT … WHERE mode_cuisson_id
+   IS DISTINCT FROM EXCLUDED.mode_cuisson_id`
+   (`api/src/Repository/CuissonsHabituelles.php::remplacer`). **Ne cherche plus
+   ce tri dans le front : il n'y est plus, et l'y remettre recréerait le
+   cinquième double juge du projet.** Vérifiable sur `maj_le` en base — c'est le
+   seul endroit où ça se voit.
 7. **La dernière décision gagne.** Un riz mis au four lundi puis remis à l'eau
-   jeudi enregistre **« eau »** (`habitudesCuisson.ts:131-147`).
+   jeudi enregistre **« eau »**. La règle est dans
+   `api/src/Service/LotDHabitudes.php::depuis` — qui dédoublonne, borne et
+   valide, et ne trie AUCUN écart. Ce que le front garantit, c'est l'ORDRE :
+   `lignesDHabitudes` émet une ligne par couple (repas, aliment) dans l'ordre du
+   plan, et le serveur retient la dernière.
 8. **La clé d'habitude est le nom normalisé.** « Riz Basmati », « riz basmati » et
    « Riz basmati  » sont **un seul** riz (`habitudesCuisson.ts:66`). C'est le seul
    identifiant que les deux frigos aient en commun — un aliment Grocy porte
@@ -212,7 +223,7 @@ aussi **au moins une façon de cuire** dans la table `mode_cuisson`.
     (`repas.tsx:524`) : des fournées incomplètes se découvriraient devant les
     casseroles.
 23. **L'échec d'écriture des habitudes ne bloque rien et ne s'affiche pas**
-    (`usePlanCalcule.ts:161`) : une habitude perdue coûte un appui la semaine
+    (`usePlanCalcule.ts:153-173`, le `onError: () => {}` en `:172`) : une habitude perdue coûte un appui la semaine
     prochaine ; interrompre quelqu'un qui va cuisiner coûte plus cher.
 24. **Isolation entre comptes (règle 2)** : `GET /api/mes-cuissons` ne rend que
     les habitudes du compte connecté ; la table `cuisson_habituelle` porte
@@ -291,7 +302,7 @@ cd "$(git rev-parse --show-toplevel)"/front && npm test
   dans le sélecteur (pour ne pas enregistrer des hésitations), pas à
   l'enregistrement du plan (pour ne pas rater les plans qu'on consulte sans
   enregistrer). Éprouver la mémorisation **sans passer à l'étape 3** ne prouve
-  rien (`usePlanCalcule.ts:146-162`).
+  rien (`usePlanCalcule.ts:153-173`).
 - **Le compteur « à situer » lit les cuissons effectives**, habitudes comprises :
   sur un compte qui a déjà tout réglé, il vaut `0` dès la composition et le
   bandeau du bouton n'apparaît jamais. Pour filmer le bandeau, il faut un compte

@@ -193,9 +193,9 @@ Un chantier peut en retirer autant qu'en ajouter : un chiffre différent se
 compare au journal (`REPRENDRE.md`), il ne se juge pas seul.
 
 ```bash
-cd front && npm test                    # 647 tests, puis 33 de rendu, 0 échec
+cd front && npm test                    # 741 tests, puis 46 de rendu, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'
-                                        # 416 tests, 1 037 assertions, 0 échec
+                                        # 564 tests, 1 306 assertions, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse'
                                         # 5 erreurs connues, aucune régression
 docker pull postgres:16                 # l'image des deux scripts ci-dessous (451 Mo),

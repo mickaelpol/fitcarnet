@@ -10,6 +10,30 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-25 (nuit) — B4 TERMINÉE : phase `done`, cycle complet (session Claude)
+
+- **Le cycle est allé jusqu'au bout** : spec → tdd → review → e2e → verify → docs.
+  Neuf commits, aucun poussé.
+- **Phase `docs` par `verite-documentaire` : vingt-trois écarts, six inconnus** et
+  antérieurs à ce chantier. `CLAUDE.md` annonçait **trois** gardes (il y en a
+  cinq), affirmait que deux « ne voient ni le serveur ni la base » — faux pour
+  `avancementUnique` —, disait `epleyUnique` seul à voir une divergence entre deux
+  langages (ils sont quatre), comptait **quatre** doubles juges retirés au lieu de
+  **six**, et portait un tableau à deux en-têtes empilés.
+- **Le plus coûteux était une ABSENCE** : la section e2e de `CLAUDE.md` ne
+  prononçait jamais `api/front`. La recopie du build y manquait, alors qu'elle est
+  écrite dans quatre autres fichiers — et c'est exactement ce qui a bloqué la
+  phase e2e ce soir. Ajoutée, avec `$DEPOT` explicite (un `rm -rf api/front` parti
+  d'un autre dossier a déjà mordu).
+- **Quatorze compteurs de tests faux**, dont l'entrée de `prochaines-etapes.md`
+  écrite pour en traquer un — elle disait 737, c'était 741. Réel au 25/09 au
+  soir : **API 564 / 1 306 assertions · front 741 + 46 de rendu · e2e 18**.
+- **Le décompte des doubles juges est désormais écrit avec sa réponse honnête** :
+  six retirés, **un restant, déclaré** (`SEUIL_COHERENCE` dans le solveur, gardé
+  par `coherenceCibleUnique.test.ts`, part au palier 3).
+- Ce qui est écrit au PASSÉ et daté est gardé : ce dépôt met son histoire dans ses
+  commentaires.
+
 ## 2026-09-25 (nuit) — B4 : e2e et vérification passées, phase `docs` (session Claude)
 
 - **Six épreuves e2e** (`e2e/epreuves/habitudesCuisson.spec.ts`), suite à 18 tests
@@ -65,12 +89,14 @@
   mauvaise raison** : l'ancien front n'envoie rien, donc la clause SQL neuve ne
   serait jamais exercée. La commande (`rm -rf api/front && cp -r front/dist
   api/front`) a été refusée par le garde-fou de destruction locale et attend le
-  propriétaire.
+  propriétaire. — **FAIT le soir même** : `api/front` et `front/dist` servent tous
+  deux `entry-d0f7640f…`. La phase e2e a pu tourner contre le bon front.
 - **Pour la phase `docs`** : trois renvois périmés relevés par la revue —
   `.claude/skills/fonctionnalite-batch-cooking/SKILL.md:214`,
   `docs/audit-2026-09/03-front.md:440`, `CALCULATEUR.md:266`. Et
   `e2e/LISEZMOI.md` annonce « 849 tests du front et 489 de l'API » : c'est 741 et
-  564.
+  564. — **tous corrigés en phase `docs`**, avec dix autres que
+  `verite-documentaire` a trouvés en plus.
 
 ## 2026-09-25 (nuit, fin) — B4 : phase `tdd` terminée, suites vertes des deux côtés (session Claude)
 

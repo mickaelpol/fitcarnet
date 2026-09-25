@@ -264,7 +264,12 @@ recopier, à ne pas écraser ce que l'utilisateur vient de faire, et à distingu
 « il n'a pas encore choisi » de « il a choisi la même chose ». Trois questions
 qui ne se posent pas si le défaut reste en dessous.
 
-**On écrit au passage au batch cooking**, et seulement ce qui a changé. Plus
+**On écrit au passage au batch cooking**, et seulement ce qui a changé — **mais
+c'est la BASE qui le décide** depuis le 25 septembre 2026 : l'écran envoie tout
+ce qu'il affiche, sans juger, et la clause `ON CONFLICT … WHERE mode_cuisson_id
+IS DISTINCT FROM EXCLUDED.mode_cuisson_id` (`CuissonsHabituelles::remplacer`) ne
+touche pas une ligne inchangée, donc ne repousse pas son `maj_le`. C'était le
+cinquième double juge du projet. Plus
 tôt — à chaque appui dans le sélecteur — on enregistrerait des aller-retours
 d'hésitation ; plus tard, à l'enregistrement du plan, on raterait les plans
 qu'on consulte sans enregistrer. Un échec d'écriture ne bloque rien et ne

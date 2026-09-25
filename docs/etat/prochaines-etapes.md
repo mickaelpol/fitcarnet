@@ -10,18 +10,14 @@
 ## Maintenant
 - [x] **Redémarrer Claude Code** — fait. L'outil `LSP` est présent dans la session du 25/09/2026 au soir : `ENABLE_LSP_TOOL` et `typescript-lsp` ont pris effet.
 
-- [ ] **B4 — `habitudes-cuisson-au-serveur`, phase `review`.** La phase `tdd` est
-  terminée le 25/09/2026 (trois commits, suites vertes des deux côtés). La mesure du
-  majorant est faite et tranchée : il n'y en a pas dans le code, la borne est un
-  plafond posé — `MAX_LIGNES = 10000` (porté de 2 000 à 10 000 en revue le soir
-  même, 2 000 refusait un geste légitime), et `MAX = 200` sur les distincts.
-  Reprendre par `/clear` puis `/harness habitudes-cuisson-au-serveur`.
-  **CA-2, CA-3 et CA-4 attendent la phase e2e** : ils exigent une vraie base.
-  **Et `REPRENDRE.md` nomme encore `habitudesAEcrire` au présent** — pour la phase `docs`.
+- [x] ~~**B4 — `habitudes-cuisson-au-serveur`**~~ — **TERMINÉE le 25/09/2026**, cycle
+  complet spec → tdd → review → e2e → verify → docs. Neuf commits, non poussés.
+  Reste pour le palier B : **`fournees.ts`**, dont `REPRENDRE.md` rappelle que le
+  plus gros est de l'état d'écran et ne part pas tel quel.
 
 ## Ensuite
 - [ ] `api/vendor/bin/phpstan analyse` rend **5 erreurs** — mesuré le 25/09/2026 sur `serveur-autoritaire`. Elles préexistent au harness. L'une est un `parameterByRef.unusedType` dans `api/tests/Service/InventaireUneLigneTest.php:121`.
-- [ ] `CLAUDE.md` ligne 36 annonce « 735 tests » front ; il y en a **737** (mesuré le 25/09/2026). Compteur à corriger — c'est exactement le genre d'écart que `verite-documentaire` cherche exprès.
+- [x] ~~`CLAUDE.md` ligne 36 annonce « 735 tests » front ; il y en a **737**~~ — **fait le 25/09/2026 au soir, et l'entrée elle-même était fausse** : il y en avait 741, pas 737. Une ligne écrite pour traquer un compteur portait un compteur périmé. Quatorze endroits du dépôt annonçaient un décompte de tests ; tous corrigés, sauf ceux écrits au passé et datés, qui sont de l'histoire.
 - [ ] Écrire les specs de features dans `docs/features/` (gabarit `_modele.md`). Les quinze skills `fonctionnalite-*` portent déjà le besoin et les critères : la spec doit y **renvoyer**, pas les recopier — sinon on crée le double juge que la règle 5 interdit, appliqué à la documentation.
 - [ ] `serveur-autoritaire` a **26 commits d'avance sur `master`** (155 fichiers, +9610/-4795) et zéro de retard. `master` est tiré par le NAS en production : la fusion est une mise en production, elle attend une décision explicite.
 
@@ -39,7 +35,7 @@
 
 ## Vérifié le 25/09/2026, rien à faire
 - La base de dev de ce poste a bien ses **3 484 lignes CIQUAL** (`aliment_reference`) : elle n'est pas victime du `rattraper-dev.sh` qui ne jouait que quatre listes sur cinq (corrigé en `bbdabd5`). Et le pull du jour n'apporte **aucune nouvelle migration** — seulement `jeu-demo.sql` et deux lanceurs.
-- Les deux suites sont vertes, mesurées le jour même : **555 tests API** (1 288 assertions) et **737 tests front + 46 de rendu**. Le compteur API de `CLAUDE.md` dit vrai ; celui du front est faux de deux (voir « Ensuite »). Ne pas les corriger d'après le `CLAUDE.md` de `master`, qui est en retard de 26 commits — c'est normal, pas un défaut.
+- ~~Les deux suites sont vertes : **555 tests API** (1 288 assertions) et **737 tests front + 46 de rendu**. Le compteur API de `CLAUDE.md` dit vrai~~ — **PÉRIMÉ le soir même**, et c'était le pire endroit pour l'être : une affirmation fausse rangée sous « rien à faire ». Au 25/09 au soir : **564 tests API** (1 306 assertions), **741 front + 46 de rendu**, **18 épreuves e2e**. Le compteur API de `CLAUDE.md` ne disait PAS vrai. Ce qui reste juste : ne pas se fier au `CLAUDE.md` de `master`, en retard de 26 commits.
 
 ## Idées mises de côté
 - Migrer vers l'architecture hexagonale : objectif assumé, **non commencé**. `api/src` suit la structure Symfony classique. Ne jamais mélanger cette refonte avec une correction de bug.

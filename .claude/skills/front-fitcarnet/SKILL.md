@@ -13,7 +13,7 @@ le métier.**
 ## Les commandes, dans cet ordre
 
 ```bash
-cd front && npm test          # tsc --noEmit + 735 tests, puis 46 de rendu (21 septembre 2026)
+cd front && npm test          # tsc --noEmit + 741 tests, puis 46 de rendu (21 septembre 2026)
 cd front && npm run verif     # typage seul, plus rapide
 cd front && npm run build:web # régénère front/dist/ (versionné, servi par Caddy)
 ```
@@ -254,9 +254,9 @@ Relevé le 15 septembre 2026, après que deux agents y sont tombés le même jou
 **Deux passes, et deux suffixes.** `npm test` lance :
 
 ```bash
-node --test "dist-tests/**/*.test.js"                    # 735 tests, SANS DOM
+node --test "dist-tests/**/*.test.js"                    # 741 tests, SANS DOM
 node --import ./dist-tests/tests/environnement.js \
-     --test "dist-tests/**/*.test-rendu.js"              # 33 tests de rendu
+     --test "dist-tests/**/*.test-rendu.js"              # 46 tests de rendu
 ```
 
 Un test de calcul s'appelle `*.test.ts`. **Un test de composant s'appelle
