@@ -1,7 +1,7 @@
 ---
 titre: B4 — le serveur décide ce qu'il enregistre des habitudes de cuisson
 slug: habitudes-cuisson-au-serveur
-phase: verify
+phase: docs
 cree_le: 2026-09-25
 brainstorm: aucun — le cadrage est l'inventaire du 21 septembre 2026, dans REPRENDRE.md § 3 (B4) et docs/plan-serveur-autoritaire.md § palier 2
 ---
@@ -69,7 +69,7 @@ semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
   la réponse est `{"enregistrees":1}` et la ligne vaut **5** : la dernière
   décision de l'envoi gagne, et c'est désormais la seule écriture de cette règle
   dans le dépôt.
-- **CA-6** ✅ *(volet front vert ; « aucun `maj_le` n'a bougé » prouvé en e2e par CA-2, qui rejoue le même envoi. Le volet ÉCRAN — composer un plan puis passer à « Cuisiner » — n'est pas automatisable : `ChoixDansListe` n'offre aucun sélecteur stable, blocage déjà connu de `avancementSeance.spec.ts`. Voir le pied de `habitudesCuisson.spec.ts`.)* — *Étant donné* un plan dont aucune cuisson n'a changé depuis la
+- **CA-6** ✅ *(volet front vert ; « aucun `maj_le` n'a bougé » prouvé en e2e par CA-2, qui rejoue le même envoi. Le volet ÉCRAN a été joué À LA MAIN en vérification le 25/09/2026 : trois passages à « Cuisiner », PUT #1 `{"enregistrees":4}`, PUT #2 sans rien changer `{"enregistrees":0}` et les quatre `maj_le` strictement identiques. Il n'est pas AUTOMATISÉ — `ChoixDansListe` n'offre aucun sélecteur stable pour l'ajout manuel — mais il est vérifié.)* — *Étant donné* un plan dont aucune cuisson n'a changé depuis la
   semaine dernière, *quand* l'utilisateur passe à l'étape « Cuisiner », *alors*
   un seul `PUT` part, il répond `{"enregistrees":0}`, et **aucun** `maj_le` de la
   table `cuisson_habituelle` n'a bougé.
@@ -98,7 +98,7 @@ déjà éprouvés, et les réécrire serait une régression silencieuse.
   compter 28 repas, et le plafond deviendrait atteignable par un usage normal —
   un refus 422 sur un geste légitime. Il faut donc **deux** bornes, chacune avec
   son chiffre, sa raison et son test de refus :
-  - `MAX_LIGNES = 2000` sur l'envoi **brut**, avant dédoublonnage ;
+  - `MAX_LIGNES = 10000` sur l'envoi **brut**, avant dédoublonnage ;
   - `MAX = 200` conservé, mais sur le nombre d'aliments **distincts**, après
     dédoublonnage — c'est-à-dire sur ce qui sera réellement écrit.
 
@@ -169,10 +169,17 @@ sera un **plafond posé**, et voici son calcul.
 |---|---|
 | Plan de la semaine, 7 j × 4 repas, 7 rôles + 3 ajouts | **280** |
 | Mois entier coché, 31 j × 4 repas, 15 aliments par repas | **1 860** |
-| `MAX_LIGNES` retenu | **2 000** |
+| Pire cas concevable, 31 j × 4 repas × un frigo de 60 | **7 440** |
+| `MAX_LIGNES` retenu | **10 000** |
 
-2 000 laisse passer le mois entier — le geste le plus gros que l'écran sache
-produire — et ferme la porte à un corps qui ne vient plus de lui. La base de
+**Ce chiffre a valu 2 000 pendant une demi-journée, et c'était faux** : 2 000
+sortait de la deuxième ligne du tableau, « quinze aliments par repas », un chiffre
+confortable et rien de plus. À dix-sept, le même mois fait 2 108 lignes et se
+faisait refuser — relevé en revue le jour même. La troisième ligne, elle, n'est
+pas confortable : c'est le maximum que le calendrier et le frigo permettent
+d'atteindre. 10 000 la laisse passer avec de la marge et ferme la porte à un
+corps qui ne vient plus de l'écran. Mesuré depuis : 7 440 lignes acceptées en
+75 ms. La base de
 dev de ce poste ne pouvait pas servir de mesure empirique : elle porte 8
 aliments et 2 plans de démonstration. Le seul chiffre mesuré du dépôt sur un
 vrai plan est celui de `usePlanCalcule.ts:34`, « sept jours sur 60 aliments ».
@@ -236,3 +243,17 @@ en e2e ou par `verification-bout-en-bout`, sur un compte jetable en `@e2e.local`
   rencontré par `avancementSeance.spec.ts` le 20 septembre. Le montage aurait
   exigé frigo + cibles + plan pour exercer, côté serveur, exactement ce que CA-2
   exerce déjà. Non bricolé, volontairement : `retries: 0`.
+- 2026-09-25 (nuit) — phase `verify`, par `verification-bout-en-bout`. Rapport :
+  `docs/verifications/habitudes-cuisson-au-serveur/2026-09-25/rapport.md`.
+  **Quatre points, tous OK.** Deux résultats que rien d'autre n'avait donnés :
+  le **parcours écran complet** a pu être joué en garnissant le frigo par l'API
+  (le blocage `ChoixDansListe` ne porte que sur l'ajout manuel), et le **volume
+  réel** — 280 lignes pour 30 aliments en 57 ms, trois rejeux à
+  `{"enregistrees":0}` avec l'empreinte md5 de la table inchangée. Les deux
+  bornes vérifiées en vrai : 7 440 lignes acceptées en 75 ms, 10 001 refusées,
+  201 aliments distincts refusés. Ménage prouvé, compteurs identiques avant/après.
+  **Le seul défaut trouvé était documentaire, et il était de moi** : cinq
+  documents annonçaient encore `MAX_LIGNES = 2000`. Corrigés.
+  **Non éprouvé** : le `ksort` anti-interblocage (M2) — deux transactions
+  entrelacées ne se constatent pas de façon fiable depuis `curl`. Le code le
+  porte, la preuve expérimentale manque.

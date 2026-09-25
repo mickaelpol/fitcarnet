@@ -23,6 +23,10 @@
 
 ## 2026-09-25 — B4 : la borne d'un envoi d'habitudes est un plafond posé, pas un majorant
 
+> ⚠️ **RÉVISÉE LE SOIR MÊME** : le chiffre de 2 000 était faux. Voir l'entrée
+> « le plafond passe de 2 000 à 10 000 » plus bas. Cette entrée est gardée telle
+> quelle — le raisonnement reste juste, c'est le chiffre qui ne l'était pas.
+
 **Choix.** `LotDHabitudes` porte deux bornes : `MAX_LIGNES = 2000` sur l'envoi brut,
 et `MAX = 200` sur les aliments distincts après dédoublonnage.
 
@@ -39,3 +43,25 @@ appliquée aux distincts et non aux lignes reçues.
 **Ce que ça remplace.** Un `MAX = 200` unique comparé aux lignes reçues, qui serait
 devenu atteignable par un usage normal dès que le front cesse de n'envoyer que les
 écarts : un refus 422 sur un geste légitime.
+
+## 2026-09-25 (soir) — B4 : le plafond brut passe de 2 000 à 10 000
+
+**Choix.** `MAX_LIGNES` vaut 10 000, et non 2 000 comme décidé le matin.
+
+**Pourquoi.** 2 000 sortait d'un calcul confortable — « mois entier coché,
+31 jours × 4 repas × quinze aliments = 1 860 ». Quinze n'était pas une mesure,
+c'était un chiffre qui semblait large. À dix-sept aliments par repas, le même
+mois fait 2 108 lignes : refusé en 422, et comme l'échec d'écriture des habitudes
+est silencieux **par décision** (`retenirLesCuissons`, `onError: () => {}`),
+l'utilisateur perdait tout son lot sans un mot. C'est exactement le défaut que la
+double borne venait corriger, réintroduit par sa propre correction. Relevé par
+`revue-fitcarnet` le jour même.
+
+10 000 est adossé au **pire cas concevable** et non à ce qui semble large :
+31 jours × 4 repas × 60 aliments — le seul chiffre mesuré du dépôt sur un vrai
+plan, `usePlanCalcule.ts:34` — soit 7 440 lignes. Vérifié depuis contre la vraie
+base : 7 440 lignes acceptées en 75 ms, 10 001 refusées.
+
+**La leçon, plus large que la borne.** Un plafond posé à partir d'un cas
+« raisonnable » refuse un jour quelqu'un de raisonnable. Il se pose à partir du
+maximum que le produit permet d'atteindre, ou il ne se pose pas.

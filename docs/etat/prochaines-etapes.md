@@ -13,7 +13,8 @@
 - [ ] **B4 — `habitudes-cuisson-au-serveur`, phase `review`.** La phase `tdd` est
   terminée le 25/09/2026 (trois commits, suites vertes des deux côtés). La mesure du
   majorant est faite et tranchée : il n'y en a pas dans le code, la borne est un
-  plafond posé — `MAX_LIGNES = 2000`, et `MAX = 200` sur les distincts.
+  plafond posé — `MAX_LIGNES = 10000` (porté de 2 000 à 10 000 en revue le soir
+  même, 2 000 refusait un geste légitime), et `MAX = 200` sur les distincts.
   Reprendre par `/clear` puis `/harness habitudes-cuisson-au-serveur`.
   **CA-2, CA-3 et CA-4 attendent la phase e2e** : ils exigent une vraie base.
   **Et `REPRENDRE.md` nomme encore `habitudesAEcrire` au présent** — pour la phase `docs`.
@@ -25,6 +26,8 @@
 - [ ] `serveur-autoritaire` a **26 commits d'avance sur `master`** (155 fichiers, +9610/-4795) et zéro de retard. `master` est tiré par le NAS en production : la fusion est une mise en production, elle attend une décision explicite.
 
 ## Dette assumée
+- [ ] 2026-09-25 — **Le `ksort` anti-interblocage de `CuissonsHabituelles::remplacer` n'a aucune preuve expérimentale.** Le constat M2 de la revue est fermé par le code, mais deux transactions entrelacées ne se constatent pas de façon fiable depuis `curl` : personne n'a vu le `40P01` qu'il empêche. Le test unitaire prouve que les écritures partent triées, rien de plus.
+- [ ] 2026-09-25 — **`ChoixDansListe` n'expose ni rôle ni `testID` stable**, ce qui empêche d'automatiser l'ajout manuel d'un aliment en e2e. Blocage rencontré deux fois : `avancementSeance.spec.ts` le 20/09, `habitudesCuisson.spec.ts` le 25/09. Le contournement (garnir le frigo par l'API) marche pour la composition, pas pour l'ajout.
 - [ ] 2026-09-25 — `php-lsp@claude-plugins-official` est activé **à la fois** en global (`~/.claude/settings.json`) et en portée projet. Le harness n'y touche pas. Pour ne le garder qu'au projet : `claude plugin uninstall php-lsp@claude-plugins-official --scope user`. Laissé en place faute d'avoir tranché si d'autres projets en dépendent.
 - [ ] 2026-09-25 — Le cache des plugins (`~/.claude/plugins/cache/`) a été normalisé en LF à la main : 901 fichiers. C'est un correctif d'arbre de travail, pas de dépôt. Le garde-fou durable est `core.autocrlf=input`, désormais posé, plus le `.gitattributes` ajouté au dépôt `claude-harness`.
 - [ ] 2026-09-25 — `docs/audits/` (harness) et `docs/audit-2026-09/` (les 79 constats de septembre) coexistent. Noms voisins, contenus distincts : ne pas les confondre, ne pas fusionner sans décision.

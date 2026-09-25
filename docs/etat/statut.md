@@ -10,6 +10,35 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-25 (nuit) — B4 : e2e et vérification passées, phase `docs` (session Claude)
+
+- **Six épreuves e2e** (`e2e/epreuves/habitudesCuisson.spec.ts`), suite à 18 tests
+  verts, ménage à zéro. CA-2, CA-3, CA-4, CA-5 et CA-8 prouvés **contre une vraie
+  base** : c'est la clause `IS DISTINCT FROM` qui est exercée, et elle ne pouvait
+  l'être nulle part ailleurs.
+- **Vérification finale** par `verification-bout-en-bout`, rapport dans
+  `docs/verifications/habitudes-cuisson-au-serveur/2026-09-25/`. Quatre points,
+  tous OK.
+- **Le parcours écran A ÉTÉ JOUÉ**, contrairement à ce que la phase e2e laissait
+  croire : le blocage `ChoixDansListe` ne porte que sur l'ajout MANUEL d'un
+  aliment. Frigo garni par l'API, plan composé, « Cuisiner » : un seul PUT de
+  14 lignes non dédoublonnées → `{"enregistrees":4}`, puis 0 au rejeu.
+- **Le volume, jamais joué jusqu'ici** : 280 lignes / 30 aliments en 57 ms, trois
+  rejeux à `{"enregistrees":0}`, empreinte md5 de la table inchangée. Coût
+  négligeable.
+- **Les deux bornes en vrai** : 7 440 lignes acceptées (75 ms), 10 001 refusées,
+  201 distincts refusés, 200 pile acceptés.
+- **Le seul défaut trouvé était documentaire, et il était de moi** : cinq
+  documents annonçaient encore `MAX_LIGNES = 2000` après la correction du soir,
+  dont `statut.md` qui se contredisait d'une ligne à l'autre. Corrigés ; la
+  décision du matin est gardée telle quelle et marquée révisée, `decisions.md`
+  étant append-only.
+- **Reste non éprouvé** : le `ksort` anti-interblocage (M2). Deux transactions
+  entrelacées ne se constatent pas de façon fiable depuis `curl` — le code le
+  porte, la preuve expérimentale manque. Dette assumée, datée.
+- **Une sauvegarde préalable a été prise** par l'agent
+  (`sauvegardes/fitcarnet_2026-09-25_194203.dump`) ; elle n'a pas servi.
+
 ## 2026-09-25 (nuit) — B4 : revue passée, six constats corrigés, phase `e2e` (session Claude)
 
 - **Verdict `revue-fitcarnet` : À CORRIGER.** Six constats, tous traités le soir
@@ -78,6 +107,8 @@
   majorant. Calcul et chiffres dans la spec, section « Le majorant, mesuré le
   25 septembre 2026 ».
 - **CA-R4 porte désormais ses deux chiffres** : `MAX_LIGNES = 2000` sur l'envoi brut
+  — ⚠️ **porté à 10 000 le soir même**, en revue : 2 000 refusait un geste légitime,
+  voir l'entrée de la nuit —
   (un mois entier coché fait 1 860 couples), `MAX = 200` conservé mais appliqué aux
   aliments **distincts** après dédoublonnage.
 - **Une correction à la spec** : CA-5 était déjà couvert côté serveur par
