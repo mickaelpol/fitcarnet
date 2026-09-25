@@ -10,6 +10,57 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-25 (nuit, fin) — B4 : phase `tdd` terminée, suites vertes des deux côtés (session Claude)
+
+- **Le cinquième double juge est parti.** `habitudesAEcrire` est supprimée ;
+  `lignesDHabitudes(repas, choisi)` la remplace — une ligne par couple (repas,
+  aliment) décidé, dans l'ordre du plan, sans comparer ni dédoublonner. Le tri
+  se fait en base (`WHERE ... IS DISTINCT FROM`) et le dédoublonnage dans
+  `LotDHabitudes::depuis`.
+- **Le défaut hors-ligne est corrigé** : `usePlanCalcule` ne passe plus
+  `mesCuissons.data ?? {}` comme « ce qui est déjà connu ». Une fonction qui ne
+  reçoit pas les habitudes connues ne peut plus se tromper sur ce qu'elle en croit.
+- **`remplacer()` rend enfin ce qui a changé**, et non ce qu'on lui a demandé.
+- **Trois commits** : `b9bd24d` (CA-8), `c35d3d2` (CA-R4), `4dfee03` (CA-1, CA-6, CA-7).
+  Rien n'est poussé — `serveur-autoritaire` reste locale, une seule PR à la fin.
+- **Preuve** : API 560 tests / 1 297 assertions verts ; front 740 tests + 46 de
+  rendu verts. Le garde `habitudesAuServeur.test.ts` a été éprouvé en sabotant
+  volontairement le code : il tombe en nommant le fichier fautif.
+- **Ce qui n'est PAS prouvé ici, et c'était prévu** : CA-2, CA-3, CA-4 demandent
+  une vraie base (un `maj_le` qui ne bouge pas ne se voit pas avec une
+  `Connection` doublée). La spec le disait dès son écriture ; c'est la phase e2e.
+- **Un reste pour la phase `docs`** : `REPRENDRE.md` nomme encore
+  `habitudesAEcrire` au présent. Les autres occurrences (`decisions.md`,
+  `docs/audit-2026-09/03-front.md`) sont au passé et se gardent.
+- **Phase passée à `review`.** PHPStan rend toujours ses 5 erreurs préexistantes,
+  aucune de ce chantier.
+
+## 2026-09-25 (nuit) — B4 phase `tdd` : la question ouverte est tranchée, phase rouge lancée (session Claude)
+
+- **La question ouverte de la spec est fermée, et la mesure surprend** : il n'y a
+  **aucun majorant dans le code**. Les jours ne sont pas bornés (le calendrier est
+  mensuel, `calendrier.tsx:91`) et les aliments d'un repas non plus (`Compose.ajouts`
+  est une liste libre, `demandeRepas.ts:274`, bornée par le seul frigo). Chercher un
+  majorant était une impasse : la borne brute est un **plafond posé**, pas un
+  majorant. Calcul et chiffres dans la spec, section « Le majorant, mesuré le
+  25 septembre 2026 ».
+- **CA-R4 porte désormais ses deux chiffres** : `MAX_LIGNES = 2000` sur l'envoi brut
+  (un mois entier coché fait 1 860 couples), `MAX = 200` conservé mais appliqué aux
+  aliments **distincts** après dédoublonnage.
+- **Une correction à la spec** : CA-5 était déjà couvert côté serveur par
+  `testLeMemeAlimentDeuxFoisNeFaitQuUneLigne` (`LotDHabitudesTest.php:78`). Ce qui
+  manquait n'était pas le test de la règle mais la preuve de son **unicité** — c'est
+  le volet (c) du garde CA-1.
+- **La base de dev de ce poste ne pouvait pas servir de mesure empirique** : 8 aliments,
+  2 plans de démonstration. Noté pour la prochaine fois qu'on voudra un chiffre réel.
+- **Phase rouge lancée**, quatre fiches : CA-8 + la clause `IS DISTINCT FROM` (dépôt),
+  CA-R4 (les deux bornes), CA-1 (nouveau garde `habitudesAuServeur.test.ts`), et la
+  mise à plat `lignesDHabitudes` qui remplace `habitudesAEcrire` (CA-6, CA-7).
+- **Rien n'est encore vert, rien n'est commité.** `npm run verif` est rouge, et c'est
+  le rouge attendu : `lignesDHabitudes` n'existe pas encore.
+- **PHPStan rend toujours ses 5 erreurs préexistantes**, inchangées, aucune n'est de ce
+  chantier — elles sont déjà dans `prochaines-etapes.md`.
+
 ## 2026-09-25 (soir) — B4 cadré : spec écrite, phase `tdd` (session Claude)
 
 - **Feature ouverte** : `docs/features/habitudes-cuisson-au-serveur.md`, phase `tdd`.

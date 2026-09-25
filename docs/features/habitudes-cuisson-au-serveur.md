@@ -1,7 +1,7 @@
 ---
 titre: B4 — le serveur décide ce qu'il enregistre des habitudes de cuisson
 slug: habitudes-cuisson-au-serveur
-phase: tdd
+phase: review
 cree_le: 2026-09-25
 brainstorm: aucun — le cadrage est l'inventaire du 21 septembre 2026, dans REPRENDRE.md § 3 (B4) et docs/plan-serveur-autoritaire.md § palier 2
 ---
@@ -53,14 +53,14 @@ semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
   un garde du front le refuse à l'avenir (sur le modèle de
   `coherenceCibleUnique.test.ts`). Le garde porte un cas témoin qui prouve qu'il
   peut tomber.
-- **CA-2** — *Étant donné* un compte dont « riz basmati » est déjà enregistré au
+- **CA-2** ⏳ *(le code est là — clause `IS DISTINCT FROM` + somme des lignes affectées ; la preuve contre une vraie base appartient à la phase e2e)* — *Étant donné* un compte dont « riz basmati » est déjà enregistré au
   mode 2, *quand* `PUT /api/mes-cuissons` reçoit `{"habitudes":[{"aliment":"riz
   basmati","mode":2}]}`, *alors* la réponse est `{"enregistrees":0}` et le
   `maj_le` de la ligne est **inchangé**.
-- **CA-3** — *Étant donné* le même compte, *quand* l'envoi porte `"mode":5` (un
+- **CA-3** ⏳ *(même chose : porté, à prouver en e2e)* — *Étant donné* le même compte, *quand* l'envoi porte `"mode":5` (un
   mode qui existe), *alors* la réponse est `{"enregistrees":1}`, la ligne vaut 5
   et son `maj_le` a bougé.
-- **CA-4** — *Étant donné* un aliment dont ce compte n'a jamais rien décidé,
+- **CA-4** ⏳ *(même chose : porté, à prouver en e2e)* — *Étant donné* un aliment dont ce compte n'a jamais rien décidé,
   *quand* l'envoi porte `"mode":null`, *alors* la réponse est
   `{"enregistrees":1}` et la ligne est créée avec `mode_cuisson_id` à `NULL` —
   « se mange sans cuisson » est une réponse, pas une absence (règle 6).
@@ -87,9 +87,9 @@ semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
 Les messages existants de `LotDHabitudes` **ne changent pas** : ce sont des refus
 déjà éprouvés, et les réécrire serait une régression silencieuse.
 
-- **CA-R1** — mode inconnu → 422, « Mode de cuisson inconnu : *N* » (inchangé).
-- **CA-R2** — aliment vide → 422, « Aliment non précisé. » (inchangé).
-- **CA-R3** — clé `mode` absente → 422, « Cuisson non précisée pour *aliment* »
+- **CA-R1** ✅ *(inchangé, test existant vert)* — mode inconnu → 422, « Mode de cuisson inconnu : *N* » (inchangé).
+- **CA-R2** ✅ *(inchangé, test existant vert)* — aliment vide → 422, « Aliment non précisé. » (inchangé).
+- **CA-R3** ✅ *(inchangé, test existant vert)* — clé `mode` absente → 422, « Cuisson non précisée pour *aliment* »
   (inchangé) ; `array_key_exists` et non `isset`, qui confondrait avec `null`.
 - **CA-R4** ✅ *(vert le 25/09/2026)* — **le plafond doit devenir DEUX bornes, et c'est nouveau.**
   `LotDHabitudes::MAX` vaut 200 et se compare au nombre de lignes **reçues**.
@@ -207,3 +207,10 @@ en e2e ou par `verification-bout-en-bout`, sur un compte jetable en `@e2e.local`
   `habitudesAEcrire` et `LotDHabitudes`, et le défaut hors-ligne de
   `mesCuissons.data ?? {}`. Une affirmation de `REPRENDRE.md` est corrigée
   (`depuisLesHabitudes` n'est pas le candidat de B4 ; il part au palier 3).
+- 2026-09-25 (nuit) — phase `tdd` terminée. Les huit critères sont portés par du
+  code ; cinq sont prouvés ici (CA-1, CA-5, CA-6 volet front, CA-7, CA-8, plus
+  CA-R1 à CA-R4), trois attendent une vraie base (CA-2, CA-3, CA-4) comme la
+  section « Vérification » l'annonçait dès l'écriture de la spec. Trois commits :
+  `b9bd24d` (CA-8), `c35d3d2` (CA-R4), `4dfee03` (CA-1, CA-6, CA-7).
+  **Un reste pour la phase `docs`** : `REPRENDRE.md` nomme encore
+  `habitudesAEcrire` au présent.

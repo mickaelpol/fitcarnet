@@ -10,11 +10,13 @@
 ## Maintenant
 - [x] **Redémarrer Claude Code** — fait. L'outil `LSP` est présent dans la session du 25/09/2026 au soir : `ENABLE_LSP_TOOL` et `typescript-lsp` ont pris effet.
 
-- [ ] **B4 — `habitudes-cuisson-au-serveur`, phase `tdd`.** Spec écrite le 25/09/2026 :
-  `docs/features/habitudes-cuisson-au-serveur.md`. Huit critères plus quatre refus.
-  Premier geste de la phase : **mesurer** le majorant de couples (repas, aliment)
-  d'un plan de 7 jours × 4 repas — CA-R4 en a besoin pour poser une borne défendable.
-  Reprendre par `/harness habitudes-cuisson-au-serveur`.
+- [ ] **B4 — `habitudes-cuisson-au-serveur`, phase `review`.** La phase `tdd` est
+  terminée le 25/09/2026 (trois commits, suites vertes des deux côtés). La mesure du
+  majorant est faite et tranchée : il n'y en a pas dans le code, la borne est un
+  plafond posé — `MAX_LIGNES = 2000`, et `MAX = 200` sur les distincts.
+  Reprendre par `/clear` puis `/harness habitudes-cuisson-au-serveur`.
+  **CA-2, CA-3 et CA-4 attendent la phase e2e** : ils exigent une vraie base.
+  **Et `REPRENDRE.md` nomme encore `habitudesAEcrire` au présent** — pour la phase `docs`.
 
 ## Ensuite
 - [ ] `api/vendor/bin/phpstan analyse` rend **5 erreurs** — mesuré le 25/09/2026 sur `serveur-autoritaire`. Elles préexistent au harness. L'une est un `parameterByRef.unusedType` dans `api/tests/Service/InventaireUneLigneTest.php:121`.

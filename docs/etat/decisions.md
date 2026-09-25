@@ -20,3 +20,22 @@
 | 2026-09-25 | B4 se recentre : c'est `habitudesAEcrire` qui part au serveur, pas `depuisLesHabitudes` | `depuisLesHabitudes` a besoin des repas du plan RÉSOLU, que le solveur calcule au front jusqu'au palier 3 ; l'y envoyer aujourd'hui coûterait un aller-retour réseau par geste, la régression que le plan nomme au § palier 1. Et ce n'est pas un jugement : il réindexe une clé d'habitude en clé de cuisson. `habitudesAEcrire`, lui, ne tourne qu'au passage à « Cuisiner » — un geste, pas une frappe — et porte une vraie règle métier. | Suivre `REPRENDRE.md`, qui le désignait « le seul candidat net » : mesuré faux le 25 septembre 2026, le journal est corrigé. | habitudes-cuisson-au-serveur |
 | 2026-09-25 | Le filtrage de l'inchangé s'écrit en SQL (`ON CONFLICT … DO UPDATE … WHERE … IS DISTINCT FROM EXCLUDED.…`), pas en PHP | Une clause, dans le seul dépôt qui écrit cette table, et sans fenêtre de concurrence : PostgreSQL ne touche pas la ligne quand rien ne change, donc `maj_le` ne bouge pas et l'instruction rend 0. `IS DISTINCT FROM` traite `NULL` comme une valeur, ce dont la règle 6 a besoin. C'est le même argument qui avait fait choisir `ON CONFLICT` en 2026-09-18. | Comparer en PHP dans `LotDHabitudes` en lui passant les habitudes connues : testable sans base, mais rouvre le « lire puis écrire » que le dépôt avait fermé, et remet la règle dans un second endroit. | habitudes-cuisson-au-serveur |
 | 2026-09-25 | La refonte serveur autoritaire reste sur `serveur-autoritaire` ; une seule PR à la fin du chantier | Demande du propriétaire, le 25 septembre : `master` est tiré par le NAS toutes les cinq minutes, donc fusionner c'est déployer. Le chantier n'est pas fini — B4, B5 et le palier 3 restent. | Fusionner morceau par morceau : mettrait en production un chantier à moitié traversé. | habitudes-cuisson-au-serveur |
+
+## 2026-09-25 — B4 : la borne d'un envoi d'habitudes est un plafond posé, pas un majorant
+
+**Choix.** `LotDHabitudes` porte deux bornes : `MAX_LIGNES = 2000` sur l'envoi brut,
+et `MAX = 200` sur les aliments distincts après dédoublonnage.
+
+**Pourquoi.** La spec demandait de mesurer le majorant du nombre de couples
+(repas, aliment) d'un plan de sept jours. La mesure montre qu'il n'y en a pas :
+le calendrier laisse cocher un mois entier et `Compose.ajouts` est une liste libre.
+Le pire cas théorique est donc 31 × 4 × (taille du frigo), inutilisable comme borne.
+2 000 laisse passer le plus gros geste que l'écran sache produire (un mois coché à
+quatre repas de quinze aliments : 1 860) et ferme la porte à un corps qui ne vient
+plus de lui. 200 garde son chiffre et sa raison d'origine — « une semaine de quatre
+repas met en jeu une trentaine d'aliments distincts » — qui redevient vraie une fois
+appliquée aux distincts et non aux lignes reçues.
+
+**Ce que ça remplace.** Un `MAX = 200` unique comparé aux lignes reçues, qui serait
+devenu atteignable par un usage normal dès que le front cesse de n'envoyer que les
+écarts : un refus 422 sur un geste légitime.
