@@ -34,7 +34,7 @@ Ces modules **font foi** et sont les seuls à porter leur formule :
 |---|---|
 | 1RM, volume, paliers | `src/calcul/performance.ts` |
 | Macros, Atwater, catégories | `src/calcul/nutrition.ts` |
-| Cru/cuit, fournées, habitudes | `src/calcul/cuisson.ts` |
+| Cru/cuit, fournées, habitudes | `src/calcul/cuisson.ts` — mais **plus aucun jugement sur les habitudes** depuis le 25 septembre 2026 : il ne reste que la fabrique de clé (`cleDHabitude`), le pré-remplissage (`depuisLesHabitudes`) et la mise à plat de ce qui part au serveur (`lignesDHabitudes`) |
 | Composition de repas | `src/solveur/` |
 | Suppression des accents | `src/calcul/texte.ts` |
 | Lecture d'un nombre saisi (virgule, vide ≠ zéro) | `src/calcul/saisieNombre.ts` — et `ChampNombre` pour un champ qui garde le texte tapé |
@@ -52,6 +52,9 @@ un fichier absent.
 | Cohérence d'un aliment, ses 14 anomalies, la couleur du bandeau | `api/src/Service/VerdictAliment.php` et `AnomaliesAliment.php` | `POST /api/verification/aliment` |
 | Rendement cru/cuit | la même route | idem |
 | « Un chrono ne compte que pour une série » | `api/src/Service/ModesDeTravail.php` | `GET /api/modes-de-travail` → **combien de séries comptent par mode** (`seriesQuiComptent`) ; l'écran découpe à ce nombre |
+| Cohérence d'une cible — seuil de 15 kcal, deux conventions de glucides | `api/src/Service/CoherenceDesCibles.php` | `POST /api/verification/cible` ; l'écran affiche la phrase telle quelle |
+| Conversion d'un plan « coach » américain | `api/src/Service/PlanCoach.php` | `POST /api/verification/plan-coach` — `src/calcul/planCoach.ts` est supprimé |
+| **Habitudes de cuisson** : « la dernière décision gagne » et « l'inchangé ne s'écrit pas » | `LotDHabitudes::depuis` dédoublonne, borne, valide — **il ne trie AUCUN écart** ; c'est la clause SQL de `CuissonsHabituelles::remplacer` (`IS DISTINCT FROM`) qui n'écrit que ce qui a changé | `PUT /api/mes-cuissons`. L'écran envoie **tout ce qu'il affiche**, sans juger : `lignesDHabitudes(repas, choisi)`, une ligne par couple (repas, aliment) dans l'ordre du plan |
 
 **Cette dernière ligne a dit le contraire jusqu'au 21 septembre 2026** — « le
 serveur envoie un **poids** par série, l'écran additionne ». C'était la
