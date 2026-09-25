@@ -5,7 +5,7 @@ import { BROCOLI, RIZ, repas } from './cuisson.test-data';
 import { cleDeCuisson, sansCuisson } from './fournees';
 import type { Cuissons } from './fournees';
 import {
-  cleDHabitude, depuisLesHabitudes, habitudesAEcrire,
+  cleDHabitude, depuisLesHabitudes, lignesDHabitudes,
 } from './habitudesCuisson';
 
 /* ============================================ les cuissons habituelles */
@@ -74,56 +74,79 @@ describe('depuisLesHabitudes', () => {
   });
 });
 
-describe('habitudesAEcrire', () => {
+describe('lignesDHabitudes', () => {
+  /* Remplace `habitudesAEcrire` le 25 septembre 2026 : le serveur retient
+     désormais la dernière décision de chaque aliment et compare lui-même à ce
+     qu'il a en base — l'écran n'a plus à juger « connues », et ne peut donc
+     plus se tromper dessus (`usePlanCalcule.ts:133` passait `mesCuissons.data
+     ?? {}`, qui valait `{}` chaque fois que la requête était en pause hors
+     ligne, et déclarait TOUTE cuisson du plan comme nouvelle). */
   const plan = [
     repas('0|R2', { aliment: RIZ, aCuire: 100 }, { aliment: BROCOLI, aCuire: 200 }),
     repas('1|R2', { aliment: RIZ, aCuire: 150 }),
   ];
 
-  it('n\'écrit rien quand rien n\'a changé', () => {
-    /* Une semaine sans changement doit pouvoir se composer sans une seule
-       écriture. Sinon chaque plan repousse `maj_le` sur trente lignes pour
-       rien. */
-    const choisi = depuisLesHabitudes(plan, { riz: 1, brocoli: null });
-    assert.deepEqual(habitudesAEcrire(plan, choisi, { riz: 1, brocoli: null }), []);
+  it('donne une ligne par couple (repas, aliment) décidé, dans l\'ordre du plan', () => {
+    // CA-6
+    /* Le riz est décidé deux fois — au four dans le premier repas, à l'eau
+       dans le second. Contrairement à `habitudesAEcrire`, qui ne gardait que
+       la dernière, ici les DEUX lignes partent : c'est au serveur de trancher
+       « la dernière décision gagne », pas à l'écran. */
+    const choisi: Cuissons = {
+      [cleDeCuisson('0|R2', RIZ)]: 4,
+      [cleDeCuisson('1|R2', RIZ)]: 1,
+    };
+    assert.deepEqual(
+      lignesDHabitudes(plan, choisi),
+      [{ aliment: 'riz', mode: 4 }, { aliment: 'riz', mode: 1 }],
+    );
   });
 
-  it('écrit une habitude jamais vue', () => {
-    const choisi: Cuissons = { [cleDeCuisson('0|R2', BROCOLI)]: 1 };
-    assert.deepEqual(habitudesAEcrire(plan, choisi, {}), [{ aliment: 'brocoli', mode: 1 }]);
-  });
-
-  it('distingue « pas d\'habitude » de « habitude sans cuisson »', () => {
-    /* Les deux valent `undefined` et `null`, et les confondre ferait sauter
-       la première écriture d'un « sans cuisson » — le skyr redemanderait
-       indéfiniment. */
+  it('envoie « sans cuisson » (mode null) mais pas une cuisson non décidée (undefined)', () => {
+    // CA-6
+    /* `null` est une réponse — « ça se mange sans cuisson » — et doit partir.
+       `undefined` veut dire « personne n'a encore choisi » : ça ne part pas,
+       sans quoi le serveur recevrait une ligne qui ne veut rien dire. */
     const choisi: Cuissons = { [cleDeCuisson('0|R2', BROCOLI)]: null };
-    assert.deepEqual(habitudesAEcrire(plan, choisi, {}), [{ aliment: 'brocoli', mode: null }]);
-    assert.deepEqual(habitudesAEcrire(plan, choisi, { brocoli: null }), []);
+    assert.deepEqual(lignesDHabitudes(plan, choisi), [{ aliment: 'brocoli', mode: null }]);
   });
 
-  it('garde la DERNIÈRE décision quand un aliment est cuit de deux façons', () => {
-    /* Un riz au four lundi et à l'eau jeudi : l'habitude est « à l'eau ».
-       C'est le sens de « ce que tu as fait la dernière fois ». */
-    const choisi: Cuissons = {
-      [cleDeCuisson('0|R2', RIZ)]: 4,
-      [cleDeCuisson('1|R2', RIZ)]: 1,
-    };
-    assert.deepEqual(habitudesAEcrire(plan, choisi, {}), [{ aliment: 'riz', mode: 1 }]);
+  it('envoie une décision même si elle est identique à une habitude déjà connue', () => {
+    // CA-7
+    /* La fonction ne prend plus de troisième paramètre : elle ne PEUT plus
+       comparer à « ce qui est déjà connu », et c'est voulu — c'est justement
+       cette comparaison, faite côté écran sur un `mesCuissons.data ?? {}`
+       parfois vide à tort, qui repoussait `maj_le` sur toute une trentaine
+       d'habitudes en cas de requête hors ligne en pause. */
+    assert.equal(lignesDHabitudes.length, 2, 'lignesDHabitudes ne doit prendre que deux paramètres');
+
+    const choisi: Cuissons = { [cleDeCuisson('0|R2', RIZ)]: 1 };
+    /* Avec `habitudesAEcrire`, un mode identique à l'habitude connue (`{ riz:
+       1 }`) était écarté — voir le test « n'écrit rien quand rien n'a changé »
+       ci-dessus. Ici, il n'y a rien à écarter : la ligne part quand même,
+       c'est le serveur qui verra qu'il n'y a rien à faire. */
+    assert.deepEqual(lignesDHabitudes(plan, choisi), [{ aliment: 'riz', mode: 1 }]);
   });
 
-  it('ne laisse pas une décision intermédiaire écraser la dernière', () => {
-    /* Le piège du passage unique : jeudi remet l'habitude connue, donc
-       « inchangé », donc écarté — et lundi resterait dans le lot. On
-       enregistrerait « four » pour un plan qui finit à l'eau. */
-    const choisi: Cuissons = {
-      [cleDeCuisson('0|R2', RIZ)]: 4,
-      [cleDeCuisson('1|R2', RIZ)]: 1,
-    };
-    assert.deepEqual(habitudesAEcrire(plan, choisi, { riz: 1 }), []);
-  });
+  it('produit des lignes même quand rien n\'a changé, mais rien du tout si rien n\'est décidé', () => {
+    // CA-6
+    /* Un plan entièrement pré-rempli par les habitudes (aucun choix qui
+       diffère de ce que le serveur a déjà) part quand même : un seul PUT, et
+       c'est le serveur qui répondra `{"enregistrees":0}` — l'écran n'a plus à
+       le deviner. */
+    const choisiInchange = depuisLesHabitudes(plan, { riz: 1, brocoli: null });
+    assert.deepEqual(
+      lignesDHabitudes(plan, choisiInchange),
+      [
+        { aliment: 'riz', mode: 1 },
+        { aliment: 'brocoli', mode: null },
+        { aliment: 'riz', mode: 1 },
+      ],
+    );
 
-  it('ignore ce qui n\'a pas encore été décidé', () => {
-    assert.deepEqual(habitudesAEcrire(plan, {}, {}), []);
+    /* À l'inverse, un plan où personne n'a encore rien décidé n'a rien à
+       envoyer : ce n'est pas « tout est inchangé », c'est qu'il n'y a même
+       pas de décision à transmettre. */
+    assert.deepEqual(lignesDHabitudes(plan, {}), []);
   });
 });

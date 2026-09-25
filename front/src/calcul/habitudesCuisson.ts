@@ -111,46 +111,57 @@ export function depuisLesHabitudes(
 }
 
 /**
- * Ce qu'il faut renvoyer au serveur : les habitudes que ce plan vient de
- * décider, celles-là seulement.
+ * Ce que ce plan a décidé, ligne par ligne, SANS EN JUGER.
  *
- * On ne réécrit PAS ce qui n'a pas bougé. Une semaine sans changement doit
- * pouvoir se composer sans une seule écriture — sinon chaque plan repousserait
- * inutilement `maj_le` sur trente lignes, et un envoi qui échoue à moitié
- * porterait sur des données qui n'avaient aucune raison de partir.
+ * Une ligne par couple (repas, aliment) dont la cuisson est décidée, dans
+ * l'ordre du plan. Rien d'autre. Ce module ne compare plus, ne dédoublonne
+ * plus, et ne sait plus ce qui est déjà enregistré.
  *
- * Un aliment cuit différemment dans deux repas du même plan ne donne qu'UNE
- * habitude : la dernière rencontrée dans l'ordre du plan, c'est-à-dire la
- * plus tardive. C'est le sens de « ce que tu as fait la dernière fois ».
+ * ── CE QUI ÉTAIT ÉCRIT ICI, ET POURQUOI C'EST PARTI (25 septembre 2026) ───
+ *
+ * `habitudesAEcrire` tenait deux règles : « la dernière décision gagne » et
+ * « l'inchangé ne s'écrit pas ». Le serveur tenait exactement les mêmes, pour
+ * une autre raison — PostgreSQL refuse un `ON CONFLICT` dont le lot porte deux
+ * fois la même clé. C'était le CINQUIÈME double juge du projet, et il n'était
+ * dans aucune liste.
+ *
+ * Et il avait déjà un défaut mesuré : `usePlanCalcule.ts` passait
+ * `mesCuissons.data ?? {}` comme « ce qui est déjà connu ». Requête en pause —
+ * hors ligne — `data` valait `undefined`, l'écran croyait ne rien connaître et
+ * déclarait TOUTE cuisson du plan comme nouvelle : une trentaine de lignes
+ * réécrites et autant de `maj_le` repoussés sans raison, c'est-à-dire
+ * exactement ce que l'ancien commentaire disait vouloir éviter.
+ *
+ * Une fonction qui ne reçoit pas les habitudes connues ne peut plus se tromper
+ * sur ce qu'elle en croit. Le tri se fait là où la vérité est : en base, par
+ * `WHERE ... IS DISTINCT FROM` (`CuissonsHabituelles::remplacer`), et le
+ * dédoublonnage par `LotDHabitudes::depuis`.
+ *
+ * L'ORDRE EST LA SEULE CHOSE QUI COMPTE ICI, et c'est pour ça qu'on rend une
+ * LISTE et non une table. Un riz mis au four lundi puis remis à l'eau jeudi
+ * part en deux lignes ; le serveur retient la dernière, et c'est le sens de
+ * « ce que tu as fait la dernière fois ». Dédoublonner avant l'envoi rendrait
+ * la règle au front, qui vient de s'en défaire.
+ *
+ * `undefined` ne part pas, et ce n'est pas un jugement : les trois états d'une
+ * habitude sont un entier, `null` — « se mange sans cuisson », qui est une
+ * RÉPONSE et part — et l'absence, qui veut dire « personne n'a décidé ». La
+ * règle 6 du projet : vide n'est pas zéro.
  */
-export function habitudesAEcrire(
+export function lignesDHabitudes(
   repas: readonly Repas[],
   choisi: Cuissons,
-  connues: Habitudes,
 ): { aliment: string; mode: number | null }[] {
-  /* DEUX TEMPS, et l'ordre compte. On retient d'abord la dernière décision de
-     chaque aliment, on compare ensuite à ce qui est déjà connu.
-
-     Faire les deux en un seul passage — « si c'est inchangé, passer » — a
-     l'air plus court et se trompe : un riz mis au four lundi puis remis à
-     l'eau jeudi verrait le jeudi écarté comme inchangé, et le lundi resterait
-     dans le lot. On enregistrerait « four » pour un plan qui finit à l'eau. */
-  const derniere = new Map<string, number | null>();
+  const lignes: { aliment: string; mode: number | null }[] = [];
 
   for (const r of repas) {
     for (const q of r.quantites) {
       const decide = choisi[cleDeCuisson(r.cle, q.aliment)];
       if (decide === undefined) continue;
 
-      derniere.set(cleDHabitude(q.aliment.nom), decide);
+      lignes.push({ aliment: cleDHabitude(q.aliment.nom), mode: decide });
     }
   }
 
-  return [...derniere]
-    /* Inchangé : rien à dire.
-       Une habitude ABSENTE rend `undefined`, et `mode` ne peut pas valoir
-       `undefined` — la boucle ci-dessus l'a écarté. L'absence est donc
-       toujours un écart, sans qu'on ait besoin de la tester à part. */
-    .filter(([cle, mode]) => connues[cle] !== mode)
-    .map(([aliment, mode]) => ({ aliment, mode }));
+  return lignes;
 }

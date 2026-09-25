@@ -47,7 +47,7 @@ semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
 
 ## Critères d'acceptation
 
-- **CA-1** — *Étant donné* le dépôt entier, *quand* on cherche une comparaison
+- **CA-1** ✅ *(vert le 25/09/2026)* — *Étant donné* le dépôt entier, *quand* on cherche une comparaison
   entre une cuisson choisie et une habitude connue dans `front/src` ou
   `front/app`, *alors* il n'y en a aucune : `habitudesAEcrire` n'existe plus, et
   un garde du front le refuse à l'avenir (sur le modèle de
@@ -64,16 +64,16 @@ semaine prochaine, interrompre quelqu'un qui va cuisiner coûte plus cher.
   *quand* l'envoi porte `"mode":null`, *alors* la réponse est
   `{"enregistrees":1}` et la ligne est créée avec `mode_cuisson_id` à `NULL` —
   « se mange sans cuisson » est une réponse, pas une absence (règle 6).
-- **CA-5** — *Étant donné* une base où « riz basmati » vaut 2, *quand* un seul
+- **CA-5** ✅ *(la règle : `LotDHabitudesTest::testLeMemeAlimentDeuxFoisNeFaitQuUneLigne`, déjà vert ; son UNICITÉ : le garde CA-1 (c). L'effet en base se prouve en phase e2e.)* — *Étant donné* une base où « riz basmati » vaut 2, *quand* un seul
   envoi porte deux fois cet aliment, d'abord `"mode":2` puis `"mode":5`, *alors*
   la réponse est `{"enregistrees":1}` et la ligne vaut **5** : la dernière
   décision de l'envoi gagne, et c'est désormais la seule écriture de cette règle
   dans le dépôt.
-- **CA-6** — *Étant donné* un plan dont aucune cuisson n'a changé depuis la
+- **CA-6** ✅ *(volet front vert le 25/09/2026 ; le volet « aucun `maj_le` n'a bougé » se prouve en phase e2e)* — *Étant donné* un plan dont aucune cuisson n'a changé depuis la
   semaine dernière, *quand* l'utilisateur passe à l'étape « Cuisiner », *alors*
   un seul `PUT` part, il répond `{"enregistrees":0}`, et **aucun** `maj_le` de la
   table `cuisson_habituelle` n'a bougé.
-- **CA-7** — *Étant donné* que `GET /api/mes-cuissons` n'a pas répondu (hors
+- **CA-7** ✅ *(vert le 25/09/2026 — la fonction n'a plus de paramètre `connues`, elle ne peut plus s'y tromper)* — *Étant donné* que `GET /api/mes-cuissons` n'a pas répondu (hors
   ligne, requête en pause), *quand* l'utilisateur passe à l'étape « Cuisiner »
   après le retour du réseau, *alors* le serveur n'écrit toujours que les écarts :
   le front ne sait rien de ce qui est connu, et ça ne change plus le résultat.

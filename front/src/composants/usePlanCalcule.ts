@@ -56,7 +56,7 @@ import { listeDeCourses, resoudreLaPeriode } from '../solveur/composer';
 import type { Compose } from '../calcul/demandeRepas';
 import type { Cuissons } from '../calcul/cuisson';
 import {
-  cleDeCuisson, enFournees, habitudesAEcrire, repartition, resteSansCuisson, sansCuisson,
+  cleDeCuisson, enFournees, lignesDHabitudes, repartition, resteSansCuisson, sansCuisson,
 } from '../calcul/cuisson';
 import { cuissonsEffectives, demandesDuPlan, mettreAPlat } from '../calcul/planCalcule';
 
@@ -126,12 +126,19 @@ export function usePlanCalcule({
     [plat, mesCuissons.data, cuissonsChoisies],
   );
 
-  /* Ce que ce plan apprend, et qui n'était pas déjà su. Rien si rien n'a
-     changé : une semaine sans nouveauté doit pouvoir se composer sans une
-     seule écriture. */
-  const habitudesNouvelles = useMemo(
-    () => habitudesAEcrire(plat, cuissons, mesCuissons.data ?? {}),
-    [plat, cuissons, mesCuissons.data],
+  /* Ce que ce plan a décidé, tel quel, sans le trier.
+     
+     LE `?? {}` A DISPARU D'ICI, ET C'ÉTAIT UN DÉFAUT, pas une précaution. On
+     passait `mesCuissons.data ?? {}` comme « ce qui est déjà connu » : requête
+     en pause — hors ligne — `data` valait `undefined`, l'écran croyait ne rien
+     connaître et déclarait TOUTE cuisson du plan comme nouvelle. Une trentaine
+     de `maj_le` repoussés sans raison, à chaque retour de réseau.
+
+     Ce qui est déjà connu ne regarde plus l'écran : le serveur le sait, et lui
+     seul peut le savoir sans se tromper. Mesuré et corrigé le 25 septembre 2026. */
+  const cuissonsAEnvoyer = useMemo(
+    () => lignesDHabitudes(plat, cuissons),
+    [plat, cuissons],
   );
 
   const parFournee = useMemo(
@@ -157,9 +164,13 @@ export function usePlanCalcule({
    * dire qu'un défaut n'a pas été mémorisé coûte plus cher que ça.
    */
   const retenirLesCuissons = useCallback(() => {
-    if (habitudesNouvelles.length === 0) return;
-    enregistrerCuissons.mutate(habitudesNouvelles, { onError: () => {} });
-  }, [habitudesNouvelles, enregistrerCuissons]);
+    /* Un plan dont AUCUNE cuisson n'est décidée n'a rien à dire : on ne part
+       pas pour un lot vide. Un plan dont rien n'a CHANGÉ, en revanche, part
+       comme les autres — c'est le serveur qui verra qu'il n'y a rien à écrire,
+       et il répondra `{"enregistrees": 0}` sans toucher un seul `maj_le`. */
+    if (cuissonsAEnvoyer.length === 0) return;
+    enregistrerCuissons.mutate(cuissonsAEnvoyer, { onError: () => {} });
+  }, [cuissonsAEnvoyer, enregistrerCuissons]);
 
   /** Un aliment de ce repas se cuit comme ceci — `null` : il se mange tel quel. */
   const noterLaCuisson = useCallback(
@@ -184,7 +195,7 @@ export function usePlanCalcule({
 
   return {
     modesCuisson, mesCuissons,
-    demandes, resultats, aAcheter, plat, cuissons, habitudesNouvelles,
+    demandes, resultats, aAcheter, plat, cuissons, cuissonsAEnvoyer,
     parFournee, restentASituer, boites,
     retenirLesCuissons, noterLaCuisson, reglerToutLeReste, oublierLesCuissons,
   };
