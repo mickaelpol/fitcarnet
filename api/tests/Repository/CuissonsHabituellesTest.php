@@ -230,4 +230,47 @@ final class CuissonsHabituellesTest extends TestCase
             $sqlVu,
         );
     }
+
+    /**
+     * LES LIGNES SE VERROUILLENT TOUJOURS DANS LE MEME ORDRE.
+     *
+     * CONSTAT M2 DE LA REVUE DU 25 SEPTEMBRE 2026. `ON CONFLICT DO UPDATE`
+     * verrouille la ligne en conflit MEME quand sa clause `WHERE` est fausse,
+     * c'est-a-dire meme quand il n'ecrit rien. Tant que l'ecran n'envoyait que
+     * les ecarts, un lot faisait deux ou trois lignes et partait rarement.
+     * Depuis B4 il porte une ligne par aliment du plan — une trentaine — et
+     * part a CHAQUE passage a « Cuisiner ».
+     *
+     * Deux envois du meme compte au meme moment — deux onglets, ou le
+     * telephone et le web — dont les plans ne nomment pas les aliments dans le
+     * meme ordre s'attendent alors l'un l'autre : `40P01`, deadlock detected,
+     * un 500. Et l'echec d'ecriture des habitudes est SILENCIEUX par decision :
+     * l'utilisateur perdrait tout le lot sans un mot.
+     *
+     * Trier ferme la porte, et ne coute rien : apres dedoublonnage, l'ordre
+     * d'iteration ne porte plus aucune semantique — « la derniere decision
+     * gagne » a deja ete tranchee dans `LotDHabitudes::depuis`, et chaque
+     * aliment n'a plus qu'une ligne.
+     */
+    public function testLesEcrituresPartentDansUnOrdreStable(): void
+    {
+        $noms = [];
+        $cnx = self::createStub(Connection::class);
+        $cnx->method('transactional')->willReturnCallback(
+            static fn (callable $travail): mixed => $travail($cnx));
+        $cnx->method('executeStatement')->willReturnCallback(
+            function (string $sql, array $params) use (&$noms): int {
+                $noms[] = $params['a'];
+
+                return 1;
+            });
+
+        /* L'ordre du plan : le riz d'abord parce qu'il est au repas du lundi. */
+        (new CuissonsHabituelles($cnx))->remplacer(
+            self::MOI, ['riz basmati' => 2, 'brocoli' => 1, 'amandes' => null]);
+
+        self::assertSame(['amandes', 'brocoli', 'riz basmati'], $noms,
+            'deux plans qui nomment les memes aliments dans un ordre different '
+            . 'doivent verrouiller les lignes dans le meme ordre');
+    }
 }

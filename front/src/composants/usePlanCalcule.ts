@@ -127,7 +127,7 @@ export function usePlanCalcule({
   );
 
   /* Ce que ce plan a décidé, tel quel, sans le trier.
-     
+
      LE `?? {}` A DISPARU D'ICI, ET C'ÉTAIT UN DÉFAUT, pas une précaution. On
      passait `mesCuissons.data ?? {}` comme « ce qui est déjà connu » : requête
      en pause — hors ligne — `data` valait `undefined`, l'écran croyait ne rien
@@ -195,7 +195,12 @@ export function usePlanCalcule({
 
   return {
     modesCuisson, mesCuissons,
-    demandes, resultats, aAcheter, plat, cuissons, cuissonsAEnvoyer,
+    /* `cuissonsAEnvoyer` n'est PAS rendu, et c'est un retrait : il l'était sous
+       le nom `habitudesNouvelles`, et aucun écran ne l'a jamais lu. Ce qui part
+       au serveur n'est pas une information dont l'écran a besoin — il a besoin
+       de `retenirLesCuissons`, qui l'envoie. Relevé en revue le 25 septembre
+       2026, constat F4. */
+    demandes, resultats, aAcheter, plat, cuissons,
     parFournee, restentASituer, boites,
     retenirLesCuissons, noterLaCuisson, reglerToutLeReste, oublierLesCuissons,
   };

@@ -120,7 +120,14 @@ final class LotDHabitudesTest extends TestCase
     public function testUnEnvoiDemesureEstRefuse(): void
     {
         /* Au-dela, ce n'est plus un geste d'utilisateur : une semaine de
-           quatre repas met en jeu une trentaine d'aliments distincts. */
+           quatre repas met en jeu une trentaine d'aliments DISTINCTS. Depuis
+           le 25 septembre 2026, c'est bien sur les distincts que `MAX` porte —
+           ce commentaire decrivait encore une borne sur l'envoi, releve en
+           revue le jour meme. Son jumeau est
+           `testLesAlimentsDistinctsRestentPlafonnesSousLaBorneBrute`, qui dit
+           la meme chose en le prouvant sous la borne brute : celui-ci reste
+           parce qu'il est anterieur aux deux bornes et qu'il tombe si `MAX`
+           disparait. */
         $trop = [];
         for ($i = 0; $i <= LotDHabitudes::MAX; ++$i) {
             $trop[] = ['aliment' => 'aliment ' . $i, 'mode' => 1];
@@ -223,5 +230,81 @@ final class LotDHabitudesTest extends TestCase
 
         self::assertFalse($lot->estValide());
         self::assertStringContainsString((string) LotDHabitudes::MAX, (string) $lot->erreur);
+    }
+
+    /**
+     * LA BORNE BRUTE, TOUTE SEULE — le cas que la revue du 25 septembre 2026
+     * a trouve manquant.
+     *
+     * Beaucoup de lignes, peu d'aliments : seule `MAX_LIGNES` peut refuser
+     * celui-la. Sans ce cas, on ne saurait pas laquelle des deux bornes
+     * travaille, et supprimer la premiere passerait inapercu le jour ou le
+     * message de la seconde changerait.
+     */
+    public function testSeuleLaBorneBruteRefuseUnEnvoiRepetitifDemesure(): void
+    {
+        $trop = [];
+        for ($i = 0; $i <= LotDHabitudes::MAX_LIGNES; ++$i) {
+            /* Dix aliments seulement : la borne des distincts n'a rien a dire. */
+            $trop[] = ['aliment' => 'aliment ' . ($i % 10), 'mode' => 1];
+        }
+
+        $lot = LotDHabitudes::depuis($trop, self::MODES);
+
+        self::assertFalse($lot->estValide());
+        self::assertStringContainsString((string) LotDHabitudes::MAX_LIGNES, (string) $lot->erreur);
+    }
+
+    /**
+     * LE PLUS GROS GESTE QUE L'ECRAN SACHE PRODUIRE DOIT PASSER.
+     *
+     * CONSTAT M3 DE LA REVUE DU 25 SEPTEMBRE 2026, et il vise la correction
+     * elle-meme : `MAX_LIGNES` valait 2000, pose le matin en calculant « un
+     * mois entier coche, 31 jours x 4 repas x 15 aliments = 1 860 ». Le meme
+     * mois a DIX-SEPT aliments par repas fait 2 108 lignes pour une quarantaine
+     * d'aliments distincts — refuse en 422, et `onError: () => {}` n'affiche
+     * rien : toutes les habitudes de ce geste perdues sans un mot. C'est
+     * exactement le defaut que CA-R4 corrigeait, reintroduit par sa propre
+     * correction.
+     *
+     * Le pire cas concevable est 31 jours x 4 repas x la taille du frigo. Le
+     * seul chiffre mesure du depot sur un vrai plan est « soixante aliments »
+     * (`usePlanCalcule.ts:34`), soit 7 440 lignes. Ce test fige ce plafond-la.
+     */
+    public function testLePireGesteConcevableDeLEcranPasse(): void
+    {
+        $enorme = [];
+        for ($jour = 0; $jour < 31; ++$jour) {
+            for ($repas = 0; $repas < 4; ++$repas) {
+                for ($a = 0; $a < 60; ++$a) {
+                    $enorme[] = ['aliment' => 'aliment ' . $a, 'mode' => 1];
+                }
+            }
+        }
+
+        self::assertCount(7440, $enorme, 'le pire plan que le calendrier laisse composer');
+
+        $lot = LotDHabitudes::depuis($enorme, self::MODES);
+
+        self::assertTrue($lot->estValide(), (string) $lot->erreur);
+        self::assertCount(60, $lot->aEcrire, 'soixante aliments distincts, pas 7 440 lignes');
+    }
+
+    /**
+     * UN NOM D'ALIMENT NUMERIQUE RESTE UNE CHAINE.
+     *
+     * Constat F6 de la revue. PHP transforme la cle '12' d'un tableau en
+     * entier 12 tout seul ; le depot repasse un `(string)` dessus avant
+     * d'ecrire, et rien ne le tenait. Un aliment nomme « 12 » — ca existe,
+     * c'est un numero de recette — partirait en base sous une cle d'un autre
+     * type que celle sous laquelle l'ecran le relira.
+     */
+    public function testUnNomDAlimentNumeriqueResteUneChaine(): void
+    {
+        $lot = LotDHabitudes::depuis([['aliment' => '12', 'mode' => 1]], self::MODES);
+
+        self::assertTrue($lot->estValide());
+        self::assertSame([1], \array_values($lot->aEcrire));
+        self::assertSame(['12'], \array_map('strval', \array_keys($lot->aEcrire)));
     }
 }

@@ -119,6 +119,19 @@ final readonly class CuissonsHabituelles
             return 0;
         }
 
+        /* TOUJOURS LE MEME ORDRE, ET C'EST UN GARDE-FOU CONTRE L'INTERBLOCAGE.
+           `ON CONFLICT DO UPDATE` verrouille la ligne en conflit meme quand sa
+           clause `WHERE` est fausse — meme quand il n'ecrit rien. Depuis que
+           le lot porte une ligne par aliment du plan et part a chaque passage
+           a « Cuisiner », deux envois concurrents du meme compte qui nomment
+           les aliments dans un ordre different s'attendraient l'un l'autre :
+           `40P01`, et un echec que l'ecran tait par decision.
+
+           Trier ne coute rien : apres `LotDHabitudes::depuis`, chaque aliment
+           n'a plus qu'une ligne et l'ordre ne porte plus aucune semantique.
+           Releve en revue le 25 septembre 2026. */
+        \ksort($aEcrire);
+
         $changees = 0;
 
         $this->cnx->transactional(

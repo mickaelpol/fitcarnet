@@ -49,11 +49,30 @@ final class LotDHabitudes
      * Ce plafond est donc POSE, pas deduit :
      *   - plan de la semaine, 7 j x 4 repas x 10 aliments .....   280 lignes
      *   - mois entier coche, 31 j x 4 repas x 15 aliments ..... 1 860 lignes
+     *   - PIRE CAS CONCEVABLE, 31 j x 4 repas x tout le frigo . 7 440 lignes
      *
-     * 2000 laisse passer le plus gros geste que l'ecran sache produire, et
-     * ferme la porte a un corps qui ne vient plus de lui.
+     * IL A VALU 2000 PENDANT UNE DEMI-JOURNEE, ET C'ETAIT FAUX — releve en
+     * revue le 25 septembre 2026, le jour meme. 2000 sortait de la deuxieme
+     * ligne du tableau ci-dessus, « quinze aliments par repas », un chiffre
+     * confortable et rien de plus. A dix-sept, le meme mois fait 2 108 lignes
+     * pour une quarantaine d'aliments distincts : refuse en 422, et comme
+     * l'echec d'ecriture des habitudes est SILENCIEUX par decision (voir
+     * `retenirLesCuissons`), l'utilisateur perdait tout le lot sans un mot.
+     * C'est exactement le defaut que la double borne venait corriger,
+     * reintroduit par sa propre correction.
+     *
+     * La troisieme ligne, elle, n'est pas confortable : c'est le maximum que
+     * le calendrier et le frigo permettent d'atteindre, avec le seul chiffre
+     * mesure du depot sur un vrai plan — « sept jours sur 60 aliments »
+     * (`usePlanCalcule.ts:34`). 10 000 la laisse passer avec de la marge et
+     * ferme la porte a un corps qui ne vient plus de l'ecran.
+     *
+     * CE QU'ELLE PROTEGE, ET CE QU'ELLE NE PROTEGE PAS. Pas la memoire :
+     * `json_decode` a deja tout materialise quand elle s'applique. Elle borne
+     * la BOUCLE qui suit, et elle dit ce qu'est un geste. La taille du corps,
+     * elle, se borne ailleurs — au serveur web.
      */
-    public const MAX_LIGNES = 2000;
+    public const MAX_LIGNES = 10000;
 
     /** Au-dela, ce n'est plus un nom d'aliment. */
     public const NOM_MAX = 200;
