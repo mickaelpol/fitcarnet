@@ -183,7 +183,7 @@ class Aliment implements ProprieteUtilisateur
     #[Assert\PositiveOrZero]
     private ?string $lip100 = null;
 
-    private const MACRO_ABSENTE = 'Valeur manquante : écris 0 si l’aliment n’en contient pas.';
+    public const MACRO_ABSENTE = 'Valeur manquante : écris 0 si l’aliment n’en contient pas.';
 
     /**
      * Fibres pour 100 g, facultatif. Convention europeenne : comptees 2 kcal/g

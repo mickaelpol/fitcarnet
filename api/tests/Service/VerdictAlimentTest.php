@@ -26,9 +26,31 @@ use PHPUnit\Framework\TestCase;
  * IL LIT AUSSI LES NOMBRES TAPES. « 12,5 » est un nombre, « 4,2,1 » n'en est
  * pas un — et c'etait encore une regle du front (`saisieNombre.ts`). La virgule
  * francaise, les espaces, l'illisible : tout cela se decide ici.
+ *
+ * MIS A JOUR LE 26 SEPTEMBRE 2026, feature `macros-editeur-vide-pas-zero`.
+ * Trois changements de contrat :
+ *  - une macro obligatoire VIDE (kcal100, prot100, gluc100, lip100) est
+ *    desormais REFUSEE, avec le meme message que l'entite rendrait en 422
+ *    (`Aliment::MACRO_ABSENTE`) — jusqu'ici on se taisait, et l'ecran
+ *    promettait un bouton que le serveur refusait ensuite ;
+ *  - les pesees (`peseeAvant`, `peseeApres`) sont lues ici : quand les deux
+ *    sont presentes et lisibles, le rendement EFFECTIF vient d'elles, et le
+ *    `ratio` envoye est ignore pour juger le sens de la cuisson ;
+ *  - `ratioCandidat` en entree et `candidat` en sortie disparaissent : le
+ *    bouton « utiliser ce resultat » de l'ecran se juge desormais avec
+ *    `rendement`, la meme reponse que le reste de la fiche.
  */
 final class VerdictAlimentTest extends TestCase
 {
+    /**
+     * COPIE LITTERALE de `Aliment::MACRO_ABSENTE`, qui est `private` : y
+     * referer directement declencherait une erreur fatale d'acces, laquelle
+     * masquerait le vrai defaut que ces tests portent. Voir le rapport de la
+     * fiche : il faudra sans doute rendre cette constante publique pour que
+     * `VerdictAliment` puisse la reutiliser sans dupliquer le texte.
+     */
+    private const MACRO_ABSENTE = 'Valeur manquante : écris 0 si l’aliment n’en contient pas.';
+
     public function testLeRizSecEstCoherentEtEnregistrable(): void
     {
         $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
@@ -63,10 +85,16 @@ final class VerdictAlimentTest extends TestCase
     public function testLeChampFautifEstNOMME(): void
     {
         /* L'ecran doit pouvoir souligner. Sans le champ, il ne peut
-           qu'afficher une phrase quelque part. */
+           qu'afficher une phrase quelque part.
+
+           ASSOUPLI LE 26 SEPTEMBRE 2026 : ce test verifiait `refus[0]`, une
+           position. Depuis que les macros vides (ici prot100, gluc100,
+           lip100, absentes) portent leur propre refus, l'ordre entre ce
+           refus-la et celui du grain sec n'est pas un contrat — seul compte
+           que kcal100 soit NOMME quelque part. */
         $v = self::rendu(['kcal100' => '130', 'categorie' => 'fec', 'ratio' => '2.26']);
 
-        self::assertSame('kcal100', $v['refus'][0]['champ']);
+        self::assertContains('kcal100', \array_column($v['refus'], 'champ'));
     }
 
     public function testUnEcartDeCaloriesAVERTIT_SANS_REFUSER(): void
@@ -180,12 +208,21 @@ final class VerdictAlimentTest extends TestCase
 
     public function testUN_CHAMP_VIDE_N_EST_PAS_UN_ZERO(): void
     {
-        /* Regle 6. Un aliment en cours de saisie n'est pas enregistrable, mais
-           il n'est pas FAUX non plus : on ne lui reproche rien. */
+        /* REECRIT LE 26 SEPTEMBRE 2026 (feature `macros-editeur-vide-pas-zero`) :
+           ce test disait jusqu'ici `refus === []`, et ce n'est plus vrai. Une
+           macro obligatoire vide n'est plus une absence muette : le serveur la
+           refuse desormais EXPLICITEMENT, avec le meme conseil que l'entite
+           rendrait en 422 — sans quoi l'ecran allumait un bouton que le
+           serveur aurait ensuite refuse (le meme jumeau oublie que la
+           categorie inconnue, plus haut). Garder l'ancienne assertion aurait
+           fige la mauvaise regle : la fiche la contredit a la lettre. */
         $v = self::rendu(['categorie' => 'fec', 'ratio' => '1']);
 
         self::assertFalse($v['enregistrable']);
-        self::assertSame([], $v['refus'], 'une absence n\'est pas une erreur');
+        self::assertCount(4, $v['refus'], 'les quatre macros obligatoires sont vides');
+        foreach (['kcal100', 'prot100', 'gluc100', 'lip100'] as $champ) {
+            self::assertContains(['champ' => $champ, 'message' => self::MACRO_ABSENTE], $v['refus']);
+        }
     }
 
     public function testON_NE_COMPARE_PAS_A_DES_MACROS_PAS_ENCORE_SAISIES(): void
@@ -360,6 +397,182 @@ final class VerdictAlimentTest extends TestCase
         self::assertTrue(VerdictAliment::pour($corrige)['enregistrable']);
     }
 
+    // ------------------------------------------- macros obligatoires vides
+
+    public function testMacroObligatoireVideEstRefuseeSurSonChamp(): void
+    {
+        // CA-1
+        $v = self::rendu(['kcal100' => '350', 'prot100' => '', 'gluc100' => '78',
+            'lip100' => '0,6', 'categorie' => 'fec', 'ratio' => '2,26']);
+
+        self::assertSame([['champ' => 'prot100', 'message' => self::MACRO_ABSENTE]], $v['refus']);
+        self::assertFalse($v['enregistrable']);
+    }
+
+    public function testLE_TEMOIN_UNE_PROTEINE_SAISIE_NE_SE_FAIT_PAS_REPROCHER(): void
+    {
+        // CA-1 (témoin)
+        $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
+            'lip100' => '0,6', 'categorie' => 'fec', 'ratio' => '2,26']);
+
+        self::assertNotContains('prot100', \array_column($v['refus'], 'champ'));
+    }
+
+    public function testProt100NullDonneLeMemeRefusQueVide(): void
+    {
+        // CA-R2
+        $avecVide = self::rendu(['kcal100' => '350', 'prot100' => '', 'gluc100' => '78',
+            'lip100' => '0,6', 'categorie' => 'fec', 'ratio' => '2,26']);
+        $avecNull = self::rendu(['kcal100' => '350', 'prot100' => null, 'gluc100' => '78',
+            'lip100' => '0,6', 'categorie' => 'fec', 'ratio' => '2,26']);
+
+        self::assertSame($avecVide['refus'], $avecNull['refus']);
+        self::assertSame([['champ' => 'prot100', 'message' => self::MACRO_ABSENTE]], $avecNull['refus']);
+    }
+
+    public function testUnNombreAVirgulesMultiplesEstRefuseAvecSonMessage(): void
+    {
+        // CA-4
+        $v = self::rendu(['prot100' => '4,2,1', 'categorie' => 'fec', 'ratio' => '1']);
+
+        self::assertContains(
+            ['champ' => 'prot100', 'message' => '« 4,2,1 » n\'est pas un nombre lisible.'],
+            $v['refus']);
+    }
+
+    public function testLE_TEMOIN_UN_NOMBRE_A_UNE_SEULE_VIRGULE_EST_LISIBLE(): void
+    {
+        // CA-4 (témoin)
+        $v = self::rendu(['kcal100' => '350', 'prot100' => '4,2', 'gluc100' => '78',
+            'lip100' => '0,6', 'categorie' => 'fec', 'ratio' => '2,26']);
+
+        self::assertNotContains('prot100', \array_column($v['refus'], 'champ'));
+    }
+
+    // ------------------------------------------------------------ rendement
+
+    public function testLeRendementSeCalculeDepuisLesDeuxPesees(): void
+    {
+        // CA-7
+        $v = self::rendu(['peseeAvant' => '100', 'peseeApres' => '230',
+            'ratio' => '1', 'categorie' => 'fec']);
+
+        self::assertArrayHasKey('rendement', $v);
+        self::assertEqualsWithDelta(2.3, $v['rendement']['valeur'], 0.001);
+        self::assertSame('100 g avant cuisson donnent 230 g une fois cuits.',
+            $v['rendement']['explication']);
+        self::assertSame('mesuré : 100 g avant cuisson → 230 g après',
+            $v['rendement']['provenance']);
+    }
+
+    public function testLE_TEMOIN_SANS_PESEES_LE_RENDEMENT_VIENT_DU_RATIO_SAISI(): void
+    {
+        // CA-7 (témoin)
+        $v = self::rendu(['ratio' => '2,26', 'categorie' => 'fec']);
+
+        self::assertArrayHasKey('rendement', $v);
+        self::assertEqualsWithDelta(2.26, $v['rendement']['valeur'], 0.001);
+        self::assertNull($v['rendement']['provenance']);
+    }
+
+    public function testUnePeseeSeuleEstRefuseeSurLAutre(): void
+    {
+        // CA-7
+        $avecAvantSeul = self::rendu(['peseeAvant' => '100', 'categorie' => 'fec', 'ratio' => '1']);
+        self::assertContains(
+            ['champ' => 'peseeApres', 'message' => 'Il manque la pesée après cuisson.'],
+            $avecAvantSeul['refus']);
+
+        $avecApresSeul = self::rendu(['peseeApres' => '230', 'categorie' => 'fec', 'ratio' => '1']);
+        self::assertContains(
+            ['champ' => 'peseeAvant', 'message' => 'Il manque la pesée avant cuisson.'],
+            $avecApresSeul['refus']);
+    }
+
+    public function testUnePeseeIllisibleEstRefuseeSurSonChamp(): void
+    {
+        // CA-7
+        $v = self::rendu(['peseeAvant' => 'abc', 'peseeApres' => '230',
+            'categorie' => 'fec', 'ratio' => '1']);
+
+        self::assertContains('peseeAvant', \array_column($v['refus'], 'champ'));
+    }
+
+    public function testUnePeseeNulleOuNegativeEstRefuseeSurSonChamp(): void
+    {
+        // CA-7
+        $nulle = self::rendu(['peseeAvant' => '0', 'peseeApres' => '230',
+            'categorie' => 'fec', 'ratio' => '1']);
+        self::assertContains('peseeAvant', \array_column($nulle['refus'], 'champ'));
+
+        $negative = self::rendu(['peseeAvant' => '-5', 'peseeApres' => '230',
+            'categorie' => 'fec', 'ratio' => '1']);
+        self::assertContains('peseeAvant', \array_column($negative['refus'], 'champ'));
+    }
+
+    public function testDesPeseesInverseesSurUnFeculentSontRefusees(): void
+    {
+        // CA-7
+        $v = self::rendu(['peseeAvant' => '230', 'peseeApres' => '100',
+            'categorie' => 'fec', 'ratio' => '1']);
+
+        self::assertContains('ratio', \array_column($v['refus'], 'champ'));
+    }
+
+    public function testLeRatioSaisiEstIgnoreQuandDesPeseesSontPresentes(): void
+    {
+        // CA-7
+        $v = self::rendu(['peseeAvant' => '100', 'peseeApres' => '230',
+            'ratio' => '0,5', 'categorie' => 'fec']);
+
+        self::assertNotContains('ratio', \array_column($v['refus'], 'champ'),
+            'le ratio effectif (2,3, mesure) doit etre juge, pas le 0,5 saisi');
+    }
+
+    public function testLE_TEMOIN_SANS_PESEES_LE_RATIO_SAISI_EST_BIEN_JUGE(): void
+    {
+        // CA-7 (témoin)
+        $v = self::rendu(['ratio' => '0,5', 'categorie' => 'fec']);
+
+        self::assertContains('ratio', \array_column($v['refus'], 'champ'));
+    }
+
+    // --------------------------------------------------------------- quantite
+
+    public function testUneQuantiteIllisibleEstRefusee(): void
+    {
+        $v = self::rendu(['categorie' => 'fec', 'ratio' => '1', 'quantite' => 'abc']);
+
+        self::assertContains('quantite', \array_column($v['refus'], 'champ'));
+    }
+
+    public function testLE_TEMOIN_UNE_QUANTITE_VIDE_N_EST_PAS_REFUSEE(): void
+    {
+        $v = self::rendu(['categorie' => 'fec', 'ratio' => '1', 'quantite' => '']);
+
+        self::assertNotContains('quantite', \array_column($v['refus'], 'champ'));
+    }
+
+    public function testUneQuantiteNegativeEstRefusee(): void
+    {
+        $v = self::rendu(['categorie' => 'fec', 'ratio' => '1', 'quantite' => '-3']);
+
+        self::assertContains('quantite', \array_column($v['refus'], 'champ'));
+    }
+
+    // -------------------------------------------------- disparition du candidat
+
+    public function testLaCleCandidatNExistePlusEnSortie(): void
+    {
+        /* `ratioCandidat` en entree et `candidat` en sortie sont retires :
+           le bouton « utiliser ce resultat » de l'ecran se juge desormais
+           avec `rendement`, la meme reponse que le reste de la fiche. */
+        $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
+            'lip100' => '0,6', 'categorie' => 'fec', 'ratio' => '2,26']);
+
+        self::assertFalse(\array_key_exists('candidat', $v));
+    }
+
     // ----------------------------------------------------------------- outils
 
     /**
@@ -369,7 +582,8 @@ final class VerdictAlimentTest extends TestCase
      *               avertissements: list<array{champ: string, message: string}>,
      *               resume: string, verdict: string, enregistrable: bool,
      *               conversion: array{saisi: float, converti: float, motif: string}|null,
-     *               candidat: array{acceptable: bool, motif: string|null}|null}
+     *               rendement: array{valeur: float|null, explication: string|null,
+     *                                provenance: string|null}}
      */
     private static function rendu(array $saisie): array
     {

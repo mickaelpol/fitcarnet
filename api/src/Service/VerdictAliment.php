@@ -54,7 +54,7 @@ final class VerdictAliment
      *               avertissements: list<array{champ: string, message: string}>,
      *               resume: string, verdict: string, enregistrable: bool,
      *               conversion: array{saisi: float, converti: float, motif: string}|null,
-     *               candidat: array{acceptable: bool, motif: string|null}|null}
+     *               rendement: array{valeur: float|null, explication: string|null, provenance: string|null}}
      */
     public static function pour(array $saisie): array
     {
@@ -79,21 +79,24 @@ final class VerdictAliment
         }
 
         $lus = [];
-        foreach (['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100', 'ratio'] as $champ) {
+        foreach (['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100', 'ratio',
+            'peseeAvant', 'peseeApres', 'quantite'] as $champ) {
             $brut = $saisie[$champ] ?? null;
-            $texte = null === $brut ? '' : \trim((string) $brut);
 
-            if ('' === $texte) {
+            if (NombreSaisi::estVide($brut)) {
                 $lus[$champ] = null;
                 continue;
             }
 
-            $valeur = self::nombreSaisi($texte);
+            /* LE LECTEUR EST CELUI DE L'ECRITURE, et c'est tout l'objet du
+               26 septembre 2026 : `NombreSaisi` lit aussi `POST /api/aliments`
+               et `POST /api/mon-frigo/stock`. Un texte ou un nombre JSON. */
+            $valeur = NombreSaisi::lire($brut);
             if (null === $valeur) {
                 /* ON NOMME LE CHAMP ET ON S'ARRETE LA POUR LUI. Juger une
                    valeur qu'on n'a pas su lire reviendrait a inventer. */
                 $refus[] = ['champ' => $champ, 'message' => \sprintf(
-                    '« %s » n\'est pas un nombre lisible.', $texte)];
+                    '« %s » n\'est pas un nombre lisible.', \is_scalar($brut) ? \trim((string) $brut) : '?')];
                 $lus[$champ] = null;
                 continue;
             }
@@ -110,6 +113,48 @@ final class VerdictAliment
             $lus[$champ] = $valeur;
         }
 
+        /* JUSQU'ICI, SEULS L'ILLISIBLE ET LE NEGATIF. La coherence plus bas se
+           juge des que les calories sont lues et que rien n'est illisible :
+           une macro MANQUANTE n'empeche pas de dire « un grain sec en fait au
+           moins 300 » (demande du 20 septembre 2026). */
+        $illisible = [] !== $refus;
+
+        /* UNE MACRO OBLIGATOIRE VIDE SE REFUSE SUR SON CHAMP — 26 septembre
+           2026. Elle etait une absence muette : l'ecran redigeait lui-meme
+           « Renseigne les quatre valeurs », et l'entite refusait avec SON
+           message (`Aliment::MACRO_ABSENTE`). Un seul juge desormais, et une
+           seule phrase : celle de l'entite. Vide n'est jamais zero (regle 6). */
+        foreach (['kcal100', 'prot100', 'gluc100', 'lip100'] as $champ) {
+            if (NombreSaisi::estVide($saisie[$champ] ?? null)) {
+                $refus[] = ['champ' => $champ, 'message' => Aliment::MACRO_ABSENTE];
+            }
+        }
+        if (0.0 === ($lus['kcal100'] ?? null)) {
+            $refus[] = ['champ' => 'kcal100', 'message' =>
+                'Un aliment à 0 kcal disparaîtrait du calcul des repas : recopie les calories de l’emballage.'];
+        }
+        if ('' === $categorie) {
+            $refus[] = ['champ' => 'categorie', 'message' => 'Choisis une catégorie.'];
+        }
+
+        /* LES PESEES : le serveur calcule le rendement, l'ecran ne l'envoie
+           plus (CA-7, CA-11). Deux pesees lues font le ratio, et le `ratio`
+           envoye a cote est ignore — il ne peut pas contredire la mesure. */
+        foreach (['peseeAvant' => 'peseeApres', 'peseeApres' => 'peseeAvant'] as $champ => $autre) {
+            if (null !== ($lus[$champ] ?? null) && $lus[$champ] <= 0.0) {
+                $refus[] = ['champ' => $champ, 'message' => 'Une pesée vaut plus de 0 g.'];
+                $lus[$champ] = null;
+            }
+            if (!NombreSaisi::estVide($saisie[$champ] ?? null) && NombreSaisi::estVide($saisie[$autre] ?? null)) {
+                $refus[] = ['champ' => $autre, 'message' => 'peseeAvant' === $autre
+                    ? 'Il manque la pesée avant cuisson.' : 'Il manque la pesée après cuisson.'];
+            }
+        }
+        $mesure = RendementExplique::depuisPesees($lus['peseeAvant'] ?? null, $lus['peseeApres'] ?? null);
+        if (null !== $mesure) {
+            $lus['ratio'] = $mesure;
+        }
+
         $ratio = $lus['ratio'] ?? 1.0;
 
         /* LES REFUS DE COHERENCE, AVEC CE QU'ON A. Les calories, la categorie
@@ -119,7 +164,7 @@ final class VerdictAliment
            aucune autre regle ne peut se declencher a tort la-dessus — la
            matiere vaut alors 0 g et l'Atwater 0, sous le plancher du soupcon
            de kilojoules. */
-        if (null !== ($lus['kcal100'] ?? null) && [] === $refus) {
+        if (null !== ($lus['kcal100'] ?? null) && !$illisible) {
             /* LES PHRASES VIENNENT D'`AnomaliesAliment`, ET C'EST TOUT
                L'INTERET — corrige le 20 septembre 2026, apres que
                `revue-fitcarnet` a mesure la regression.
@@ -211,12 +256,18 @@ final class VerdictAliment
                la decide plus. */
             'verdict' => $controle['verdict'],
             'conversion' => self::conversionProposee($lus),
-            /* LE RENDEMENT QU'ON VIENT DE MESURER, juge a part. L'ecran propose
-               « utiliser ce resultat » apres deux pesees : c'est un CANDIDAT,
-               pas la valeur en cours, et il fallait donc une reponse distincte.
-               Sans elle, l'ecran aurait garde un juge local pour ce seul
-               bouton — et la duplication serait revenue par la fenetre. */
-            'candidat' => self::jugerLeCandidat($saisie, $categorie),
+            /* LE RENDEMENT, CALCULE ET DIT PAR LE SERVEUR — 26 septembre 2026.
+               L'ecran affichait `expliquerRatio` et `provenanceRatio`, qu'il
+               calculait lui-meme depuis des pesees qu'il lisait lui-meme. Il
+               affiche desormais ceci, et « inconnu » s'il n'a pas de reponse.
+               Le « candidat » juge a part a disparu avec : la pesee tapee EST
+               la saisie. */
+            'rendement' => [
+                'valeur' => $lus['ratio'] ?? null,
+                'explication' => null === ($lus['ratio'] ?? null) ? null : RendementExplique::explication($lus['ratio']),
+                'provenance' => null === $mesure ? null
+                    : RendementExplique::provenance($lus['peseeAvant'], $lus['peseeApres']),
+            ],
             /* `incoherent` EMPECHE D'ENREGISTRER, comme avant la refonte.
                L'ancien `valide` de l'ecran portait `controle.verdict !==
                'incoherent'` ; je l'avais laisse tomber, et un aliment a 100 kcal
@@ -273,11 +324,7 @@ final class VerdictAliment
         }
 
         $lu = static function (string $champ) use ($origine): ?float {
-            $brut = $origine[$champ] ?? null;
-
-            return null === $brut || '' === \trim((string) $brut)
-                ? null
-                : self::nombreSaisi(\trim((string) $brut));
+            return NombreSaisi::lire($origine[$champ] ?? null);
         };
 
         $kcal = $lu('kcal100');
@@ -295,35 +342,6 @@ final class VerdictAliment
             $lu('fibres100'),
             $lu('ratio') ?? 1.0,
         );
-    }
-
-    /**
-     * Le rendement mesure a l'instant est-il acceptable ?
-     *
-     * `null` quand il n'y a pas de candidat — aucune pesee en cours. L'ecran
-     * propose « utiliser ce resultat » apres deux pesees : c'est un CANDIDAT,
-     * pas la valeur en cours, et il fallait donc une reponse distincte. Sans
-     * elle, l'ecran aurait garde un juge local pour ce seul bouton.
-     *
-     * @param array<string, mixed> $saisie
-     *
-     * @return array{acceptable: bool, motif: string|null}|null
-     */
-    private static function jugerLeCandidat(array $saisie, string $categorie): ?array
-    {
-        $brut = $saisie['ratioCandidat'] ?? null;
-        if (null === $brut || '' === \trim((string) $brut) || '' === $categorie) {
-            return null;
-        }
-
-        $valeur = self::nombreSaisi(\trim((string) $brut));
-        if (null === $valeur) {
-            return ['acceptable' => false, 'motif' => 'Ce rendement n\'est pas un nombre lisible.'];
-        }
-
-        $motif = RendementPlausible::sens($categorie, $valeur);
-
-        return ['acceptable' => null === $motif, 'motif' => $motif];
     }
 
     /**
@@ -372,29 +390,11 @@ final class VerdictAliment
             : null;
     }
 
-    /**
-     * Lire un nombre TEL QU'IL A ETE TAPE, signe compris.
-     *
-     * LA VIRGULE FRANCAISE EST UN SEPARATEUR DECIMAL, et « 4,2,1 » n'est pas
-     * un nombre. `parseFloat` le lisait 4,2 sans broncher, et une pesee qui
-     * n'existe pas partait en base — releve le 15 septembre 2026. Un espace
-     * ne fait pas un millier non plus : on ne devine pas.
-     *
-     * ELLE REND LES NEGATIFS, et c'est voulu : « -2 » EST un nombre lisible.
-     * Cette methode refusait le signe en rendant `null`, si bien que l'ecran
-     * annoncait « n'est pas un nombre lisible » pour une saisie parfaitement
-     * lisible — et l'utilisateur cherchait une faute de frappe inexistante.
-     * Lire et juger sont deux gestes : `refusDuSigne()` fait le second.
-     * Corrige le 21 septembre 2026.
-     */
-    private static function nombreSaisi(string $texte): ?float
-    {
-        $normalise = \str_replace(',', '.', $texte);
-
-        return 1 === \preg_match('/^-?\d+(\.\d+)?$/', $normalise)
-            ? (float) $normalise
-            : null;
-    }
+    /* `nombreSaisi()` VIVAIT ICI, en methode privee. Il est devenu
+       `NombreSaisi::lire` le 26 septembre 2026, pour que l'ECRITURE lise comme
+       l'ecran : `(float) "12,5"` y valait 12. Ses deux lecons restent vraies
+       et sont ecrites la-bas — « 4,2,1 » n'est pas un nombre (15 septembre),
+       « -2 » est lisible et le signe se juge a part (21 septembre). */
 
     /**
      * Le refus qu'appelle un nombre negatif, ou `null` s'il n'y a rien a dire.

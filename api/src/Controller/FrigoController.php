@@ -16,6 +16,7 @@ use App\Service\RendementPlausible;
 use App\Service\FrigoBase;
 use App\Service\FrigoGrocy;
 use App\Service\InventaireLots;
+use App\Service\NombreSaisi;
 use App\Service\StockPromis;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -231,10 +232,23 @@ final class FrigoController extends AbstractController
 
         $donnees = (array) \json_decode($requete->getContent(), true);
         $idAliment = (int) ($donnees['alimentId'] ?? 0);
-        $quantite = (float) ($donnees['quantite'] ?? 0);
+        /* LA QUANTITE PART TELLE QUE TAPEE depuis le 26 septembre 2026, et
+           c'est le serveur qui la lit (CA-14) : `(float) "12,5"` y valait 12.
+           Vide ou absente : zero, et l'ecran le dit — « l'aliment sera cree a
+           zero et se remplira au prochain inventaire ». Illisible : refus, sur
+           son champ, plutot qu'un stock invente. */
+        $quantite = NombreSaisi::estVide($donnees['quantite'] ?? null)
+            ? 0.0 : NombreSaisi::lire($donnees['quantite']);
 
         if ($idAliment <= 0) {
             return $this->json(['erreur' => 'Aliment non précisé.'], 422);
+        }
+        if (null === $quantite) {
+            $message = \sprintf('« %s » n\'est pas une quantité lisible.',
+                \is_scalar($donnees['quantite']) ? (string) $donnees['quantite'] : '?');
+
+            return $this->json(['erreur' => $message,
+                'refus' => [['champ' => 'quantite', 'message' => $message]]], 422);
         }
         if ($quantite < 0) {
             return $this->json(['erreur' => 'Une quantité ne peut pas être négative.'], 422);
@@ -291,13 +305,16 @@ final class FrigoController extends AbstractController
 
         // Les calories fondent tout le calcul : un zero ferait disparaitre
         // l'aliment du solveur sans que rien ne le signale.
-        $kcal100 = (float) ($donnees['kcal100'] ?? 0);
-        if ($kcal100 <= 0) {
+        /* `NombreSaisi` ET NON `(float)` — 26 septembre 2026. L'editeur envoie
+           desormais les textes tels que tapes, et `(float) "350,5"` vaut 350
+           sans un mot (regle 7). Meme lecteur que `/api/aliments`. */
+        $kcal100 = NombreSaisi::lire($donnees['kcal100'] ?? null);
+        if (null === $kcal100 || $kcal100 <= 0) {
             return $this->json(['erreur' => 'Les calories sont obligatoires.'], 422);
         }
 
-        $ratio = (float) ($donnees['ratio'] ?? 1);
-        if ($ratio <= 0) {
+        $ratio = NombreSaisi::estVide($donnees['ratio'] ?? null) ? 1.0 : NombreSaisi::lire($donnees['ratio']);
+        if (null === $ratio || $ratio <= 0) {
             return $this->json(['erreur' => 'Le ratio doit être positif.'], 422);
         }
 
@@ -307,13 +324,13 @@ final class FrigoController extends AbstractController
            `Aliment` (NotNull). Voir `ValeursGrocyObligatoiresTest`. */
         $macros = [];
         foreach (['prot100', 'gluc100', 'lip100'] as $cle) {
-            $valeur = $donnees[$cle] ?? null;
-            if (!\is_numeric($valeur) || (float) $valeur < 0) {
+            $valeur = NombreSaisi::lire($donnees[$cle] ?? null);
+            if (null === $valeur || $valeur < 0) {
                 return $this->json([
                     'erreur' => 'Protéines, glucides et lipides sont obligatoires : écris 0 si l’aliment n’en contient pas.',
                 ], 422);
             }
-            $macros[$cle] = (float) $valeur;
+            $macros[$cle] = $valeur;
         }
 
         /* LA MEME COHERENCE QUE SUR L'ENTITE — pose le 20 septembre 2026,
@@ -451,7 +468,10 @@ final class FrigoController extends AbstractController
 
         $donnees = (array) \json_decode($requete->getContent(), true);
         $reference = (string) ($donnees['reference'] ?? '');
-        $quantite = (float) ($donnees['quantite'] ?? -1);
+        /* Vide : zero, comme a la creation cote base — l'ecran le dit (« l'aliment
+           sera cree a zero »). Illisible : -1, donc refuse plus bas. */
+        $quantite = NombreSaisi::estVide($donnees['quantite'] ?? null)
+            ? 0.0 : (NombreSaisi::lire($donnees['quantite']) ?? -1.0);
 
         if (!\str_starts_with($reference, 'grocy:')) {
             return $this->json(['erreur' => 'Référence inattendue : ' . $reference], 422);
@@ -596,7 +616,7 @@ final class FrigoController extends AbstractController
 
     private static function nombreOuNull(mixed $valeur): ?float
     {
-        return null === $valeur || '' === $valeur ? null : (float) $valeur;
+        return NombreSaisi::lire($valeur);
     }
 
     private function utilisateur(): Utilisateur
