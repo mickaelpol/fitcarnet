@@ -33,7 +33,7 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 741 tests, puis 46 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 741 tests, puis 57 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
@@ -60,7 +60,7 @@ rm -rf "$DEPOT/api/front" && cp -r "$DEPOT/front/dist" "$DEPOT/api/front"
 # 25 septembre 2026, et elle serait passée au VERT pour la mauvaise raison si personne
 # n'avait comparé les empreintes des deux bundles.
 cd e2e && npm install                  # une seule fois
-cd e2e && npm test                     # ~2 min pour dix-huit épreuves (elles tombent si la machine peine : rejouer le fichier seul)
+cd e2e && npm test                     # ~2 min pour dix-neuf épreuves (elles tombent si la machine peine : rejouer le fichier seul)
 ```
 
 ### Les épreuves de bout en bout — `e2e/`

@@ -178,7 +178,10 @@ quantités décimales, et **laisse deux aliments à zéro**
    dépasse pas 1,05 fois son poids cru. La règle est sur le SERVEUR depuis le
    20 septembre 2026 — `api/src/Service/RendementPlausible.php::sens`, servie
    par `POST /api/verification/aliment` ; l'écran affiche ce qui revient. **Refus** : `nombreSaisi` et non `parseFloat` —
-   « 4,2,1 » ne produit aucun ratio (`editeurAliment.tsx:227-229`).
+   « 4,2,1 » ne produit aucun ratio (`editeurAliment.tsx:303-306`). Les deux
+   champs de pesée sont des `ChampNombre` depuis le 26 septembre 2026 (feature
+   `pesees-editeur-aliment-saisienombre`) : une pesée illisible se borde de
+   rouge, comme les autres champs numériques de l'application.
 
 10. **Un aliment créé appartient à son compte.** Après création, en base :
     `utilisateur_id = <le compte>`, **posé par l'API depuis le jeton** et

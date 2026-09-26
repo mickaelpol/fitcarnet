@@ -10,6 +10,55 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-26 — `pesees-editeur-aliment-saisienombre` : TERMINÉE (session Claude)
+
+- docs-sync : huit écarts corrigés — CLAUDE.md, README.md, e2e/LISEZMOI.md,
+  skills front-fitcarnet et fonctionnalite-frigo (57 tests de rendu, 19
+  épreuves e2e). Signalé non corrigé : plusieurs `editeurAliment.tsx:NNN` de
+  `fonctionnalite-frigo` sont décalés de quelques lignes (comportement juste).
+- Suivante : les macros de l'éditeur lues 0, choisie par le propriétaire.
+
+## 2026-09-26 — `pesees-editeur-aliment-saisienombre` : vérification validée (session Claude)
+
+- 8/8 PASS sur l'application réelle, filmé ; validé par le propriétaire.
+  Rapport : `docs/verifications/pesees-editeur-aliment-saisienombre/2026-09-26/rapport.md`.
+- Dette notée : un `Bouton` désactivé reste un `<div>` cliquable pour le
+  navigateur. Phase docs.
+
+## 2026-09-26 — `pesees-editeur-aliment-saisienombre` : e2e verte (session Claude)
+
+- `e2e/epreuves/peseesEditeur.spec.ts` : aliment garni par l'API à 42,5 / 96,
+  relu par l'API avant l'écran (témoin), l'éditeur affiche « 42,5 » et « 96 ».
+  Suite e2e 19/19, ménage vérifié (0 compte `@e2e.local`). `front/dist`
+  reconstruit et recopié dans `api/front`. Phase verify.
+
+## 2026-09-26 — `pesees-editeur-aliment-saisienombre` : revue OK (session Claude)
+
+- `revue-fitcarnet`, verdict OK, trois points faibles : deux commentaires au
+  présent sur du code disparu (corrigés), une saisie illisible perdue à la
+  bascule de la mesure (dette notée). Phase e2e.
+
+## 2026-09-26 — `pesees-editeur-aliment-saisienombre` : tdd close (session Claude)
+
+- 7/8 critères implémentés (CA-6 est l'épreuve e2e, phase suivante), suite verte :
+  741 tests front + 57 de rendu. Les pesées sont des `ChampNombre` à état
+  `number | null`, relues à la virgule, bordées de rouge si illisibles.
+- La bordure rouge se constate dans jsdom : react-native-web injecte ses styles
+  atomiques, `getComputedStyle(cadre).borderColor` rend `C.erreur`.
+
+## 2026-09-26 — `pesees-editeur-aliment-saisienombre` : brainstorm clos, spec écrite (session Claude)
+
+- Constat de départ : l'ENREGISTREMENT des pesées passait déjà par `nombreSaisi`
+  (20/09). Restent la relecture au point (`String(…)`) et deux `Champ` tenus à la
+  main. Spec : 6 critères + 2 refus, dont une épreuve e2e voulue par le propriétaire.
+- Spec validée par le propriétaire : phase `tdd`.
+- Deux dettes datées ajoutées (macros lues 0, pesée arrondie par `NUMERIC(7,1)`).
+- **Correction d'une affirmation fausse** : la dette `ChoixDansListe` et l'entrée
+  du 25/09 ci-dessous disent qu'il bloque « l'ajout MANUEL d'un aliment ». Faux :
+  le frigo ne l'utilise pas. Il sert au choix d'un exercice et à l'affectation
+  d'un aliment à un repas. Relevé par le propriétaire ; la dette est corrigée,
+  l'entrée du 25/09 est laissée telle quelle (journal append-only).
+
 ## 2026-09-25 (nuit) — B4 TERMINÉE : phase `done`, cycle complet (session Claude)
 
 - **Le cycle est allé jusqu'au bout** : spec → tdd → review → e2e → verify → docs.

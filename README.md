@@ -80,7 +80,7 @@ cd front && npm install
 ## Commandes
 
 ```bash
-cd front && npm test        # tsc --noEmit + 741 tests, puis 46 de rendu
+cd front && npm test        # tsc --noEmit + 741 tests, puis 57 de rendu
 cd front && npm run verif   # typage seul, plus rapide
 cd front && npm run build:web   # régénère front/dist/ (versionné, servi par Caddy)
 

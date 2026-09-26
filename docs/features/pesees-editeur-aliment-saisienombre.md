@@ -1,7 +1,7 @@
 ---
 titre: Les pesées de l'éditeur d'aliment passent par saisieNombre
 slug: pesees-editeur-aliment-saisienombre
-phase: docs
+phase: done
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -99,6 +99,9 @@ CA-1 à CA-5, CA-R1 et CA-R2 sont prouvés par des tests de rendu qui tapent pou
 de vrai (`editeurAliment.test-rendu.tsx`). L'épreuve e2e exige `front/dist`
 reconstruit **et** recopié dans `api/front` (voir `CLAUDE.md`, section e2e).
 
+Verdict détaillé des 8 critères, captures et vidéos :
+`docs/verifications/pesees-editeur-aliment-saisienombre/2026-09-26/rapport.md`.
+
 ## Journal
 - 2026-09-26 — spec créée depuis le brainstorm
 - 2026-09-26 — spec validée par le propriétaire, phase tdd
@@ -106,3 +109,4 @@ reconstruit **et** recopié dans `api/front` (voir `CLAUDE.md`, section e2e).
 - 2026-09-26 — revue `revue-fitcarnet` : OK, deux commentaires corrigés, une dette notée. Phase e2e.
 - 2026-09-26 — e2e : `e2e/epreuves/peseesEditeur.spec.ts`, CA-6 vert, suite 19/19, aucun compte `@e2e.local` restant. Phase verify.
 - 2026-09-26 — verify : 8/8 PASS, validé par le propriétaire après visionnage. Rapport `docs/verifications/pesees-editeur-aliment-saisienombre/2026-09-26/rapport.md`. Phase docs.
+- 2026-09-26 — docs-sync : huit écarts corrigés (compteurs 57 de rendu / 19 épreuves, une référence de ligne, renvoi au rapport). Aucune skill métier : pas de règle nouvelle, `ChampNombre` et `saisieNombre` font déjà foi. Phase done.
