@@ -10,6 +10,12 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-26 — `macros-editeur-vide-pas-zero` : e2e verte (session Claude)
+
+- `e2e/epreuves/macrosEditeur.spec.ts` : 10 épreuves, dont une de non-régression
+  (créer puis renommer un aliment comme avant la refonte). Suite complète 30/30,
+  aucune épreuve préexistante rouge, 0 compte jetable restant. Phase : verify.
+
 ## 2026-09-26 — `macros-editeur-vide-pas-zero` : revue faite et corrigée (session Claude)
 
 - `revue-fitcarnet` : À CORRIGER, rien de bloquant. Points 2 à 6 corrigés en TDD

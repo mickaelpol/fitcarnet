@@ -1,7 +1,7 @@
 ---
 titre: Les macros de l'éditeur ne lisent plus vide comme zéro
 slug: macros-editeur-vide-pas-zero
-phase: e2e
+phase: verify
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -306,3 +306,4 @@ CA-15 (un 422 affiché sous les champs). CA-R4 et CA-R5 se prouvent par requête
   `NombreSaisi` corrigé (« le seul lecteur » était faux) ; PHPStan revenu à ses
   5 erreurs d'avant. Écartés : les deux constats du seul chemin Grocy —
   **Grocy est abandonné** (`decisions.md`, 26/09/2026).
+- 2026-09-26 — e2e : `e2e/epreuves/macrosEditeur.spec.ts`, 10 épreuves (CA-1 à 4, 7, 12, 15, R6, R7, non-régression création + renommage) ; suite complète 30/30 verte, aucune épreuve préexistante rouge.
