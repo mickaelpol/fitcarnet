@@ -628,8 +628,9 @@ export function EditeurAliment({
                         /* `nombreSaisi` ET NON `parseFloat` — corrigé le
                            20 septembre 2026, palier 1. Ces deux lignes
                            enregistraient les pesées par `parseFloat` sous un
-                           commentaire qui l'interdit 263 lignes plus haut, et
-                           qui explique pourquoi : « 4,2,1 » se lit 4,2.
+                           commentaire qui l'interdisait plus haut (celui de
+                           `ratioMesure`), et qui expliquait pourquoi :
+                           « 4,2,1 » se lit 4,2.
 
                            LE GARDE `ratioMesure !== null` LES FAISAIT
                            COÏNCIDER PAR ACCIDENT, et c'est tout ce qui tenait.
@@ -640,8 +641,9 @@ export function EditeurAliment({
                            clavier numérique d'Android, atteignable au collage
                            sur le web. Relevé par `verite-documentaire`.
 
-                           `?? null` et non `?? 0` : une pesée illisible est
-                           une absence, pas un zéro (règle 6).
+                           Elles s'écrivaient alors `nombreSaisi(…)`, sans
+                           `?? 0` : une pesée illisible est une absence, pas
+                           un zéro (règle 6).
 
                            DEPUIS LE 26 SEPTEMBRE 2026, LA LECTURE N'EST PLUS
                            ICI : `ChampNombre` remonte déjà le nombre, ou

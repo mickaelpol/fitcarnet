@@ -1,7 +1,7 @@
 ---
 titre: Les pesées de l'éditeur d'aliment passent par saisieNombre
 slug: pesees-editeur-aliment-saisienombre
-phase: review
+phase: e2e
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -103,3 +103,4 @@ reconstruit **et** recopié dans `api/front` (voir `CLAUDE.md`, section e2e).
 - 2026-09-26 — spec créée depuis le brainstorm
 - 2026-09-26 — spec validée par le propriétaire, phase tdd
 - 2026-09-26 — tdd : CA-1 à CA-5, CA-R1, CA-R2 verts (11 tests de rendu, dont 3 témoins verts dès avant). CA-6 relève de la phase e2e. Phase review.
+- 2026-09-26 — revue `revue-fitcarnet` : OK, deux commentaires corrigés, une dette notée. Phase e2e.

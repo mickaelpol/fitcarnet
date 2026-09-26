@@ -244,18 +244,18 @@ describe('l\'éditeur AFFICHE ce que le serveur répond', () => {
 /* ======================================================================== */
 
 /**
- * LA PANNE. « Poids avant cuisson » et « Poids après cuisson » sont deux
- * `<Champ>` pilotés par un `useState('')` tenu à la main — la reconstruction
+ * LA PANNE, CORRIGÉE LE 26 SEPTEMBRE 2026. « Poids avant cuisson » et « Poids
+ * après cuisson » étaient deux `<Champ>` pilotés par un `useState('')` tenu à la main — la reconstruction
  * texte-depuis-nombre que `ChampNombre` existe justement pour éviter (voir
- * `champNombre.tsx`, 15 septembre 2026). Deux symptômes concrets :
+ * `champNombre.tsx`, 15 septembre 2026). Deux symptômes concrets, alors :
  *
  *  - à l'ouverture, une pesée déjà connue s'affiche au POINT (`String(42.5)`
- *    donne « 42.5 ») au lieu du séparateur français ;
- *  - une saisie illisible (« 4,2,1 », « abc », « -3 ») ne borde rien de rouge :
- *    aucun `illisible` n'est jamais posé sur ces deux champs, contrairement à
+ *    donnait « 42.5 ») au lieu du séparateur français ;
+ *  - une saisie illisible (« 4,2,1 », « abc », « -3 ») ne bordait rien de rouge :
+ *    aucun `illisible` n'était jamais posé sur ces deux champs, contrairement à
  *    ceux des macros, qui l'ont depuis le 17 septembre. La règle 6 — une
- *    absence n'est pas un zéro — reste vraie côté données (`nombreSaisi`
- *    renvoie déjà `null`), mais l'écran ne le MONTRE pas.
+ *    absence n'est pas un zéro — restait vraie côté données (`nombreSaisi`
+ *    renvoyait déjà `null`), mais l'écran ne le MONTRAIT pas.
  */
 describe('les pesées de l’éditeur passent par ChampNombre', () => {
   /** Un aliment complet, valide pour l'enregistrement — seules les pesées varient. */
@@ -307,14 +307,14 @@ describe('les pesées de l’éditeur passent par ChampNombre', () => {
     assert.equal(champApres().value, '96');
   });
 
-  test('CA-2 : sans aucune pesée, les deux champs sont vides — témoin, probablement déjà vert', (t: TestContext) => {
+  test('CA-2 : sans aucune pesée, les deux champs sont vides — témoin', (t: TestContext) => {
     ouvrirMesure(t, alimentAvecPesees(null, null));
 
     assert.equal(champAvant().value, '', 'null ne doit ni s’afficher "0" ni "null"');
     assert.equal(champApres().value, '');
   });
 
-  test('CA-3 : la virgule ne disparaît pas sous les doigts — témoin, probablement déjà vert', (t: TestContext) => {
+  test('CA-3 : la virgule ne disparaît pas sous les doigts — témoin', (t: TestContext) => {
     ouvrirMesure(t, alimentAvecPesees(null, null));
 
     assert.deepEqual(
@@ -324,7 +324,7 @@ describe('les pesées de l’éditeur passent par ChampNombre', () => {
     );
   });
 
-  test('CA-4 : la mesure va jusqu’à l’enregistrement — témoin, probablement déjà vert', (t: TestContext) => {
+  test('CA-4 : la mesure va jusqu’à l’enregistrement — témoin', (t: TestContext) => {
     const envoyes: AlimentSaisi[] = [];
     ouvrirMesure(t, alimentAvecPesees(null, null), (a) => { envoyes.push(a); });
 
