@@ -1,7 +1,7 @@
 ---
 titre: Les pesées de l'éditeur d'aliment passent par saisieNombre
 slug: pesees-editeur-aliment-saisienombre
-phase: e2e
+phase: verify
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -50,7 +50,7 @@ l'est. Ce qu'il valide remonte au parent exactement comme aujourd'hui.
 - [x] **CA-5** — *Étant donné* les deux champs de pesée, *alors* ce sont des
   `ChampNombre` : le rendu de l'éditeur n'en contient aucun autre champ de pesée
   tenu à la main.
-- **CA-6** (e2e) — *Étant donné* un compte jetable `@e2e.local` dont le frigo
+- [x] **CA-6** (e2e) — *Étant donné* un compte jetable `@e2e.local` dont le frigo
   est garni **par l'API** d'un aliment à `peseeAvant: 42.5` et d'une ligne de
   stock, *quand* on ouvre son éditeur dans Chromium puis « Je préfère
   mesurer », *alors* le champ « Poids avant cuisson » affiche « 42,5 ». Le
@@ -104,3 +104,4 @@ reconstruit **et** recopié dans `api/front` (voir `CLAUDE.md`, section e2e).
 - 2026-09-26 — spec validée par le propriétaire, phase tdd
 - 2026-09-26 — tdd : CA-1 à CA-5, CA-R1, CA-R2 verts (11 tests de rendu, dont 3 témoins verts dès avant). CA-6 relève de la phase e2e. Phase review.
 - 2026-09-26 — revue `revue-fitcarnet` : OK, deux commentaires corrigés, une dette notée. Phase e2e.
+- 2026-09-26 — e2e : `e2e/epreuves/peseesEditeur.spec.ts`, CA-6 vert, suite 19/19, aucun compte `@e2e.local` restant. Phase verify.
