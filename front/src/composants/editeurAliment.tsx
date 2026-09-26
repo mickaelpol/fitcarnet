@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View,
 } from 'react-native';
 import { Bouton, Champ, Discret, Texte } from './base';
+import { ChampNombre } from './champNombre';
 import { ChampRattachement } from './champRattachement';
 import type { AlimentReference } from '../api/types';
 import type { SaisieAliment, VerdictAliment } from '../api/hooks/verification';
@@ -15,7 +16,7 @@ import {
    reste du métier, et `api/regles/rendement.json` n'a plus rien à verrouiller
    pour ce qui le concerne. */
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
-import { nombreSaisi, texteDuNombre } from '@/calcul/saisieNombre';
+import { nombreSaisi } from '@/calcul/saisieNombre';
 
 export interface AlimentSaisi {
   id?: number;
@@ -216,8 +217,13 @@ export function EditeurAliment({
 }) {
   const [a, setA] = useState<AlimentSaisi>(aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' });
   const [mesurer, setMesurer] = useState(false);
-  const [avant, setAvant] = useState('');
-  const [apres, setApres] = useState('');
+  /* LES PESÉES SONT DES NOMBRES, ET LEUR TEXTE VIT DANS `ChampNombre`.
+     Jusqu'au 26 septembre 2026, c'étaient deux textes tenus à la main : une
+     seconde façon de faire, relue par `String(…)` — 42,5 g revenait « 42.5 » —
+     et une pesée illisible ne se voyait pas, elle faisait seulement disparaître
+     le bouton. `null` : pas de pesée, ou une pesée illisible (règle 6). */
+  const [avant, setAvant] = useState<number | null>(null);
+  const [apres, setApres] = useState<number | null>(null);
 
   /* Le texte saisi vit à part du nombre.
      Piloter l'input avec String(nombre) rendait la saisie impossible : « 0 »
@@ -268,8 +274,8 @@ export function EditeurAliment({
       setTextes(textesDe(aliment));
       setMesurer(false);
       // une mesure antérieure se retrouve, pour la vérifier ou la refaire
-      setAvant(texteDuNombre(depart.peseeAvant ?? null));
-      setApres(texteDuNombre(depart.peseeApres ?? null));
+      setAvant(depart.peseeAvant ?? null);
+      setApres(depart.peseeApres ?? null);
     }
     // `aliment` est volontairement absent des dépendances : voir ci-dessus.
   }, [visible, identite]);
@@ -294,9 +300,10 @@ export function EditeurAliment({
 
 
 
-  /* `nombreSaisi` ET NON `parseFloat` : « 4,2,1 » g se lisait 4,2 et proposait
-     un ratio calculé sur une pesée qui n'existe pas. */
-  const ratioMesure = ratioDepuisPesees(nombreSaisi(avant) ?? NaN, nombreSaisi(apres) ?? NaN);
+  /* LA LECTURE EST CELLE DE `ChampNombre`, donc de `nombreSaisi` et non de
+     `parseFloat` : « 4,2,1 » g se lisait 4,2 et proposait un ratio calculé sur
+     une pesée qui n'existe pas. Illisible, la pesée vaut `null` ici. */
+  const ratioMesure = ratioDepuisPesees(avant ?? NaN, apres ?? NaN);
 
   /* CE QUI EST TAPÉ, ENVOYÉ AU PARENT. Il en fait un appel au serveur, avec
      anti-rebond ; cet écran ne sait pas qu'il y a un réseau. On envoie les
@@ -610,9 +617,9 @@ export function EditeurAliment({
                     {' '}<Texte style={{ fontSize: T.normal }}>après</Texte>. L'app en déduit le reste.
                   </Discret>
                   <View style={[s.paire, { marginTop: E.s }]}>
-                    <Champ etiquette="Poids avant cuisson" unite="g" numerique
+                    <ChampNombre etiquette="Poids avant cuisson" unite="g"
                       style={{ flex: 1 }} valeur={avant} onChange={setAvant} placeholder="100" />
-                    <Champ etiquette="Poids après cuisson" unite="g" numerique
+                    <ChampNombre etiquette="Poids après cuisson" unite="g"
                       style={{ flex: 1 }} valeur={apres} onChange={setApres} placeholder="230" />
                   </View>
                   {ratioMesure !== null && (
@@ -634,11 +641,16 @@ export function EditeurAliment({
                            sur le web. Relevé par `verite-documentaire`.
 
                            `?? null` et non `?? 0` : une pesée illisible est
-                           une absence, pas un zéro (règle 6). */
+                           une absence, pas un zéro (règle 6).
+
+                           DEPUIS LE 26 SEPTEMBRE 2026, LA LECTURE N'EST PLUS
+                           ICI : `ChampNombre` remonte déjà le nombre, ou
+                           `null`. Ce qui s'enregistre est ce qui a servi au
+                           ratio — ils ne peuvent plus diverger. */
                         maj({
                           ratio: ratioMesure,
-                          peseeAvant: nombreSaisi(avant),
-                          peseeApres: nombreSaisi(apres),
+                          peseeAvant: avant,
+                          peseeApres: apres,
                         });
                         setMesurer(false);
                       }}

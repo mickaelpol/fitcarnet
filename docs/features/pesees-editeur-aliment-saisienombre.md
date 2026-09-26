@@ -1,7 +1,7 @@
 ---
 titre: Les pesées de l'éditeur d'aliment passent par saisieNombre
 slug: pesees-editeur-aliment-saisienombre
-phase: tdd
+phase: review
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -47,7 +47,7 @@ l'est. Ce qu'il valide remonte au parent exactement comme aujourd'hui.
 - [x] **CA-4** — *Étant donné* la mesure ouverte, *quand* on tape « 100 » puis
   « 230 » et qu'on appuie sur « Utiliser ce résultat », *alors* le parent reçoit
   `peseeAvant: 100`, `peseeApres: 230` et le ratio déduit de ces deux pesées.
-- **CA-5** — *Étant donné* les deux champs de pesée, *alors* ce sont des
+- [x] **CA-5** — *Étant donné* les deux champs de pesée, *alors* ce sont des
   `ChampNombre` : le rendu de l'éditeur n'en contient aucun autre champ de pesée
   tenu à la main.
 - **CA-6** (e2e) — *Étant donné* un compte jetable `@e2e.local` dont le frigo
@@ -58,11 +58,11 @@ l'est. Ce qu'il valide remonte au parent exactement comme aujourd'hui.
 
 ## Ce que la feature refuse
 
-- **CA-R1** — *Étant donné* la mesure ouverte, *quand* on tape « 4,2,1 » dans
+- [x] **CA-R1** — *Étant donné* la mesure ouverte, *quand* on tape « 4,2,1 » dans
   une pesée (de même « abc », « -3 »), *alors* ce champ est bordé de rouge et le
   bouton « Utiliser ce résultat » n'apparaît pas. **Aucun message propre à cet
   écran** : la bordure est le signal commun aux séries et aux modèles.
-- **CA-R2** — *Étant donné* une pesée illisible, *quand* on corrige en « 100 »,
+- [x] **CA-R2** — *Étant donné* une pesée illisible, *quand* on corrige en « 100 »,
   *alors* la bordure disparaît et, l'autre pesée étant lisible, le bouton
   réapparaît.
 
@@ -102,3 +102,4 @@ reconstruit **et** recopié dans `api/front` (voir `CLAUDE.md`, section e2e).
 ## Journal
 - 2026-09-26 — spec créée depuis le brainstorm
 - 2026-09-26 — spec validée par le propriétaire, phase tdd
+- 2026-09-26 — tdd : CA-1 à CA-5, CA-R1, CA-R2 verts (11 tests de rendu, dont 3 témoins verts dès avant). CA-6 relève de la phase e2e. Phase review.
