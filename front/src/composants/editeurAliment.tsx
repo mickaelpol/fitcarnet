@@ -15,7 +15,7 @@ import {
    reste du métier, et `api/regles/rendement.json` n'a plus rien à verrouiller
    pour ce qui le concerne. */
 import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
-import { nombreSaisi } from '@/calcul/saisieNombre';
+import { nombreSaisi, texteDuNombre } from '@/calcul/saisieNombre';
 
 export interface AlimentSaisi {
   id?: number;
@@ -268,8 +268,8 @@ export function EditeurAliment({
       setTextes(textesDe(aliment));
       setMesurer(false);
       // une mesure antérieure se retrouve, pour la vérifier ou la refaire
-      setAvant(depart.peseeAvant ? String(depart.peseeAvant) : '');
-      setApres(depart.peseeApres ? String(depart.peseeApres) : '');
+      setAvant(texteDuNombre(depart.peseeAvant ?? null));
+      setApres(texteDuNombre(depart.peseeApres ?? null));
     }
     // `aliment` est volontairement absent des dépendances : voir ci-dessus.
   }, [visible, identite]);

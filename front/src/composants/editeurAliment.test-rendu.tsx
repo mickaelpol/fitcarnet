@@ -22,9 +22,12 @@
  */
 import { describe, it, type TestContext, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { EditeurAliment, type AlimentSaisi } from './editeurAliment';
+import { C } from '@/theme';
 
 /** Un aliment tel que l'écran le reçoit : fibres inconnues, à corriger. */
 const alimentNomme = (nom: string): AlimentSaisi => ({ nom, categorie: 'prot',
@@ -233,5 +236,205 @@ describe('l\'éditeur AFFICHE ce que le serveur répond', () => {
     const texte = document.body.textContent ?? '';
     assert.doesNotMatch(texte, /grain sec/);
     assert.doesNotMatch(texte, /cohérent/i);
+  });
+});
+
+/* ======================================================================== */
+/* LES PESÉES DE LA MESURE PASSENT PAR CHAMPNOMBRE — 26 SEPTEMBRE 2026       */
+/* ======================================================================== */
+
+/**
+ * LA PANNE. « Poids avant cuisson » et « Poids après cuisson » sont deux
+ * `<Champ>` pilotés par un `useState('')` tenu à la main — la reconstruction
+ * texte-depuis-nombre que `ChampNombre` existe justement pour éviter (voir
+ * `champNombre.tsx`, 15 septembre 2026). Deux symptômes concrets :
+ *
+ *  - à l'ouverture, une pesée déjà connue s'affiche au POINT (`String(42.5)`
+ *    donne « 42.5 ») au lieu du séparateur français ;
+ *  - une saisie illisible (« 4,2,1 », « abc », « -3 ») ne borde rien de rouge :
+ *    aucun `illisible` n'est jamais posé sur ces deux champs, contrairement à
+ *    ceux des macros, qui l'ont depuis le 17 septembre. La règle 6 — une
+ *    absence n'est pas un zéro — reste vraie côté données (`nombreSaisi`
+ *    renvoie déjà `null`), mais l'écran ne le MONTRE pas.
+ */
+describe('les pesées de l’éditeur passent par ChampNombre', () => {
+  /** Un aliment complet, valide pour l'enregistrement — seules les pesées varient. */
+  const alimentAvecPesees = (peseeAvant: number | null, peseeApres: number | null): AlimentSaisi => ({
+    nom: 'Riz basmati', categorie: 'fec', kcal100: 350, prot100: 7, gluc100: 77,
+    lip100: 1, fibres100: null, ratio: 1, peseeAvant, peseeApres,
+  });
+
+  const champAvant = () => screen.getByLabelText('Poids avant cuisson') as HTMLInputElement;
+  const champApres = () => screen.getByLabelText('Poids après cuisson') as HTMLInputElement;
+
+  /** Chaque étape est le contenu ENTIER du champ après une frappe, comme sur un clavier. */
+  function taper(champ: () => HTMLInputElement, ...etapes: string[]): string[] {
+    return etapes.map((v) => {
+      fireEvent.change(champ(), { target: { value: v } });
+
+      return champ().value;
+    });
+  }
+
+  function ouvrirMesure(t: TestContext, aliment: AlimentSaisi, onEnregistrer: (a: AlimentSaisi) => void = () => undefined) {
+    t.after(cleanup);
+    render(<EditeurAliment visible aliment={aliment} onEnregistrer={onEnregistrer} onFermer={() => undefined} />);
+    fireEvent.click(screen.getByText('Je préfère mesurer'));
+  }
+
+  /**
+   * Couleur attendue du cadre en erreur, DÉDUITE de `C.erreur` plutôt que
+   * recopiée en dur : `getComputedStyle` rend une couleur `rgb(r, g, b)`,
+   * jamais l'hexadécimal posé dans la feuille de style. Convertir ici évite
+   * une seconde écriture de la couleur qui pourrait diverger du thème.
+   */
+  const hexEnRgb = (hex: string): string => {
+    const n = parseInt(hex.replace('#', ''), 16);
+
+    return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+  };
+  const ROUGE = hexEnRgb(C.erreur);
+
+  /** Le cadre du champ, c'est le `View` PARENT du `TextInput` — voir `base.tsx` l.158. */
+  const bordeDeRouge = (champ: HTMLInputElement): boolean =>
+    getComputedStyle(champ.parentElement as Element).borderColor === ROUGE;
+
+  test('CA-1 : une pesée connue s’affiche à la française, pas au point', (t: TestContext) => {
+    ouvrirMesure(t, alimentAvecPesees(42.5, 96));
+
+    assert.equal(champAvant().value, '42,5',
+      'String(42.5) donne "42.5" : le point de JavaScript, pas la virgule française');
+    assert.equal(champApres().value, '96');
+  });
+
+  test('CA-2 : sans aucune pesée, les deux champs sont vides — témoin, probablement déjà vert', (t: TestContext) => {
+    ouvrirMesure(t, alimentAvecPesees(null, null));
+
+    assert.equal(champAvant().value, '', 'null ne doit ni s’afficher "0" ni "null"');
+    assert.equal(champApres().value, '');
+  });
+
+  test('CA-3 : la virgule ne disparaît pas sous les doigts — témoin, probablement déjà vert', (t: TestContext) => {
+    ouvrirMesure(t, alimentAvecPesees(null, null));
+
+    assert.deepEqual(
+      taper(champAvant, '4', '42', '42,', '42,5'),
+      ['4', '42', '42,', '42,5'],
+      'c’est exactement le bug du 15 septembre 2026 (425 kg au lieu de 42,5) : ici sur une pesée',
+    );
+  });
+
+  test('CA-4 : la mesure va jusqu’à l’enregistrement — témoin, probablement déjà vert', (t: TestContext) => {
+    const envoyes: AlimentSaisi[] = [];
+    ouvrirMesure(t, alimentAvecPesees(null, null), (a) => { envoyes.push(a); });
+
+    fireEvent.change(champAvant(), { target: { value: '100' } });
+    fireEvent.change(champApres(), { target: { value: '230' } });
+    fireEvent.click(screen.getByText(/Utiliser ce résultat/));
+    fireEvent.click(screen.getByText('Enregistrer'));
+
+    assert.equal(envoyes.length, 1);
+    const recu = envoyes.at(-1);
+    assert.equal(recu?.peseeAvant, 100);
+    assert.equal(recu?.peseeApres, 230);
+    assert.equal(recu?.ratio, 2.3);
+  });
+
+  describe('CA-5 : ce sont des ChampNombre, aucune pesée tenue à la main — porté sur le SOURCE', () => {
+    /* MÊME TECHNIQUE QUE `formuleUnique.test.ts` : lire le fichier réel plutôt
+       que son rendu, pour attraper une régression même si elle ne casse aucun
+       des tests de comportement ci-dessus (deux témoins sur quatre le sont
+       déjà). `__dirname` vaut `dist-tests/composants` à l'exécution : deux
+       niveaux au-dessus rejoignent `front/`, où vit `src/`. */
+    const CHEMIN = join(__dirname, '..', '..', 'src', 'composants', 'editeurAliment.tsx');
+    const SOURCE = readFileSync(CHEMIN, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/^\s*\/\/.*$/gm, ' ');
+
+    /** La balise ouvrante juste avant une étiquette donnée — `<ChampNombre` ou `<Champ`, ou `null`. */
+    function baliseDeLEtiquette(source: string, etiquette: string): string | null {
+      const pos = source.indexOf(`etiquette="${etiquette}"`);
+      if (pos === -1) return null;
+      const avant = source.slice(0, pos);
+      const dernierOuvrant = avant.lastIndexOf('<');
+
+      return avant.slice(dernierOuvrant + 1).match(/^[A-Za-z]+/)?.[0] ?? null;
+    }
+
+    /** Un `useState('')` texte, destructuré vers ces deux noms précis. */
+    function useStateVideDeclare(source: string, nomValeur: string, nomSetter: string): boolean {
+      const motif = new RegExp(`\\[\\s*${nomValeur}\\s*,\\s*${nomSetter}\\s*\\]\\s*=\\s*useState\\(\\s*''\\s*\\)`);
+
+      return motif.test(source);
+    }
+
+    it('le motif reconnaît encore sa cible — le témoin', () => {
+      /* SANS CE TÉMOIN : si `etiquette="Poids avant cuisson"` disparaissait du
+         fichier (renommage de l'écran), les deux assertions suivantes
+         passeraient en trouvant `null`, un vert qui ne garde plus rien — le
+         défaut que la règle du projet interdit. On le prouve ici sur un
+         extrait FABRIQUÉ, indépendant de l'état réel du fichier, pour ne
+         jamais dépendre de si `editeurAliment.tsx` est déjà corrigé ou non. */
+      const bonExtrait = '<ChampNombre etiquette="Poids avant cuisson" unite="g" />';
+      const mauvaisExtrait = '<Champ etiquette="Poids avant cuisson" unite="g" />';
+      const useStateFabrique = "const [avant, setAvant] = useState('');";
+
+      assert.equal(baliseDeLEtiquette(bonExtrait, 'Poids avant cuisson'), 'ChampNombre');
+      assert.equal(baliseDeLEtiquette(mauvaisExtrait, 'Poids avant cuisson'), 'Champ');
+      assert.equal(useStateVideDeclare(useStateFabrique, 'avant', 'setAvant'), true);
+      assert.equal(useStateVideDeclare("const [x, setX] = useState(0);", 'avant', 'setAvant'), false);
+    });
+
+    it('« Poids avant cuisson » et « Poids après cuisson » sont des ChampNombre', () => {
+      assert.equal(baliseDeLEtiquette(SOURCE, 'Poids avant cuisson'), 'ChampNombre',
+        'c’est encore un <Champ> piloté à la main : aucune bordure rouge possible sur une saisie illisible');
+      assert.equal(baliseDeLEtiquette(SOURCE, 'Poids après cuisson'), 'ChampNombre');
+    });
+
+    it('aucun état texte tenu à la main pour ces deux pesées', () => {
+      assert.equal(useStateVideDeclare(SOURCE, 'avant', 'setAvant'), false,
+        'useState(\'\') est le texte-tenu-à-la-main que ChampNombre remplace : l’état doit devenir un nombre');
+      assert.equal(useStateVideDeclare(SOURCE, 'apres', 'setApres'), false);
+    });
+  });
+
+  describe('CA-R1/CA-R2 : une pesée illisible se voit — pas seulement dans les données', () => {
+    /**
+     * `nombreSaisi` renvoie déjà `null` pour ces trois saisies (règle 6, non
+     * en cause ici) : le sujet est que RIEN NE LE MONTRE. Ni bordure, ni
+     * message — l'utilisateur tape « 4,2,1 » et ne voit qu'un champ ordinaire.
+     */
+    for (const invalide of ['4,2,1', 'abc', '-3']) {
+      test(`CA-R1 : "${invalide}" dans "Poids avant cuisson" borde le champ de rouge et cache le bouton`, (t: TestContext) => {
+        ouvrirMesure(t, alimentAvecPesees(null, null));
+
+        fireEvent.change(champAvant(), { target: { value: invalide } });
+        fireEvent.change(champApres(), { target: { value: '230' } });
+
+        assert.equal(bordeDeRouge(champAvant()), true,
+          `aucun "illisible" n’est posé sur ce champ : "${invalide}" ne se voit nulle part`);
+        assert.equal(screen.queryByText(/Utiliser ce résultat/), null,
+          'un ratio ne peut pas se proposer sur une pesée qui ne désigne aucun nombre');
+        assert.equal(champAvant().value, invalide,
+          'effacer ce qui a été tapé cacherait l’erreur au lieu de la montrer');
+      });
+    }
+
+    test('CA-R2 : corriger une pesée illisible fait disparaître la bordure et revenir le bouton', (t: TestContext) => {
+      ouvrirMesure(t, alimentAvecPesees(null, null));
+
+      fireEvent.change(champAvant(), { target: { value: '4,2,1' } });
+      fireEvent.change(champApres(), { target: { value: '230' } });
+      assert.equal(bordeDeRouge(champAvant()), true,
+        'précondition : sans bordure au départ, "elle disparaît" ne prouverait rien');
+      assert.equal(screen.queryByText(/Utiliser ce résultat/), null);
+
+      fireEvent.change(champAvant(), { target: { value: '100' } });
+
+      assert.equal(bordeDeRouge(champAvant()), false,
+        'la pesée redevient lisible : la bordure doit partir avec l’erreur');
+      assert.notEqual(screen.queryByText(/Utiliser ce résultat/), null,
+        'un ratio redevient calculable dès que les deux pesées se lisent');
+    });
   });
 });
