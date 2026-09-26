@@ -341,7 +341,16 @@ export function EditeurAliment({
      c'est l'API qui tranchera, et un bouton éteint par défaut ferait croire à
      un formulaire cassé. Le nom reste un contrôle léger de l'écran.
      PAS SUR UN VERDICT PÉRIMÉ : il décrit la saisie d'avant. */
-  const valide = fiche.nom.trim() !== ''
+  /* LES QUATRE VALEURS OBLIGATOIRES, VUES SEULEMENT VIDES OU NON — décision
+     du propriétaire, 26 septembre 2026 : « il faut quand même un minimum de
+     vérification côté front pour éviter à l'utilisateur d'avoir à faire des
+     allers-retours, mais seul le serveur reste la vérif finale ». L'écran ne
+     LIT aucun nombre ici (garde `lectureAuServeur.test.ts`) : « 0 » est une
+     réponse et allume le bouton, « 4,2,1 » aussi — c'est le serveur qui le
+     refusera. Un vide ne part jamais, ni vide ni comme un zéro (règle 6). */
+  const obligatoiresRemplies = (['kcal100', 'prot100', 'gluc100', 'lip100'] as const)
+    .every((cle) => textes[cle].trim() !== '');
+  const valide = fiche.nom.trim() !== '' && obligatoiresRemplies
     && (verdictPerime === true || (verdict?.enregistrable ?? true));
 
   /* La teinte traduit la décision du serveur ; elle ne la prend plus. */

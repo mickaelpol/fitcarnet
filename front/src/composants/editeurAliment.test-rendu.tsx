@@ -156,19 +156,32 @@ test('une huile intacte s\'enregistre — le témoin de l\'inverse', (t: TestCon
   assert.equal(envoyes.length, 1, 'sans ce témoin, un bouton toujours désactivé passerait pour une correction');
 });
 
-test('des protéines vidées partent vides, pas comme 0 g', (t: TestContext) => {
+test('des protéines vidées ne partent pas : « Enregistrer » reste éteint', (t: TestContext) => {
   const envoyes = editer(t);
 
   fireEvent.change(macro(PROTEINES), { target: { value: '' } });
   fireEvent.click(screen.getByText('Enregistrer'));
 
-  /* RÉÉCRIT LE 26 SEPTEMBRE 2026 (feature `macros-editeur-vide-pas-zero`).
-     Ce test exigeait que l'ÉCRAN refuse d'envoyer : c'était lui qui jugeait.
-     Il ne juge plus (CA-5) — il envoie le vide TEL QUEL, et c'est
-     `POST /api/aliments` qui le refuse en 422, sous le champ. Ce qui compte
-     ne change pas : le vide ne part jamais comme un zéro. */
-  assert.equal(envoyes.at(-1)?.prot100, '',
-    'vider un champ, c\'est dire « je ne sais pas » : l\'envoyer à 0 g écrit un chiffre que personne n\'a donné');
+  /* RÉÉCRIT DEUX FOIS LE 26 SEPTEMBRE 2026. D'abord l'écran refusait d'envoyer
+     en JUGEANT le texte (`nombreSaisi`) ; puis, feature
+     `macros-editeur-vide-pas-zero`, il envoyait le vide tel quel et le serveur
+     le refusait en 422. Le propriétaire a tranché le soir même : « il faut
+     quand même un minimum de vérification côté front pour éviter à
+     l'utilisateur d'avoir à faire des allers-retours, mais seul le serveur
+     reste la vérif finale ». L'écran ne LIT toujours rien — il regarde
+     seulement si le champ est vide — et n'envoie pas. Jamais comme un zéro. */
+  assert.equal(envoyes.length, 0,
+    'une macro vide ne doit pas partir : ni vide, ni surtout comme 0 g');
+});
+
+test('un 0 tapé est une réponse : il part tel quel — témoin', (t: TestContext) => {
+  const envoyes = editer(t);
+
+  fireEvent.change(macro(PROTEINES), { target: { value: '0' } });
+  fireEvent.click(screen.getByText('Enregistrer'));
+
+  assert.equal(envoyes.at(-1)?.prot100, '0',
+    'zéro veut dire zéro : le contrôle du vide ne doit pas éteindre le bouton sur un 0');
 });
 
 test('des lipides illisibles partent tels quels, pour que le serveur les refuse', (t: TestContext) => {
@@ -487,19 +500,41 @@ describe('le refus, le rendement et l’enregistrable viennent du serveur, rien 
       'ce message était rédigé par l’écran ; il n’a plus le droit de juger');
   });
 
-  test('CA-5 : le bouton reste actif, kcal vide, si le serveur dit enregistrable — l’écran ne décide plus', (t: TestContext) => {
-    // CA-5
+  test('CA-5 : kcal vide éteint le bouton, même si le serveur dit enregistrable', (t: TestContext) => {
+    // CA-5, AMENDÉ le 26 septembre 2026 par le propriétaire : un contrôle léger
+    // du VIDE évite l'aller-retour. L'écran ne juge toujours pas la VALEUR —
+    // voir le test suivant.
     t.after(cleanup);
     const envoyes: AlimentTape[] = [];
     render(<EditeurAliment visible verdict={{ ...VERDICT_BASE, enregistrable: true }}
       onEnregistrer={(a) => envoyes.push(a)} onFermer={() => undefined} />);
 
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Riz' } });
-    // kcal reste vide : en création, aucune macro n'est pré-remplie.
+    fireEvent.change(screen.getByLabelText('Protéines'), { target: { value: '7' } });
+    fireEvent.change(screen.getByLabelText('Glucides'), { target: { value: '78' } });
+    fireEvent.change(screen.getByLabelText('Lipides'), { target: { value: '1' } });
+    // kcal reste vide
+    fireEvent.click(screen.getByText('Enregistrer'));
+
+    assert.equal(envoyes.length, 0, 'une macro obligatoire vide ne part pas');
+  });
+
+  test('CA-5 : kcal à « 0 » ne l’éteint pas — l’écran ne juge pas la valeur, le serveur le fera', (t: TestContext) => {
+    // CA-5 : plus aucun `kcal100 > 0` à l'écran.
+    t.after(cleanup);
+    const envoyes: AlimentTape[] = [];
+    render(<EditeurAliment visible verdict={{ ...VERDICT_BASE, enregistrable: true }}
+      onEnregistrer={(a) => envoyes.push(a)} onFermer={() => undefined} />);
+
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Riz' } });
+    fireEvent.change(screen.getByLabelText('Calories'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('Protéines'), { target: { value: '7' } });
+    fireEvent.change(screen.getByLabelText('Glucides'), { target: { value: '78' } });
+    fireEvent.change(screen.getByLabelText('Lipides'), { target: { value: '1' } });
     fireEvent.click(screen.getByText('Enregistrer'));
 
     assert.equal(envoyes.length, 1,
-      'kcal vide n’éteint plus le bouton par lui-même : seul enregistrable, rendu par le serveur, compte désormais');
+      'seul enregistrable, rendu par le serveur, juge un zéro : l’écran ne regarde que le vide');
   });
 
   test('CA-5 (témoin) : enregistrable à faux éteint le bouton, même tout rempli', (t: TestContext) => {
@@ -555,6 +590,9 @@ describe('le refus, le rendement et l’enregistrable viennent du serveur, rien 
     render(<EditeurAliment visible verdict={verdict}
       onSaisie={(s) => vues.push(s)} onEnregistrer={(a) => envoyes.push(a)} onFermer={() => undefined} />);
     fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Riz' } });
+    for (const [etiquette, valeur] of [['Calories', '350'], ['Protéines', '7'], ['Glucides', '78'], ['Lipides', '1']] as const) {
+      fireEvent.change(screen.getByLabelText(etiquette), { target: { value: valeur } });
+    }
     fireEvent.click(screen.getByText('Je préfère mesurer'));
 
     fireEvent.change(screen.getByLabelText('Poids avant cuisson'), { target: { value: '100' } });

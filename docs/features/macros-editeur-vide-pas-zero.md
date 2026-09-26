@@ -80,6 +80,11 @@ aurait calculé.
   rédigé par l'écran : « Renseigne les quatre valeurs — écris 0 si l'aliment
   n'en contient pas » et le calcul local `illisible` disparaissent ; le bouton
   « Enregistrer » ne dépend plus de `a.kcal100 > 0` ni de `macrosLisibles`.
+  **Amendé le 26/09/2026 par le propriétaire** : « il faut quand même un minimum
+  de vérification côté front pour éviter à l'utilisateur d'avoir à faire des
+  allers-retours, mais seul le serveur reste la vérif finale ». « Enregistrer »
+  reste éteint tant qu'une des quatre macros obligatoires est **vide** ; l'écran
+  ne lit toujours aucune valeur (« 0 » et « 4,2,1 » l'allument, le serveur juge).
 - [x] **CA-6** — *Étant donné* le résumé du verdict, *alors* son affichage ne
   dépend plus de `a.kcal100 > 0 || a.prot100 > 0` : ce que le serveur renvoie
   s'affiche ; s'il ne renvoie pas de résumé, rien ne s'affiche.
@@ -307,3 +312,4 @@ CA-15 (un 422 affiché sous les champs). CA-R4 et CA-R5 se prouvent par requête
   5 erreurs d'avant. Écartés : les deux constats du seul chemin Grocy —
   **Grocy est abandonné** (`decisions.md`, 26/09/2026).
 - 2026-09-26 — e2e : `e2e/epreuves/macrosEditeur.spec.ts`, 10 épreuves (CA-1 à 4, 7, 12, 15, R6, R7, non-régression création + renommage) ; suite complète 30/30 verte, aucune épreuve préexistante rouge.
+- 2026-09-26 — CA-5 amendé (contrôle léger du vide, décision du propriétaire) ; tests de rendu réécrits en conséquence, suites front 747 + 75 et e2e 30/30 vertes.

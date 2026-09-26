@@ -88,7 +88,7 @@ test('un champ de macro vide ne montre pas un zéro en indication', (t: TestCont
   }
 });
 
-test('des lipides oubliés partent vides, jamais comme 0 g', (t: TestContext) => {
+test('des lipides oubliés ne partent pas, ni vides ni comme 0 g', (t: TestContext) => {
   const crees = creer(t);
 
   saisir('Nom', 'Saumon');
@@ -97,11 +97,12 @@ test('des lipides oubliés partent vides, jamais comme 0 g', (t: TestContext) =>
   saisir('Glucides', '0');
   fireEvent.click(screen.getByText('Enregistrer'));
 
-  /* RÉÉCRIT LE 26 SEPTEMBRE 2026 (CA-5) : l'écran ne retient plus
-     l'envoi, il envoie le vide TEL QUEL et `POST /api/aliments` le refuse
-     en 422, sous le champ. Ce qui compte ne change pas : jamais un zéro. */
-  assert.equal((crees.at(-1) as Record<string, unknown> | undefined)?.lip100, '',
-    'un saumon sans lipides saisis est parti avec « zéro gramme » : « je ne sais pas » est devenu un chiffre');
+  /* RÉÉCRIT DEUX FOIS LE 26 SEPTEMBRE 2026 : l'écran a d'abord envoyé le vide
+     tel quel (CA-5), puis le propriétaire a voulu un contrôle léger qui évite
+     l'aller-retour — une macro vide éteint « Enregistrer ». Ce qui compte ne
+     change pas : jamais un zéro que personne n'a donné. */
+  assert.equal(crees.length, 0,
+    'un saumon sans lipides saisis ne doit pas partir : « je ne sais pas » n\'est pas un chiffre');
 });
 
 test('les quatre macros saisies, la création part — le témoin de l\'inverse', (t: TestContext) => {
