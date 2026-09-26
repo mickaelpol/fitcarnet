@@ -19,7 +19,7 @@ import {
 } from '@/composants/etatInventaire';
 import {
   FRAICHEUR_RESULTAT, ecartsInventaire, estIncomplet, filtrerFrigo,
-  grouperParEmplacement, poidsConnu, resultatEncoreFrais,
+  grouperParEmplacement, idDeLaReference, poidsConnu, resultatEncoreFrais,
 } from '@/calcul/frigo';
 import { C, E, P, R, T, TOUCHE } from '@/theme';
 
@@ -437,7 +437,7 @@ export default function MonFrigo() {
         onConfirmer={() => {
           if (aSupprimer === null) return;
 
-          supprimer.mutate(Number(aSupprimer.reference.split(':')[1]), {
+          supprimer.mutate(idDeLaReference(aSupprimer.reference), {
             // en cas d'échec la carte reste ouverte : le motif s'affiche en
             // haut de l'écran, et on garde sous les yeux l'aliment concerné
             onSuccess: () => { setASupprimer(null); setOuvert(null); },

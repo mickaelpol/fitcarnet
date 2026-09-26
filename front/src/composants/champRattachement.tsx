@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Champ, Discret, Texte } from './base';
 import type { AlimentReference } from '../api/types';
+import { nombreSaisi } from '../calcul/saisieNombre';
 import { C, E, R, T, TOUCHE } from '../theme';
 
 /**
@@ -40,14 +41,22 @@ import { C, E, R, T, TOUCHE } from '../theme';
  * `EditeurAliment` et `EditeurAlimentConnecte`.
  */
 export function ChampRattachement({
-  valeur, nomAliment, kcalSaisies, recherche, resultats, onRecherche, onChange,
+  valeur, nomAliment, kcalTapees, recherche, resultats, onRecherche, onChange,
 }: {
   /** le code CIQUAL retenu, `null` tant qu'on n'a rien choisi */
   valeur: string | null;
   /** sert d'invite : on part de ce que la personne a déjà tapé comme nom */
   nomAliment: string;
-  /** pour l'avertissement d'écart ; `null` tant que rien n'est saisi */
-  kcalSaisies: number | null;
+  /**
+   * Les calories TELLES QUE TAPÉES, pour l'avertissement d'écart.
+   *
+   * UN TEXTE DEPUIS LE 26 SEPTEMBRE 2026 : l'éditeur ne lit plus aucun nombre
+   * (`lectureAuServeur.test.ts`). Cet avertissement, lui, se juge ENCORE à
+   * l'écran — le seul jugement de l'éditeur resté au front, DÉCLARÉ en dette
+   * dans `docs/etat/prochaines-etapes.md`. Il ne bloque rien : il invite à
+   * relire l'étiquette.
+   */
+  kcalTapees: string;
   /** la recherche en cours, tenue par l'appelant qui interroge le serveur */
   recherche: string;
   resultats: AlimentReference[];
@@ -74,7 +83,7 @@ export function ChampRattachement({
             <Discret style={{ color: C.vif }}>Changer</Discret>
           </Pressable>
         </View>
-        <Ecart choisi={choisi} kcalSaisies={kcalSaisies} />
+        <Ecart choisi={choisi} kcalSaisies={nombreSaisi(kcalTapees)} />
       </View>
     );
   }

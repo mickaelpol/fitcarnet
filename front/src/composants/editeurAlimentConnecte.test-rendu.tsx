@@ -18,6 +18,7 @@ import { type TestContext, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { EditeurAlimentConnecte } from './editeurAlimentConnecte';
+import { ErreurApi } from '../api/erreurApi';
 
 /** Une mutation qui retient ce qu'on lui envoie, sans réseau. */
 function mutation(envois: unknown[]) {
@@ -87,7 +88,7 @@ test('un champ de macro vide ne montre pas un zéro en indication', (t: TestCont
   }
 });
 
-test('des lipides oubliés ne partent pas comme 0 g', (t: TestContext) => {
+test('des lipides oubliés partent vides, jamais comme 0 g', (t: TestContext) => {
   const crees = creer(t);
 
   saisir('Nom', 'Saumon');
@@ -96,8 +97,11 @@ test('des lipides oubliés ne partent pas comme 0 g', (t: TestContext) => {
   saisir('Glucides', '0');
   fireEvent.click(screen.getByText('Enregistrer'));
 
-  assert.equal(crees.length, 0,
-    'un saumon sans lipides saisis a été créé : « je ne sais pas » est devenu « zéro gramme »');
+  /* RÉÉCRIT LE 26 SEPTEMBRE 2026 (CA-5) : l'écran ne retient plus
+     l'envoi, il envoie le vide TEL QUEL et `POST /api/aliments` le refuse
+     en 422, sous le champ. Ce qui compte ne change pas : jamais un zéro. */
+  assert.equal((crees.at(-1) as Record<string, unknown> | undefined)?.lip100, '',
+    'un saumon sans lipides saisis est parti avec « zéro gramme » : « je ne sais pas » est devenu un chiffre');
 });
 
 test('les quatre macros saisies, la création part — le témoin de l\'inverse', (t: TestContext) => {
@@ -115,6 +119,163 @@ test('les quatre macros saisies, la création part — le témoin de l\'inverse'
   assert.deepEqual(
     (({ kcal100, prot100, gluc100, lip100, fibres100 }) => ({ kcal100, prot100, gluc100, lip100, fibres100 }))(
       crees[0] as Record<string, unknown>),
-    { kcal100: 200, prot100: 20, gluc100: 0, lip100: 13, fibres100: null },
+    { kcal100: '200', prot100: '20', gluc100: '0', lip100: '13', fibres100: '' },
   );
+});
+
+/* ========================================================================= *
+ * LE CONTRAT ARRÊTÉ LE 26 SEPTEMBRE 2026 : LES TEXTES TELS QUE TAPÉS.
+ *
+ * `EditeurAliment.onEnregistrer` reçoit un `AlimentTape` — nom, kcal100,
+ * prot100, gluc100, lip100, fibres100, ratio, peseeAvant, peseeApres en
+ * CHAÎNES telles que tapées. `EditeurAlimentConnecte` les envoie telles
+ * quelles à `creer.mutate` / `majAliment.mutate`, et la quantité TELLE QUE
+ * TAPÉE (chaîne, '' si vide) à `definir.mutate({ alimentId, quantite })`.
+ *
+ * Plus aucune lecture numérique ici : c'est le serveur qui lit « 12,5 »
+ * (`RendementExplique.php`, `POST /api/verification/aliment`), pas ce
+ * composant. Voir `lectureAuServeur.test.ts`, qui garde qu'aucun des deux
+ * fichiers ne réintroduit `nombreSaisi`, `parseFloat`, `Number(` ou
+ * `ratioDepuisPesees`.
+ *
+ * ET UN REFUS DU SERVEUR NE FERME PLUS L'ÉDITEUR EN SILENCE : `ErreurApi`
+ * porte désormais `refus: Grief[]`, affiché sous chaque champ concerné
+ * (`data-testid="refus-<champ>"`), et un statut 0 — serveur injoignable — le
+ * dit clairement plutôt que de relayer un message technique.
+ * ========================================================================= */
+
+/** Une mutation configurable : erreur à simuler, résultat de succès à rejouer. */
+function mutationAvec(envois: unknown[], opts: {
+  error?: unknown;
+  resultat?: unknown;
+} = {}) {
+  return {
+    isPending: false,
+    error: opts.error ?? null,
+    mutate: (corps: unknown, options?: { onSuccess?: (r: unknown) => void }) => {
+      envois.push(corps);
+      if (opts.resultat !== undefined) options?.onSuccess?.(opts.resultat);
+    },
+  } as never;
+}
+
+/**
+ * L'éditeur de création, avec de quoi observer `definir.mutate` et injecter
+ * une erreur sur `creer`. `creer` rejoue toujours son `onSuccess` avec un
+ * aliment fabriqué : c'est ce qui déclenche `definir.mutate` dans
+ * `editeurAlimentConnecte.tsx`.
+ */
+function creerPersonnalise(t: TestContext, opts: {
+  creerErreur?: unknown;
+  quantite?: string;
+} = {}): { crees: unknown[]; definitions: unknown[] } {
+  t.after(cleanup);
+  const crees: unknown[] = [];
+  const definitions: unknown[] = [];
+  render(
+    <EditeurAlimentConnecte
+      source="base"
+      creation
+      edite={null}
+      aCompleter={null}
+      quantite={opts.quantite ?? ''}
+      onQuantiteChange={() => undefined}
+      onFermer={() => undefined}
+      onCreationEnvoyee={() => undefined}
+      onEditionFaite={() => undefined}
+      creer={mutationAvec(crees, {
+        error: opts.creerErreur ?? null,
+        resultat: { id: 42, reference: 'base:42' },
+      })}
+      majAliment={mutationAvec([])}
+      definir={mutationAvec(definitions)}
+      enregistrer={mutationAvec([])}
+      poserQuantite={mutationAvec([])}
+    />,
+  );
+
+  return { crees, definitions };
+}
+
+const remplirLesQuatreMacros = () => {
+  saisir('Nom', 'Saumon');
+  saisir('Calories', '200');
+  saisir('Protéines', '12,5');
+  saisir('Glucides', '0');
+  saisir('Lipides', '13');
+};
+
+test('CA-14 : la quantité tapée « 12,5 » part en texte vers definir.mutate', (t: TestContext) => {
+  const { definitions } = creerPersonnalise(t, { quantite: '12,5' });
+  remplirLesQuatreMacros();
+  fireEvent.click(screen.getByText('Enregistrer'));
+
+  assert.equal(definitions.length, 1, 'la création doit déclencher un definir.mutate');
+  assert.equal(typeof definitions[0]?.['quantite' as never], 'string',
+    'la quantité doit être une CHAÎNE, comme tapée — pas un nombre issu d’un parseFloat local');
+  assert.equal((definitions[0] as { quantite: unknown }).quantite, '12,5',
+    `definir.mutate doit recevoir quantite === '12,5', reçu : ${JSON.stringify(definitions[0])}`);
+});
+
+test('CA-14 : le témoin — une quantité vide part comme une chaîne vide, pas 0', (t: TestContext) => {
+  const { definitions } = creerPersonnalise(t, { quantite: '' });
+  remplirLesQuatreMacros();
+  fireEvent.click(screen.getByText('Enregistrer'));
+
+  assert.equal(definitions.length, 1);
+  assert.equal((definitions[0] as { quantite: unknown }).quantite, '',
+    `une quantité non saisie doit partir '' et non 0, reçu : ${JSON.stringify(definitions[0])}`);
+});
+
+// CA-9/CA-10
+test('les protéines tapées « 12,5 » partent en texte vers creer.mutate', (t: TestContext) => {
+  const { crees } = creerPersonnalise(t);
+  remplirLesQuatreMacros();
+  fireEvent.click(screen.getByText('Enregistrer'));
+
+  assert.equal(crees.length, 1);
+  assert.equal((crees[0] as { prot100: unknown }).prot100, '12,5',
+    `creer.mutate doit recevoir prot100 === '12,5' (texte tel que tapé), reçu : `
+    + `${JSON.stringify(crees[0])}`);
+});
+
+// CA-15
+test('un refus 422 sur "prot100" s\'affiche sous le champ, et l\'éditeur reste ouvert', (t: TestContext) => {
+  const erreur = new ErreurApi(422, 'Valeur refusée');
+  (erreur as unknown as { refus: { champ: string; message: string }[] }).refus =
+    [{ champ: 'prot100', message: 'REFUS-422' }];
+
+  creerPersonnalise(t, { creerErreur: erreur });
+
+  const bloc = screen.getByTestId('refus-prot100');
+  assert.match(bloc.textContent ?? '', /REFUS-422/,
+    'le grief que le serveur renvoie pour "prot100" doit apparaître sous ce champ');
+  assert.ok(screen.queryByText('Enregistrer'),
+    'un refus 422 ne doit pas fermer l\'éditeur : il faut pouvoir corriger et renvoyer');
+});
+
+// CA-R7
+test('un serveur injoignable à l\'enregistrement le dit clairement, bouton actif', (t: TestContext) => {
+  /* Le message technique ne contient volontairement PAS « Rien n'a été
+     enregistré » : si l'écran se contentait de relayer .message tel quel
+     (ce qu'il fait aujourd'hui), ce test doit tomber sur l'absence de cette
+     phrase, pas sur un hasard de rédaction du message d'origine. */
+  const erreur = new ErreurApi(
+    0, 'Le serveur ne répond pas (30 s) : http://api.test. Réessaie dans un instant.');
+
+  const { crees } = creerPersonnalise(t, { creerErreur: erreur });
+  remplirLesQuatreMacros();
+
+  const texte = document.body.textContent ?? '';
+  assert.match(texte, /Rien n'a été enregistré/,
+    `un statut 0 doit afficher un message contenant « Rien n'a été enregistré », `
+    + `pas relayer le message technique brut. Texte affiché : « ${texte} »`);
+
+  /* `Bouton` ne pose ni `disabled` ni `aria-disabled` (dette du 26/09/2026) :
+     on éprouve donc ce qui compte — un clic REPART vers le serveur. */
+  const avant = crees.length;
+  fireEvent.click(screen.getByText('Enregistrer'));
+  assert.equal(crees.length, avant + 1,
+    'le bouton doit rester actif après un serveur injoignable : rien n\'a été '
+    + 'enregistré, l\'utilisateur doit pouvoir réessayer');
 });

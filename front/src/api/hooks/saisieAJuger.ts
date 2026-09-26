@@ -9,7 +9,10 @@ import type { SaisieAliment } from './verification';
 export type { SaisieAliment };
 
 /** Les champs qu'on remplit soi-meme : eux seuls font une « saisie ». */
-const CHAMPS_TAPES = ['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100'] as const;
+/* LES PESEES Y SONT DEPUIS LE 26 SEPTEMBRE 2026 : elles remplacent
+   `ratioCandidat`, que l'ecran calculait lui-meme. */
+const CHAMPS_TAPES = ['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100',
+  'peseeAvant', 'peseeApres'] as const;
 
 /**
  * Y A-T-IL DE QUOI DERANGER LE SERVEUR ?
@@ -21,7 +24,7 @@ const CHAMPS_TAPES = ['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100'] as
  * simple ouverture du frigo :
  *
  *   POST /api/verification/aliment
- *   {"categorie":"prot","kcal100":"", … ,"ratio":"1","ratioCandidat":""}
+ *   {"categorie":"prot","kcal100":"", … ,"ratio":"1","peseeAvant":"","peseeApres":""}
  *
  * LA CATEGORIE ET LE RENDEMENT NE COMPTENT PAS : ils ont une valeur par defaut
  * (`prot`, `1`) que personne n'a tapee. Les retenir aurait laisse le defaut
@@ -34,7 +37,6 @@ const CHAMPS_TAPES = ['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100'] as
 export function ilYAQuelqueChoseAJuger(saisie: SaisieAliment | null): boolean {
   if (saisie === null) return false;
 
-  return CHAMPS_TAPES.some((champ) => saisie[champ].trim() !== '')
-    || (saisie.ratioCandidat ?? '').trim() !== '';
+  return CHAMPS_TAPES.some((champ) => (saisie[champ] ?? '').trim() !== '');
 }
 

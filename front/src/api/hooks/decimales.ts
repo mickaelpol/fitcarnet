@@ -21,31 +21,28 @@
 
 import type { Cible, Modele, Seance, Serie } from '../types';
 
-/** Ce qu'un aliment de la base attend en écriture. */
+/**
+ * Ce qu'un aliment de la base attend en écriture : LA SAISIE TELLE QUE TAPÉE.
+ *
+ * `versDecimales` convertissait ici des nombres en chaînes pour Doctrine. Il
+ * est parti le 26 septembre 2026 : l'écran n'envoie plus de nombres du tout,
+ * il envoie les textes tapés, et `App\Serializer\AlimentDenormalizer` les lit
+ * avec le même lecteur que le verdict (`NombreSaisi`). Deux lecteurs — l'écran
+ * qui convertit, le serveur qui juge — c'était deux réponses possibles.
+ */
 export interface AlimentEcriture {
   nom: string;
   categorie: string;
-  kcal100: number;
-  prot100: number;
-  gluc100: number;
-  lip100: number;
-  fibres100: number | null;
-  ratio: number;
-  peseeAvant: number | null;
-  peseeApres: number | null;
+  kcal100: string;
+  prot100: string;
+  gluc100: string;
+  lip100: string;
+  fibres100: string;
+  ratio: string;
+  peseeAvant: string;
+  peseeApres: string;
+  referenceCiqual?: string | null;
 }
-
-export const versDecimales = (v: AlimentEcriture): Record<string, unknown> => ({
-  ...v,
-  kcal100: String(v.kcal100),
-  prot100: String(v.prot100),
-  gluc100: String(v.gluc100),
-  lip100: String(v.lip100),
-  fibres100: v.fibres100 === null ? null : String(v.fibres100),
-  ratio: String(v.ratio),
-  peseeAvant: v.peseeAvant === null ? null : String(v.peseeAvant),
-  peseeApres: v.peseeApres === null ? null : String(v.peseeApres),
-});
 
 /**
  * Les quatre macros d'une cible sont des DECIMAL : elles s'écrivent en

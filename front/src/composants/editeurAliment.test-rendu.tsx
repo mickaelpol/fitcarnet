@@ -22,12 +22,24 @@
  */
 import { describe, it, type TestContext, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { EditeurAliment, type AlimentSaisi } from './editeurAliment';
+import { EditeurAliment, type AlimentSaisi, type AlimentTape } from './editeurAliment';
+import type { SaisieAliment, VerdictAliment } from '@/api/hooks/verification';
 import { C } from '@/theme';
+
+/**
+ * Couleur attendue du texte d'un refus, DÉDUITE de `C.erreur` plutôt que
+ * recopiée en dur : `getComputedStyle` rend une couleur `rgb(r, g, b)`, jamais
+ * l'hexadécimal posé dans la feuille de style. Convertir ici évite une seconde
+ * écriture de la couleur qui pourrait diverger du thème.
+ */
+const hexEnRgb = (hex: string): string => {
+  const n = parseInt(hex.replace('#', ''), 16);
+
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+};
+const ROUGE = hexEnRgb(C.erreur);
 
 /** Un aliment tel que l'écran le reçoit : fibres inconnues, à corriger. */
 const alimentNomme = (nom: string): AlimentSaisi => ({ nom, categorie: 'prot',
@@ -125,9 +137,9 @@ const huile = (): AlimentSaisi => ({ nom: 'Huile d\'olive', categorie: 'lip',
 const macro = (rang: 0 | 1 | 2 | 3) => screen.getAllByPlaceholderText('à saisir')[rang] as HTMLInputElement;
 const CALORIES = 0; const PROTEINES = 1; const LIPIDES = 3;
 
-function editer(t: TestContext): AlimentSaisi[] {
+function editer(t: TestContext): AlimentTape[] {
   t.after(cleanup);
-  const envoyes: AlimentSaisi[] = [];
+  const envoyes: AlimentTape[] = [];
   render(
     <EditeurAliment visible aliment={huile()} onEnregistrer={(a) => { envoyes.push(a); }} onFermer={() => undefined} />,
   );
@@ -144,23 +156,29 @@ test('une huile intacte s\'enregistre — le témoin de l\'inverse', (t: TestCon
   assert.equal(envoyes.length, 1, 'sans ce témoin, un bouton toujours désactivé passerait pour une correction');
 });
 
-test('des protéines vidées ne partent pas comme 0 g', (t: TestContext) => {
+test('des protéines vidées partent vides, pas comme 0 g', (t: TestContext) => {
   const envoyes = editer(t);
 
   fireEvent.change(macro(PROTEINES), { target: { value: '' } });
   fireEvent.click(screen.getByText('Enregistrer'));
 
-  assert.equal(envoyes.length, 0,
-    'vider un champ, c\'est dire « je ne sais pas » : l\'enregistrer à 0 g écrit un chiffre que personne n\'a donné');
+  /* RÉÉCRIT LE 26 SEPTEMBRE 2026 (feature `macros-editeur-vide-pas-zero`).
+     Ce test exigeait que l'ÉCRAN refuse d'envoyer : c'était lui qui jugeait.
+     Il ne juge plus (CA-5) — il envoie le vide TEL QUEL, et c'est
+     `POST /api/aliments` qui le refuse en 422, sous le champ. Ce qui compte
+     ne change pas : le vide ne part jamais comme un zéro. */
+  assert.equal(envoyes.at(-1)?.prot100, '',
+    'vider un champ, c\'est dire « je ne sais pas » : l\'envoyer à 0 g écrit un chiffre que personne n\'a donné');
 });
 
-test('des lipides illisibles ne partent pas non plus', (t: TestContext) => {
+test('des lipides illisibles partent tels quels, pour que le serveur les refuse', (t: TestContext) => {
   const envoyes = editer(t);
 
   fireEvent.change(macro(LIPIDES), { target: { value: '10,0,0' } });
   fireEvent.click(screen.getByText('Enregistrer'));
 
-  assert.equal(envoyes.length, 0);
+  /* Même réécriture : l'illisible part tel quel, et le serveur le refuse. */
+  assert.equal(envoyes.at(-1)?.lip100, '10,0,0');
 });
 
 describe('l\'éditeur AFFICHE ce que le serveur répond', () => {
@@ -183,13 +201,15 @@ describe('l\'éditeur AFFICHE ce que le serveur répond', () => {
     ratio: 2.26, peseeAvant: null, peseeApres: null,
   };
 
-  const VERDICT_REFUS = {
+  // `candidat` a disparu de `VerdictAliment` le 26 septembre 2026, remplacé
+  // par `rendement` — voir plus bas dans ce fichier.
+  const VERDICT_REFUS: VerdictAliment = {
     refus: [{ champ: 'kcal100', message: '130 kcal pour 100 g d\u2019un féculent qui gonfle : un grain sec en fait au moins 300.' }],
     avertissements: [],
     resume: 'Les valeurs sont cohérentes entre elles.',
     verdict: 'coherent' as const,
     conversion: null,
-    candidat: null,
+    rendement: { valeur: null, explication: null, provenance: null },
     enregistrable: false,
   };
 
@@ -239,26 +259,37 @@ describe('l\'éditeur AFFICHE ce que le serveur répond', () => {
   });
 });
 
+
 /* ======================================================================== */
-/* LES PESÉES DE LA MESURE PASSENT PAR CHAMPNOMBRE — 26 SEPTEMBRE 2026       */
+/* LES PESÉES REDEVIENNENT DES CHAMPS TEXTE, JUGÉS PAR LE SERVEUR            */
+/* — 26 SEPTEMBRE 2026, LE LENDEMAIN                                         */
 /* ======================================================================== */
 
 /**
- * LA PANNE, CORRIGÉE LE 26 SEPTEMBRE 2026. « Poids avant cuisson » et « Poids
- * après cuisson » étaient deux `<Champ>` pilotés par un `useState('')` tenu à la main — la reconstruction
- * texte-depuis-nombre que `ChampNombre` existe justement pour éviter (voir
- * `champNombre.tsx`, 15 septembre 2026). Deux symptômes concrets, alors :
+ * LE CONTRAT A CHANGÉ UNE SECONDE FOIS EN DEUX JOURS. La veille, « Poids avant
+ * cuisson » et « Poids après cuisson » étaient devenus des `ChampNombre`, avec
+ * un jugement LOCAL de la lisibilité (bordure rouge, bouton caché) — voir
+ * l'historique de ce fichier. Ce jugement local est exactement ce que la
+ * décision du 20 septembre 2026 interdit : « tout doit passer par le serveur ».
+ * Les pesées redeviennent donc des `Champ` texte ordinaires, envoyées TELLES
+ * QUELLES dans `SaisieAliment.peseeAvant`/`peseeApres`, et c'est le serveur qui
+ * dit si elles se lisent (refus), qui calcule un rendement
+ * (`VerdictAliment.rendement`) et qui juge l'aliment entier — refus d'écriture
+ * compris (`EditeurAliment.refusEcriture`, un 422).
  *
- *  - à l'ouverture, une pesée déjà connue s'affiche au POINT (`String(42.5)`
- *    donnait « 42.5 ») au lieu du séparateur français ;
- *  - une saisie illisible (« 4,2,1 », « abc », « -3 ») ne bordait rien de rouge :
- *    aucun `illisible` n'était jamais posé sur ces deux champs, contrairement à
- *    ceux des macros, qui l'ont depuis le 17 septembre. La règle 6 — une
- *    absence n'est pas un zéro — restait vraie côté données (`nombreSaisi`
- *    renvoyait déjà `null`), mais l'écran ne le MONTRAIT pas.
+ * CE QUI SURVIT DE LA VEILLE, ET C'EST POUR ÇA QUE CES TROIS TÉMOINS RESTENT :
+ * l'affichage à la française d'une pesée déjà connue, le vide qui reste vide,
+ * et la virgule qui ne disparaît pas sous les doigts. Ce sont des exigences sur
+ * le TEXTE affiché, indépendantes de qui juge ensuite ce texte.
+ *
+ * CE QUI DISPARAÎT AVEC `ChampNombre` : le contrôle porté sur le SOURCE
+ * (l'ancien CA-5, « ce sont des ChampNombre ») et la bordure rouge calculée
+ * localement (CA-R1/CA-R2 de la veille) — il n'y a plus de jugement local à
+ * colorer, le refus vient désormais du serveur et s'affiche par
+ * `testID="refus-peseeAvant"` / `testID="refus-peseeApres"`, comme pour toute
+ * autre valeur.
  */
-describe('les pesées de l’éditeur passent par ChampNombre', () => {
-  /** Un aliment complet, valide pour l'enregistrement — seules les pesées varient. */
+describe('les pesées sont des champs texte, envoyées brutes au serveur', () => {
   const alimentAvecPesees = (peseeAvant: number | null, peseeApres: number | null): AlimentSaisi => ({
     nom: 'Riz basmati', categorie: 'fec', kcal100: 350, prot100: 7, gluc100: 77,
     lip100: 1, fibres100: null, ratio: 1, peseeAvant, peseeApres,
@@ -276,30 +307,14 @@ describe('les pesées de l’éditeur passent par ChampNombre', () => {
     });
   }
 
-  function ouvrirMesure(t: TestContext, aliment: AlimentSaisi, onEnregistrer: (a: AlimentSaisi) => void = () => undefined) {
+  function ouvrirMesure(t: TestContext, aliment: AlimentSaisi) {
     t.after(cleanup);
-    render(<EditeurAliment visible aliment={aliment} onEnregistrer={onEnregistrer} onFermer={() => undefined} />);
+    render(<EditeurAliment visible aliment={aliment} onEnregistrer={() => undefined} onFermer={() => undefined} />);
     fireEvent.click(screen.getByText('Je préfère mesurer'));
   }
 
-  /**
-   * Couleur attendue du cadre en erreur, DÉDUITE de `C.erreur` plutôt que
-   * recopiée en dur : `getComputedStyle` rend une couleur `rgb(r, g, b)`,
-   * jamais l'hexadécimal posé dans la feuille de style. Convertir ici évite
-   * une seconde écriture de la couleur qui pourrait diverger du thème.
-   */
-  const hexEnRgb = (hex: string): string => {
-    const n = parseInt(hex.replace('#', ''), 16);
-
-    return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-  };
-  const ROUGE = hexEnRgb(C.erreur);
-
-  /** Le cadre du champ, c'est le `View` PARENT du `TextInput` — voir `base.tsx` l.158. */
-  const bordeDeRouge = (champ: HTMLInputElement): boolean =>
-    getComputedStyle(champ.parentElement as Element).borderColor === ROUGE;
-
   test('CA-1 : une pesée connue s’affiche à la française, pas au point', (t: TestContext) => {
+    // CA-1
     ouvrirMesure(t, alimentAvecPesees(42.5, 96));
 
     assert.equal(champAvant().value, '42,5',
@@ -308,6 +323,7 @@ describe('les pesées de l’éditeur passent par ChampNombre', () => {
   });
 
   test('CA-2 : sans aucune pesée, les deux champs sont vides — témoin', (t: TestContext) => {
+    // CA-2
     ouvrirMesure(t, alimentAvecPesees(null, null));
 
     assert.equal(champAvant().value, '', 'null ne doit ni s’afficher "0" ni "null"');
@@ -315,6 +331,7 @@ describe('les pesées de l’éditeur passent par ChampNombre', () => {
   });
 
   test('CA-3 : la virgule ne disparaît pas sous les doigts — témoin', (t: TestContext) => {
+    // CA-3
     ouvrirMesure(t, alimentAvecPesees(null, null));
 
     assert.deepEqual(
@@ -323,118 +340,267 @@ describe('les pesées de l’éditeur passent par ChampNombre', () => {
       'c’est exactement le bug du 15 septembre 2026 (425 kg au lieu de 42,5) : ici sur une pesée',
     );
   });
+});
 
-  test('CA-4 : la mesure va jusqu’à l’enregistrement — témoin', (t: TestContext) => {
-    const envoyes: AlimentSaisi[] = [];
-    ouvrirMesure(t, alimentAvecPesees(null, null), (a) => { envoyes.push(a); });
+/* ======================================================================== */
+/* LE REFUS, LE RENDEMENT ET L'ENREGISTRABLE VIENNENT DU SERVEUR             */
+/* — 26 SEPTEMBRE 2026                                                       */
+/* ======================================================================== */
 
-    fireEvent.change(champAvant(), { target: { value: '100' } });
-    fireEvent.change(champApres(), { target: { value: '230' } });
-    fireEvent.click(screen.getByText(/Utiliser ce résultat/));
+/**
+ * DEUXIÈME PALIER DE LA MÊME REFONTE. Ce que cet écran ne fait plus DU TOUT :
+ *
+ *  - il ne rédige plus AUCUN message (« Renseigne les quatre valeurs… »,
+ *    « Un féculent absorbe de l'eau… », « Ces deux poids sont inversés… » ont
+ *    disparu — c'était le dernier métier local) ;
+ *  - il ne calcule plus de ratio candidat lui-même (`ratioCandidat` a disparu
+ *    de `SaisieAliment`, et `VerdictAliment.candidat` est remplacé par
+ *    `VerdictAliment.rendement`, rendu par le serveur) ;
+ *  - il n'éteint plus le bouton sur ses propres macros : seul `enregistrable`,
+ *    rendu par le serveur, compte — une macro vide n'est plus un motif
+ *    d'extinction LOCAL.
+ *
+ * CE QU'IL FAIT ENCORE : filtrer la frappe des champs numériques
+ * (`/^[0-9.,]*$/`) pour qu'une lettre ne s'affiche jamais dans un champ censé
+ * porter un nombre — ce n'est pas un jugement métier, c'est un clavier.
+ *
+ * `AlimentTape` (les textes tels que tapés) remplace ce que `onEnregistrer`
+ * recevait : les pesées y sont des chaînes, pas des nombres — c'est le serveur
+ * qui les relit, comme pour les quatre macros depuis le 20 septembre.
+ */
+describe('le refus, le rendement et l’enregistrable viennent du serveur, rien n’est jugé ici', () => {
+  /** Toutes les valeurs à 12 : sert à vérifier qu'une frappe illisible ne bouge rien. */
+  const alimentDouze = (): AlimentSaisi => ({
+    nom: 'Aliment de test', categorie: 'prot', kcal100: 12, prot100: 12, gluc100: 12,
+    lip100: 12, fibres100: 12, ratio: 1, peseeAvant: 12, peseeApres: 12,
+  });
+
+  const RENDEMENT_INCONNU: VerdictAliment['rendement'] = { valeur: null, explication: null, provenance: null };
+
+  const VERDICT_BASE: VerdictAliment = {
+    refus: [], avertissements: [], resume: '', verdict: 'indecidable',
+    conversion: null, enregistrable: true, rendement: RENDEMENT_INCONNU,
+  };
+
+  test('CA-1 : une macro non touchée remonte "" à onSaisie, et le refus du serveur s’affiche sous elle', (t: TestContext) => {
+    // CA-1
+    t.after(cleanup);
+    const vues: SaisieAliment[] = [];
+    const verdict: VerdictAliment = {
+      ...VERDICT_BASE,
+      refus: [{ champ: 'prot100', message: 'Valeur manquante : écris 0 si l’aliment n’en contient pas.' }],
+    };
+    render(<EditeurAliment visible verdict={verdict}
+      onSaisie={(s) => vues.push(s)} onEnregistrer={() => undefined} onFermer={() => undefined} />);
+
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Riz' } });
+    fireEvent.change(screen.getByLabelText('Calories'), { target: { value: '350' } });
+    fireEvent.change(screen.getByLabelText('Glucides'), { target: { value: '77' } });
+    fireEvent.change(screen.getByLabelText('Lipides'), { target: { value: '1' } });
+    // Protéines volontairement non touché : sur une création, il part vide.
+
+    assert.equal(vues.at(-1)?.prot100, '', 'une macro non touchée doit rester vide, pas "0"');
+
+    const refusProt = screen.getByTestId('refus-prot100');
+    assert.match(refusProt.textContent ?? '', /Valeur manquante/,
+      'l’écran ne rédige plus ce message : il doit venir tel quel du verdict');
+    /* La couleur est portée par le TEXTE du refus : un `View` n'a pas de
+       couleur de texte en React Native. */
+    assert.equal(getComputedStyle(refusProt.firstElementChild as Element).color, ROUGE);
+  });
+
+  for (const etiquette of ['Calories', 'Protéines', 'Fibres (facultatif)', 'Poids avant cuisson', 'Poids après cuisson']) {
+    test(`CA-2 : une frappe illisible sur « ${etiquette} » laisse le champ inchangé`, (t: TestContext) => {
+      // CA-2
+      t.after(cleanup);
+      render(<EditeurAliment visible aliment={alimentDouze()}
+        onEnregistrer={() => undefined} onFermer={() => undefined} />);
+      if (etiquette.startsWith('Poids')) fireEvent.click(screen.getByText('Je préfère mesurer'));
+
+      const champ = screen.getByLabelText(etiquette) as HTMLInputElement;
+      assert.equal(champ.value, '12', 'précondition : le champ doit porter "12" avant la frappe illisible');
+
+      fireEvent.change(champ, { target: { value: 'a' } });
+      assert.equal(champ.value, '12', '"a" seul ne matche pas /^[0-9.,]*$/');
+
+      fireEvent.change(champ, { target: { value: '4a2' } });
+      assert.equal(champ.value, '12', '"4a2" collé ne matche pas non plus');
+    });
+  }
+
+  test('CA-2 : une frappe illisible sur « Quantité déjà en stock » n’est même pas transmise', (t: TestContext) => {
+    // CA-2
+    t.after(cleanup);
+    const captures: string[] = [];
+    render(<EditeurAliment visible aliment={alimentDouze()} quantite="12"
+      onQuantiteChange={(v) => captures.push(v)}
+      onEnregistrer={() => undefined} onFermer={() => undefined} />);
+
+    const champ = screen.getByLabelText('Quantité déjà en stock (facultatif)') as HTMLInputElement;
+    fireEvent.change(champ, { target: { value: 'a' } });
+    fireEvent.change(champ, { target: { value: '4a2' } });
+
+    assert.equal(champ.value, '12');
+    assert.equal(captures.length, 0,
+      'un texte illisible ne doit même pas être transmis au parent : sinon un parent qui le stockerait afficherait autre chose que "12"');
+  });
+
+  test('CA-3 : la virgule et le point sont tous deux acceptés dans une macro', (t: TestContext) => {
+    // CA-3
+    t.after(cleanup);
+    render(<EditeurAliment visible aliment={alimentDouze()}
+      onEnregistrer={() => undefined} onFermer={() => undefined} />);
+    const kcal = () => screen.getByLabelText('Calories') as HTMLInputElement;
+    assert.equal(kcal().value, '12');
+
+    fireEvent.change(kcal(), { target: { value: '42,5' } });
+    assert.equal(kcal().value, '42,5');
+
+    fireEvent.change(kcal(), { target: { value: '42.5' } });
+    assert.equal(kcal().value, '42.5');
+  });
+
+  test('CA-4 : « 4,2,1 » passe le filtre de frappe — c’est le serveur qui le refuse ensuite', (t: TestContext) => {
+    // CA-4
+    t.after(cleanup);
+    const verdict: VerdictAliment = {
+      ...VERDICT_BASE,
+      refus: [{ champ: 'lip100', message: '« 4,2,1 » n’est pas un nombre lisible.' }],
+    };
+    render(<EditeurAliment visible aliment={alimentDouze()} verdict={verdict}
+      onEnregistrer={() => undefined} onFermer={() => undefined} />);
+
+    const lip = screen.getByLabelText('Lipides') as HTMLInputElement;
+    fireEvent.change(lip, { target: { value: '4,2,1' } });
+    assert.equal(lip.value, '4,2,1',
+      'le filtre de frappe accepte chiffres, points et virgules même en surnombre : ce n’est pas à lui de juger');
+
+    assert.match(screen.getByTestId('refus-lip100').textContent ?? '', /n’est pas un nombre lisible/);
+  });
+
+  test('CA-5 : « Renseigne les quatre valeurs » a disparu, même macro vide', (t: TestContext) => {
+    // CA-5
+    t.after(cleanup);
+    render(<EditeurAliment visible onEnregistrer={() => undefined} onFermer={() => undefined} />);
+
+    assert.equal(screen.queryByText(/Renseigne les quatre valeurs/), null,
+      'ce message était rédigé par l’écran ; il n’a plus le droit de juger');
+  });
+
+  test('CA-5 : le bouton reste actif, kcal vide, si le serveur dit enregistrable — l’écran ne décide plus', (t: TestContext) => {
+    // CA-5
+    t.after(cleanup);
+    const envoyes: AlimentTape[] = [];
+    render(<EditeurAliment visible verdict={{ ...VERDICT_BASE, enregistrable: true }}
+      onEnregistrer={(a) => envoyes.push(a)} onFermer={() => undefined} />);
+
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Riz' } });
+    // kcal reste vide : en création, aucune macro n'est pré-remplie.
+    fireEvent.click(screen.getByText('Enregistrer'));
+
+    assert.equal(envoyes.length, 1,
+      'kcal vide n’éteint plus le bouton par lui-même : seul enregistrable, rendu par le serveur, compte désormais');
+  });
+
+  test('CA-5 (témoin) : enregistrable à faux éteint le bouton, même tout rempli', (t: TestContext) => {
+    // CA-5
+    t.after(cleanup);
+    const envoyes: AlimentTape[] = [];
+    render(<EditeurAliment visible aliment={alimentDouze()} verdict={{ ...VERDICT_BASE, enregistrable: false }}
+      onEnregistrer={(a) => envoyes.push(a)} onFermer={() => undefined} />);
+
+    fireEvent.click(screen.getByText('Enregistrer'));
+
+    assert.equal(envoyes.length, 0,
+      'sans ce témoin, un bouton toujours actif passerait le test précédent par accident');
+  });
+
+  test('CA-6 : le résumé du serveur s’affiche même sur un aliment à zéro', (t: TestContext) => {
+    // CA-6
+    t.after(cleanup);
+    const aliment: AlimentSaisi = { ...alimentDouze(), kcal100: 0, prot100: 0 };
+    render(<EditeurAliment visible aliment={aliment} verdict={{ ...VERDICT_BASE, resume: 'RÉSUMÉ-SERVEUR' }}
+      onEnregistrer={() => undefined} onFermer={() => undefined} />);
+
+    assert.match(document.body.textContent ?? '', /RÉSUMÉ-SERVEUR/);
+  });
+
+  test('CA-6 (témoin) : un résumé vide n’affiche rien', (t: TestContext) => {
+    // CA-6
+    t.after(cleanup);
+    const aliment: AlimentSaisi = { ...alimentDouze(), kcal100: 0, prot100: 0 };
+    render(<EditeurAliment visible aliment={aliment} verdict={{ ...VERDICT_BASE, resume: '' }}
+      onEnregistrer={() => undefined} onFermer={() => undefined} />);
+
+    assert.doesNotMatch(document.body.textContent ?? '', /RÉSUMÉ-SERVEUR/);
+  });
+
+  test('CA-7 : sans verdict, le rendement affiche « inconnu » — témoin', (t: TestContext) => {
+    // CA-7
+    t.after(cleanup);
+    render(<EditeurAliment visible onEnregistrer={() => undefined} onFermer={() => undefined} />);
+
+    assert.equal(screen.getByTestId('rendement').textContent, 'Rendement : inconnu');
+  });
+
+  test('CA-7 : la mesure envoie les pesées tapées, et le rendement du serveur se propose puis s’enregistre', (t: TestContext) => {
+    // CA-7
+    t.after(cleanup);
+    const vues: SaisieAliment[] = [];
+    const envoyes: AlimentTape[] = [];
+    const verdict: VerdictAliment = {
+      ...VERDICT_BASE,
+      rendement: { valeur: 2.3, explication: 'EXPLICATION-SERVEUR', provenance: 'PROVENANCE-SERVEUR' },
+    };
+    render(<EditeurAliment visible verdict={verdict}
+      onSaisie={(s) => vues.push(s)} onEnregistrer={(a) => envoyes.push(a)} onFermer={() => undefined} />);
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Riz' } });
+    fireEvent.click(screen.getByText('Je préfère mesurer'));
+
+    fireEvent.change(screen.getByLabelText('Poids avant cuisson'), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText('Poids après cuisson'), { target: { value: '230' } });
+
+    const derniere = vues.at(-1);
+    assert.equal(derniere?.peseeAvant, '100');
+    assert.equal(derniere?.peseeApres, '230');
+    assert.ok(derniere !== undefined && !('ratioCandidat' in derniere),
+      'ratioCandidat a disparu de SaisieAliment : le rendement candidat n’est plus jugé ici');
+
+    assert.equal(screen.getByTestId('rendement').textContent, 'EXPLICATION-SERVEUR');
+    assert.match(document.body.textContent ?? '', /✓[\s\S]*PROVENANCE-SERVEUR/);
+
+    fireEvent.click(screen.getByText('Utiliser ce résultat (2,3)'));
     fireEvent.click(screen.getByText('Enregistrer'));
 
     assert.equal(envoyes.length, 1);
-    const recu = envoyes.at(-1);
-    assert.equal(recu?.peseeAvant, 100);
-    assert.equal(recu?.peseeApres, 230);
-    assert.equal(recu?.ratio, 2.3);
+    assert.equal(envoyes.at(-1)?.peseeAvant, '100');
+    assert.equal(envoyes.at(-1)?.peseeApres, '230');
   });
 
-  describe('CA-5 : ce sont des ChampNombre, aucune pesée tenue à la main — porté sur le SOURCE', () => {
-    /* MÊME TECHNIQUE QUE `formuleUnique.test.ts` : lire le fichier réel plutôt
-       que son rendu, pour attraper une régression même si elle ne casse aucun
-       des tests de comportement ci-dessus (deux témoins sur quatre le sont
-       déjà). `__dirname` vaut `dist-tests/composants` à l'exécution : deux
-       niveaux au-dessus rejoignent `front/`, où vit `src/`. */
-    const CHEMIN = join(__dirname, '..', '..', 'src', 'composants', 'editeurAliment.tsx');
-    const SOURCE = readFileSync(CHEMIN, 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/^\s*\/\/.*$/gm, ' ');
+  test('CA-15 : un refus d’écriture (422) s’affiche sous le bon champ, sans effacer la saisie', (t: TestContext) => {
+    // CA-15
+    t.after(cleanup);
+    render(<EditeurAliment visible aliment={alimentDouze()}
+      refusEcriture={[{ champ: 'kcal100', message: 'REFUS-422' }]}
+      onEnregistrer={() => undefined} onFermer={() => undefined} />);
 
-    /** La balise ouvrante juste avant une étiquette donnée — `<ChampNombre` ou `<Champ`, ou `null`. */
-    function baliseDeLEtiquette(source: string, etiquette: string): string | null {
-      const pos = source.indexOf(`etiquette="${etiquette}"`);
-      if (pos === -1) return null;
-      const avant = source.slice(0, pos);
-      const dernierOuvrant = avant.lastIndexOf('<');
-
-      return avant.slice(dernierOuvrant + 1).match(/^[A-Za-z]+/)?.[0] ?? null;
-    }
-
-    /** Un `useState('')` texte, destructuré vers ces deux noms précis. */
-    function useStateVideDeclare(source: string, nomValeur: string, nomSetter: string): boolean {
-      const motif = new RegExp(`\\[\\s*${nomValeur}\\s*,\\s*${nomSetter}\\s*\\]\\s*=\\s*useState\\(\\s*''\\s*\\)`);
-
-      return motif.test(source);
-    }
-
-    it('le motif reconnaît encore sa cible — le témoin', () => {
-      /* SANS CE TÉMOIN : si `etiquette="Poids avant cuisson"` disparaissait du
-         fichier (renommage de l'écran), les deux assertions suivantes
-         passeraient en trouvant `null`, un vert qui ne garde plus rien — le
-         défaut que la règle du projet interdit. On le prouve ici sur un
-         extrait FABRIQUÉ, indépendant de l'état réel du fichier, pour ne
-         jamais dépendre de si `editeurAliment.tsx` est déjà corrigé ou non. */
-      const bonExtrait = '<ChampNombre etiquette="Poids avant cuisson" unite="g" />';
-      const mauvaisExtrait = '<Champ etiquette="Poids avant cuisson" unite="g" />';
-      const useStateFabrique = "const [avant, setAvant] = useState('');";
-
-      assert.equal(baliseDeLEtiquette(bonExtrait, 'Poids avant cuisson'), 'ChampNombre');
-      assert.equal(baliseDeLEtiquette(mauvaisExtrait, 'Poids avant cuisson'), 'Champ');
-      assert.equal(useStateVideDeclare(useStateFabrique, 'avant', 'setAvant'), true);
-      assert.equal(useStateVideDeclare("const [x, setX] = useState(0);", 'avant', 'setAvant'), false);
-    });
-
-    it('« Poids avant cuisson » et « Poids après cuisson » sont des ChampNombre', () => {
-      assert.equal(baliseDeLEtiquette(SOURCE, 'Poids avant cuisson'), 'ChampNombre',
-        'c’est encore un <Champ> piloté à la main : aucune bordure rouge possible sur une saisie illisible');
-      assert.equal(baliseDeLEtiquette(SOURCE, 'Poids après cuisson'), 'ChampNombre');
-    });
-
-    it('aucun état texte tenu à la main pour ces deux pesées', () => {
-      assert.equal(useStateVideDeclare(SOURCE, 'avant', 'setAvant'), false,
-        'useState(\'\') est le texte-tenu-à-la-main que ChampNombre remplace : l’état doit devenir un nombre');
-      assert.equal(useStateVideDeclare(SOURCE, 'apres', 'setApres'), false);
-    });
+    assert.match(screen.getByTestId('refus-kcal100').textContent ?? '', /REFUS-422/);
+    assert.equal((screen.getByLabelText('Calories') as HTMLInputElement).value, '12',
+      'un refus d’écriture ne doit pas effacer ce qui a été tapé');
   });
 
-  describe('CA-R1/CA-R2 : une pesée illisible se voit — pas seulement dans les données', () => {
-    /**
-     * `nombreSaisi` renvoie déjà `null` pour ces trois saisies (règle 6, non
-     * en cause ici) : le sujet est que RIEN NE LE MONTRE. Ni bordure, ni
-     * message — l'utilisateur tape « 4,2,1 » et ne voit qu'un champ ordinaire.
-     */
-    for (const invalide of ['4,2,1', 'abc', '-3']) {
-      test(`CA-R1 : "${invalide}" dans "Poids avant cuisson" borde le champ de rouge et cache le bouton`, (t: TestContext) => {
-        ouvrirMesure(t, alimentAvecPesees(null, null));
+  test('CA-R6 : en panne, aucun refus ne s’affiche, et le rendement redevient « inconnu »', (t: TestContext) => {
+    // CA-R6
+    t.after(cleanup);
+    render(<EditeurAliment visible aliment={alimentDouze()} verdictEnPanne
+      verdict={{ ...VERDICT_BASE, refus: [{ champ: 'kcal100', message: 'NE-DOIT-PAS-APPARAITRE' }] }}
+      onEnregistrer={() => undefined} onFermer={() => undefined} />);
 
-        fireEvent.change(champAvant(), { target: { value: invalide } });
-        fireEvent.change(champApres(), { target: { value: '230' } });
-
-        assert.equal(bordeDeRouge(champAvant()), true,
-          `aucun "illisible" n’est posé sur ce champ : "${invalide}" ne se voit nulle part`);
-        assert.equal(screen.queryByText(/Utiliser ce résultat/), null,
-          'un ratio ne peut pas se proposer sur une pesée qui ne désigne aucun nombre');
-        assert.equal(champAvant().value, invalide,
-          'effacer ce qui a été tapé cacherait l’erreur au lieu de la montrer');
-      });
-    }
-
-    test('CA-R2 : corriger une pesée illisible fait disparaître la bordure et revenir le bouton', (t: TestContext) => {
-      ouvrirMesure(t, alimentAvecPesees(null, null));
-
-      fireEvent.change(champAvant(), { target: { value: '4,2,1' } });
-      fireEvent.change(champApres(), { target: { value: '230' } });
-      assert.equal(bordeDeRouge(champAvant()), true,
-        'précondition : sans bordure au départ, "elle disparaît" ne prouverait rien');
-      assert.equal(screen.queryByText(/Utiliser ce résultat/), null);
-
-      fireEvent.change(champAvant(), { target: { value: '100' } });
-
-      assert.equal(bordeDeRouge(champAvant()), false,
-        'la pesée redevient lisible : la bordure doit partir avec l’erreur');
-      assert.notEqual(screen.queryByText(/Utiliser ce résultat/), null,
-        'un ratio redevient calculable dès que les deux pesées se lisent');
-    });
+    assert.equal(screen.queryByTestId('refus-kcal100'), null,
+      'en panne, on ne sait rien vérifier : afficher un refus serait mentir sur ce qui a été contrôlé');
+    assert.doesNotMatch(document.body.textContent ?? '', /NE-DOIT-PAS-APPARAITRE/);
+    assert.match(document.body.textContent ?? '', /serveur n.{0,2}a pas répondu/i,
+      'la règle 7 : dire l’incertitude plutôt qu’un cadre vide ou un ancien avis');
+    assert.equal(screen.getByTestId('rendement').textContent, 'Rendement : inconnu');
   });
 });

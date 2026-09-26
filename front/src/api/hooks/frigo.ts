@@ -7,7 +7,7 @@ import {
   prevenirFinInventaire, preparerLesNotifications,
 } from '@/composants/notifications';
 import type { Aliment, MonFrigo } from '../types';
-import { type AlimentEcriture, versDecimales } from './decimales';
+import type { AlimentEcriture } from './decimales';
 
 /**
  * Le frigo de l'utilisateur, quelle que soit sa provenance.
@@ -46,7 +46,9 @@ export function useDefinirStock() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (v: { alimentId: number; quantite: number; emplacementId?: number }) =>
+    /* `quantite` TELLE QUE TAPÉE, ou un nombre : le serveur la lit
+       (`NombreSaisi`) — 26 septembre 2026, CA-14. */
+    mutationFn: (v: { alimentId: number; quantite: number | string; emplacementId?: number }) =>
       api<{ ok: boolean }>('/mon-frigo/stock', { methode: 'POST', corps: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
   });
@@ -70,14 +72,17 @@ export function useEnregistrerAliment() {
       /** obligatoire à la création, ignoré ensuite — Grocy est maître du nom */
       nom?: string;
       categorie: string;
-      kcal100: number;
-      prot100: number;
-      gluc100: number;
-      lip100: number;
-      fibres100: number | null;
-      ratio: number;
-      peseeAvant: number | null;
-      peseeApres: number | null;
+      /* LES TEXTES TELS QUE TAPÉS — 26 septembre 2026 : le serveur les lit
+         (`NombreSaisi`), l'écran ne convertit plus rien. */
+      kcal100: string;
+      prot100: string;
+      gluc100: string;
+      lip100: string;
+      fibres100: string;
+      ratio: string;
+      peseeAvant: string;
+      peseeApres: string;
+      referenceCiqual?: string | null;
     }) => api<{ ok: boolean; reference: string }>(
       '/mon-frigo/aliment', { methode: 'POST', corps: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
@@ -93,7 +98,7 @@ export function useCreerAliment() {
 
   return useMutation({
     mutationFn: (v: AlimentEcriture) =>
-      api<Aliment>('/aliments', { methode: 'POST', corps: versDecimales(v) }),
+      api<Aliment>('/aliments', { methode: 'POST', corps: v }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
     },
@@ -106,7 +111,7 @@ export function useMajAliment() {
 
   return useMutation({
     mutationFn: ({ id, ...v }: AlimentEcriture & { id: number }) =>
-      api<Aliment>(`/aliments/${id}`, { methode: 'PATCH', corps: versDecimales(v) }),
+      api<Aliment>(`/aliments/${id}`, { methode: 'PATCH', corps: v }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['mon-frigo'] });
     },
@@ -143,7 +148,7 @@ export function useDefinirQuantiteGrocy() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (ligne: { reference: string; quantite: number }) =>
+    mutationFn: (ligne: { reference: string; quantite: number | string }) =>
       api<{ ok: true }>('/mon-frigo/quantite', { methode: 'POST', corps: ligne }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['mon-frigo'] }),
   });

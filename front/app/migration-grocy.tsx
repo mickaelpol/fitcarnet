@@ -233,7 +233,7 @@ function LigneAMigrer({
           <ChampRattachement
             valeur={reference}
             nomAliment={aliment.nom}
-            kcalSaisies={valeur('kcal100')}
+            kcalTapees={textes.kcal100 ?? ''}
             recherche={recherche}
             resultats={resultats.data ?? []}
             onRecherche={setRecherche}

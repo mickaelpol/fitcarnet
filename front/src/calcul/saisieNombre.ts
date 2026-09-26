@@ -49,3 +49,16 @@ export function nombreSaisi(brut: string | undefined, options: { entier?: boolea
  */
 export const texteDuNombre = (n: number | null): string =>
   (n === null ? '' : String(n).replace('.', ','));
+
+/**
+ * UNE FRAPPE ACCEPTABLE DANS UN CHAMP NUMÉRIQUE — 26 septembre 2026.
+ *
+ * Ce n'est PAS une lecture, et c'est tout le sujet de la feature
+ * `macros-editeur-vide-pas-zero` : l'écran ne décide plus de ce qu'un texte
+ * désigne, le serveur le fait. Ce filtre est le « contrôle front léger »
+ * que le propriétaire laisse à l'écran : il empêche seulement de taper autre
+ * chose qu'un chiffre, « , » ou « . ». « 4,2,1 » passe, et c'est le serveur
+ * qui le refuse, sous le champ. Le signe moins ne passe pas : aucune valeur
+ * de l'éditeur d'aliment n'est négative.
+ */
+export const frappeNumeriqueAcceptee = (texte: string): boolean => /^[0-9.,]*$/.test(texte);

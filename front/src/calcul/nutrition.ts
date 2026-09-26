@@ -66,29 +66,12 @@ export const RATIOS_GUIDES: ChoixRatio[] = [
     exemple: '100 g crus → environ 85 g cuits', valeur: 0.85 },
 ];
 
-/** Depuis deux pesées : « j'avais 100 g secs, j'ai obtenu 230 g cuits ». */
-export function ratioDepuisPesees(avant: number, apres: number): number | null {
-  if (!(avant > 0) || !(apres > 0)) return null;
-
-  return Math.round((apres / avant) * 100) / 100;
-}
-
-/**
- * D'où vient le ratio ? Un chiffre mesuré n'a pas le même statut qu'une
- * valeur courante choisie dans une liste — l'utilisateur doit pouvoir
- * les distinguer six mois plus tard.
- */
-export function provenanceRatio(
-  avant: number | null | undefined,
-  apres: number | null | undefined,
-): string | null {
-  if (!avant || !apres || avant <= 0 || apres <= 0) return null;
-
-  return `mesuré : ${nombreCourt(avant)} g avant cuisson → ${nombreCourt(apres)} g après`;
-}
-
-const nombreCourt = (v: number): string =>
-  Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1);
+/* `ratioDepuisPesees` ET `provenanceRatio` VIVAIENT ICI, et l'éditeur
+   d'aliment en était le seul lecteur : il calculait le rendement qu'il
+   envoyait ensuite à l'API, qui le croyait. Ils sont sur le serveur depuis le
+   26 septembre 2026 — `api/src/Service/RendementExplique.php` — et l'écran
+   n'envoie plus que les deux pesées brutes (feature
+   `macros-editeur-vide-pas-zero`). Ne pas les réécrire ici. */
 
 /**
  * EN DEÇÀ DE CET ÉCART, ON DIT QUE LE POIDS NE CHANGE PAS.
@@ -107,23 +90,17 @@ export const POIDS_INCHANGE = 0.01;
 /** Le poids ne bouge-t-il pas assez pour qu'on en parle ? */
 const inchange = (ratio: number): boolean => Math.abs(ratio - 1) < POIDS_INCHANGE;
 
-/** Formulation en clair, pour que l'utilisateur vérifie la vraisemblance. */
-export function expliquerRatio(ratio: number): string {
-  if (inchange(ratio)) return 'Le poids ne change pas à la cuisson.';
-  if (ratio > 1) {
-    return `100 g avant cuisson donnent ${Math.round(ratio * 100)} g une fois cuits.`;
-  }
-
-  return `100 g avant cuisson donnent ${Math.round(ratio * 100)} g une fois cuits `
-    + `(perte d'eau).`;
-}
+/* `expliquerRatio` — la phrase longue de l'éditeur — est parti au serveur le
+   26 septembre 2026 avec le reste du rendement
+   (`RendementExplique::explication`). Il y garde son jumeau déclaré de
+   `POIDS_INCHANGE`, et `ratioDit.test.ts` refuse que les deux divergent. */
 
 /**
- * La meme chose, en trois mots, pour une case de tableau.
+ * Le rendement en trois mots, pour une case de tableau.
  *
  * Le frigo déplie ses macros dans une grille où une phrase ne rentre pas. Ce
- * qui compte : les deux basculent au MÊME seuil, et c'est ce que vérifie
- * `ratioDit.test.ts` sur toute la plage que la base accepte.
+ * qui compte : la phrase longue, écrite par le serveur, bascule au MÊME seuil
+ * — `ratioDit.test.ts` compare les deux `POIDS_INCHANGE`.
  */
 export const resumeRatio = (ratio: number): string =>
   (inchange(ratio) ? 'poids inchangé' : `100 g → ${Math.round(ratio * 100)} g`);

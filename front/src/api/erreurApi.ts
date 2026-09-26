@@ -17,8 +17,22 @@
  * distinguer d'un refus est ce qui permet de réessayer l'un sans réessayer
  * l'autre.
  */
+/** Une raison, et le champ qu'elle vise — pour que l'écran puisse souligner. */
+export interface Grief {
+  champ: string;
+  message: string;
+}
+
 export class ErreurApi extends Error {
-  constructor(public readonly statut: number, message: string) {
+  /**
+   * LES REFUS CHAMP PAR CHAMP D'UN 422 — 26 septembre 2026.
+   *
+   * L'écriture d'un aliment est jugée par le même `VerdictAliment` que la
+   * saisie : quand elle refuse, l'écran doit afficher chaque message SOUS SON
+   * CHAMP, pas une phrase recollée dans un bandeau. Toujours un tableau, vide
+   * par défaut : l'appelant n'a pas à s'en souvenir à chaque lecture.
+   */
+  constructor(public readonly statut: number, message: string, public readonly refus: Grief[] = []) {
     super(message);
     this.name = 'ErreurApi';
   }

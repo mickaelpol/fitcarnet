@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../client';
 import { ilYAQuelqueChoseAJuger } from './saisieAJuger';
+import type { Grief } from '../erreurApi';
 
 /**
  * CE QUE L'ECRAN DOIT DIRE, DEMANDE AU SERVEUR.
@@ -16,11 +17,9 @@ import { ilYAQuelqueChoseAJuger } from './saisieAJuger';
  * de reimplementer.
  */
 
-/** Une raison, et le champ qu'elle vise — pour que l'ecran puisse souligner. */
-export interface Grief {
-  champ: string;
-  message: string;
-}
+/* `Grief` vit dans `erreurApi.ts` depuis le 26 septembre 2026 : un 422
+   d'ecriture porte les memes `{champ, message}` que ce verdict. */
+export type { Grief };
 
 /** La teinte du bandeau est une DECISION du serveur, pas un style du front. */
 export type Verdict = 'coherent' | 'ecart' | 'incoherent' | 'indecidable';
@@ -40,13 +39,14 @@ export interface VerdictAliment {
    */
   conversion: { saisi: number; converti: number; motif: 'plafond' | 'rapport' } | null;
   /**
-   * Le rendement qu'on vient de MESURER, juge a part.
+   * LE RENDEMENT, CALCULE PAR LE SERVEUR — 26 septembre 2026.
    *
-   * L'ecran propose « utiliser ce resultat » apres deux pesees : c'est un
-   * candidat, pas la valeur en cours. Sans cette reponse distincte, l'ecran
-   * aurait garde un juge local pour ce seul bouton.
+   * Depuis les deux pesees quand il y en a, sinon depuis `ratio`. L'ecran
+   * affiche `explication` et `provenance` telles quelles, et « inconnu » s'il
+   * n'a pas de reponse : il ne calcule plus rien. Le « candidat » juge a part
+   * a disparu avec : la pesee tapee EST la saisie.
    */
-  candidat: { acceptable: boolean; motif: string | null } | null;
+  rendement: { valeur: number | null; explication: string | null; provenance: string | null };
   enregistrable: boolean;
 }
 
@@ -59,8 +59,11 @@ export interface SaisieAliment {
   lip100: string;
   fibres100: string;
   ratio: string;
-  /** Le rendement issu des deux pesees en cours, s'il y en a. */
-  ratioCandidat?: string;
+  /** Les deux pesees TELLES QUE TAPEES : le serveur en tire le rendement. */
+  peseeAvant: string;
+  peseeApres: string;
+  /** La quantite deja en stock, a la creation seulement. */
+  quantite?: string;
   /**
    * CE QUE LA FICHE PORTAIT DEJA, sur une correction.
    *
@@ -71,7 +74,7 @@ export interface SaisieAliment {
    *
    * Absent sur une creation : tout y est nouveau, ce qui est exactement juste.
    */
-  origine?: Omit<SaisieAliment, 'origine' | 'ratioCandidat'>;
+  origine?: Omit<SaisieAliment, 'origine' | 'peseeAvant' | 'peseeApres' | 'quantite'>;
 }
 
 /**

@@ -1,7 +1,7 @@
 ---
 titre: Les macros de l'éditeur ne lisent plus vide comme zéro
 slug: macros-editeur-vide-pas-zero
-phase: tdd
+phase: review
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -63,69 +63,69 @@ aurait calculé.
 
 ### L'écran ne lit ni ne juge plus rien
 
-- **CA-1** — *Étant donné* une création, *quand* l'utilisateur laisse
+- [x] **CA-1** — *Étant donné* une création, *quand* l'utilisateur laisse
   « Protéines » vide et remplit le reste, *alors* la saisie envoyée au serveur
   porte `prot100: ""` (et non `0`), et le message de refus renvoyé par le
   serveur pour `prot100` s'affiche en rouge **sous le champ Protéines**.
-- **CA-2** — *Étant donné* n'importe quel champ numérique de l'éditeur
+- [x] **CA-2** — *Étant donné* n'importe quel champ numérique de l'éditeur
   (kcal, protéines, glucides, lipides, fibres, pesée avant, pesée après,
   quantité), *quand* l'utilisateur tape « a » ou colle « 4a2 », *alors* le
   texte du champ reste celui d'avant la frappe, caractère pour caractère.
-- **CA-3** — *Étant donné* un champ contenant « 42 », *quand* l'utilisateur
+- [x] **CA-3** — *Étant donné* un champ contenant « 42 », *quand* l'utilisateur
   tape « ,5 », *alors* le champ affiche « 42,5 » : la virgule et le point sont
   acceptés par le filtre, rien n'est retiré.
-- **CA-4** — *Étant donné* un champ contenant « 4,2,1 » (accepté par le filtre),
+- [x] **CA-4** — *Étant donné* un champ contenant « 4,2,1 » (accepté par le filtre),
   *alors* c'est le serveur qui le refuse, et son message s'affiche sous ce champ.
-- **CA-5** — *Étant donné* l'éditeur, *alors* aucun message de refus n'est
+- [x] **CA-5** — *Étant donné* l'éditeur, *alors* aucun message de refus n'est
   rédigé par l'écran : « Renseigne les quatre valeurs — écris 0 si l'aliment
   n'en contient pas » et le calcul local `illisible` disparaissent ; le bouton
   « Enregistrer » ne dépend plus de `a.kcal100 > 0` ni de `macrosLisibles`.
-- **CA-6** — *Étant donné* le résumé du verdict, *alors* son affichage ne
+- [x] **CA-6** — *Étant donné* le résumé du verdict, *alors* son affichage ne
   dépend plus de `a.kcal100 > 0 || a.prot100 > 0` : ce que le serveur renvoie
   s'affiche ; s'il ne renvoie pas de résumé, rien ne s'affiche.
 
 ### Le rendement vient du serveur
 
-- **CA-7** — *Étant donné* des pesées « 100 » avant et « 230 » après, *quand*
+- [x] **CA-7** — *Étant donné* des pesées « 100 » avant et « 230 » après, *quand*
   la saisie est envoyée, *alors* elle porte les deux pesées **brutes** (et plus
   de `ratioCandidat` calculé par l'écran) ; le rendement 2,3, sa phrase
   d'explication et sa provenance (mesuré / table) affichés sont ceux **renvoyés
   par le serveur**.
-- **CA-8** — `ratioDepuisPesees`, `provenanceRatio` et `expliquerRatio`
+- [x] **CA-8** — `ratioDepuisPesees`, `provenanceRatio` et `expliquerRatio`
   disparaissent de `front/src/calcul/nutrition.ts` (l'éditeur en était le seul
   lecteur) ; leur logique existe côté serveur, avec ses tests PHPUnit.
 
 ### L'écriture n'a qu'un juge
 
-- **CA-9** — *Étant donné* `POST /api/aliments` avec `"prot100": "12,5"`,
+- [x] **CA-9** — *Étant donné* `POST /api/aliments` avec `"prot100": "12,5"`,
   *alors* l'aliment est créé avec 12,5 g de protéines, lu par le même lecteur
   que la route de verdict (`VerdictAliment`).
-- **CA-10** — *Étant donné* `POST /api/aliments` avec `"prot100": 12.5` (nombre
+- [x] **CA-10** — *Étant donné* `POST /api/aliments` avec `"prot100": 12.5` (nombre
   JSON), *alors* l'aliment est créé avec 12,5 g : les deux formes sont acceptées
   et lues par le même lecteur. `e2e/epreuves/peseesEditeur.spec.ts:57`, qui
   envoie des nombres, passe sans modification.
-- **CA-11** — *Étant donné* des pesées brutes « 100 » et « 230 » dans le corps
+- [x] **CA-11** — *Étant donné* des pesées brutes « 100 » et « 230 » dans le corps
   d'écriture, *alors* le rendement enregistré est celui **calculé par le
   serveur** (2,3), quel que soit le `ratio` éventuellement envoyé à côté.
-- **CA-12** — *Étant donné* une saisie que `POST /api/verification/aliment`
+- [x] **CA-12** — *Étant donné* une saisie que `POST /api/verification/aliment`
   déclare `enregistrable`, *quand* la même saisie est envoyée à
   `POST /api/aliments`, *alors* elle est enregistrée ; et inversement, toute
   saisie que le verdict refuse est refusée à l'écriture avec **la même liste**
   `{champ, message}`. (Un seul juge.)
-- **CA-13** — *Étant donné* une modification, *alors* `PATCH /api/aliments/{id}`
+- [x] **CA-13** — *Étant donné* une modification, *alors* `PATCH /api/aliments/{id}`
   reçoit la saisie complète et le serveur juge contre **l'aliment tel qu'il est
   en base** (origine lue en base, jamais celle du client) : un aliment
   incohérent hérité d'avant la règle peut être renommé sans toucher à ses
   valeurs.
-- **CA-14** — *Étant donné* la quantité saisie à la création, *alors* elle part
+- [x] **CA-14** — *Étant donné* la quantité saisie à la création, *alors* elle part
   telle que tapée et c'est le serveur qui la lit ; le `parseFloat` de
   `editeurAlimentConnecte.tsx:127` disparaît.
-- **CA-15** — *Étant donné* un 422 de l'écriture, *alors* l'éditeur reste
+- [x] **CA-15** — *Étant donné* un 422 de l'écriture, *alors* l'éditeur reste
   ouvert, la saisie intacte, et chaque message s'affiche sous son champ.
 
 ### Garde permanente
 
-- **CA-16** — Un test de garde, sur le modèle des cinq existants
+- [x] **CA-16** — Un test de garde, sur le modèle des cinq existants
   (`front/src/calcul/*Unique.test.ts`), refuse `nombreSaisi`, `parseFloat`,
   `Number(`, `ratioDepuisPesees` dans `editeurAliment.tsx` et
   `editeurAlimentConnecte.tsx`, et porte un cas TÉMOIN qui prouve qu'il tombe
@@ -133,22 +133,22 @@ aurait calculé.
 
 ## Ce que la feature refuse
 
-- **CA-R1** — *Étant donné* `POST /api/aliments` avec `"prot100": ""`, *alors*
+- [x] **CA-R1** — *Étant donné* `POST /api/aliments` avec `"prot100": ""`, *alors*
   422, refus rattaché à `prot100`, rien n'est créé en base (vérifié par requête).
-- **CA-R2** — *Étant donné* `POST /api/aliments` avec `"prot100": null`, *alors*
+- [x] **CA-R2** — *Étant donné* `POST /api/aliments` avec `"prot100": null`, *alors*
   422 avec le même refus que `""` : `null` n'est **jamais** lu 0.
-- **CA-R3** — *Étant donné* `POST /api/aliments` avec `"prot100": "abc"`,
+- [x] **CA-R3** — *Étant donné* `POST /api/aliments` avec `"prot100": "abc"`,
   *alors* 422, refus rattaché à `prot100`.
-- **CA-R4** — *Étant donné* un aliment incohérent en base, *quand* un `PATCH`
+- [x] **CA-R4** — *Étant donné* un aliment incohérent en base, *quand* un `PATCH`
   forgé déclare une fausse origine égale à de nouvelles valeurs incohérentes,
   *alors* 422 : l'origine envoyée par le client est ignorée.
-- **CA-R5** — *Étant donné* un `PATCH` sur l'aliment d'un autre compte, *alors*
+- [x] **CA-R5** — *Étant donné* un `PATCH` sur l'aliment d'un autre compte, *alors*
   404, avant tout jugement de la saisie (règle 2, voter `MIEN`).
-- **CA-R6** — *Étant donné* le serveur injoignable **pendant la saisie**,
+- [x] **CA-R6** — *Étant donné* le serveur injoignable **pendant la saisie**,
   *alors* un bandeau gris dit que le serveur ne répond pas et que rien n'est
   vérifié ; aucun message rouge sous les champs ; le rendement s'affiche
   « inconnu », jamais un chiffre.
-- **CA-R7** — *Étant donné* le serveur injoignable **à l'enregistrement**,
+- [x] **CA-R7** — *Étant donné* le serveur injoignable **à l'enregistrement**,
   *alors* l'écran dit que rien n'a été enregistré et invite à réessayer ; la
   saisie reste intacte et le bouton reste actif.
 
@@ -284,3 +284,16 @@ CA-15 (un 422 affiché sous les champs). CA-R4 et CA-R5 se prouvent par requête
 ## Journal
 - 2026-09-26 — spec créée depuis le brainstorm.
 - 2026-09-26 — spec validée par le propriétaire ; phase tdd.
+- 2026-09-26 — tdd : 23/23 critères portés par un test, suites vertes (API 631 tests,
+  front 747 + 72 de rendu). Contrat technique ajouté ci-dessus. Tests d'avant
+  RÉÉCRITS parce que la spec les contredit : dans `editeurAliment.test-rendu.tsx`,
+  le bloc « les pesées passent par ChampNombre » (CA-4, CA-5 et CA-R1/R2 de
+  `pesees-editeur-aliment-saisienombre` : ratio et bordure calculés par l'écran)
+  et « des protéines vidées / des lipides illisibles ne partent pas » (l'écran
+  retenait l'envoi : il envoie désormais le texte, le serveur refuse) ; leur
+  jumeau « des lipides oubliés » dans `editeurAlimentConnecte.test-rendu.tsx` ;
+  `VerdictAlimentTest` (macros vides désormais refusées) ;
+  `nutrition.test.ts` supprimé (il ne testait que `ratioDepuisPesees`).
+  Hors CA, nécessaires : les routes Grocy et `/mon-frigo/quantite` lisent par
+  `NombreSaisi` ; `idDeLaReference` (`calcul/frigo.ts`) remplace deux
+  `Number(ref.split(':')[1])`.

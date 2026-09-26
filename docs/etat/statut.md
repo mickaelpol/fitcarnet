@@ -10,6 +10,13 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-26 — `macros-editeur-vide-pas-zero` : tdd terminée (session Claude)
+
+- 23/23 critères implémentés, suites vertes : API 631 tests / 1 415 assertions,
+  front 747 + 72 de rendu. Un seul lecteur (`NombreSaisi`), un seul juge
+  (`VerdictAliment`, aussi à l'écriture via `AlimentDenormalizer`), rendement au
+  serveur (`RendementExplique`). Phase : review.
+
 ## 2026-09-26 — `macros-editeur-vide-pas-zero` : spec écrite (session Claude)
 
 - Brainstorm clos, spec `docs/features/macros-editeur-vide-pas-zero.md` : 16 CA + 7 refus,

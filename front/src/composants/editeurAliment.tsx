@@ -3,21 +3,28 @@ import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View,
 } from 'react-native';
 import { Bouton, Champ, Discret, Texte } from './base';
-import { ChampNombre } from './champNombre';
 import { ChampRattachement } from './champRattachement';
 import type { AlimentReference } from '../api/types';
-import type { SaisieAliment, VerdictAliment } from '../api/hooks/verification';
-import {
-  CATEGORIES, RATIOS_GUIDES, expliquerRatio, provenanceRatio, ratioDepuisPesees,
-} from '@/calcul/nutrition';
+import type { Grief, SaisieAliment, VerdictAliment } from '../api/hooks/verification';
+import { CATEGORIES, RATIOS_GUIDES } from '@/calcul/nutrition';
 /* CET ÉCRAN NE JUGE PLUS RIEN — 20 septembre 2026. Il importait
    `rendementPossible`, `controler`, `soupconKilojoules` et `verifierAliment` :
    quatre jugements qu'il refaisait après le serveur. Ils sont partis avec le
    reste du métier, et `api/regles/rendement.json` n'a plus rien à verrouiller
-   pour ce qui le concerne. */
-import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
-import { nombreSaisi } from '@/calcul/saisieNombre';
+   pour ce qui le concerne.
 
+   ET IL NE LIT PLUS RIEN NON PLUS — 26 septembre 2026, feature
+   `macros-editeur-vide-pas-zero`. Il importait encore `nombreSaisi` pour
+   convertir chaque champ, et `ratioDepuisPesees`, `provenanceRatio`,
+   `expliquerRatio` pour calculer puis dire le rendement. Une macro vide ou
+   illisible devenait 0 dans son état (`nombreSaisi(v) ?? 0`), et ce 0
+   décidait encore du bouton et du résumé (règle 6). Tout est parti au
+   serveur : l'écran envoie les textes, affiche ce qui revient.
+   `lectureAuServeur.test.ts` refuse qu'une lecture revienne ici. */
+import { C, E, P, R, T, TOUCHE, couleurRole, nb } from '@/theme';
+import { frappeNumeriqueAcceptee, texteDuNombre } from '@/calcul/saisieNombre';
+
+/** Un aliment déjà connu, tel que l'écran le reçoit : des nombres, venus du serveur. */
 export interface AlimentSaisi {
   id?: number;
   nom: string;
@@ -44,51 +51,54 @@ export interface AlimentSaisi {
   referenceCiqual?: string | null;
 }
 
+/** Les champs numériques de l'éditeur : leur TEXTE est tout ce que l'écran tient. */
+type CleTexte = 'kcal100' | 'prot100' | 'gluc100' | 'lip100' | 'fibres100'
+  | 'ratio' | 'peseeAvant' | 'peseeApres';
+
 /**
- * État interne du formulaire quand il ne reçoit aucun aliment : une création.
+ * CE QUE L'ÉDITEUR REMET À L'ENREGISTREMENT : LA SAISIE TELLE QUE TAPÉE.
  *
- * SES ZÉROS NE SONT NI AFFICHÉS NI ENVOYÉS. Les champs partent du texte vide
- * (`textesDe` sans aliment), et `valide` exige un texte lisible pour chaque
- * macro : ces 0 ne servent qu'à l'aperçu du contrôle.
- *
- * PLUS EXPORTÉ DEPUIS LE 17 SEPTEMBRE 2026. L'écran le passait comme `aliment`
- * pour ouvrir une création : l'éditeur y voyait un aliment existant dont les
- * quatre macros valent zéro, et les affichait « 0 ». Un oubli partait alors en
- * base comme une valeur (règle 6). Une création se demande en ne passant
- * AUCUN aliment — `EditeurAlimentConnecte` le fait sur `creation`.
+ * Jusqu'au 26 septembre 2026, c'était un `AlimentSaisi` — des nombres, lus par
+ * l'écran, et un ratio qu'il avait calculé lui-même. Le serveur les croyait.
+ * Désormais `POST`/`PATCH /api/aliments` reçoivent ces textes et les lisent
+ * avec le même lecteur que le verdict (`NombreSaisi`) : un seul juge.
  */
-const ALIMENT_VIDE: AlimentSaisi = {
-  nom: '', categorie: 'prot', kcal100: 0, prot100: 0, gluc100: 0,
-  lip100: 0, fibres100: null, ratio: 1,
-  peseeAvant: null, peseeApres: null,
+export type AlimentTape = { nom: string; categorie: string; referenceCiqual?: string | null }
+  & Record<CleTexte, string>;
+
+/**
+ * Texte de départ des champs numériques.
+ *
+ * Sur un aliment existant, un zéro est une valeur : l'huile n'a pas de
+ * protéines et doit afficher « 0 », pas un champ vide. Sur une création,
+ * tout part vide pour laisser parler les indications de saisie — sauf le
+ * rendement, qui part de « le poids ne change pas ».
+ *
+ * `texteDuNombre` ET NON `String` : 42,5 g se relit « 42,5 », pas « 42.5 »
+ * (feature `pesees-editeur-aliment-saisienombre`, 26 septembre 2026).
+ *
+ * `ALIMENT_VIDE` VIVAIT ICI, avec ses quatre macros à zéro « qui ne servaient
+ * qu'à l'aperçu ». L'aperçu est au serveur : il n'y a plus de zéro à inventer.
+ */
+const textesDe = (aliment?: AlimentSaisi): Record<CleTexte, string> => {
+  if (aliment === undefined) {
+    return {
+      kcal100: '', prot100: '', gluc100: '', lip100: '', fibres100: '',
+      ratio: '1', peseeAvant: '', peseeApres: '',
+    };
+  }
+
+  return {
+    kcal100: texteDuNombre(aliment.kcal100),
+    prot100: texteDuNombre(aliment.prot100),
+    gluc100: texteDuNombre(aliment.gluc100),
+    lip100: texteDuNombre(aliment.lip100),
+    fibres100: texteDuNombre(aliment.fibres100),
+    ratio: texteDuNombre(aliment.ratio),
+    peseeAvant: texteDuNombre(aliment.peseeAvant ?? null),
+    peseeApres: texteDuNombre(aliment.peseeApres ?? null),
+  };
 };
-
-type CleNombre = 'kcal100' | 'prot100' | 'gluc100' | 'lip100' | 'fibres100';
-
-/**
- * Lecture numérique d'un champ de saisie.
- *
- * REMONTÉE ICI LE 15 SEPTEMBRE 2026, ET CE N'EST PAS DU RANGEMENT (F13).
- * C'était un `const` déclaré DANS le composant, une trentaine de lignes SOUS
- * `majNombre`, qui l'appelle. Le code ne plantait que par chance : `majNombre`
- * n'est invoqué qu'à la frappe, donc après le premier rendu, donc après la
- * zone morte temporelle du `const`. Le jour où ce bloc serait appelé pendant
- * le rendu — ou extrait dans un hook, ce que le plan de l'audit prévoit —
- * l'écran serait mort sur un `ReferenceError`.
- *
- * Rien ici ne dépend de l'état du composant : la fonction n'avait aucune raison
- * d'y vivre. Au niveau du module, la zone morte est franchie au chargement et
- * l'ordre ne peut plus se retourner contre nous.
- */
-const nombre = (v: string): number => nombreSaisi(v) ?? 0;
-/* LE 0 CI-DESSUS NE SERT QU'À L'APERÇU, ET C'EST TOUT LE CORRECTIF.
-   Jusqu'au 15 septembre 2026, ce 0 partait EN BASE : une macro vidée ou
-   illisible s'enregistrait « 0 g ». Les calories vides étaient déjà refusées
-   (`kcal100 > 0`), un zéro incohérent aussi, par le contrôle — restait le cas
-   qui passe, une macro qui vaut zéro pour cet aliment : vider les protéines de
-   l'huile d'olive donnait les mêmes valeurs, et « je ne sais pas » devenait
-   « zéro gramme » (règle 6). Relevé par la revue. Désormais `valide` exige un
-   texte LISIBLE pour chaque macro obligatoire : ce 0 n'atteint plus l'API. */
 
 /**
  * Texte indicatif des quatre macros. « 0 » l'a été jusqu'au 17 septembre 2026 :
@@ -97,29 +107,12 @@ const nombre = (v: string): number => nombreSaisi(v) ?? 0;
  */
 const A_SAISIR = 'à saisir';
 
-/** Ce texte désigne-t-il un nombre ? Vide ne compte pas comme lisible. */
-const lisible = (texte: string): boolean => nombreSaisi(texte) !== null;
-
 /**
- * Texte de départ des champs numériques.
- *
- * Sur un aliment existant, un zéro est une valeur : l'huile n'a pas de
- * protéines et doit afficher « 0 », pas un champ vide. Sur une création,
- * tout part vide pour laisser parler les indications de saisie.
+ * Les champs qui ont une case à l'écran : leurs refus s'affichent dessous.
+ * Les autres — `nom`, `categorie`… — vont dans le bloc général.
  */
-const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
-  if (aliment === undefined) {
-    return { kcal100: '', prot100: '', gluc100: '', lip100: '', fibres100: '' };
-  }
-
-  return {
-    kcal100: String(aliment.kcal100),
-    prot100: String(aliment.prot100),
-    gluc100: String(aliment.gluc100),
-    lip100: String(aliment.lip100),
-    fibres100: aliment.fibres100 === null ? '' : String(aliment.fibres100),
-  };
-};
+const CHAMPS_AVEC_CASE = ['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100',
+  'ratio', 'peseeAvant', 'peseeApres', 'quantite'];
 
 /**
  * Saisie d'un aliment et de ses valeurs nutritionnelles.
@@ -131,7 +124,7 @@ const textesDe = (aliment?: AlimentSaisi): Record<CleNombre, string> => {
 export function EditeurAliment({
   visible, aliment, titre = 'Nouvel aliment', onEnregistrer, onFermer, enCours, erreur,
   quantite, onQuantiteChange, nomModifiable = true, nomImpose,
-  rattachement, verdict, verdictPerime, verdictEnPanne, onSaisie,
+  rattachement, verdict, verdictPerime, verdictEnPanne, onSaisie, refusEcriture,
 }: {
   visible: boolean;
   aliment?: AlimentSaisi;
@@ -140,13 +133,12 @@ export function EditeurAliment({
    *
    * Le cas des produits Grocy jamais renseignés (19 septembre 2026) : le nom
    * existe, les macros n'existent pas. On ne peut donc pas passer `aliment` —
-   * il obligerait à inventer des nombres, et `ALIMENT_VIDE` les met à zéro,
-   * ce qui est précisément le défaut corrigé le 17 septembre (règle 6 : un
-   * oubli n'est pas un zéro). Les champs restent vides, seul le nom est posé.
+   * il obligerait à inventer des nombres. Les champs restent vides, seul le
+   * nom est posé (règle 6 : un oubli n'est pas un zéro).
    */
   nomImpose?: string;
   titre?: string;
-  onEnregistrer: (a: AlimentSaisi) => void;
+  onEnregistrer: (a: AlimentTape) => void;
   onFermer: () => void;
   enCours?: boolean;
   /** message d'échec de l'enregistrement ; la saisie reste à l'écran */
@@ -155,6 +147,7 @@ export function EditeurAliment({
    * Quantité déjà possédée, saisie à la création seulement.
    * Le champ n'apparaît que si `onQuantiteChange` est fourni : ailleurs la
    * quantité se corrige dans l'inventaire, seul endroit où elle s'écrit.
+   * Elle part TELLE QUE TAPÉE : c'est le serveur qui la lit (CA-14).
    */
   quantite?: string;
   onQuantiteChange?: (v: string) => void;
@@ -182,9 +175,8 @@ export function EditeurAliment({
    * réimplémenter, ce qui est le vrai sujet.
    *
    * `undefined` veut dire « pas encore de réponse » : on n'affiche alors NI
-   * refus NI résumé, plutôt qu'un avis fabriqué ici en attendant. Inventer un
-   * verdict local le temps de l'aller-retour, c'est réintroduire exactement
-   * la deuxième écriture qu'on vient de retirer.
+   * refus NI résumé, et le rendement est « inconnu », plutôt qu'un avis
+   * fabriqué ici en attendant.
    */
   verdict?: VerdictAliment;
   /**
@@ -199,10 +191,9 @@ export function EditeurAliment({
   /**
    * LE SERVEUR N'A PAS RÉPONDU — réseau coupé, ou erreur.
    *
-   * Il FAUT le dire. Sans réponse, `verdict` vaut `undefined` et l'écran
-   * affichait un cadre bordé et VIDE, avec le bouton actif : ni un refus, ni
-   * une incertitude énoncée, mais une absence de réponse déguisée en réponse.
-   * La règle 7 demande l'inverse.
+   * Il FAUT le dire, et ne rien montrer d'autre : aucun refus, aucun
+   * rendement chiffré. Un verdict d'avant la panne décrirait une autre saisie
+   * (règle 7, CA-R6).
    */
   verdictEnPanne?: boolean;
   /**
@@ -214,23 +205,34 @@ export function EditeurAliment({
    * test ne l'annoncent.
    */
   onSaisie?: (s: SaisieAliment) => void;
+  /**
+   * LES REFUS D'UN 422 À L'ENREGISTREMENT — 26 septembre 2026 (CA-15).
+   *
+   * L'écriture est jugée par le même `VerdictAliment` que la saisie : ses
+   * refus arrivent champ par champ, et s'affichent sous leur champ comme ceux
+   * du verdict. La saisie, elle, reste intacte.
+   */
+  refusEcriture?: Grief[];
 }) {
-  const [a, setA] = useState<AlimentSaisi>(aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' });
+  /* CE QUI N'EST PAS UN NOMBRE : le nom, la catégorie, le rattachement. */
+  const ficheDe = () => ({
+    nom: aliment?.nom ?? nomImpose ?? '',
+    categorie: aliment?.categorie ?? 'prot',
+    referenceCiqual: aliment?.referenceCiqual ?? null,
+  });
+  const [fiche, setFiche] = useState(ficheDe);
   const [mesurer, setMesurer] = useState(false);
-  /* LES PESÉES SONT DES NOMBRES, ET LEUR TEXTE VIT DANS `ChampNombre`.
-     Jusqu'au 26 septembre 2026, c'étaient deux textes tenus à la main : une
-     seconde façon de faire, relue par `String(…)` — 42,5 g revenait « 42.5 » —
-     et une pesée illisible ne se voyait pas, elle faisait seulement disparaître
-     le bouton. `null` : pas de pesée, ou une pesée illisible (règle 6). */
-  const [avant, setAvant] = useState<number | null>(null);
-  const [apres, setApres] = useState<number | null>(null);
 
-  /* Le texte saisi vit à part du nombre.
+  /* LE TEXTE EST TOUT CE QUE L'ÉCRAN TIENT, pesées comprises.
      Piloter l'input avec String(nombre) rendait la saisie impossible : « 0 »
-     redonnait '', « 0,8 » repassait par « 0 » puis « 0, » que parseFloat
-     ramenait à 0, et le séparateur disparaissait sous les doigts. Le champ
-     garde donc le texte tel quel ; le nombre n'en est que la lecture. */
-  const [textes, setTextes] = useState<Record<CleNombre, string>>(textesDe(aliment));
+     redonnait '', « 0,8 » repassait par « 0 » puis « 0, », et le séparateur
+     disparaissait sous les doigts. Depuis le 26 septembre 2026, il n'y a plus
+     de nombre du tout de ce côté : le serveur lit. */
+  const [textes, setTextes] = useState<Record<CleTexte, string>>(() => textesDe(aliment));
+
+  /* LES PESÉES D'AVANT LA MESURE, pour que « Revenir aux valeurs courantes »
+     annule la mesure au lieu de la garder. `null` hors mesure. */
+  const [peseesDAvant, setPeseesDAvant] = useState<{ avant: string; apres: string } | null>(null);
 
   /* ON DÉPEND DE L'IDENTITÉ DE L'ALIMENT, PAS DE LA RÉFÉRENCE DE L'OBJET.
      ET C'EST UNE CORRECTION, DU 15 SEPTEMBRE 2026.
@@ -247,118 +249,119 @@ export function EditeurAliment({
      les fibres d'un aliment pendant un inventaire, c'était voir sa saisie
      s'effacer toutes les deux secondes.
 
-     Corrigé ICI plutôt que chez l'appelant, en mémoïsant de son côté : un
-     seul composant appelle `EditeurAliment` aujourd'hui, le prochain
-     n'héritera pas du piège. C'est la leçon d'É1 — le contrôle va au point de
-     passage obligé, pas devant chaque porte.
-
      CE QUI IDENTIFIE UN ALIMENT ICI, ET POURQUOI PAS SEULEMENT `id`.
-     Relevé le 15 septembre 2026 par la revue : `versSaisie`, le seul appelant
-     réel, ne renseigne PAS `id` — un `AlimentDisponible` porte une `reference`
-     (« grocy:12 », « base:47 »), pas un identifiant numérique. `aliment?.id`
-     valait donc toujours `null` en production, et cette dépendance était
-     inerte : seul `visible` faisait rejouer l'effet.
-
-     Ça marchait, parce que `frigo.tsx` remet `edite` à `null` avant toute
-     réouverture. Mais rien ne l'impose : un écran qui passerait de A à B sans
-     repasser par `null` afficherait le titre de B et les valeurs de A, en
-     silence. Le nom sert donc de repli — il identifie l'aliment aussi bien, il
-     est toujours présent, et il ne change pas pendant la saisie puisque c'est
-     la PROP, pas l'état local du formulaire. */
+     `versSaisie`, le seul appelant réel, ne renseigne PAS `id` — un
+     `AlimentDisponible` porte une `reference` (« grocy:12 », « base:47 »).
+     Le nom sert donc de repli : il est toujours présent, et il ne change pas
+     pendant la saisie puisque c'est la PROP, pas l'état local du formulaire. */
   const identite = aliment?.id ?? aliment?.nom ?? nomImpose ?? null;
 
   useEffect(() => {
     if (visible) {
-      const depart = aliment ?? { ...ALIMENT_VIDE, nom: nomImpose ?? '' };
-      setA(depart);
+      setFiche(ficheDe());
       setTextes(textesDe(aliment));
       setMesurer(false);
-      // une mesure antérieure se retrouve, pour la vérifier ou la refaire
-      setAvant(depart.peseeAvant ?? null);
-      setApres(depart.peseeApres ?? null);
+      setPeseesDAvant(null);
     }
     // `aliment` est volontairement absent des dépendances : voir ci-dessus.
   }, [visible, identite]);
 
-  const maj = (champs: Partial<AlimentSaisi>) => setA({ ...a, ...champs });
-
-  /** Saisie d'un champ numérique : on conserve le texte, on en déduit le nombre. */
-  const majNombre = (cle: CleNombre, texte: string) => {
+  /**
+   * UNE FRAPPE QUI FERAIT APPARAÎTRE AUTRE CHOSE QU'UN CHIFFRE, « , » OU « . »
+   * N'EST PAS PRISE — et le champ garde son texte d'avant, caractère pour
+   * caractère (CA-2). Ce n'est pas une lecture : « 4,2,1 » passe, et c'est le
+   * serveur qui le refuse, sous le champ (CA-4). Rien n'est retiré en silence.
+   */
+  const majTexte = (cle: CleTexte, texte: string) => {
+    if (!frappeNumeriqueAcceptee(texte)) return;
     setTextes((t) => ({ ...t, [cle]: texte }));
-
-    if ('fibres100' === cle) {
-      // les fibres sont facultatives : vide veut dire « non renseigné », pas zéro
-      maj({ fibres100: texte.trim() === '' ? null : nombre(texte) });
-
-      return;
-    }
-
-    maj({ [cle]: nombre(texte) });
   };
 
-  const changerCategorie = (categorie: string) => maj({ categorie });
-
-
-
-  /* LA LECTURE EST CELLE DE `ChampNombre`, donc de `nombreSaisi` et non de
-     `parseFloat` : « 4,2,1 » g se lisait 4,2 et proposait un ratio calculé sur
-     une pesée qui n'existe pas. Illisible, la pesée vaut `null` ici. */
-  const ratioMesure = ratioDepuisPesees(avant ?? NaN, apres ?? NaN);
+  const pesees = { peseeAvant: textes.peseeAvant, peseeApres: textes.peseeApres };
+  const sansPesee = textes.peseeAvant.trim() === '' && textes.peseeApres.trim() === '';
 
   /* CE QUI EST TAPÉ, ENVOYÉ AU PARENT. Il en fait un appel au serveur, avec
      anti-rebond ; cet écran ne sait pas qu'il y a un réseau. On envoie les
-     TEXTES et non les nombres : lire « 12,5 » est aussi une règle métier, et
-     elle est partie sur le serveur avec le reste. */
+     TEXTES : lire « 12,5 » est une règle métier, et elle est au serveur. Les
+     pesées partent brutes — c'est le serveur qui en tire le rendement (CA-7). */
   const saisie: SaisieAliment = {
-    categorie: a.categorie,
+    categorie: fiche.categorie,
     kcal100: textes.kcal100,
     prot100: textes.prot100,
     gluc100: textes.gluc100,
     lip100: textes.lip100,
     fibres100: textes.fibres100,
-    ratio: String(a.ratio),
-    /* Le rendement en cours de mesure part avec le reste : c'est le serveur
-       qui dira s'il est acceptable, pas cet ecran. */
-    ratioCandidat: ratioMesure === null ? '' : String(ratioMesure),
+    ratio: textes.ratio,
+    ...pesees,
+    ...(onQuantiteChange === undefined ? {} : { quantite: quantite ?? '' }),
     /* CE QUE LA FICHE PORTAIT EN ARRIVANT. Sur une création il n'y a pas
-       d'aliment, donc pas d'origine : tout y est nouveau. */
+       d'aliment, donc pas d'origine : tout y est nouveau. À l'ÉCRITURE, le
+       serveur ne la croit plus — il la lit en base (CA-13, CA-R4). */
     origine: aliment === undefined ? undefined : {
       categorie: aliment.categorie,
-      kcal100: String(aliment.kcal100),
-      prot100: String(aliment.prot100),
-      gluc100: String(aliment.gluc100),
-      lip100: String(aliment.lip100),
-      fibres100: aliment.fibres100 === null ? '' : String(aliment.fibres100),
-      ratio: String(aliment.ratio),
+      kcal100: texteDuNombre(aliment.kcal100),
+      prot100: texteDuNombre(aliment.prot100),
+      gluc100: texteDuNombre(aliment.gluc100),
+      lip100: texteDuNombre(aliment.lip100),
+      fibres100: texteDuNombre(aliment.fibres100),
+      ratio: texteDuNombre(aliment.ratio),
     },
   };
   const signature = JSON.stringify(saisie);
 
   useEffect(() => { onSaisie?.(JSON.parse(signature) as SaisieAliment); }, [signature, onSaisie]);
 
-  const OBLIGATOIRES = ['kcal100', 'prot100', 'gluc100', 'lip100'] as const;
-  const macrosLisibles = OBLIGATOIRES.every((cle) => lisible(textes[cle]))
-    && (textes.fibres100.trim() === '' || lisible(textes.fibres100));
-  const illisible = (cle: CleNombre): boolean => textes[cle].trim() !== '' && !lisible(textes[cle]);
+  /* EN PANNE, ON NE MONTRE RIEN DE CE QUE LE SERVEUR AVAIT DIT : ce verdict
+     décrit une saisie d'avant la coupure (CA-R6). */
+  const verdictVisible = verdictEnPanne === true ? undefined : verdict;
+  const tousLesRefus = [...(verdictVisible?.refus ?? []), ...(refusEcriture ?? [])]
+    .filter((x, i, liste) => liste.findIndex((y) => y.champ === x.champ && y.message === x.message) === i);
+  const refusGeneraux = tousLesRefus.filter((x) => !CHAMPS_AVEC_CASE.includes(x.champ));
 
-  const refus = verdict?.refus ?? [];
+  /** Les refus d'un champ, en rouge, juste sous lui — mot pour mot, rien de rédigé ici. */
+  const refus = (champ: string) => {
+    const siens = tousLesRefus.filter((x) => x.champ === champ);
+    if (siens.length === 0) return null;
 
-  const valide = a.nom.trim() !== ''
-    && macrosLisibles
-    && a.kcal100 > 0
-    /* LE DROIT D'ENREGISTRER VIENT DU SERVEUR. `enregistrable` porte à la fois
-       « aucun refus » et « les quatre valeurs obligatoires sont lisibles » :
-       l'écran ne le recalcule pas. Tant qu'aucune réponse n'est arrivée, on
-       laisse le bouton actif — c'est l'API qui tranchera, et un bouton éteint
-       par défaut ferait croire à un formulaire cassé. */
-    /* PAS SUR UN VERDICT PÉRIMÉ : il décrit la saisie d'avant. Éteindre le
-       bouton là-dessus refuserait une valeur que le serveur accepte. */
+    return (
+      <View testID={`refus-${champ}`} style={verdictPerime === true && { opacity: 0.45 }}>
+        {siens.map((x) => (
+          <Discret key={x.message} style={{ color: C.erreur, fontSize: T.petit, lineHeight: 16, marginTop: 2 }}>
+            {x.message}
+          </Discret>
+        ))}
+      </View>
+    );
+  };
+
+  /* LE DROIT D'ENREGISTRER VIENT DU SERVEUR. `enregistrable` porte « aucun
+     refus » et « les quatre valeurs obligatoires sont là » : l'écran ne le
+     recalcule pas — il ne regarde plus ni `kcal100 > 0` ni la lisibilité
+     (CA-5). Tant qu'aucune réponse n'est arrivée, on laisse le bouton actif :
+     c'est l'API qui tranchera, et un bouton éteint par défaut ferait croire à
+     un formulaire cassé. Le nom reste un contrôle léger de l'écran.
+     PAS SUR UN VERDICT PÉRIMÉ : il décrit la saisie d'avant. */
+  const valide = fiche.nom.trim() !== ''
     && (verdictPerime === true || (verdict?.enregistrable ?? true));
 
   /* La teinte traduit la décision du serveur ; elle ne la prend plus. */
   const couleurVerdict = {
     coherent: C.ok, ecart: C.vif, incoherent: C.erreur, indecidable: C.attenue,
-  }[verdict?.verdict ?? 'indecidable'];
+  }[verdictVisible?.verdict ?? 'indecidable'];
+
+  /* LE RENDEMENT EST CELUI DU SERVEUR, ou « inconnu » — jamais un chiffre
+     calculé ici en attendant (CA-7, CA-R6). */
+  const rendement = verdictVisible?.rendement ?? null;
+  const rendementConnu = rendement !== null && rendement.valeur !== null && rendement.explication !== null;
+
+  /** Un champ numérique de l'éditeur : texte tel quel, filtre de frappe, refus dessous. */
+  const champNombre = (cle: CleTexte, etiquette: string, unite: string, placeholder: string) => (
+    <View style={{ flex: 1 }}>
+      <Champ etiquette={etiquette} unite={unite} numerique
+        valeur={textes[cle]} onChange={(v) => majTexte(cle, v)} placeholder={placeholder} />
+      {refus(cle)}
+    </View>
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onFermer}>
@@ -374,14 +377,14 @@ export function EditeurAliment({
               {nomModifiable ? (
                 <Champ
                   etiquette="Nom"
-                  valeur={a.nom}
-                  onChange={(v) => maj({ nom: v })}
+                  valeur={fiche.nom}
+                  onChange={(v) => setFiche((f) => ({ ...f, nom: v }))}
                   placeholder="Skyr nature Milbona"
                 />
               ) : (
                 <>
                   <Discret style={[s.section, { marginTop: 0 }]}>Nom</Discret>
-                  <Texte>{a.nom}</Texte>
+                  <Texte>{fiche.nom}</Texte>
                   <Discret style={s.aide}>
                     Le nom vient de Grocy. Renomme le produit là-bas si besoin :
                     le modifier ici ne changerait rien.
@@ -397,13 +400,13 @@ export function EditeurAliment({
               {rattachement !== undefined && (
                 <View style={{ marginTop: E.m }}>
                   <ChampRattachement
-                    valeur={a.referenceCiqual ?? null}
-                    nomAliment={a.nom}
-                    kcalSaisies={nombreSaisi(textes.kcal100)}
+                    valeur={fiche.referenceCiqual}
+                    nomAliment={fiche.nom}
+                    kcalTapees={textes.kcal100}
                     recherche={rattachement.recherche}
                     resultats={rattachement.resultats}
                     onRecherche={rattachement.onRecherche}
-                    onChange={(code) => maj({ referenceCiqual: code })}
+                    onChange={(code) => setFiche((f) => ({ ...f, referenceCiqual: code }))}
                   />
                 </View>
               )}
@@ -414,9 +417,10 @@ export function EditeurAliment({
                     etiquette="Quantité déjà en stock (facultatif)"
                     unite="g" numerique style={{ marginTop: E.s }}
                     valeur={quantite ?? ''}
-                    onChange={onQuantiteChange}
+                    onChange={(v) => { if (frappeNumeriqueAcceptee(v)) onQuantiteChange(v); }}
                     placeholder="0"
                   />
+                  {refus('quantite')}
                   <Discret style={s.aide}>
                     Laisse vide si tu n'en as pas encore. L'aliment sera créé à
                     zéro et se remplira au prochain inventaire.
@@ -429,16 +433,16 @@ export function EditeurAliment({
                 {CATEGORIES.map((c) => (
                   <Pressable
                     key={c.cle}
-                    onPress={() => changerCategorie(c.cle)}
+                    onPress={() => setFiche((f) => ({ ...f, categorie: c.cle }))}
                     style={[
                       s.categorie,
-                      a.categorie === c.cle && {
+                      fiche.categorie === c.cle && {
                         backgroundColor: couleurRole(c.cle),
                         borderColor: couleurRole(c.cle),
                       },
                     ]}
                   >
-                    <Discret style={a.categorie === c.cle
+                    <Discret style={fiche.categorie === c.cle
                       ? { color: C.fond, fontFamily: P.fort, fontSize: T.petit }
                       : { fontSize: T.petit }}>
                       {c.libelle}
@@ -447,39 +451,24 @@ export function EditeurAliment({
                 ))}
               </View>
               <Discret style={{ fontSize: T.petit, marginTop: 4 }}>
-                {CATEGORIES.find((c) => c.cle === a.categorie)?.exemple}
+                {CATEGORIES.find((c) => c.cle === fiche.categorie)?.exemple}
               </Discret>
 
               {/* ---- valeurs nutritionnelles ---- */}
               <Discret style={s.section}>Pour 100 g, d'après l'emballage</Discret>
 
               <View style={s.paire}>
-                <Champ etiquette="Calories" unite="kcal" numerique style={{ flex: 1 }}
-                  valeur={textes.kcal100}
-                  onChange={(v) => majNombre('kcal100', v)} placeholder={A_SAISIR}
-                  illisible={illisible('kcal100')} />
-                <Champ etiquette="Protéines" unite="g" numerique style={{ flex: 1 }}
-                  valeur={textes.prot100}
-                  onChange={(v) => majNombre('prot100', v)} placeholder={A_SAISIR}
-                  illisible={illisible('prot100')} />
+                {champNombre('kcal100', 'Calories', 'kcal', A_SAISIR)}
+                {champNombre('prot100', 'Protéines', 'g', A_SAISIR)}
               </View>
               <View style={[s.paire, { marginTop: E.s }]}>
-                <Champ etiquette="Glucides" unite="g" numerique style={{ flex: 1 }}
-                  valeur={textes.gluc100}
-                  onChange={(v) => majNombre('gluc100', v)} placeholder={A_SAISIR}
-                  illisible={illisible('gluc100')} />
-                <Champ etiquette="Lipides" unite="g" numerique style={{ flex: 1 }}
-                  valeur={textes.lip100}
-                  onChange={(v) => majNombre('lip100', v)} placeholder={A_SAISIR}
-                  illisible={illisible('lip100')} />
+                {champNombre('gluc100', 'Glucides', 'g', A_SAISIR)}
+                {champNombre('lip100', 'Lipides', 'g', A_SAISIR)}
               </View>
-              {/* LE BOUTON NE SE DÉSACTIVE PAS EN SILENCE. Une macro vide bloque
-                  l'enregistrement : on dit pourquoi, et comment en sortir. */}
-              {!macrosLisibles && (
-                <Discret style={{ color: C.erreur, marginTop: E.xs }}>
-                  Renseigne les quatre valeurs — écris 0 si l'aliment n'en contient pas.
-                </Discret>
-              )}
+              {/* « Renseigne les quatre valeurs — écris 0 si l'aliment n'en
+                  contient pas » ÉTAIT ÉCRIT ICI, par l'écran, jusqu'au
+                  26 septembre 2026. Le serveur le dit désormais lui-même, sous
+                  le champ vide, avec le texte de l'entité (CA-1, CA-5). */}
 
               <Discret style={s.aide}>
                 Les calories se saisissent en <Texte style={{ fontSize: T.petit }}>kcal</Texte>,
@@ -494,33 +483,31 @@ export function EditeurAliment({
                 Idem pour les acides gras saturés, compris dans les lipides.
               </Discret>
 
-              {verdict?.conversion != null && verdictPerime !== true && (
+              {verdictVisible?.conversion != null && verdictPerime !== true && (
                 <View style={[s.controle, { borderColor: C.vif }]}>
                   <Discret style={{ color: C.vif, fontSize: T.normal, lineHeight: 18 }}>
-                    {verdict.conversion.motif === 'plafond'
-                      ? `${nb(verdict.conversion.saisi)} kcal pour 100 g est impossible : rien ne dépasse `
+                    {verdictVisible.conversion.motif === 'plafond'
+                      ? `${nb(verdictVisible.conversion.saisi)} kcal pour 100 g est impossible : rien ne dépasse `
                         + '900 kcal, la densité de la matière grasse pure. '
-                      : `${nb(verdict.conversion.saisi)} est exactement 4,18 fois ce que donnent tes macros. `}
+                      : `${nb(verdictVisible.conversion.saisi)} est exactement 4,18 fois ce que donnent tes macros. `}
                     Tu as probablement recopié les kilojoules.
                   </Discret>
                   <Bouton
                     variante="contour"
-                    onPress={() => majNombre('kcal100', String(verdict.conversion?.converti ?? ''))}
+                    onPress={() => setTextes((t) => ({
+                      ...t, kcal100: texteDuNombre(verdictVisible.conversion?.converti ?? null),
+                    }))}
                     style={{ marginTop: E.s }}
                   >
-                    {`Convertir : ${nb(verdict.conversion.saisi)} kJ = ${nb(verdict.conversion.converti)} kcal`}
+                    {`Convertir : ${nb(verdictVisible.conversion.saisi)} kJ = ${nb(verdictVisible.conversion.converti)} kcal`}
                   </Bouton>
                 </View>
               )}
 
-              <Champ
-                etiquette="Fibres (facultatif)"
-                unite="g" numerique style={{ marginTop: E.s }}
-                valeur={textes.fibres100}
-                onChange={(v) => majNombre('fibres100', v)}
-                placeholder="—"
-              />
-              {a.fibres100 === null && (
+              <View style={{ marginTop: E.s }}>
+                {champNombre('fibres100', 'Fibres (facultatif)', 'g', '—')}
+              </View>
+              {textes.fibres100.trim() === '' && (
                 <Discret style={s.aide}>
                   Sans les fibres, la vérification ci-dessous reste approximative :
                   elles comptent pour 2 calories par gramme et faussent l'écart sur
@@ -534,29 +521,28 @@ export function EditeurAliment({
                 /* ON DIT L'INCERTITUDE PLUTÔT QU'UN CADRE VIDE (règle 7). */
                 <View style={[s.controle, { borderColor: C.attenue }]}>
                   <Discret style={{ color: C.attenue, fontSize: T.normal, lineHeight: 18 }}>
-                    Le contrôle des valeurs n'a pas pu être fait : le serveur
-                    n'a pas répondu. Tu peux enregistrer — il vérifiera à ce
-                    moment-là.
+                    Le serveur n'a pas répondu : rien de ce que tu tapes n'est
+                    vérifié pour l'instant. Il vérifiera à l'enregistrement.
                   </Discret>
                 </View>
-              ) : refus.length > 0 ? (
-                /* LE REFUS PASSE DEVANT. Afficher « cohérent » au-dessus de
-                   « le serveur va refuser » serait deux réponses à la même
-                   question. */
-                <View style={[s.controle, { borderColor: C.erreur },
+              ) : refusGeneraux.length > 0 ? (
+                <View testID="refus-general" style={[s.controle, { borderColor: C.erreur },
                   verdictPerime === true && { opacity: 0.45 }]}>
-                  {refus.map((x) => (
+                  {refusGeneraux.map((x) => (
                     <Discret key={x.champ + x.message}
                       style={{ color: C.erreur, fontSize: T.normal, lineHeight: 18 }}>
                       {x.message}
                     </Discret>
                   ))}
                 </View>
-              ) : (a.kcal100 > 0 || a.prot100 > 0) && (
+              ) : (verdictVisible?.resume ?? '') !== '' && (
+                /* LE RÉSUMÉ S'AFFICHE DÈS QUE LE SERVEUR LE RENVOIE (CA-6). Il
+                   dépendait de `a.kcal100 > 0 || a.prot100 > 0` — un chiffre
+                   lu par l'écran, 0 pour un champ vide. */
                 <View style={[s.controle, { borderColor: couleurVerdict },
                   verdictPerime === true && { opacity: 0.45 }]}>
                   <Discret style={{ color: couleurVerdict, fontSize: T.normal, lineHeight: 18 }}>
-                    {verdict?.resume ?? ''}
+                    {verdictVisible?.resume}
                   </Discret>
                 </View>
               )}
@@ -564,50 +550,45 @@ export function EditeurAliment({
               {/* ---- ratio ---- */}
               <Discret style={s.section}>Changement de poids à la cuisson</Discret>
 
-              {/* LE REFUS S'EXPLIQUE, IL NE SE CONTENTE PAS DE GRISER LE BOUTON.
-                  Le 16 septembre 2026, `rendementPossible` a remplacé un garde
-                  aveugle à la catégorie — un progrès net, mais muet : la
-                  catégorie par défaut d'un nouvel aliment est « prot », et
-                  choisir le guide « riz, pâtes : 100 g → 230 g » rendait
-                  « Enregistrer » inerte SANS un mot, pendant que la ligne
-                  au-dessus affichait tranquillement « 100 g avant cuisson
-                  donnent 230 g une fois cuits ». Règle 7 : une déviation
-                  s'explique à l'écran. Relevé par la revue le soir même. */}
-              {refus.some((x) => x.champ === 'ratio') && (
-                <Discret style={{ color: C.erreur, fontSize: T.petit, lineHeight: 16 }}>
-                  {a.categorie === 'fec'
-                    ? 'Un féculent absorbe de l\'eau : il ne peut pas peser moins cuit que cru. '
-                    : 'Une viande, un poisson ou un légume PERD de l\'eau : il ne peut pas '
-                      + 'peser plus cuit que cru. '}
-                  Tant que ce rendement reste tel quel, l'aliment ne peut pas être
-                  enregistré — la base le refuserait.
-                </Discret>
-              )}
+              {/* LE REFUS DU RENDEMENT EST CELUI DU SERVEUR, mot pour mot. Deux
+                  phrases vivaient ici — « Un féculent absorbe de l'eau… »,
+                  « Ces deux poids sont inversés… » — rédigées par l'écran à
+                  partir de la catégorie : un second juge. Parties le
+                  26 septembre 2026 (CA-5) ; `RendementPlausible` dit la même
+                  chose, avec ses mots. */}
+              {refus('ratio')}
 
               {!mesurer ? (
                 <>
-                  {RATIOS_GUIDES.map((g) => (
-                    <Pressable
-                      key={g.cle}
-                      onPress={() => maj({
-                        ratio: g.valeur, peseeAvant: null, peseeApres: null,
-                      })}
-                      style={[s.choixRatio, Math.abs(a.ratio - g.valeur) < 0.01 && s.choixActif]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Texte style={{ fontSize: T.normal }}>{g.libelle}</Texte>
-                        <Discret style={{ fontSize: T.petit }}>{g.exemple}</Discret>
-                      </View>
-                      {Math.abs(a.ratio - g.valeur) < 0.01 && (
-                        <Discret style={{ color: C.vif }}>✓</Discret>
-                      )}
-                    </Pressable>
-                  ))}
-                  <Bouton variante="discret" onPress={() => setMesurer(true)}>
+                  {RATIOS_GUIDES.map((g) => {
+                    const choisi = sansPesee && textes.ratio === texteDuNombre(g.valeur);
+
+                    return (
+                      <Pressable
+                        key={g.cle}
+                        onPress={() => setTextes((t) => ({
+                          ...t, ratio: texteDuNombre(g.valeur), peseeAvant: '', peseeApres: '',
+                        }))}
+                        style={[s.choixRatio, choisi && s.choixActif]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Texte style={{ fontSize: T.normal }}>{g.libelle}</Texte>
+                          <Discret style={{ fontSize: T.petit }}>{g.exemple}</Discret>
+                        </View>
+                        {choisi && <Discret style={{ color: C.vif }}>✓</Discret>}
+                      </Pressable>
+                    );
+                  })}
+                  <Bouton variante="discret" onPress={() => {
+                    setPeseesDAvant({ avant: textes.peseeAvant, apres: textes.peseeApres });
+                    setMesurer(true);
+                  }}>
                     <Discret style={{ fontSize: T.normal, textDecorationLine: 'underline' }}>
                       Je préfère mesurer
                     </Discret>
                   </Bouton>
+                  {refus('peseeAvant')}
+                  {refus('peseeApres')}
                 </>
               ) : (
                 <View style={s.mesure}>
@@ -616,72 +597,52 @@ export function EditeurAliment({
                     cuire, note le poids. Cuis-le, égoutte-le, et pèse-le
                     {' '}<Texte style={{ fontSize: T.normal }}>après</Texte>. L'app en déduit le reste.
                   </Discret>
+                  {/* LES PESÉES SONT DES TEXTES, ENVOYÉS BRUTS — 26 septembre
+                      2026. Elles passaient par `ChampNombre`, qui les lisait
+                      ici pour que l'écran calcule le ratio : c'était la
+                      dernière règle de lecture de cet écran. Le serveur lit,
+                      calcule et refuse, sous le champ (CA-7). */}
                   <View style={[s.paire, { marginTop: E.s }]}>
-                    <ChampNombre etiquette="Poids avant cuisson" unite="g"
-                      style={{ flex: 1 }} valeur={avant} onChange={setAvant} placeholder="100" />
-                    <ChampNombre etiquette="Poids après cuisson" unite="g"
-                      style={{ flex: 1 }} valeur={apres} onChange={setApres} placeholder="230" />
+                    {champNombre('peseeAvant', 'Poids avant cuisson', 'g', '100')}
+                    {champNombre('peseeApres', 'Poids après cuisson', 'g', '230')}
                   </View>
-                  {ratioMesure !== null && (
+                  {rendementConnu && rendement.provenance !== null && verdictPerime !== true && (
                     <Bouton
-                      onPress={() => {
-                        /* `nombreSaisi` ET NON `parseFloat` — corrigé le
-                           20 septembre 2026, palier 1. Ces deux lignes
-                           enregistraient les pesées par `parseFloat` sous un
-                           commentaire qui l'interdisait plus haut (celui de
-                           `ratioMesure`), et qui expliquait pourquoi :
-                           « 4,2,1 » se lit 4,2.
-
-                           LE GARDE `ratioMesure !== null` LES FAISAIT
-                           COÏNCIDER PAR ACCIDENT, et c'est tout ce qui tenait.
-                           Trois notations lui échappaient : `Number('0x10')`
-                           vaut 16 quand `parseFloat('0x10')` vaut 0 — idem
-                           pour `0b101` et `0o17`. Le ratio se calculait sur
-                           16, la pesée s'enregistrait à 0. Inatteignable au
-                           clavier numérique d'Android, atteignable au collage
-                           sur le web. Relevé par `verite-documentaire`.
-
-                           Elles s'écrivaient alors `nombreSaisi(…)`, sans
-                           `?? 0` : une pesée illisible est une absence, pas
-                           un zéro (règle 6).
-
-                           DEPUIS LE 26 SEPTEMBRE 2026, LA LECTURE N'EST PLUS
-                           ICI : `ChampNombre` remonte déjà le nombre, ou
-                           `null`. Ce qui s'enregistre est ce qui a servi au
-                           ratio — ils ne peuvent plus diverger. */
-                        maj({
-                          ratio: ratioMesure,
-                          peseeAvant: avant,
-                          peseeApres: apres,
-                        });
-                        setMesurer(false);
-                      }}
-                      desactive={verdictPerime === true || verdict?.candidat?.acceptable === false}
+                      onPress={() => { setMesurer(false); setPeseesDAvant(null); }}
+                      desactive={tousLesRefus.some((x) => x.champ === 'ratio')}
                       style={{ marginTop: E.s }}
                     >
-                      {verdict?.candidat?.acceptable === false
-                        ? 'Ces deux poids sont inversés : ce produit ne peut pas varier ainsi'
-                        : `Utiliser ce résultat (${nb(ratioMesure)})`}
+                      {`Utiliser ce résultat (${nb(rendement.valeur ?? 0)})`}
                     </Bouton>
                   )}
-                  <Bouton variante="discret" onPress={() => setMesurer(false)}>
+                  <Bouton variante="discret" onPress={() => {
+                    /* ANNULER LA MESURE, c'est retrouver les pesées d'avant —
+                       celles de la fiche, ou aucune. */
+                    setTextes((t) => ({
+                      ...t,
+                      peseeAvant: peseesDAvant?.avant ?? '',
+                      peseeApres: peseesDAvant?.apres ?? '',
+                    }));
+                    setPeseesDAvant(null);
+                    setMesurer(false);
+                  }}>
                     <Discret style={{ fontSize: T.normal }}>Revenir aux valeurs courantes</Discret>
                   </Bouton>
                 </View>
               )}
 
-              <Discret style={[s.aide, { color: C.attenue }]}>
-                {expliquerRatio(a.ratio)}
+              <Discret testID="rendement" style={[s.aide, { color: C.attenue }]}>
+                {rendementConnu ? rendement.explication : 'Rendement : inconnu'}
               </Discret>
-              {provenanceRatio(a.peseeAvant, a.peseeApres) !== null ? (
+              {rendementConnu && (rendement.provenance !== null ? (
                 <Discret style={[s.aide, { color: C.ok }]}>
-                  ✓ {provenanceRatio(a.peseeAvant, a.peseeApres)}
+                  ✓ {rendement.provenance}
                 </Discret>
               ) : (
                 <Discret style={s.aide}>
                   Valeur courante — mesure-la pour un chiffre propre à ton produit.
                 </Discret>
-              )}
+              ))}
 
               {/* Il y avait ici un sélecteur « cru ou sec / déjà cuit ». Il a
                   disparu, et c'est la meilleure nouvelle de cet écran : il
@@ -710,7 +671,7 @@ export function EditeurAliment({
                 Annuler
               </Bouton>
               <Bouton
-                onPress={() => onEnregistrer(a)}
+                onPress={() => onEnregistrer({ ...fiche, ...textes })}
                 desactive={!valide || enCours === true}
                 style={{ flex: 1 }}
               >

@@ -20,6 +20,8 @@
  */
 
 import { EditeurAliment, type AlimentSaisi } from './editeurAliment';
+import { ErreurApi } from '../api/erreurApi';
+import { idDeLaReference } from '../calcul/frigo';
 import type { AlimentDisponible, AlimentIncomplet, AlimentReference } from '../api/types';
 import type { SaisieAliment, VerdictAliment } from '../api/hooks/verification';
 import type {
@@ -122,12 +124,22 @@ export function EditeurAlimentConnecte({
 }) {
   const surGrocy = source === 'grocy';
 
-  /** La quantité tapée, ou zéro. Voir plus bas pourquoi zéro s'envoie quand même. */
-  const quantiteSaisie = () => {
-    const q = parseFloat(quantite.replace(',', '.'));
+  /* `quantiteSaisie()` VIVAIT ICI, un `parseFloat` qui faisait d'une quantité
+     illisible un zéro. La quantité part TELLE QUE TAPÉE depuis le
+     26 septembre 2026 : le serveur la lit, et la refuse sous son champ (CA-14). */
 
-    return Number.isNaN(q) ? 0 : q;
-  };
+  /* L'ÉCHEC DE L'ENREGISTREMENT, DIT À L'ÉCRAN — 26 septembre 2026.
+     Un 422 porte ses refus champ par champ : ils s'affichent sous les champs,
+     et la phrase d'ensemble d'API Platform ferait doublon. Un serveur
+     injoignable (statut 0) se dit en clair : rien n'est parti (CA-R7). */
+  const echec = surGrocy
+    ? enregistrer.error ?? poserQuantite.error
+    : creer.error ?? majAliment.error ?? definir.error;
+  const refusEcriture = echec instanceof ErreurApi ? echec.refus : [];
+  const messageDEchec = echec === null || echec === undefined ? null
+    : echec instanceof ErreurApi && echec.statut === 0
+      ? 'Rien n\'a été enregistré : le serveur n\'a pas répondu. Réessaie dans un instant.'
+      : refusEcriture.length > 0 ? null : echec.message;
 
   return (
     <EditeurAliment
@@ -146,9 +158,8 @@ export function EditeurAlimentConnecte({
       enCours={surGrocy
         ? enregistrer.isPending || poserQuantite.isPending
         : creer.isPending || majAliment.isPending || definir.isPending}
-      erreur={surGrocy
-        ? enregistrer.error?.message ?? null
-        : (creer.error ?? majAliment.error)?.message ?? null}
+      erreur={messageDEchec}
+      refusEcriture={refusEcriture}
       /* Côté Grocy, le nom ne se saisit qu'à la création : ensuite Grocy en est
          maître, et le changer ici ferait diverger les deux outils. */
       nomModifiable={surGrocy ? (creation && aCompleter === null) : true}
@@ -169,8 +180,10 @@ export function EditeurAlimentConnecte({
           lip100: v.lip100,
           fibres100: v.fibres100,
           ratio: v.ratio,
-          peseeAvant: v.peseeAvant ?? null,
-          peseeApres: v.peseeApres ?? null,
+          /* LES TEXTES TELS QUE TAPÉS, pesées comprises, depuis le
+             26 septembre 2026 : le serveur les lit (`NombreSaisi`). */
+          peseeAvant: v.peseeAvant,
+          peseeApres: v.peseeApres,
           /* LE RATTACHEMENT CIQUAL — 20 septembre 2026. Il dit ce que
              l'aliment EST, jamais ce qu'il vaut : les macros ci-dessus restent
              celles lues sur le paquet. `null` est légitime, une marque n'a pas
@@ -192,7 +205,7 @@ export function EditeurAlimentConnecte({
             onSuccess: (rendu) => {
               if (!creation || aCompleter !== null) { onEditionFaite(); return; }
 
-              const q = quantiteSaisie();
+              const q = quantite;
               onCreationEnvoyee();
 
               /* La quantité passe par l'INVENTAIRE, pas par `/mon-frigo/stock`
@@ -217,7 +230,7 @@ export function EditeurAlimentConnecte({
         if (creation) {
           creer.mutate(corps, {
             onSuccess: (cree) => {
-              const q = quantiteSaisie();
+              const q = quantite;
               onCreationEnvoyee();
 
               // On pose la quantité MÊME à zéro : c'est cet appel qui crée
@@ -234,7 +247,7 @@ export function EditeurAlimentConnecte({
         if (edite === null) return;
 
         majAliment.mutate(
-          { id: Number(edite.reference.split(':')[1]), ...corps },
+          { id: idDeLaReference(edite.reference), ...corps },
           { onSuccess: () => onEditionFaite() },
         );
       }}

@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { adresseDeLApi, type Emplacement } from './adresse';
-import { ErreurApi } from './erreurApi';
+import { ErreurApi, type Grief } from './erreurApi';
 import { renouvelerJeton, type DepotJetons } from './renouvellement';
 import { uneSeuleFois } from './uneSeuleFois';
 
@@ -636,6 +636,8 @@ interface Reponse<T> {
   ok: boolean;
   donnees: T | null;
   message: string;
+  /** les refus champ par champ d'un 422 ; absent ailleurs */
+  refus?: Grief[];
 }
 
 async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>> {
@@ -786,6 +788,8 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
      précis. Et le repli reste derrière tout le monde. */
   const d = donnees as {
     detail?: string; message?: string; 'hydra:description'?: string; erreur?: string;
+    violations?: { propertyPath?: string; message?: string }[];
+    refus?: Grief[];
   } | null;
 
   return {
@@ -794,6 +798,12 @@ async function appeler<T>(chemin: string, options: Options): Promise<Reponse<T>>
     donnees: null,
     message: d?.detail ?? d?.['hydra:description'] ?? d?.message ?? d?.erreur
       ?? repli(reponse.status, sansJeton),
+    /* DEUX FORMES, UNE LISTE. API Platform range ses refus dans `violations`
+       (`propertyPath`), les contrôleurs maison dans `refus` (`champ`) — le
+       même `{champ, message}` que rend `POST /api/verification/aliment`. */
+    refus: Array.isArray(d?.violations)
+      ? d.violations.map((v) => ({ champ: v.propertyPath ?? '', message: v.message ?? '' }))
+      : (Array.isArray(d?.refus) ? d.refus : []),
   };
 }
 
@@ -836,7 +846,7 @@ function repli(statut: number, sansJeton: boolean): string {
 }
 
 function remonter<T>(r: Reponse<T>): T {
-  if (!r.ok) throw new ErreurApi(r.statut, r.message);
+  if (!r.ok) throw new ErreurApi(r.statut, r.message, r.refus ?? []);
 
   return r.donnees as T;
 }

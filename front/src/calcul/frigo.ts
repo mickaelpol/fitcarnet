@@ -202,3 +202,14 @@ export const resultatEncoreFrais = (
 
   return Number.isFinite(fini) && maintenant - fini < FRAICHEUR_RESULTAT;
 };
+
+/**
+ * L'identifiant en base d'un aliment du frigo, depuis sa référence « base:47 ».
+ *
+ * CE N'EST PAS UNE SAISIE : la référence vient du serveur, jamais du clavier.
+ * Sortie de `editeurAlimentConnecte.tsx` le 26 septembre 2026, où elle
+ * s'écrivait `Number(…split(':')[1])` — le motif même que
+ * `lectureAuServeur.test.ts` refuse dans l'éditeur — et recopiée telle quelle
+ * dans `app/(onglets)/frigo.tsx`. Une seule écriture désormais.
+ */
+export const idDeLaReference = (reference: string): number => Number(reference.split(':')[1]);

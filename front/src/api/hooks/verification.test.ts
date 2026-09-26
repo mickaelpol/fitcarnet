@@ -15,7 +15,7 @@ import { ilYAQuelqueChoseAJuger, type SaisieAliment } from './saisieAJuger';
  *
  *   POST /api/verification/aliment
  *   {"categorie":"prot","kcal100":"","prot100":"","gluc100":"","lip100":"",
- *    "fibres100":"","ratio":"1","ratioCandidat":""}
+ *    "fibres100":"","ratio":"1","peseeAvant":"","peseeApres":""}
  *
  * Un appel complet pour dire au serveur que tout est vide, à chaque ouverture
  * du frigo. `enabled: interrogee !== null` ne coupait rien : l'éditeur est
@@ -34,7 +34,8 @@ const vide: SaisieAliment = {
   lip100: '',
   fibres100: '',
   ratio: '1',
-  ratioCandidat: '',
+  peseeAvant: '',
+  peseeApres: '',
 };
 
 describe('quand le serveur a quelque chose à juger', () => {
@@ -83,6 +84,6 @@ describe('quand le serveur a quelque chose à juger', () => {
   it('une pesée en cours compte, elle aussi', () => {
     /* Le rendement CANDIDAT vient de deux pesées réelles, contrairement au
        rendement par défaut : il y a bien quelque chose à juger. */
-    assert.equal(ilYAQuelqueChoseAJuger({ ...vide, ratioCandidat: '2.3' }), true);
+    assert.equal(ilYAQuelqueChoseAJuger({ ...vide, peseeAvant: '100' }), true);
   });
 });

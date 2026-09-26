@@ -33,7 +33,7 @@ const YAOURT: AlimentReference = {
 const BASE = {
   valeur: null,
   nomAliment: 'Skyr nature Milbona',
-  kcalSaisies: null,
+  kcalTapees: '',
   recherche: '',
   resultats: [],
   onRecherche: () => undefined,
@@ -106,7 +106,7 @@ describe('rattacher un aliment au catalogue', () => {
        C'est la règle 7 : afficher l'incertitude plutôt qu'un chiffre non
        vérifié. */
     const { container } = render(
-      <ChampRattachement {...BASE} valeur="19024" kcalSaisies={300} resultats={[YAOURT]} />);
+      <ChampRattachement {...BASE} valeur="19024" kcalTapees="300" resultats={[YAOURT]} />);
 
     fireEvent.click(screen.getByText(/Yaourt ou lait fermenté/));
 
@@ -122,7 +122,7 @@ describe('rattacher un aliment au catalogue', () => {
        ci-dessus tout en criant sur chaque aliment juste — et on apprendrait
        à l'ignorer. 60 kcal pour un yaourt à 50, c'est un skyr : rien à dire. */
     const { container } = render(
-      <ChampRattachement {...BASE} valeur="19024" kcalSaisies={60} resultats={[YAOURT]} />);
+      <ChampRattachement {...BASE} valeur="19024" kcalTapees="60" resultats={[YAOURT]} />);
 
     fireEvent.click(screen.getByText(/Yaourt ou lait fermenté/));
 

@@ -566,6 +566,58 @@ describe('le message montré vient du serveur', () => {
   });
 });
 
+/**
+ * LES REFUS D'UN 422 — de quoi souligner le bon champ dans l'éditeur.
+ *
+ * `ErreurApi` gagne `refus: Grief[]` (`{ champ, message }`), rempli depuis
+ * DEUX FORMES : `violations` d'API Platform (`propertyPath` → `champ`), et
+ * `refus` des contrôleurs maison, déjà sous la forme attendue. Vide par
+ * défaut — sans quoi une erreur sans grief ferait planter un `.map` côté
+ * éditeur au lieu de simplement n'afficher aucun soulignement.
+ */
+describe('le client lit les refus d’un 422', () => {
+  it('les "violations" d’API Platform deviennent des refus {champ, message}', async () => {
+    await sessionOuverte();
+    brancherFetch(() => json({
+      detail: 'Des champs sont invalides.',
+      violations: [{ propertyPath: 'prot100', message: 'M' }],
+    }, 422));
+
+    await assert.rejects(client.api('/aliments'), erreurApi((e) => {
+      assert.deepEqual(e.refus, [{ champ: 'prot100', message: 'M' }],
+        '"violations" (propertyPath/message) doit devenir refus (champ/message), '
+        + `reçu : ${JSON.stringify(e.refus)}`);
+    }));
+  });
+
+  it('le "refus" des contrôleurs maison passe tel quel', async () => {
+    await sessionOuverte();
+    brancherFetch(() => json({
+      erreur: 'La quantité est invalide.',
+      refus: [{ champ: 'quantite', message: 'Q' }],
+    }, 422));
+
+    await assert.rejects(client.api('/mon-frigo/stock'), erreurApi((e) => {
+      assert.deepEqual(e.refus, [{ champ: 'quantite', message: 'Q' }],
+        `le "refus" déjà au bon format doit ressortir tel quel, reçu : ${JSON.stringify(e.refus)}`);
+    }));
+  });
+
+  it('LE TÉMOIN : sans "violations" ni "refus", refus est un tableau vide', async () => {
+    /* Sans ce cas, une ErreurApi dont `.refus` vaudrait toujours `undefined`
+       passerait quand même les deux tests ci-dessus s'ils lisaient `?? []`
+       à la volée : ce témoin prouve que c'est bien le CLIENT qui range un
+       tableau vide, pas l'appelant qui doit s'en souvenir à chaque lecture. */
+    await sessionOuverte();
+    brancherFetch(() => json({ detail: 'x' }, 404));
+
+    await assert.rejects(client.api('/aliments/9'), erreurApi((e) => {
+      assert.deepEqual(e.refus, [],
+        `sans grief dans la réponse, refus doit être [], reçu : ${JSON.stringify(e.refus)}`);
+    }));
+  });
+});
+
 describe('ce que le client annonce au serveur', () => {
   it('un PATCH s\'annonce en merge-patch, un POST en ld+json, un GET n\'annonce rien', async () => {
     await sessionOuverte();
