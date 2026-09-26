@@ -1,7 +1,7 @@
 ---
 titre: Les pesées de l'éditeur d'aliment passent par saisieNombre
 slug: pesees-editeur-aliment-saisienombre
-phase: verify
+phase: docs
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -105,3 +105,4 @@ reconstruit **et** recopié dans `api/front` (voir `CLAUDE.md`, section e2e).
 - 2026-09-26 — tdd : CA-1 à CA-5, CA-R1, CA-R2 verts (11 tests de rendu, dont 3 témoins verts dès avant). CA-6 relève de la phase e2e. Phase review.
 - 2026-09-26 — revue `revue-fitcarnet` : OK, deux commentaires corrigés, une dette notée. Phase e2e.
 - 2026-09-26 — e2e : `e2e/epreuves/peseesEditeur.spec.ts`, CA-6 vert, suite 19/19, aucun compte `@e2e.local` restant. Phase verify.
+- 2026-09-26 — verify : 8/8 PASS, validé par le propriétaire après visionnage. Rapport `docs/verifications/pesees-editeur-aliment-saisienombre/2026-09-26/rapport.md`. Phase docs.
