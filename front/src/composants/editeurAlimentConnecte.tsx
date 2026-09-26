@@ -131,10 +131,17 @@ export function EditeurAlimentConnecte({
   /* L'ÉCHEC DE L'ENREGISTREMENT, DIT À L'ÉCRAN — 26 septembre 2026.
      Un 422 porte ses refus champ par champ : ils s'affichent sous les champs,
      et la phrase d'ensemble d'API Platform ferait doublon. Un serveur
-     injoignable (statut 0) se dit en clair : rien n'est parti (CA-R7). */
+     injoignable (statut 0) se dit en clair : rien n'est parti (CA-R7).
+
+     L'ÉCHEC LU EST CELUI DU GESTE EN COURS, PAS LE PREMIER QUI TRAÎNE — même
+     jour. Lire `creer.error ?? majAliment.error ?? definir.error` faisait
+     afficher, dans la correction d'un aliment, l'échec d'une création
+     précédente : « Corriger » ne remet à zéro que `majAliment`. Et `definir`
+     part APRÈS la fermeture de l'éditeur : son échec (l'aliment est créé, la
+     quantité non) ne peut s'afficher qu'à l'en-tête du frigo, qui le dit. */
   const echec = surGrocy
     ? enregistrer.error ?? poserQuantite.error
-    : creer.error ?? majAliment.error ?? definir.error;
+    : creation ? creer.error : majAliment.error;
   const refusEcriture = echec instanceof ErreurApi ? echec.refus : [];
   const messageDEchec = echec === null || echec === undefined ? null
     : echec instanceof ErreurApi && echec.statut === 0

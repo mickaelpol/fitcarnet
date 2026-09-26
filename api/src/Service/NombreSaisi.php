@@ -5,7 +5,17 @@ declare(strict_types=1);
 namespace App\Service;
 
 /**
- * LE SEUL LECTEUR D'UN NOMBRE SAISI, COTE SERVEUR — 26 septembre 2026.
+ * LE LECTEUR D'UN NOMBRE SAISI, COTE SERVEUR — 26 septembre 2026.
+ *
+ * PAS « LE SEUL », et cet en-tete l'a pretendu le jour de sa creation.
+ * Il est le seul sur l'aliment (`VerdictAliment`, donc `POST`/`PATCH
+ * /api/aliments`) et sur la quantite de `POST /api/mon-frigo/stock`. Lisent
+ * encore par `(float)`, releves par `revue-fitcarnet` le meme jour et hors de
+ * la feature : l'inventaire (`FrigoController`, `quantite` d'une ligne de lot)
+ * et la cible (`VerificationController`, `POST /api/verification/cible`) —
+ * « 12,5 » y vaut 12, sans un mot. `MigrationGrocyController` lit par
+ * `is_numeric`, mais Grocy est abandonne (CLAUDE.md) : il partira, on ne le
+ * convertit pas.
  *
  * Il vivait en methode privee de `VerdictAliment`, si bien que l'ecriture
  * (`POST /api/aliments`, `POST /api/mon-frigo/stock`, les routes Grocy) lisait

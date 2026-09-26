@@ -10,6 +10,14 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-26 — `macros-editeur-vide-pas-zero` : revue faite et corrigée (session Claude)
+
+- `revue-fitcarnet` : À CORRIGER, rien de bloquant. Points 2 à 6 corrigés en TDD
+  (CA-13 hors Atwater, erreur périmée de l'éditeur, épreuve CA-R5, OpenAPI,
+  commentaires, PHPStan). Constats Grocy écartés : **Grocy est abandonné**,
+  désormais écrit dans `CLAUDE.md` et `decisions.md`. Suites : API 634 tests /
+  1 427 assertions, front 747 + 73 de rendu, e2e CA-R5 verte. Phase : e2e.
+
 ## 2026-09-26 — `macros-editeur-vide-pas-zero` : tdd terminée (session Claude)
 
 - 23/23 critères implémentés, suites vertes : API 631 tests / 1 415 assertions,

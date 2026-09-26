@@ -62,8 +62,11 @@ describe('CA-16 : l’éditeur ne relit plus un nombre saisi ni un rendement cru
     }
 
     /* Témoin négatif : `Number.isNaN(` ne doit pas déclencher le motif
-       « Number( » — sans quoi le garde interdirait un appel parfaitement
-       légitime, présent ailleurs dans `editeurAlimentConnecte.tsx`. */
+       « Number( » — sans quoi le garde interdirait un appel qui ne lit
+       aucune saisie. Ce commentaire le disait « présent ailleurs dans
+       `editeurAlimentConnecte.tsx` » : il est parti avec `quantiteSaisie`
+       le 26 septembre 2026, et le témoin reste parce que le motif, lui, est
+       toujours assez large pour s'y tromper. */
     assert.doesNotMatch('Number.isNaN(q)', /\bNumber\s*\(/,
       'le motif « Number( » se déclenche à tort sur Number.isNaN(...)');
   });

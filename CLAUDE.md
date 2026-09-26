@@ -198,6 +198,8 @@ contente d'afficher ce qu'ils répondent :
 | Les quatorze anomalies nutritionnelles | `api/src/Service/AnomaliesAliment.php` |
 | Cohérence des kilocalories déclarées | `api/src/Service/CoherenceNutritionnelle.php` |
 | Somme d'Atwater, côté serveur | `api/src/Service/Atwater.php` — **seule écriture PHP**, elle l'était cinq fois |
+| Lecture d'un nombre saisi, côté serveur (virgule, vide ≠ zéro, `null` ≡ `""`) | `api/src/Service/NombreSaisi.php` — depuis le 26 septembre 2026. Seul lecteur de l'aliment et de la quantité à la création ; **pas encore** de l'inventaire ni de la cible, son en-tête nomme ces deux restes |
+| Rendement tiré des pesées, et la phrase qui l'explique | `api/src/Service/RendementExplique.php` — depuis le 26 septembre 2026 ; `ratioDepuisPesees`, `provenanceRatio` et `expliquerRatio` ont quitté le front. L'écriture d'un aliment passe par `VerdictAliment`, via `AlimentDenormalizer` : **un seul juge, avant et pendant l'écriture** |
 | Force d'un mot de passe | `api/src/Service/MotDePasse.php` — servi par `POST /api/verification/mot-de-passe`, **route publique** (l'écran d'invitation n'a pas encore de compte) |
 | « Un chrono ne compte que pour une série » | `api/src/Service/ModesDeTravail.php` — **seule écriture du dépôt**. `Seance::getAvancement()` la lui demande, l'écran la reçoit par `GET /api/modes-de-travail` |
 | Cohérence d'une cible — seuil de 15 kcal, deux conventions de glucides | `api/src/Service/CoherenceDesCibles.php` — servi par `POST /api/verification/cible`. Le solveur garde `SEUIL_COHERENCE` pour SON diagnostic : jumeau **déclaré**, gardé par `coherenceCibleUnique.test.ts`, part au palier 3 |
@@ -375,6 +377,19 @@ substituer une valeur par défaut silencieuse à une donnée manquante.
 C'est une application de nutrition : ce qui est affiché sera pesé et mangé. En cas de doute sur un
 calcul, afficher l'incertitude ou refuser, jamais une valeur plausible non vérifiée. Toute
 déviation par rapport à la cible doit être expliquée à l'écran.
+
+## Grocy est ABANDONNÉ — ne plus jamais le traiter
+
+**Décision du propriétaire, répétée plusieurs fois et écrite enfin ici le
+26 septembre 2026** : ses données ont été migrées de Grocy vers la base de
+l'application, et Grocy ne lui sert plus à rien. Le code Grocy traîne encore
+(`source_frigo = grocy`, `/mon-frigo/aliment`, `/mon-frigo/quantite`,
+`MigrationGrocyController`, skill `fonctionnalite-frigo-grocy`, les mentions
+de Grocy dans la règle 3) : **c'est du code mort en attente de retrait**, pas un
+chemin à protéger. Un défaut, un critère, un test ou un constat de revue qui ne
+touche que lui est **écarté, pas corrigé** — et un agent de revue qui en
+remonte un se trompe de sujet. Le retrait lui-même est un chantier à part
+(`docs/etat/prochaines-etapes.md`), à ne lancer que sur demande.
 
 ## Architecture, en bref
 

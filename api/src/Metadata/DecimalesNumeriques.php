@@ -38,7 +38,10 @@ use Symfony\Component\TypeInfo\TypeIdentifier;
  * que le mutateur accepte deja. Les deux formes passent donc :
  *
  *   {"kcal100": 350}    un JSON naturel, curl, un script d'import
- *   {"kcal100": "350"}  ce que le front envoie (`versDecimales`)
+ *   {"kcal100": "350"}  une chaine — ce qu'envoyait `versDecimales`, retire
+ *                       du front depuis ; l'editeur d'aliment envoie desormais
+ *                       le texte tape (« 12,5 »), lu par `AlimentDenormalizer`
+ *                       AVANT cette fabrique (26 septembre 2026)
  *
  * ELLE S'APPLIQUE A TOUTES LES ENTITES, ET C'EST LE POINT. Le constat est ne
  * sur `Aliment`, mais `Cible`, `Serie`, `Stock`, `Complement` et `ModeleSerie`

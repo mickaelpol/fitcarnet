@@ -1,7 +1,7 @@
 ---
 titre: Les macros de l'éditeur ne lisent plus vide comme zéro
 slug: macros-editeur-vide-pas-zero
-phase: review
+phase: e2e
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -297,3 +297,12 @@ CA-15 (un 422 affiché sous les champs). CA-R4 et CA-R5 se prouvent par requête
   Hors CA, nécessaires : les routes Grocy et `/mon-frigo/quantite` lisent par
   `NombreSaisi` ; `idDeLaReference` (`calcul/frigo.ts`) remplace deux
   `Number(ref.split(':')[1])`.
+- 2026-09-26 — revue (`revue-fitcarnet`) : À CORRIGER, rien de bloquant. Corrigé le
+  même jour : CA-13 valait aussi pour un aliment hérité hors d'Atwater
+  (`VerdictAliment::macrosDeLOrigine`) ; l'éditeur n'affiche plus l'échec d'un
+  autre geste (`editeurAlimentConnecte.tsx`, `echec` selon le mode) ; CA-R5 est
+  désormais porté par `e2e/epreuves/alimentDAutrui.spec.ts` (404 avant jugement,
+  avec témoin 422) ; contrat OpenAPI du verdict à jour ; en-tête de
+  `NombreSaisi` corrigé (« le seul lecteur » était faux) ; PHPStan revenu à ses
+  5 erreurs d'avant. Écartés : les deux constats du seul chemin Grocy —
+  **Grocy est abandonné** (`decisions.md`, 26/09/2026).

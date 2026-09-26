@@ -340,7 +340,11 @@ final readonly class VerificationDansOpenApi implements OpenApiFactoryInterface
                 'kcal100' => $texte, 'prot100' => $texte, 'gluc100' => $texte,
                 'lip100' => $texte, 'fibres100' => $texte,
                 'ratio' => ['type' => 'string', 'description' => 'Rendement cru/cuit. 1 = pas de cuisson.'],
-                'ratioCandidat' => ['type' => 'string', 'description' => 'Le rendement issu de deux pesées en cours.'],
+                'peseeAvant' => ['type' => 'string', 'description' => 'Pesée avant cuisson, telle que tapée. '
+                    . 'Avec `peseeApres`, c\'est le SERVEUR qui en tire le rendement, et le `ratio` envoyé est ignoré.'],
+                'peseeApres' => ['type' => 'string', 'description' => 'Pesée après cuisson, telle que tapée.'],
+                'quantite' => ['type' => 'string', 'description' => 'Facultative : la quantité posée à la création. '
+                    . 'Vide = rien à juger ; illisible ou négative = refus sur `quantite`.'],
                 'origine' => [
                     'type' => 'object',
                     'description' => 'Ce que la fiche portait DÉJÀ, sur une correction. '
@@ -385,12 +389,18 @@ final readonly class VerificationDansOpenApi implements OpenApiFactoryInterface
                         'motif' => ['type' => 'string', 'enum' => ['plafond', 'rapport']],
                     ],
                 ],
-                'candidat' => [
-                    'type' => 'object', 'nullable' => true,
-                    'description' => 'Le rendement qu\'on vient de mesurer, jugé à part.',
+                'rendement' => [
+                    'type' => 'object',
+                    'description' => 'Le rendement cru/cuit RETENU par le serveur — tiré des pesées quand il y en a '
+                        . 'deux, sinon le `ratio` saisi — et ce qu\'il faut en dire. L\'écran l\'affiche, il ne le '
+                        . 'calcule pas ; `valeur` nulle = « inconnu ».',
                     'properties' => [
-                        'acceptable' => ['type' => 'boolean'],
-                        'motif' => ['type' => 'string', 'nullable' => true],
+                        'valeur' => ['type' => 'number', 'nullable' => true],
+                        'explication' => ['type' => 'string', 'nullable' => true],
+                        'provenance' => [
+                            'type' => 'string', 'nullable' => true,
+                            'description' => '« mesuré : 42,5 g avant cuisson → 96 g après », ou null sans pesées.',
+                        ],
                     ],
                 ],
                 'enregistrable' => [

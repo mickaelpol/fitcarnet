@@ -91,6 +91,29 @@ final class VerificationDansOpenApiTest extends TestCase
             'la route est bornee a 120 appels par minute : le dire fait partie du contrat');
     }
 
+    public function testLE_VERDICT_D_ALIMENT_DECRIT_LE_CONTRAT_DU_26_SEPTEMBRE(): void
+    {
+        /* RELEVE PAR `revue-fitcarnet` le 26 septembre 2026 : la feature
+           `macros-editeur-vide-pas-zero` a retire `ratioCandidat` et `candidat`,
+           ajoute les pesees, la quantite et `rendement` — et le contrat
+           decrivait encore l'ancien. Un front ecrit d'apres `/api/docs` aurait
+           envoye un candidat ignore et attendu une reponse qui n'existe plus. */
+        $post = $this->decore()->getPaths()->getPath('/api/verification/aliment')?->getPost();
+        self::assertNotNull($post);
+
+        $entree = $post->getRequestBody()?->getContent()['application/json']['schema']['properties'] ?? [];
+        $reponse = $post->getResponses()['200'] ?? null;
+        self::assertInstanceOf(\ApiPlatform\OpenApi\Model\Response::class, $reponse);
+        $sortie = $reponse->getContent()['application/json']['schema']['properties'] ?? [];
+
+        foreach (['peseeAvant', 'peseeApres', 'quantite'] as $champ) {
+            self::assertArrayHasKey($champ, $entree, $champ . ' manque a la saisie documentee');
+        }
+        self::assertArrayNotHasKey('ratioCandidat', $entree, 'ratioCandidat est retire depuis le 26/09/2026');
+        self::assertArrayHasKey('rendement', $sortie, 'le rendement calcule par le serveur manque au verdict');
+        self::assertArrayNotHasKey('candidat', $sortie, 'candidat est retire depuis le 26/09/2026');
+    }
+
     // ----------------------------------------------------------------- outils
 
     /** Le contrat tel que le decorateur le rend, a partir d'un contrat deja rempli. */

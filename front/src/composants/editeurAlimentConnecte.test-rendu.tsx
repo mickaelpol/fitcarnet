@@ -279,3 +279,48 @@ test('un serveur injoignable à l\'enregistrement le dit clairement, bouton acti
     'le bouton doit rester actif après un serveur injoignable : rien n\'a été '
     + 'enregistré, l\'utilisateur doit pouvoir réessayer');
 });
+
+/* ===========================================================================
+ * UNE ERREUR PÉRIMÉE NE REVIENT PAS DANS UN AUTRE ÉDITEUR — 26 septembre 2026.
+ *
+ * Relevé par `revue-fitcarnet`. `echec` lisait `creer.error ?? majAliment.error
+ * ?? definir.error` quel que soit le mode, et « Corriger » ne remet à zéro que
+ * `majAliment`. Une création dont la QUANTITÉ n'était pas partie (réseau) —
+ * l'aliment, lui, bien créé — faisait afficher « Rien n'a été enregistré » en
+ * ouvrant la correction d'un AUTRE aliment : faux, et règle 7. De même, les
+ * refus d'une création abandonnée s'affichaient sous les champs d'un autre.
+ * ========================================================================= */
+test('la correction d\'un aliment n\'affiche pas l\'échec d\'une création précédente', (t: TestContext) => {
+  t.after(cleanup);
+  const edite = {
+    reference: 'base:7', nom: 'Poulet', categorie: 'prot', kcal100: 120, prot100: 23,
+    gluc100: 0, lip100: 2, fibres100: null, ratio: 0.75, stock: 0,
+    grammesDisponibles: 0, unite: 'g',
+  } as never;
+  render(
+    <EditeurAlimentConnecte
+      source="base"
+      creation={false}
+      edite={edite}
+      aCompleter={null}
+      quantite=""
+      onQuantiteChange={() => undefined}
+      onFermer={() => undefined}
+      onCreationEnvoyee={() => undefined}
+      onEditionFaite={() => undefined}
+      creer={mutationAvec([], {
+        error: new ErreurApi(422, 'refusé', [{ champ: 'prot100', message: 'refus d\'une autre saisie' }]),
+      })}
+      majAliment={mutationAvec([])}
+      definir={mutationAvec([], { error: new ErreurApi(0, 'Le serveur ne répond pas.') })}
+      enregistrer={mutationAvec([])}
+      poserQuantite={mutationAvec([])}
+    />,
+  );
+
+  const texte = document.body.textContent ?? '';
+  assert.doesNotMatch(texte, /Rien n'a été enregistré/,
+    'l\'échec de la quantité d\'une AUTRE création ne concerne pas cette correction');
+  assert.doesNotMatch(texte, /refus d'une autre saisie/,
+    'les refus d\'une création abandonnée ne s\'affichent pas sous les champs d\'un autre aliment');
+});

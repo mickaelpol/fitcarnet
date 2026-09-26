@@ -570,13 +570,16 @@ final class VerdictAlimentTest extends TestCase
         $v = self::rendu(['kcal100' => '350', 'prot100' => '7', 'gluc100' => '78',
             'lip100' => '0,6', 'categorie' => 'fec', 'ratio' => '2,26']);
 
-        self::assertFalse(\array_key_exists('candidat', $v));
+        /* SUR LE JSON, ET NON PAR `array_key_exists` : PHPStan lit la forme
+           declaree du retour et juge la cle absente d'avance — l'assertion ne
+           pouvait pas tomber a ses yeux. Ce que l'ecran recoit, c'est le JSON. */
+        self::assertStringNotContainsString('"candidat"', (string) \json_encode($v));
     }
 
     // ----------------------------------------------------------------- outils
 
     /**
-     * @param array<string, string> $saisie
+     * @param array<string, mixed> $saisie le contrat de `VerdictAliment::pour` : texte, nombre JSON ou `null`
      *
      * @return array{refus: list<array{champ: string, message: string}>,
      *               avertissements: list<array{champ: string, message: string}>,

@@ -171,6 +171,55 @@ final class AlimentDenormalizerTest extends TestCase
     }
 
     /**
+     * CA-13, SECONDE MOITIE — relevee par `revue-fitcarnet` le 26 septembre
+     * 2026. La fixture ci-dessus n'est incoherente qu'au sens
+     * d'`AnomaliesAliment` (le riz cuit) ; celle-ci l'est au sens de
+     * `ControleDesMacros` — 100 kcal pour 50 g de proteines, Atwater a 200,
+     * +100 %. Ce verdict `incoherent` bloquait `enregistrable` SANS exempter
+     * l'origine : renommer l'aliment rendait 422 sur `kcal100`, un champ que
+     * personne n'avait touche. Avant la feature, ce PATCH ne passait que par
+     * l'entite, qui ne juge pas l'ecart d'Atwater.
+     */
+    public function testUnAlimentHeriteIncoherentAuSensDAtwaterSeRenommeAussi(): void
+    {
+        $recu = [];
+        $denormaliseur = self::denormaliseur($recu);
+
+        $exception = null;
+        try {
+            $denormaliseur->denormalize(['nom' => 'Blanc renommé'], Aliment::class, 'json',
+                ['object_to_populate' => self::alimentHeriteHorsAtwater()]);
+        } catch (ValidationException $e) {
+            $exception = $e;
+        }
+
+        self::assertNull($exception,
+            "renommer un aliment herite hors d'Atwater ne doit pas rejuger ses valeurs");
+        self::assertSame('Blanc renommé', $recu['donnees']['nom'] ?? null);
+    }
+
+    /**
+     * L'EXEMPTION N'EST PAS UN PERMIS : toucher a une valeur de ce meme
+     * aliment, en restant hors d'Atwater, est refuse comme sur une creation.
+     */
+    public function testUnAlimentHeriteHorsAtwaterNeSeModifiePasEnRestantIncoherent(): void
+    {
+        $recu = [];
+        $denormaliseur = self::denormaliseur($recu);
+
+        $exception = null;
+        try {
+            $denormaliseur->denormalize(['kcal100' => '101'], Aliment::class, 'json',
+                ['object_to_populate' => self::alimentHeriteHorsAtwater()]);
+        } catch (ValidationException $e) {
+            $exception = $e;
+        }
+
+        self::assertInstanceOf(ValidationException::class, $exception);
+        self::assertSame([], $recu, "l'interne ne doit pas etre appele");
+    }
+
+    /**
      * CA-R1 : une macro obligatoire vide refuse sans appeler l'interne.
      *
      * PARTICULARITE : `VerdictAliment::pour()` ne compte PAS l'absence comme
@@ -309,6 +358,23 @@ final class AlimentDenormalizerTest extends TestCase
             ->setGluc100(28)
             ->setLip100(0.3)
             ->setRatio(2.26);
+        $aliment->memoriserLesValeursChargees();
+
+        return $aliment;
+    }
+
+    /** 100 kcal pour 50 g de proteines : Atwater a 202, `ControleDesMacros` dit `incoherent`. */
+    private static function alimentHeriteHorsAtwater(): Aliment
+    {
+        $aliment = (new Aliment())
+            ->setNom('Blanc')
+            ->setCategorie('prot')
+            ->setKcal100(100)
+            ->setProt100(50)
+            ->setGluc100(0)
+            ->setLip100(0)
+            ->setFibres100(1)
+            ->setRatio(1);
         $aliment->memoriserLesValeursChargees();
 
         return $aliment;

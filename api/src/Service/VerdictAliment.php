@@ -274,9 +274,42 @@ final class VerdictAliment
                pour 50 g de proteines s'enregistrait sous un bandeau rouge qui
                disait « une valeur semble erronee ». Mesure par
                `revue-fitcarnet` le 20 septembre 2026. */
+            /* ET L'EXEMPTION D'ORIGINE VAUT ICI AUSSI — 26 septembre 2026.
+               Elle ne couvrait que `motifLisible` : un aliment herite hors
+               d'Atwater (100 kcal pour 50 g de proteines) ne se RENOMMAIT plus,
+               des que l'ecriture est passee par ce verdict. Meme regle que
+               l'entite : on ne reproche pas ce qu'on trouve, on reproche ce
+               qu'on introduit — donc seulement si les valeurs ont bouge.
+               Releve par `revue-fitcarnet`. */
             'enregistrable' => [] === $refus && $complet
-                && 'incoherent' !== $controle['verdict'],
+                && ('incoherent' !== $controle['verdict'] || self::macrosDeLOrigine($saisie, $lus)),
         ];
+    }
+
+    /**
+     * Les cinq valeurs nutritionnelles sont-elles CELLES DE L'ORIGINE ?
+     *
+     * Faux sans origine (une creation n'a rien d'herite), et faux des qu'une
+     * seule a change : l'exemption couvre ce qu'on a trouve, jamais ce qu'on
+     * ecrit de neuf.
+     *
+     * @param array<string, mixed>       $saisie
+     * @param array<string, float|null>  $lus
+     */
+    private static function macrosDeLOrigine(array $saisie, array $lus): bool
+    {
+        $origine = $saisie['origine'] ?? null;
+        if (!\is_array($origine)) {
+            return false;
+        }
+
+        foreach (['kcal100', 'prot100', 'gluc100', 'lip100', 'fibres100'] as $champ) {
+            if (NombreSaisi::lire($origine[$champ] ?? null) !== ($lus[$champ] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
