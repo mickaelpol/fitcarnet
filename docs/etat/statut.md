@@ -10,6 +10,14 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-09-26 — `macros-editeur-vide-pas-zero` : spec écrite (session Claude)
+
+- Brainstorm clos, spec `docs/features/macros-editeur-vide-pas-zero.md` : 16 CA + 7 refus,
+  aucune question ouverte. Portée élargie par le propriétaire : TOUT l'éditeur (pesées,
+  rendement, quantité) — l'écran ne convertit plus rien, `POST`/`PATCH /api/aliments`
+  passent par `VerdictAliment`. Grocy hors sujet (retrait noté dans `prochaines-etapes.md`).
+- Spec validée par le propriétaire. Phase : tdd.
+
 ## 2026-09-26 — `pesees-editeur-aliment-saisienombre` : TERMINÉE (session Claude)
 
 - docs-sync : huit écarts corrigés — CLAUDE.md, README.md, e2e/LISEZMOI.md,
