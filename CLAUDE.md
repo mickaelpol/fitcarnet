@@ -33,11 +33,11 @@ lui-même se reconstruit : `/graphify .`.
 ## Commandes
 
 ```bash
-cd front && npm test          # eslint + tsc --noEmit + 741 tests, puis 57 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
+cd front && npm test          # eslint + tsc --noEmit + 747 tests, puis 75 de rendu — À LANCER APRÈS TOUTE MODIF FRONT
 cd front && npm run verif     # typage + lint, sans les tests : plus rapide
 cd front && npm run lint      # la règle des hooks seule (instantané)
 cd front && npm run build:web # régénère front/dist/ (versionné, voir plus bas)
-# 564 tests API (1 306 assertions), sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
+# 634 tests API (1 427 assertions), sans base ni noyau, aucun effet de bord. DANS LE CONTENEUR :
 # le PHP de l'hote n'a ni dom, ni mbstring, ni xmlwriter, et PHPUnit refuse de
 # demarrer sans elles. `cd api && bin/phpunit` est ecrit partout ailleurs et
 # echoue ici — releve par `verite-documentaire` le 15 septembre 2026.
@@ -60,7 +60,7 @@ rm -rf "$DEPOT/api/front" && cp -r "$DEPOT/front/dist" "$DEPOT/api/front"
 # 25 septembre 2026, et elle serait passée au VERT pour la mauvaise raison si personne
 # n'avait comparé les empreintes des deux bundles.
 cd e2e && npm install                  # une seule fois
-cd e2e && npm test                     # ~2 min pour dix-neuf épreuves (elles tombent si la machine peine : rejouer le fichier seul)
+cd e2e && npm test                     # ~2 min pour TRENTE épreuves (elles tombent si la machine peine : rejouer le fichier seul)
 ```
 
 ### Les épreuves de bout en bout — `e2e/`
@@ -224,12 +224,21 @@ n'y ont été ajoutés que le 25 septembre 2026, par `verite-documentaire`.
 | **Cohérence d'une cible** | **21 sept. 2026** | `api/src/Service/CoherenceDesCibles.php`, servi par `POST /api/verification/cible` |
 | **Habitudes de cuisson** — « la dernière décision gagne » et « l'inchangé ne s'écrit pas » | **25 sept. 2026** | **DEUX endroits, et les confondre invite à en recréer un** : `LotDHabitudes::depuis` dédoublonne, borne et valide — il ne trie AUCUN écart ; c'est la clause SQL de `CuissonsHabituelles::remplacer` qui n'écrit que ce qui a changé. Servis par `PUT /api/mes-cuissons` |
 
-**IL EN RESTE UN, ET IL EST DÉCLARÉ.** `front/src/solveur/solveur.ts` garde
-`SEUIL_COHERENCE`, `ecartDeCoherence` et `bornesDeCoherence` : le solveur pose le
-même constat dans ses propres diagnostics, et il part au palier 3 avec le reste
-du solveur. `coherenceCibleUnique.test.ts` vérifie que les deux seuils ne
-divergent pas d'ici là. C'est la seule réponse honnête à « combien en
-reste-t-il » : **un, déclaré, gardé**.
+**IL EN RESTE DEUX, ET ILS SONT TOUS DEUX DÉCLARÉS ET GARDÉS.** Cette page a
+annoncé « un » jusqu'au 2 octobre 2026 — sixième erreur de comptage sur ce même
+paragraphe, et cette fois c'est la feature `macros-editeur-vide-pas-zero` qui en
+avait créé un second le 26 septembre sans que personne le reporte ici.
+
+| Jumeau déclaré | Les deux écritures | Ce qui les tient | Quand il part |
+|---|---|---|---|
+| `SEUIL_COHERENCE`, `ecartDeCoherence`, `bornesDeCoherence` | `front/src/solveur/solveur.ts` et `api/src/Service/CoherenceDesCibles.php` | `coherenceCibleUnique.test.ts` | au palier 3, avec le solveur |
+| `POIDS_INCHANGE` (0,01) — « le poids ne bouge pas assez pour qu'on en parle » | `front/src/calcul/nutrition.ts:88` (il sert encore à `resumeRatio`, la phrase courte du frigo) et `api/src/Service/RendementExplique.php:24` | `ratioDit.test.ts`, qui ouvre le PHP et compare les deux valeurs | le jour où la case du frigo recevra sa phrase du serveur |
+
+Le solveur pose le même constat de cohérence dans ses propres diagnostics ; le
+front garde le seuil du poids inchangé parce que `resumeRatio` écrit encore la
+phrase courte du frigo. **Les deux sont déclarés, gardés par un test qui lit
+l'autre langage, et datés d'une sortie.** C'est la seule réponse honnête à
+« combien en reste-t-il » : **deux**.
 
 `api/regles/coherence.json`, `rendement.json`, `motdepasse.json` et
 `avancement.json` sont supprimés, ainsi que leurs huit suites jumelles.
@@ -280,7 +289,7 @@ croyait vérifier. **Si tu lis cette page pour savoir combien il y en a, va
 d'abord regarder `api/regles/` et la liste des routes de vérification.**
 
 **CE QUI EMPÊCHE MAINTENANT QU'ILS REVIENNENT**, faute de fichier de règles à
-tenir d'accord — **cinq** gardes. La portée de chacun est écrite ci-dessous
+tenir d'accord — **sept** gardes. La portée de chacun est écrite ci-dessous
 parce qu'elle décide de ce qu'il peut voir : un garde qui ne lit que `front/` ne
 verra jamais une divergence entre deux langages, et c'est précisément le défaut
 qu'on cherche. **La colonne distingue le BALAYAGE — ce qu'il parcourt en masse —
@@ -294,6 +303,8 @@ seconde liste qui dit s'il voit l'autre langage.
 | `front/src/calcul/formuleUnique.test.ts` | toute multiplication par un coefficient `KCAL_…` hors de `nutrition.ts` | `front/src` + `front/app` |
 | `front/src/calcul/coherenceCibleUnique.test.ts` | qu'un écran rejuge la cohérence d'une cible ; la divergence des deux seuils | balaie `front/app`, **et ouvre `solveur.ts`, `CoherenceDesCibles.php`, `FormatCourt.php`, `theme/index.ts`** |
 | `front/src/calcul/habitudesAuServeur.test.ts` | toute comparaison choisi/connu, le nom `habitudesAEcrire`, tout envoi au serveur qui ne vient pas de `lignesDHabitudes` | balaie `front/src` + `front/app`, **et ouvre `LotDHabitudes.php`** |
+| `front/src/calcul/lectureAuServeur.test.ts` *(26 sept. 2026)* | `nombreSaisi`, `parseFloat`, `Number(` et `ratioDepuisPesees` dans les deux éditeurs d'aliment ; le retour de `ratioDepuisPesees`, `provenanceRatio` ou `expliquerRatio` dans `nutrition.ts` | ouvre **quatre fichiers nommés** : `editeurAliment.tsx`, `editeurAlimentConnecte.tsx`, `nutrition.ts`, `nutrition.test.ts`. Ne balaie rien, **et ne voit aucun autre langage** |
+| `front/src/calcul/ratioDit.test.ts` *(26 sept. 2026)* | la divergence de `POIDS_INCHANGE` entre le front et le serveur | ouvre `api/src/Service/RendementExplique.php` et le compare à `nutrition.ts` |
 
 **CETTE PAGE A ANNONCÉ « TROIS » JUSQU'AU 25 SEPTEMBRE 2026**, et elle disait
 deux autres choses fausses dans le même paragraphe : que « les deux derniers ne
@@ -301,9 +312,18 @@ voient ni le serveur ni la base » — alors qu'`avancementUnique` compare les t
 listes de modes à travers SQL, PHP et TSX, et que son propre commentaire le
 revendique : « LE SEUL CONTRÔLE QUI VOIT CETTE DIVERGENCE » — et, plus bas,
 qu'`epleyUnique` serait « le seul dispositif qui voit une divergence entre deux
-langages », alors qu'ils sont **quatre**. Le tableau portait en prime deux lignes
+langages », alors qu'ils sont plusieurs. Le tableau portait en prime deux lignes
 d'en-tête empilées, dont la seconde s'affichait comme une ligne de données.
 Relevé par `verite-documentaire`.
+
+**ET LE 2 OCTOBRE 2026, ELLE ANNONÇAIT ENCORE « CINQ ».** `lectureAuServeur` et
+`ratioDit` étaient posés depuis le 26 septembre, aucun des deux n'était dans le
+tableau, et `ratioDit` gardait en prime un second jumeau déclaré que le
+paragraphe ci-dessus ignorait. Les deux ont été écrits par une session qui
+corrigeait consciencieusement cette page par ailleurs. **Le défaut n'est pas
+l'inattention : c'est que poser un garde et le déclarer sont deux gestes, et
+que le second s'oublie.** Trouvé par `doc-auditor` pendant la passe de
+documentation de `macros-editeur-vide-pas-zero`.
 
 **CE QUI RESTE VRAI DE L'AVERTISSEMENT** : `db/manuel/cibles.sql` écrit
 `4 * prot + 4 * gluc + 9 * lip` — l'Atwater **américain**, sans fibres,
@@ -329,9 +349,13 @@ Les deux copies sont supprimées (migration 39 pour la vue). **La formule n'a pl
 qu'un domicile**, et `front/src/calcul/epleyUnique.test.ts` refuse toute
 réécriture du coefficient **dans tout le dépôt** — `.ts`, `.tsx`, `.php`, `.sql`,
 `.py` — pas seulement dans le front. C'est le seul qui balaie le dépôt ENTIER ;
-ils sont **quatre** à voir une divergence entre deux langages, chacun sur son
-sujet — voir le tableau des cinq gardes. Cette phrase disait « le seul
-dispositif » : faux depuis le 21 septembre 2026, corrigé le 25.
+ils sont **cinq** à voir une divergence entre deux langages — `epleyUnique`,
+`avancementUnique`, `coherenceCibleUnique`, `habitudesAuServeur` et `ratioDit`,
+chacun sur son sujet. **Les énumérer, pas les compter** : la phrase disait « le
+seul dispositif » (faux depuis le 21 septembre 2026, corrigé le 25), puis
+« quatre » (faux depuis le 26 septembre, corrigé le 2 octobre). Les sept gardes
+et leur portée sont dans le tableau plus haut ; les deux qui ne lisent que du
+TypeScript sont `formuleUnique` et `lectureAuServeur`.
 
 **Ne pas réintroduire `rmEstime` dans l'API sans décision explicite.** Si un
 autre lecteur doit un jour obtenir ce chiffre du serveur, il faudra le lui faire

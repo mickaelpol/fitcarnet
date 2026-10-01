@@ -165,7 +165,7 @@ qu'elles sont là. Les plus lourdes :
 | `composants/carteRepas.tsx` | **six** formules, dont la somme des fibres du repas (`:219-224`), qu'aucun module ne porte, et trois `/ portions` qui produisent le chiffre lu devant la balance |
 | `composants/disqueRM.tsx:21-29` | `SEUIL = 0.03` et `tendanceDe` — hausse/stable/baisse du 1RM, **sans aucun test** |
 | `app/admin-fusion.tsx:12-31` | **un Levenshtein complet** + seuils 0,9 / 0,45, qui décide quels exercices sont proposés à une fusion définitive |
-| `composants/editeurAliment.tsx:470-471` | `parseFloat` pour **enregistrer** les deux pesées, alors que le même fichier écrit plus haut « `nombreSaisi` ET NON `parseFloat` » (`:226`). **Risque dormant, pas défaut actif** — vérifié sur douze saisies le 19 septembre 2026 : chaque cas où les deux divergent (`4,2,1`, `1 000`, `100abc`, `-5`) est un cas où `ratioMesure` vaut `null` et où le bouton n'est pas rendu. Le garde les fait coïncider **par accident** ; déplacer ce garde réveille le défaut |
+| ~~`composants/editeurAliment.tsx` : `parseFloat` pour enregistrer les deux pesées~~ | **RÉGLÉ le 26 septembre 2026** par `macros-editeur-vide-pas-zero`, et pas en remplaçant `parseFloat` par `nombreSaisi` : l'éditeur **ne lit plus aucun nombre**. Il envoie les champs tels qu'ils sont tapés, le serveur les lit (`api/src/Service/NombreSaisi.php`) et calcule le rendement (`RendementExplique.php`). Le « risque dormant » n'a plus d'endroit où dormir, et `lectureAuServeur.test.ts` refuse `parseFloat`, `Number(` et `nombreSaisi` dans les deux éditeurs |
 | `composants/planRelu.tsx:163` | ~~recopie exacte~~ de `etapeBatch.tsx:161` — **quasi-copie : `etapeBatch` porte un troisième terme (« à ajouter après ») que `planRelu` n'a pas, et c'est délibéré. Fusionner sur la foi du mot « exacte » aurait fait compter les crus deux fois** |
 
 `formuleUnique.test.ts` ne les voit pas : son motif ne cible que `KCAL_… *`,
@@ -207,12 +207,15 @@ acceptait 90 kcal pour un riz qui en fait 350. **Fait** : `CoherenceNutritionnel
 témoins — dont le plancher sur l'Atwater, sans lequel la règle refusait du vin
 et du cidre publiés par l'Anses.
 
-**Ce qui reste du palier 1** : `editeurAliment.tsx` enregistre encore les deux
-pesées par `parseFloat`, sous un commentaire qui l'interdit 263 lignes plus haut.
-Le garde les fait coïncider **par accident** — et `verite-documentaire` a trouvé
-trois notations qui divergent en passant le garde : `0x10`, `0b101`, `0o17`, où
-`Number` rend 16, 5 et 15 quand `parseFloat` rend 0. Inatteignable au clavier
-numérique d'Android, atteignable au collage sur le web.
+~~**Ce qui reste du palier 1**~~ — **RIEN, depuis le 26 septembre 2026.** Ce
+paragraphe disait que `editeurAliment.tsx` enregistrait encore les deux pesées
+par `parseFloat`, sous un commentaire qui l'interdit, et que trois notations
+divergentes passaient le garde (`0x10`, `0b101`, `0o17`, où `Number` rend 16, 5
+et 15 quand `parseFloat` rend 0 — atteignables au collage sur le web).
+`macros-editeur-vide-pas-zero` a refermé le sujet d'un cran plus haut que prévu :
+l'éditeur ne lit plus rien du tout, donc il n'y a plus deux lectures à faire
+coïncider. Gardé ici au passé parce que le raisonnement reste juste — c'est
+l'état qui a changé.
 
 ### Palier 2 — le serveur rend les chiffres dérivés
 

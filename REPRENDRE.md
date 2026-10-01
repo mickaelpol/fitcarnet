@@ -31,16 +31,33 @@ deux côtés.
 
 ---
 
-# ⏩ REPRENDRE ICI — sur l'autre poste, le 22 septembre 2026
+# ⏩ REPRENDRE ICI — le 2 octobre 2026
 
 **Le travail vit sur la branche `serveur-autoritaire`, poussée sur Gitea. Elle
 n'est PAS fusionnée dans `master`** — et il ne faut pas la fusionner sans
 décision : le NAS tire `master` toutes les cinq minutes.
 
-> **Session interrompue le 21 septembre 2026 au soir**, en pleine traversée du
-> palier B. Trois morceaux sur cinq sont faits, éprouvés et commités ; l'arbre
-> est propre. Les deux qui restent sont décrits au § 3, et le plus délicat —
-> Epley — a son piège écrit en gras.
+> **MIS À JOUR LE 2 OCTOBRE 2026.** Ce bloc disait « 22 septembre, trois
+> morceaux sur cinq, l'arbre est propre » : périmé de dix jours et de trois
+> features. Depuis, `habitudes-cuisson-au-serveur` (25 sept.),
+> `pesees-editeur-aliment-saisienombre` et `macros-editeur-vide-pas-zero`
+> (26 sept.) sont **terminées**, cycle complet. Du palier B il ne reste que
+> **`fournees.ts` et `performance.ts`** — le § 3 les décrit, et le piège d'Epley
+> y est écrit en gras.
+>
+> **L'ÉDITEUR D'ALIMENT NE LIT, NE CONVERTIT NI NE JUGE PLUS RIEN**, et c'est le
+> vrai acquis du 26 septembre : il envoie les champs **tels qu'ils sont tapés**,
+> `api/src/Service/NombreSaisi.php` les lit, `VerdictAliment` les juge — y
+> compris **à l'écriture**, par `AlimentDenormalizer`, si bien qu'il n'y a plus
+> qu'un seul juge avant et pendant l'enregistrement — et
+> `RendementExplique.php` calcule le rendement cru/cuit et rédige sa phrase.
+> `ratioDepuisPesees`, `provenanceRatio` et `expliquerRatio` ont quitté le front.
+>
+> **ATTENTION EN REPARTANT — rien n'est poussé ni fusionné.** La branche
+> `serveur-autoritaire` a **54 commits d'avance sur `master`** et **15 d'avance
+> sur `origin`** : le dernier `git push` date du 25 septembre à 20 h 33.
+> Pousser n'est pas déployer — c'est `master` que le NAS tire — mais tant que
+> rien n'est poussé, **tout ce travail n'existe que sur ce poste**.
 
 ## 1. Se remettre à niveau (cinq minutes)
 
@@ -58,11 +75,11 @@ s'arrêter là et lire le message avant de coder** :
 
 ```bash
 docker compose -f compose.dev.yml up -d
-docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'      # 555, 0 échec
-cd front && npm test                                              # 735 + 46, 0 échec
+docker exec fitcarnet-app-dev sh -c 'cd /app && bin/phpunit'      # 634, 0 échec
+cd front && npm test                                              # 747 + 75, 0 échec
 docker exec fitcarnet-app-dev sh -c 'cd /app && vendor/bin/phpstan analyse --no-progress'
                                                                   # 5 erreurs, ANTÉRIEURES
-cd ../e2e && npm test                                             # 12, 0 échec
+cd ../e2e && npm test                                             # 30, 0 échec
 ```
 
 **Les E2E tombent quand la machine peine.** Mesuré le 21 septembre : une épreuve
@@ -81,8 +98,12 @@ mensongères.
 palier B est à moitié traversé.** *(Cette phrase disait « quatre » : elle
 oubliait la cohérence d'une cible, partie le 21 septembre, et les habitudes de
 cuisson, parties le 25. Corrigé le 25 septembre 2026 par `verite-documentaire`.
-Il en reste **un, déclaré** : `SEUIL_COHERENCE` dans le solveur, qui part au
-palier 3.)* Le serveur décide de la cohérence d'un
+Il en reste **deux, tous deux déclarés et gardés** : `SEUIL_COHERENCE` dans le
+solveur, qui part au palier 3, et `POIDS_INCHANGE`, né le 26 septembre avec le
+rendement au serveur — `nutrition.ts` le garde pour la phrase courte du frigo,
+`RendementExplique.php` l'a pour la sienne, et `ratioDit.test.ts` lit le PHP
+pour vérifier qu'ils ne divergent pas. Cette page a annoncé « un » jusqu'au
+2 octobre 2026.)* Le serveur décide de la cohérence d'un
 aliment, du rendement cru/cuit, de la force d'un mot de passe, de la règle du
 chrono — et depuis le 21 septembre, de la cohérence d'une cible, de la
 conversion d'un plan américain, de ce qui reste vraiment dans le frigo et du
@@ -204,7 +225,15 @@ et met à plat ce qui part au serveur (`lignesDHabitudes`).
 
 ## 5. Ce qui n'est pas commité et qu'il faut savoir
 
-Rien. L'arbre est propre, et les cinq commits du palier B sont poussés.
+**L'arbre est propre — mais rien n'est poussé depuis le 25 septembre 2026,
+20 h 33.** Quinze commits attendent sur ce poste : les trois features de fin
+septembre et leur documentation. Le seul fichier non suivi est
+`presentation/fitcarnet-pro-2026-09-21.pptx`, et c'est **voulu** (décision du
+25 septembre : ni versionné, ni ignoré, ni retiré).
+
+*Cette section disait « Rien. L'arbre est propre, et les cinq commits du
+palier B sont poussés » — vrai le 22 septembre, faux depuis. Un lecteur qui la
+croyait repartait en pensant que son travail était à l'abri sur Gitea.*
 
 **Le dossier `prompt/` est sorti du dépôt** le 21 septembre (« il n'a rien à
 faire dans le projet ») : les fichiers restent sur le disque du poste

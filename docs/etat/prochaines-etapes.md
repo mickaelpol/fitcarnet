@@ -16,7 +16,9 @@
   plus gros est de l'état d'écran et ne part pas tel quel.
 
 - [x] ~~**`pesees-editeur-aliment-saisienombre`**~~ — **TERMINÉE le 26/09/2026**, cycle complet tdd → review → e2e → verify → docs. Non poussée.
-- [ ] **Suivante, choisie par le propriétaire le 26/09/2026 : les macros de l'éditeur lues 0** — la dette « Éditeur d'aliment : les macros lisent vide/illisible comme 0 » ci-dessous. Contraire à la règle 6 ; touche `ALIMENT_VIDE`, le type `Aliment` et le contrat serveur : à cadrer d'abord (`/harness nouvelle`).
+- [x] ~~**`macros-editeur-vide-pas-zero`**~~ — **TERMINÉE le 02/10/2026**, cycle complet brainstorm → spec → tdd → review → e2e → verify → docs. Non poussée.
+- [ ] **Suivante : le palier B, deux morceaux** — `fournees.ts` (265 l.) ou `performance.ts` (375 l., **le piège d'Epley**). `REPRENDRE.md` § 3 décrit les deux et dit par où commencer pour chacun.
+- [ ] **Décider du push.** 15 commits ne sont pas sur Gitea depuis le 25/09 20 h 33, et 54 séparent `serveur-autoritaire` de `master`. Pousser la branche n'est PAS déployer (le NAS tire `master`), mais tant que rien n'est poussé ce travail n'existe que sur un poste.
 
 ## Ensuite
 - [ ] **Retirer le code Grocy** — **Grocy est ABANDONNÉ** (le propriétaire a migré ses données vers la base de l'app ; décision du 26/09/2026, écrite dans `CLAUDE.md` et `decisions.md` : aucun constat Grocy ne se corrige plus). Quitté en production le 20/09/2026, mais ≈ 50 fichiers de `front/src`, `front/app`, `api/src` le nomment encore, et la base de dév est toujours en `source_frigo = grocy` (`REPRENDRE.md:500`). Relevé le 26/09/2026 pendant le brainstorm `macros-editeur-vide-pas-zero`. À cadrer : le filet « aller-retour » est-il encore voulu ?

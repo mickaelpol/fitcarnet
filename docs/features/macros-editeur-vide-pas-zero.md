@@ -1,7 +1,7 @@
 ---
 titre: Les macros de l'éditeur ne lisent plus vide comme zéro
 slug: macros-editeur-vide-pas-zero
-phase: docs
+phase: done
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -281,7 +281,15 @@ ignorée (CA-R4).
 
 ## Vérification
 
-La vidéo doit montrer : CA-1 (vide → message sous Protéines, rien en base),
+**FAITE LE 26 SEPTEMBRE 2026 — 13/13 PASS.** Rapport, captures et consoles :
+[`docs/verifications/macros-editeur-vide-pas-zero/2026-09-26/rapport.md`](../verifications/macros-editeur-vide-pas-zero/2026-09-26/rapport.md).
+Les vidéos sont à côté, hors dépôt (`.gitignore`, décision du 25 septembre 2026).
+
+**13, et non 23 : ce sont les critères jouables sur l'application.** Les dix
+autres sont portés par des tests et par eux seuls — ne pas lire « 13/13 » comme
+« tout a été vu à l'écran ».
+
+Ce que la vidéo devait montrer : CA-1 (vide → message sous Protéines, rien en base),
 CA-2 et CA-3 (« a » refusé, « 42,5 » accepté), CA-7 (100 → 230 : rendement et
 phrase venus du serveur), CA-R6 (serveur coupé : « inconnu », aucun chiffre),
 CA-15 (un 422 affiché sous les champs). CA-R4 et CA-R5 se prouvent par requête.
@@ -323,3 +331,17 @@ CA-15 (un 422 affiché sous les champs). CA-R4 et CA-R5 se prouvent par requête
   écart positif (kcal100=10, macros 20/20/20), seul jeu qui exerce le refus.
 - 2026-10-02 — phase docs : la vérification du 26/09 était faite et verte mais ni
   commitée ni déclarée ; reprise telle quelle, sans rejeu.
+- 2026-10-02 — docs-sync (`doc-auditor`) : **deux écarts trompeurs trouvés, tous
+  deux créés par cette feature et jamais déclarés.** (1) Elle a posé un SIXIÈME
+  et un SEPTIÈME garde — `lectureAuServeur.test.ts` (CA-16) et le bloc
+  `POIDS_INCHANGE` de `ratioDit.test.ts` — alors que `CLAUDE.md` annonçait
+  « cinq ». (2) Elle a créé un SECOND jumeau déclaré, `POIDS_INCHANGE`, alors
+  que la même page affirmait « il en reste UN, déclaré ». Corrigés dans
+  `CLAUDE.md`, avec la leçon : **poser un garde et le déclarer sont deux gestes,
+  et le second s'oublie.** Corrigés aussi : les décomptes de tests dans sept
+  fichiers (747 + 75 front, 634 / 1 427 API, 30 épreuves e2e), les trois
+  passages périmés de la skill `fonctionnalite-frigo`, `presentation/features.md`,
+  le « ce qui reste du palier 1 » de `docs/plan-serveur-autoritaire.md` (il
+  décrivait au présent un `parseFloat` supprimé), et le « REPRENDRE ICI » de
+  `REPRENDRE.md`, périmé de dix jours. Les 23 critères sont tous portés par un
+  test — l'audit les a énumérés un par un. Phase : done.

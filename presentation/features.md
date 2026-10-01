@@ -108,14 +108,14 @@ démontrer devant un client.
 - **Création en deux temps** — l'aliment, puis sa quantité (même à zéro : c'est cet appel qui le rattache à un emplacement). Si le second échoue, on le dit sans perdre le premier. `frigo.tsx:247`
 - **Le stock ne s'écrit que par `/api/mon-frigo`** — `/api/stocks` n'expose plus que ses lectures depuis le 17 septembre 2026 : ses écritures contournaient les contrôles de `FrigoBase` (propriété, emplacement, source du frigo). Un emplacement inconnu est refusé en 422. `Stock.php:29`, `FrigoController.php:158`
 - **Un aliment appartient à son compte** — le propriétaire vient du jeton, jamais du corps, et chacun ne voit que les siens. Sur des valeurs nutritionnelles, l'erreur de l'un ne doit pas fausser la diète des autres. `AlimentProcessor.php:38`
-- **Catégorie en puces colorées** parmi huit, avec un exemple sous la rangée. `editeurAliment.tsx:291`
-- **Fibres facultatives** — vide veut dire « non renseigné », pas zéro. `editeurAliment.tsx:207`
-- **Les quatre macros sont obligatoires, et un zéro se dit** — champs vides à la création, texte indicatif « à saisir » (c'était « 0 » jusqu'au 17 septembre 2026), bouton éteint avec « Renseigne les quatre valeurs — écris 0 si l'aliment n'en contient pas. » ; l'API refuse aussi une macro absente, en 422. `editeurAliment.tsx:85`, `Aliment.php:107`
-- **Détection des kilojoules** — bandeau et bouton « Convertir : 1473 kJ = 352 kcal », déclenché par le facteur 4,184 ou par le plafond de 900 kcal/100 g. `editeurAliment.tsx:361`
-- **Vérificateur de cohérence en direct** — vert, jaune, rouge, gris ; l'enregistrement est **bloqué** sur « incohérent ». `editeurAliment.tsx:236`
-- **Rendement de cuisson** — choix parmi des guides, ou **« Je préfère mesurer »** : poids avant, poids après, et « Utiliser ce résultat (2,3) » ou « Ces deux poids sont inversés : ce produit ne peut pas varier ainsi » quand la mesure contredit la catégorie. `editeurAliment.tsx:428`
+- **Catégorie en puces colorées** parmi huit, avec un exemple sous la rangée.
+- **Fibres facultatives** — vide veut dire « non renseigné », pas zéro : l'éditeur envoie le champ tel que tapé et c'est le serveur qui le lit (depuis le 26 septembre 2026).
+- **Les quatre macros sont obligatoires, et un zéro se dit** — champs vides à la création, texte indicatif « à saisir » (c'était « 0 » jusqu'au 17 septembre 2026), bouton éteint tant qu'une des quatre est **vide** (un texte illisible passe le bouton : c'est le serveur qui le refuse). Depuis le 26 septembre 2026, le refus « Valeur manquante : écris 0 si l'aliment n'en contient pas. » n'est plus rédigé par l'écran : il vient du serveur (`Aliment::MACRO_ABSENTE`) et s'affiche en rouge sous le champ concerné. `Aliment.php`
+- **Détection des kilojoules** — bandeau et bouton « Convertir : 1473 kJ = 352 kcal », déclenché par le facteur 4,184 ou par le plafond de 900 kcal/100 g — jugés et convertis par le serveur.
+- **Vérificateur de cohérence en direct** — vert, jaune, rouge, gris ; l'enregistrement est **bloqué** sur « incohérent » : c'est le serveur qui rend le verdict, avant comme pendant l'écriture (`VerdictAliment`).
+- **Rendement de cuisson** — choix parmi des guides, ou **« Je préfère mesurer »** : poids avant, poids après, et « Utiliser ce résultat (2,3) » ou « Ces deux poids sont inversés : ce produit ne peut pas varier ainsi » quand la mesure contredit la catégorie. Le rendement et sa phrase sont calculés par le serveur à partir des deux pesées brutes (`RendementExplique.php`, depuis le 26 septembre 2026) ; sans réponse du serveur, l'écran dit « Rendement : inconnu ».
 - **Provenance du ratio affichée** — « ✓ mesuré par toi » ou « Valeur courante — mesure-la pour un chiffre propre à ton produit ». `AlimentDisponible.php:103`
-- **Le texte saisi vit à part du nombre** — on peut taper « 0,8 » sans que le séparateur disparaisse. `editeurAliment.tsx:145`
+- **Le texte saisi vit à part du nombre** — on peut taper « 0,8 » sans que le séparateur disparaisse ; seuls les chiffres, la virgule et le point sont acceptés à la frappe.
 - **Corriger un aliment, mais seulement le sien** — son propriétaire, et lui seul. `Aliment.php:53`
 - **Supprimer un aliment, mais seulement le sien.** `Aliment.php:60`
 - **Refus de supprimer un aliment encore en stock** — comptage en SQL direct, hors du filtre de propriété — depuis la migration 35, seul le stock du propriétaire peut viser l'aliment —, 409 nommant le nombre de lignes. Les lignes à zéro sont supprimées silencieusement. `AlimentSuppressionProcessor.php:43`
@@ -440,7 +440,7 @@ Ces garanties sont **éprouvées par test de propriétés** — 250 frigos aléa
 - **Valeurs déjà cuites détectées** — bande physique du grain sec, 300 à 400 kcal/100 g, avec la correction chiffrée complète. `AnomaliesAliment.php`
 - **Féculent qui rétrécit** — « un féculent absorbe de l'eau, il ne peut pas peser moins cuit que sec. Ce n'est pas une cuisson inhabituelle, c'est impossible. » `AnomaliesAliment.php`
 - **Plus de 100 g de nutriments dans 100 g de produit.** `AnomaliesAliment.php`
-- **Soupçon de kilojoules** — deux détections, le plafond de 900 kcal et le rapport 4,184 aux macros. `nutrition.ts:158`
+- **Soupçon de kilojoules** — deux détections, le plafond de 900 kcal et le rapport 4,184 aux macros (côté serveur depuis le 20 septembre 2026).
 - **Apport négligeable** — « X ne pèse quasiment rien ici (1,0 g, soit 0,3 g de protéines). Retire-le, ou réduis ce que tu as déjà mis. » `solveur.ts:464`
 - **Rendement à contresens** — une viande qui gagnerait du poids, un féculent qui en perdrait. `RendementPlausible.php:255`
 - **Une pesée non retenue est dite explicitement** — la taire laisserait croire qu'elle a été prise en compte. `AlimentDisponible.php:118`

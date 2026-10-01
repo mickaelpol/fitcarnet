@@ -10,6 +10,18 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-10-02 — `macros-editeur-vide-pas-zero` : TERMINÉE (session Claude)
+
+- docs-sync : deux écarts TROMPEURS, tous deux créés par la feature elle-même et
+  jamais déclarés — un sixième et un septième garde absents du tableau de
+  `CLAUDE.md`, et un SECOND jumeau déclaré (`POIDS_INCHANGE`) sous une page qui
+  affirmait « il en reste un ». Corrigés. Plus les décomptes de tests dans sept
+  fichiers, la skill `fonctionnalite-frigo`, `presentation/features.md`, le plan
+  de la refonte et le « REPRENDRE ICI » de `REPRENDRE.md`.
+- **Rien n'est poussé depuis le 25/09 20 h 33** : 15 commits sur ce poste,
+  54 d'avance sur `master`. À décider.
+- Suivante : `fournees.ts` ou `performance.ts` (palier B), au choix.
+
 ## 2026-10-02 — `macros-editeur-vide-pas-zero` : vérification reprise, phase docs (session Claude)
 
 - La vérification avait été jouée le 26/09 — **13/13 PASS, aucun écart applicatif** —
