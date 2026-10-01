@@ -18,8 +18,9 @@
   affirmait « il en reste un ». Corrigés. Plus les décomptes de tests dans sept
   fichiers, la skill `fonctionnalite-frigo`, `presentation/features.md`, le plan
   de la refonte et le « REPRENDRE ICI » de `REPRENDRE.md`.
-- **Rien n'est poussé depuis le 25/09 20 h 33** : 15 commits sur ce poste,
-  54 d'avance sur `master`. À décider.
+- **Poussée sur Gitea le 02/10/2026** (`94e7002`), sur demande du propriétaire :
+  les 15 commits en attente sont partis. `master` garde ses 54 commits d'écart —
+  la fusion est une mise en production, elle n'est pas demandée.
 - Suivante : `fournees.ts` ou `performance.ts` (palier B), au choix.
 
 ## 2026-10-02 — `macros-editeur-vide-pas-zero` : vérification reprise, phase docs (session Claude)

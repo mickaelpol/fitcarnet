@@ -53,11 +53,11 @@ décision : le NAS tire `master` toutes les cinq minutes.
 > `RendementExplique.php` calcule le rendement cru/cuit et rédige sa phrase.
 > `ratioDepuisPesees`, `provenanceRatio` et `expliquerRatio` ont quitté le front.
 >
-> **ATTENTION EN REPARTANT — rien n'est poussé ni fusionné.** La branche
-> `serveur-autoritaire` a **54 commits d'avance sur `master`** et **15 d'avance
-> sur `origin`** : le dernier `git push` date du 25 septembre à 20 h 33.
-> Pousser n'est pas déployer — c'est `master` que le NAS tire — mais tant que
-> rien n'est poussé, **tout ce travail n'existe que sur ce poste**.
+> **POUSSÉE SUR GITEA LE 2 OCTOBRE 2026** (`94e7002`), à jour : le travail
+> n'est plus sur un seul poste. **Toujours PAS fusionnée dans `master`**, dont
+> elle a **54 commits d'avance** — et la fusion, elle, EST une mise en
+> production : le NAS tire `master` toutes les cinq minutes. Elle attend une
+> décision explicite, pas un réflexe de fin de chantier.
 
 ## 1. Se remettre à niveau (cinq minutes)
 
@@ -225,9 +225,8 @@ et met à plat ce qui part au serveur (`lignesDHabitudes`).
 
 ## 5. Ce qui n'est pas commité et qu'il faut savoir
 
-**L'arbre est propre — mais rien n'est poussé depuis le 25 septembre 2026,
-20 h 33.** Quinze commits attendent sur ce poste : les trois features de fin
-septembre et leur documentation. Le seul fichier non suivi est
+**L'arbre est propre, et tout est poussé** — `origin/serveur-autoritaire` est à
+`94e7002` depuis le 2 octobre 2026. Le seul fichier non suivi est
 `presentation/fitcarnet-pro-2026-09-21.pptx`, et c'est **voulu** (décision du
 25 septembre : ni versionné, ni ignoré, ni retiré).
 
