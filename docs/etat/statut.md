@@ -10,6 +10,15 @@
 > Quand ce fichier dépasse ~300 lignes, archive les entrées de plus d'un mois dans
 > docs/etat/archive/statut-<année>.md (le skill /harness te le signale).
 
+## 2026-10-02 — `macros-editeur-vide-pas-zero` : vérification reprise, phase docs (session Claude)
+
+- La vérification avait été jouée le 26/09 — **13/13 PASS, aucun écart applicatif** —
+  mais elle n'était ni commitée ni déclarée : le dossier `docs/verifications/` était
+  resté non suivi et la phase bloquée à `verify`. Reprise telle quelle, sans rejeu.
+- Relevé par `qa` et gardé dans la spec : l'exemple de données de CA-R4 ne produit
+  pas d'incohérence (`ControleDesMacros` est asymétrique sur l'écart négatif sans
+  fibres). Phase : docs.
+
 ## 2026-09-26 — `macros-editeur-vide-pas-zero` : e2e verte (session Claude)
 
 - `e2e/epreuves/macrosEditeur.spec.ts` : 10 épreuves, dont une de non-régression

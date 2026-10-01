@@ -1,7 +1,7 @@
 ---
 titre: Les macros de l'éditeur ne lisent plus vide comme zéro
 slug: macros-editeur-vide-pas-zero
-phase: verify
+phase: docs
 cree_le: 2026-09-26
 brainstorm: aucun fichier archivé — débat du 26/09/2026, décisions reportées dans docs/etat/decisions.md
 ---
@@ -313,3 +313,13 @@ CA-15 (un 422 affiché sous les champs). CA-R4 et CA-R5 se prouvent par requête
   **Grocy est abandonné** (`decisions.md`, 26/09/2026).
 - 2026-09-26 — e2e : `e2e/epreuves/macrosEditeur.spec.ts`, 10 épreuves (CA-1 à 4, 7, 12, 15, R6, R7, non-régression création + renommage) ; suite complète 30/30 verte, aucune épreuve préexistante rouge.
 - 2026-09-26 — CA-5 amendé (contrôle léger du vide, décision du propriétaire) ; tests de rendu réécrits en conséquence, suites front 747 + 75 et e2e 30/30 vertes.
+- 2026-09-26 — verify (`qa`, sur l'application réelle) : **13/13 PASS**, aucun écart
+  applicatif. Rapport, captures et consoles :
+  `docs/verifications/macros-editeur-vide-pas-zero/2026-09-26/rapport.md`. Un point
+  relevé par la vérification et laissé tel quel : l'exemple de données de CA-R4
+  (« kcal100=500, macros 10/10/10 ») ne produit PAS un aliment incohérent —
+  `ControleDesMacros` est volontairement asymétrique, un écart NÉGATIF sans fibres
+  renseignées rend « ecart » et non « incoherent ». Le critère a été joué avec un
+  écart positif (kcal100=10, macros 20/20/20), seul jeu qui exerce le refus.
+- 2026-10-02 — phase docs : la vérification du 26/09 était faite et verte mais ni
+  commitée ni déclarée ; reprise telle quelle, sans rejeu.

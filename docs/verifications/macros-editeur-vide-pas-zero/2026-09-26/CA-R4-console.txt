@@ -1,0 +1,29 @@
+
+
+ ! [NOTE] Self-salting hasher used: the hasher generated its own built-in salt. 
+
+ [OK] Password hashing succeeded                                                
+
+INSERT 0 1
+== Aliment REELLEMENT incoherent insere directement en base : kcal 10, macros 20/20/20 (340 kcal calcules contre 10 annonces, +3300%) ==
+INSERT 0 1
+id aliment: 308
+== A. PATCH qui change une valeur en restant incoherent (prot 20->25) ==
+statut A: 422
+{"@context":"\/api\/contexts\/ConstraintViolation","@id":"\/api\/validation_errors\/000000000000043a0000000000000000","@type":"ConstraintViolation","status":422,"violations":[{"propertyPath":"kcal100","message":"Le calcul donne 360 calories contre 10 annoncées, soit +3500 %. Vérifie tes saisies : une valeur semble erronée.","code":null}],"detail":"kcal100: Le calcul donne 360 calories contre 10 annoncées, soit +3500 %. Vérifie tes saisies : une valeur semble erronée.","description":"kcal100: Le calcul donne 360 calories contre 10 annoncées, soit +3500 %. Vérifie tes saisies : une valeur semble erronée.","type":"\/validation_errors\/000000000000043a0000000000000000","title":"An error occurred"}
+== B. PATCH avec une cle 'origine' forgee dans le corps, pretendant que l'origine egale les nouvelles valeurs (tentative de contournement) ==
+statut B: 400
+{"@context":"\/api\/contexts\/Error","@id":"\/api\/errors\/400","@type":"Error","title":"An error occurred","detail":"Champ(s) inconnu(s) : origine. Ils ne correspondent a rien dans cette ressource et ne seraient pas enregistres.","status":400,"type":"\/errors\/400","description":"Champ(s) inconnu(s) : origine. Ils ne correspondent a rien dans cette ressource et ne seraient pas enregistres.","trace":[{"file":"\/app\/vendor\/symfony\/event-dispatcher\/Debug\/WrappedListener.php","line":115,"function":"__invoke","class":"App\\EventListener\\RefuserLesChampsInconnus","type":"-\u003E"},{"file":"\/app\/vendor\/symfony\/event-dispatcher\/EventDispatcher.php","line":206,"function":"__invoke","class":"Symfony\\Component\\EventDispatcher\\Debug\\WrappedListener","type":"-\u003E"},{"file":"\/app\/vendor\/symfony\/event-dispatcher\/EventDispatcher.php","line":56,"function":"callListeners","class":"Symfony\\Component\\EventDispatcher\\EventDispatcher","type":"-\u003E"},{"file":"\/app\/vendor\/symfony\/event-dispatcher\/Debug\/TraceableEventDispatcher.php","line":129,"function":"dispatch","class":"Symfony\\Component\\EventDispatcher\\EventDispatcher","type":"-\u003E"},{"file":"\/app\/vendor\/symfony\/http-kernel\/HttpKernel.php","line":159,"function":"dispatch","class":"Symfony\\Component\\EventDispatcher\\Debug\\TraceableEventDispatcher","type":"-\u003E"},{"file":"\/app\/vendor\/symfony\/http-kernel\/HttpKernel.php","line":76,"function":"handleRaw","class":"Symfony\\Component\\HttpKernel\\HttpKernel","type":"-\u003E"},{"file":"\/app\/vendor\/symfony\/http-kernel\/Kernel.php","line":193,"function":"handle","class":"Symfony\\Component\\HttpKernel\\HttpKernel","type":"-\u003E"},{"file":"\/app\/vendor\/symfony\/runtime\/Runner\/Symfony\/HttpKernelRunner.php","line":34,"function":"handle","class":"Symfony\\Component\\HttpKernel\\Kernel","type":"-\u003E"},{"file":"\/app\/vendor\/autoload_runtime.php","line":32,"function":"run","class":"Symfony\\Component\\Runtime\\Runner\\Symfony\\HttpKernelRunner","type":"-\u003E"},{"file":"\/app\/public\/index.php","line":5,"function":"require_once"}]}
+== C. PATCH qui ne change QUE le nom (CA-13) : l'aliment herite se renomme sans etre rejuge sur ses valeurs ==
+statut C: 200
+{"@context":"\/api\/contexts\/Aliment","@id":"\/api\/aliments\/308","@type":"Aliment","id":308,"nom":"Incoherent CA-R4 renomme","categorie":"prot","kcal100":10,"prot100":20,"gluc100":20,"lip100":20,"ratio":1,"source":"manuel"}
+== Etat final en base ==
+Incoherent CA-R4 renomme|10.00|20.00|20.00|20.00
+DELETE 0
+DELETE 1
+DELETE 1
+reste apres menage: 0
+== RESUME ==
+A (PATCH, reste incoherent)      -> 422 (attendu 422)
+B (PATCH, origine forgee)        -> 400 (attendu refus, 400 ou 422)
+C (PATCH, renommage seul, CA-13) -> 200 (attendu 2xx)

@@ -1,0 +1,18 @@
+
+Running 1 test using 1 worker
+
+
+
+ ! [NOTE] Self-salting hasher used: the hasher generated its own built-in salt. 
+
+ [OK] Password hashing succeeded                                                
+
+
+
+ ! [NOTE] Self-salting hasher used: the hasher generated its own built-in salt. 
+
+ [OK] Password hashing succeeded                                                
+
+  ✓  1 [chromium] › epreuves/alimentDAutrui.spec.ts:76:7 › CA-R5 : un PATCH sur l'aliment d'un autre compte › rend 404, jamais le 422 du jugement, et ne touche à rien (3.9s)
+
+  1 passed (4.3s)
